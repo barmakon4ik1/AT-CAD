@@ -15,7 +15,7 @@ from typing import Optional, Dict, Tuple, List
 from config.at_config import FONT_NAME, FONT_SIZE, FONT_TYPE, BACKGROUND_COLOR
 # from at_utils import init_autocad, at_point_input
 from locales.at_localization import loc
-from at_style import (
+from windows.at_style import (
     style_label,
     style_textctrl,
     style_combobox,
