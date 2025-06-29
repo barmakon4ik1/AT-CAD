@@ -9,15 +9,15 @@ import os
 import logging
 import traceback
 from typing import Optional, Dict, Callable
-from at_cone_input_window import ConeInputWindow
-from at_shell_input_window import ShellInputWindow
-from at_ringe_window import RingInputWindow
-from at_head_input_window import HeadInputWindow
-from at_window_utils import create_window, show_popup, get_button_font
-from at_localization import loc
-import at_config
-from at_run_cone import run_application
-from at_window_utils import apply_styles_to_panel
+# from at_cone_input_window import ConeInputWindow
+# from at_shell_input_window import ShellInputWindow
+# from at_ringe_window import RingInputWindow
+# from at_head_input_window import HeadInputWindow
+# from at_window_utils import create_window, show_popup, get_button_font
+from locales.at_localization import loc
+import config.at_config as at_config
+# from at_run_cone import run_application
+from windows.at_window_utils import apply_styles_to_panel
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, filename="at_cad.log",
@@ -236,10 +236,10 @@ class MainWindow(wx.Frame):
         sizer_links = wx.BoxSizer(wx.VERTICAL)
 
         programs = [
-            (loc.get("at_run_cone"), lambda: run_application()),
-            (loc.get("program_shell"), lambda: create_window(ShellInputWindow, parent=self)),
-            (loc.get("at_ringe"), lambda: create_window(RingInputWindow, parent=self)),
-            (loc.get("at_run_heads"), lambda: create_window(HeadInputWindow, parent=self)),
+            # (loc.get("at_run_cone"), lambda: run_application()),
+            # (loc.get("program_shell"), lambda: create_window(ShellInputWindow, parent=self)),
+            # (loc.get("at_ringe"), lambda: create_window(RingInputWindow, parent=self)),
+            # (loc.get("at_run_heads"), lambda: create_window(HeadInputWindow, parent=self)),
         ]
 
         self.link_labels = []
