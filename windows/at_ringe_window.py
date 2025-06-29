@@ -8,8 +8,8 @@
 import wx
 import wx.grid
 from typing import Optional, Dict
-from at_config import BACKGROUND_COLOR, LANGUAGE
-from at_localization import loc, Localization
+from config.at_config import BACKGROUND_COLOR, LANGUAGE
+from locales.at_localization import loc, Localization
 from at_window_utils import BaseInputWindow, CanvasPanel, show_popup, get_standard_font, create_standard_buttons, create_window
 
 loc.language = LANGUAGE

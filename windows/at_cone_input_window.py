@@ -12,13 +12,13 @@ from typing import Optional, Dict, Tuple
 
 import wx
 
-from at_config import (
+from config.at_config import (
     FONT_NAME, FONT_SIZE, FONT_TYPE, BACKGROUND_COLOR, FOREGROUND_COLOR,
     CONE_IMAGE_PATH, LAST_CONE_INPUT_FILE, INPUT_FIELD_SIZE
 )
-from at_construction import at_diameter, at_cone_height, at_steigung
-from at_localization import loc
-from at_window_utils import (
+from programms.at_construction import at_diameter, at_cone_height, at_steigung
+from locales.at_localization import loc
+from windows.at_window_utils import (
     BaseInputWindow, CanvasPanel, save_last_input, show_popup,
     get_standard_font, create_standard_buttons, apply_styles_to_panel
 )

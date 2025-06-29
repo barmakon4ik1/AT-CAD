@@ -3,10 +3,10 @@
 """
 
 from pyautocad import APoint
-from at_localization import loc
-from at_gui_utils import show_popup
+from locales.at_localization import loc
+from windows.at_gui_utils import show_popup
 from typing import Optional
-from at_utils import handle_errors
+from programms.at_utils import handle_errors
 
 
 @handle_errors

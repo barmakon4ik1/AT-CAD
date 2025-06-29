@@ -2,12 +2,8 @@
 Модуль утилит для работы с AutoCAD (фасад).
 """
 
-from at_base import *
-from at_geometry import *
-# from at_construction import *
-from at_input import *
-from functools import wraps
 import math
+from functools import wraps
 
 
 def handle_errors(func):

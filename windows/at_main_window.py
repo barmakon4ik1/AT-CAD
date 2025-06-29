@@ -9,14 +9,15 @@ import os
 import logging
 import traceback
 from typing import Optional, Dict, Callable
-# from at_cone_input_window import ConeInputWindow
-# from at_shell_input_window import ShellInputWindow
-# from at_ringe_window import RingInputWindow
-# from at_head_input_window import HeadInputWindow
-# from at_window_utils import create_window, show_popup, get_button_font
+from windows.at_cone_input_window import ConeInputWindow
+from windows.at_shell_input_window import ShellInputWindow
+from windows.at_ringe_window import RingInputWindow
+from windows.at_head_input_window import HeadInputWindow
+from windows.at_window_utils import create_window, show_popup, get_button_font
 from locales.at_localization import loc
-import config.at_config as at_config
-# from at_run_cone import run_application
+from config.at_config import IMAGES_DIR, RESOURCE_DIR, ICON_PATH, BACKGROUND_COLOR, FOREGROUND_COLOR, BANNER_COLOR, \
+    LANGUAGE_ICONS, BANNER_TEXT_COLOR, EXIT_BUTTON_COLOR
+from programms.at_run_cone import run_application
 from windows.at_window_utils import apply_styles_to_panel
 
 # Настройка логирования
@@ -42,7 +43,7 @@ class MainWindow(wx.Frame):
         self.panel = wx.Panel(self)
 
         # Установка иконки приложения
-        icon_path = at_config.ICON_PATH
+        icon_path = ICON_PATH
         if os.path.exists(icon_path):
             icon_bitmap = wx.Bitmap(icon_path, wx.BITMAP_TYPE_PNG)
             if icon_bitmap.IsOk():
@@ -61,7 +62,7 @@ class MainWindow(wx.Frame):
         self.SetMaxSize((800, 600))
 
         # Панель
-        self.panel.SetBackgroundColour(wx.Colour(at_config.BACKGROUND_COLOR))
+        self.panel.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
 
         # Создаём меню
         self._create_menu()
@@ -89,7 +90,7 @@ class MainWindow(wx.Frame):
 
         # Текст копирайта
         self.copyright_label = wx.StaticText(self.panel, label=loc.get("copyright"))
-        self.copyright_label.SetForegroundColour(wx.Colour(at_config.FOREGROUND_COLOR))
+        self.copyright_label.SetForegroundColour(wx.Colour(FOREGROUND_COLOR))
         self.copyright_label.SetFont(wx.Font(8, wx.DEFAULT, wx.NORMAL, wx.NORMAL))
         copyright_sizer = wx.BoxSizer(wx.HORIZONTAL)
         copyright_sizer.AddStretchSpacer()
@@ -105,7 +106,7 @@ class MainWindow(wx.Frame):
         self.CreateStatusBar()
         self.GetStatusBar().SetFieldsCount(1)
         self.GetStatusBar().SetStatusText("")
-        self.GetStatusBar().SetBackgroundColour(wx.Colour(at_config.BANNER_COLOR))
+        self.GetStatusBar().SetBackgroundColour(wx.Colour(BANNER_COLOR))
 
         # Применение стилей
         apply_styles_to_panel(self.panel)
@@ -138,10 +139,10 @@ class MainWindow(wx.Frame):
             tuple[wx.Panel, wx.BoxSizer]: Панель заголовка и её сайзер.
         """
         header_panel = wx.Panel(self.panel)
-        header_panel.SetBackgroundColour(wx.Colour(at_config.BANNER_COLOR))
+        header_panel.SetBackgroundColour(wx.Colour(BANNER_COLOR))
         sizer_header = wx.BoxSizer(wx.HORIZONTAL)
 
-        logo_path = at_config.ICON_PATH
+        logo_path = ICON_PATH
         logo_bitmap = wx.Bitmap(logo_path, wx.BITMAP_TYPE_PNG) if os.path.exists(logo_path) else wx.NullBitmap
         if logo_bitmap.IsOk():
             logo_bitmap = self.scale_bitmap(logo_bitmap, 100, 100)
@@ -154,7 +155,7 @@ class MainWindow(wx.Frame):
         sizer_header.AddStretchSpacer()
 
         self.title = wx.StaticText(header_panel, label="AT-Metal Unfold Pro System", style=wx.ALIGN_CENTER)
-        self.title.SetForegroundColour(wx.Colour(at_config.BANNER_TEXT_COLOR))
+        self.title.SetForegroundColour(wx.Colour(BANNER_TEXT_COLOR))
         self.title.SetFont(wx.Font(24, wx.DEFAULT, wx.NORMAL, wx.BOLD))
         sizer_header.Add(self.title, 0, wx.ALIGN_CENTER_VERTICAL, 0)
 
@@ -180,7 +181,7 @@ class MainWindow(wx.Frame):
         Returns:
             wx.StaticBitmap: Иконка языка или заглушка, если файл не найден.
         """
-        language_file = at_config.LANGUAGE_ICONS.get(loc.language, at_config.LANGUAGE_ICONS["ru"])
+        language_file = LANGUAGE_ICONS.get(loc.language, LANGUAGE_ICONS["ru"])
         if os.path.exists(language_file):
             bitmap = wx.Bitmap(language_file, wx.BITMAP_TYPE_PNG)
             if bitmap.IsOk():
@@ -200,7 +201,7 @@ class MainWindow(wx.Frame):
         Returns:
             wx.Bitmap: Масштабированный битмап иконки языка или заглушка.
         """
-        language_file = at_config.LANGUAGE_ICONS.get(loc.language, at_config.LANGUAGE_ICONS["ru"])
+        language_file = LANGUAGE_ICONS.get(loc.language, LANGUAGE_ICONS["ru"])
         if os.path.exists(language_file):
             bitmap = wx.Bitmap(language_file, wx.BITMAP_TYPE_PNG)
             if bitmap.IsOk():
@@ -236,17 +237,17 @@ class MainWindow(wx.Frame):
         sizer_links = wx.BoxSizer(wx.VERTICAL)
 
         programs = [
-            # (loc.get("at_run_cone"), lambda: run_application()),
-            # (loc.get("program_shell"), lambda: create_window(ShellInputWindow, parent=self)),
-            # (loc.get("at_ringe"), lambda: create_window(RingInputWindow, parent=self)),
-            # (loc.get("at_run_heads"), lambda: create_window(HeadInputWindow, parent=self)),
+            (loc.get("at_run_cone"), lambda: run_application()),
+            (loc.get("program_shell"), lambda: create_window(ShellInputWindow, parent=self)),
+            (loc.get("at_ringe"), lambda: create_window(RingInputWindow, parent=self)),
+            (loc.get("at_run_heads"), lambda: create_window(HeadInputWindow, parent=self)),
         ]
 
         self.link_labels = []
         for label, callback in programs:
             link = wx.StaticText(self.panel, label=label)
             link.SetFont(wx.Font(18, wx.DEFAULT, wx.NORMAL, wx.BOLD))
-            link.SetForegroundColour(wx.Colour(at_config.FOREGROUND_COLOR))
+            link.SetForegroundColour(wx.Colour(FOREGROUND_COLOR))
             link.Bind(wx.EVT_LEFT_DOWN, lambda evt, cb=callback: self.on_program_link(evt, cb))
             sizer_links.Add(link, 0, wx.ALIGN_LEFT | wx.LEFT | wx.TOP, 10)
             self.link_labels.append(link)
@@ -264,7 +265,7 @@ class MainWindow(wx.Frame):
         self.exit_button = wx.Button(self.panel, label=loc.get("button_exit"))
         button_font = get_button_font()
         self.exit_button.SetFont(button_font)
-        self.exit_button.SetBackgroundColour(wx.Colour(at_config.EXIT_BUTTON_COLOR))
+        self.exit_button.SetBackgroundColour(wx.Colour(EXIT_BUTTON_COLOR))
         self.exit_button.SetForegroundColour(wx.Colour("white"))
         self.exit_button.Bind(wx.EVT_BUTTON, self.on_exit)
 

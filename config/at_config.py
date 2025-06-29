@@ -8,22 +8,23 @@ import os
 from locales.at_localization import loc
 
 # Путь к папке с ресурсами (иконки, изображения и т.д.)
-RESOURCE_DIR: str = "images"
+IMAGES_DIR: str = "images"
+RESOURCE_DIR: str = "config"
 
 # Путь к иконке приложения
-ICON_PATH: str = os.path.join(RESOURCE_DIR, "AT-CAD_8.png")
+ICON_PATH: str = os.path.join(IMAGES_DIR, "AT-CAD_8.png")
 
 # Путь к изображению конуса
-CONE_IMAGE_PATH: str = os.path.join(RESOURCE_DIR, "cone_image.png")
+CONE_IMAGE_PATH: str = os.path.join(IMAGES_DIR, "cone_image.png")
 
 # Путь к файлу с последними введёнными данными для конуса
 LAST_CONE_INPUT_FILE: str = os.path.join(RESOURCE_DIR, "last_cone_input.json")
 
 # Иконки для языков
 LANGUAGE_ICONS: dict = {
-    "ru": os.path.join(RESOURCE_DIR, "ru.png"),
-    "de": os.path.join(RESOURCE_DIR, "de.png"),
-    "en": os.path.join(RESOURCE_DIR, "en.png")
+    "ru": os.path.join(IMAGES_DIR, "ru.png"),
+    "de": os.path.join(IMAGES_DIR, "de.png"),
+    "en": os.path.join(IMAGES_DIR, "en.png")
 }
 
 # Размер полей ввода и выпадающих списков
@@ -73,3 +74,7 @@ def set_language(lang: str) -> None:
     LANGUAGE = lang
     loc.language = lang
     print(f"set_language: LANGUAGE обновлён на {LANGUAGE}, loc.language = {loc.language}")
+
+
+# if __name__ == "__main__":
+#     print(ICON_PATH)

@@ -3,12 +3,12 @@
 """
 from contextlib import contextmanager
 
-from at_localization import loc
-from at_config import LANGUAGE
-from at_cad_init import ATCadInit
-from at_gui_utils import show_popup
+from locales.at_localization import loc
+from config.at_config import LANGUAGE
+from config.at_cad_init import ATCadInit
+from windows.at_gui_utils import show_popup
 from functools import wraps
-import pythoncom
+from pythoncom import CoInitialize, CoUninitialize
 from typing import Optional, Tuple
 
 loc.language = LANGUAGE  # Установка языка локализации
@@ -37,11 +37,11 @@ def init_autocad() -> Optional[Tuple[object, object, object]]:
     global _cad_instance
     if _cad_instance is not None and _cad_instance.is_initialized():
         return _cad_instance.adoc, _cad_instance.model, _cad_instance.original_layer
-    pythoncom.CoInitialize()
+    CoInitialize()
     _cad_instance = ATCadInit()
     if not _cad_instance.is_initialized():
         show_popup(loc.get('cad_init_error'), popup_type="error")
-        pythoncom.CoUninitialize()
+        CoUninitialize()
         return None
     return _cad_instance.adoc, _cad_instance.model, _cad_instance.original_layer
 

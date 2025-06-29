@@ -1,14 +1,14 @@
 # at_run_cone.py
 import pythoncom
 from pyautocad import APoint
-from at_construction import at_cone_sheet, polar_point, at_addText
-from at_cone_input_window import ConeInputWindow  # Импортируем класс напрямую
+from programms.at_construction import at_cone_sheet, polar_point, at_addText
+from windows.at_cone_input_window import ConeInputWindow  # Импортируем класс напрямую
 from typing import Optional, Dict, Any
-from at_localization import loc
-from at_config import LANGUAGE, TEXT_DISTANCE, TEXT_HEIGHT_BIG, TEXT_HEIGHT_SMALL
-from at_gui_utils import show_popup
-from at_base import ensure_layer, regen
-from at_input import at_point_input
+from locales.at_localization import loc
+from config.at_config import LANGUAGE, TEXT_DISTANCE, TEXT_HEIGHT_BIG, TEXT_HEIGHT_SMALL
+from windows.at_gui_utils import show_popup
+from programms.at_base import ensure_layer, regen
+from programms.at_input import at_point_input
 import wx
 
 loc.language = LANGUAGE

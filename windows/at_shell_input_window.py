@@ -6,10 +6,10 @@
 
 import wx
 from typing import Optional, Dict
-from at_config import BACKGROUND_COLOR, LANGUAGE
-from at_construction import at_diameter
-from at_localization import loc
-from at_window_utils import BaseInputWindow, CanvasPanel, save_last_input, show_popup, get_standard_font, create_standard_buttons, create_window
+from config.at_config import BACKGROUND_COLOR, LANGUAGE
+from programms.at_construction import at_diameter
+from locales.at_localization import loc
+from windows.at_window_utils import BaseInputWindow, CanvasPanel, save_last_input, show_popup, get_standard_font, create_standard_buttons, create_window
 
 loc.language = LANGUAGE
 

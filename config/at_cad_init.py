@@ -5,9 +5,9 @@
 """
 
 from pyautocad import Autocad
-from at_gui_utils import show_popup
-from at_config import LANGUAGE
-from at_localization import loc
+from windows.at_gui_utils import show_popup
+from config.at_config import LANGUAGE
+from locales.at_localization import loc
 
 loc.language = LANGUAGE  # Установка языка локализации из конфигурации
 

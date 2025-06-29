@@ -1,16 +1,12 @@
 """
 Модуль для создания геометрических объектов в AutoCAD.
 """
-# import math
-#
-from pyautocad import APoint
-from at_localization import loc
-from at_gui_utils import show_popup
-from typing import Optional, List, Tuple
-from at_base import *
-from at_utils import *
-from at_geometry import *
 import array
+
+from pyautocad import APoint
+
+from programms.at_base import *
+from programms.at_geometry import *
 
 
 @handle_errors
