@@ -1,0 +1,71 @@
+{
+  "fields": [
+    {"name": "head_type", "type": "choice", "label": "head_type", "options": ["DIN 28011", "DIN 28013", "ASME VIII-1", "NFE 81-103", "Custom"]},
+    {"name": "D", "type": "choice_with_custom", "label": "diameter", "data_source": "dimensions.diameters"},
+    {"name": "s", "type": "choice_with_custom", "label": "thickness", "data_source": "dimensions.thicknesses"},
+    {"name": "R", "type": "float", "label": "radius_R", "enabled": false},
+    {"name": "r", "type": "float", "label": "radius_r", "enabled": false},
+    {"name": "h1", "type": "choice_with_custom", "label": "height_h1", "options": []}
+  ],
+  "head_types": {
+    "DIN 28011": {"R": "D", "r": "0.1 * D", "h1": "get_h1"},
+    "DIN 28013": {"R": "0.8 * D", "r": "0.154 * D", "h1": "get_h1"},
+    "ASME VIII-1": {"R": "0.9 * (D - 2 * s)", "r": "0.17 * (D - 2 * s)", "h1": "get_h1_asme"},
+    "NFE 81-103": {"R": "(D - 2 * s) / 1.16", "r": "(D - 2 * s) / 5.39", "h1": "get_h1_nfe"},
+    "Custom": {"R": null, "r": null, "h1": null}
+  },
+  "h1_table": {
+    "DIN 28011": [
+      {"max_s": 5, "h1": 20},
+      {"min_s": 6, "max_s": 7, "h1": 25},
+      {"min_s": 8, "max_s": 8, "h1": 30},
+      {"min_s": 9, "max_s": 10, "h1": 35},
+      {"min_s": 11, "max_s": 12, "h1": 45},
+      {"min_s": 13, "max_s": 14, "h1": 50},
+      {"min_s": 15, "max_s": 17, "h1": 60},
+      {"min_s": 18, "max_s": 20, "h1": 70},
+      {"min_s": 21, "max_s": 23, "h1": 80},
+      {"min_s": 24, "max_s": 25, "h1": 90},
+      {"min_s": 26, "max_s": 28, "h1": 100},
+      {"min_s": 29, "max_s": 31, "h1": 110},
+      {"min_s": 32, "max_s": 34, "h1": 120},
+      {"min_s": 35, "max_s": 37, "h1": 130},
+      {"min_s": 38, "max_s": 40, "h1": 140},
+      {"min_s": 41, "max_s": 50, "h1": 150},
+      {"min_s": 52, "max_s": 80, "h1": 120},
+      {"min_s": 82, "max_s": 100, "h1": 100},
+      {"min_s": 102, "max_s": 120, "h1": 75}
+    ],
+    "DIN 28013": [
+      {"max_s": 6, "h1": 20},
+      {"min_s": 7, "max_s": 8, "h1": 25},
+      {"min_s": 9, "max_s": 10, "h1": 30},
+      {"min_s": 11, "max_s": 13, "h1": 40},
+      {"min_s": 14, "max_s": 15, "h1": 45},
+      {"min_s": 16, "max_s": 18, "h1": 55},
+      {"min_s": 19, "max_s": 20, "h1": 60},
+      {"min_s": 21, "max_s": 23, "h1": 70},
+      {"min_s": 26, "max_s": 28, "h1": 85},
+      {"min_s": 29, "max_s": 30, "h1": 90},
+      {"min_s": 31, "max_s": 33, "h1": 100},
+      {"min_s": 34, "max_s": 36, "h1": 110},
+      {"min_s": 37, "max_s": 40, "h1": 120},
+      {"min_s": 41, "max_s": 43, "h1": 130},
+      {"min_s": 44, "max_s": 46, "h1": 140},
+      {"min_s": 47, "max_s": 50, "h1": 150},
+      {"min_s": 52, "max_s": 80, "h1": 120},
+      {"min_s": 82, "max_s": 100, "h1": 100},
+      {"min_s": 102, "max_s": 120, "h1": 75}
+    ],
+    "ASME VIII-1": [
+      {"max_s": 5, "h1": 20},
+      {"min_s": 6, "max_s": 7, "h1": 25},
+      {"min_s": 8, "max_s": 8, "h1": 30}
+    ],
+    "NFE 81-103": [
+      {"max_s": 5, "h1": 20},
+      {"min_s": 6, "max_s": 7, "h1": 25},
+      {"min_s": 8, "max_s": 8, "h1": 30}
+    ]
+  }
+}
