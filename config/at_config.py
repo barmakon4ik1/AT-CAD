@@ -55,7 +55,7 @@ FONT_SIZE: int = 14  # Размер шрифта в интерфейсе
 BACKGROUND_COLOR: str = "#508050"  # Цвет фона (зеленый, как на ДНЦ-пульте Нева)
 FOREGROUND_COLOR: str = "white"  # Цвет текста
 BANNER_COLOR: str = "light blue"  # Цвет баннера
-BANNER_TEXT_COLOR: str = "blue"  # Цвет текста баннера
+BANNER_TEXT_COLOR: str = "black"  # Цвет текста баннера
 EXIT_BUTTON_COLOR: str = "#FF0000"  # Цвет кнопки выхода
 
 # Слои по умолчанию для объектов AutoCAD

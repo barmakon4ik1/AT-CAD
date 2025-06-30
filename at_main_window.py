@@ -7,7 +7,7 @@ import wx
 import os
 import logging
 from config.at_config import ICON_PATH, LANGUAGE, LANGUAGE_ICONS, BANNER_COLOR, BANNER_TEXT_COLOR, set_language, \
-    BACKGROUND_COLOR, EXIT_BUTTON_COLOR, BANNER_HIGH, WINDOW_SIZE, LOGO_SIZE
+    BACKGROUND_COLOR, EXIT_BUTTON_COLOR, BANNER_HIGH, WINDOW_SIZE, LOGO_SIZE, FONT_SIZE
 from windows.at_style import style_label
 from locales.at_localization import loc
 from windows.at_window_utils import load_last_position, save_last_position, apply_styles_to_panel, get_button_font
@@ -36,11 +36,11 @@ class ATMainWindow(wx.Frame):
         self.panel.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
 
         # Инициализация AutoCAD
-        self.cad = ATCadInit()
-        if not self.cad.is_initialized():
-            show_popup(loc.get("cad_init_error_short"), popup_type="error")
-            self.Close()
-            return
+        # self.cad = ATCadInit()
+        # if not self.cad.is_initialized():
+        #     show_popup(loc.get("cad_init_error_short"), popup_type="error")
+        #     self.Close()
+        #     return
 
         # Отладка: вывод текущей рабочей директории и путей
         logging.info(f"Current working directory: {os.getcwd()}")
@@ -167,7 +167,7 @@ class ATMainWindow(wx.Frame):
         title.SetForegroundColour(wx.Colour(BANNER_TEXT_COLOR))
         if BANNER_HIGH >= 100:
             font = title.GetFont()
-            font.SetPointSize(font.GetPointSize() + 2)  # Увеличиваем шрифт для крупного баннера
+            font.SetPointSize(FONT_SIZE + 10)  # Увеличиваем шрифт для крупного баннера
             title.SetFont(font)
         banner_sizer.Add(title, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.ALL, border=10)
 
