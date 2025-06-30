@@ -30,33 +30,35 @@ logging.basicConfig(level=logging.INFO, filename="at_cad.log",
 
 def load_last_position() -> Tuple[int, int]:
     """
-    Загружает координаты последней позиции окна из файла 'last_position.json'.
+    Загружает координаты последней позиции окна из файла 'config/last_position.json'.
 
     Returns:
         Tuple[int, int]: Координаты окна (x, y) или (-1, -1) при ошибке или отсутствии файла.
     """
+    config_path = os.path.join("config", "last_position.json")
     try:
-        with open("last_position.json", "r") as f:
+        with open(config_path, "r") as f:
             data = json.load(f)
             return (data.get("x", -1), data.get("y", -1))
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        logging.error(f"Ошибка загрузки last_position.json: {e}")
+        logging.error(f"Ошибка загрузки {config_path}: {e}")
         return (-1, -1)
 
 
 def save_last_position(x: int, y: int) -> None:
     """
-    Сохраняет координаты позиции окна в файл 'last_position.json'.
+    Сохраняет координаты позиции окна в файл 'config/last_position.json'.
 
     Args:
         x: Координата x окна.
         y: Координата y окна.
     """
+    config_path = os.path.join("config", "last_position.json")
     try:
-        with open("last_position.json", "w") as f:
+        with open(config_path, "w") as f:
             json.dump({"x": x, "y": y}, f, indent=2)
     except (PermissionError, OSError) as e:
-        logging.error(f"Ошибка сохранения last_position.json: {e}")
+        logging.error(f"Ошибка сохранения {config_path}: {e}")
 
 
 def load_common_data() -> Dict:

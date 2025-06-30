@@ -1,409 +1,678 @@
-# at_localization.py
 """
 Модуль для локализации текстовых сообщений в проекте.
 Поддерживает переводы на русский, немецкий и английский языки.
 """
 
 from typing import Union
+import logging
+
+# Настройка логирования для отладки
+logging.basicConfig(level=logging.INFO, filename="at_cad.log",
+                    format="%(asctime)s - %(levelname)s - %(message)s")
 
 translations = {
-    "ru": {
-        "cad_init_error": "Ошибка инициализации AutoCAD.",
-        "cad_init_error_short": "Ошибка инициализации AutoCAD.",
-        "cad_init_error_details": "Ошибка при подключении к AutoCAD: {}",
-        "no_input_data": "Ввод отменен или данные отсутствуют.",
-        "no_diameters": "Нет диаметров для построения окружностей!",
-        "no_center": "Не удалось выбрать точку центра. Построение отменено.",
-        "circle_error": "Ошибка при построении окружностей.",
-        "text_error": "Ошибка при добавлении текста.",
-        "text_error_details": "Ошибка при добавлении текста: {}",
-        "text_layer_error": "Не удалось добавить текст на слой '{}'.",
-        "regen_error": "Ошибка при обновлении слоя.",
-        "cad_init_success": "AutoCAD инициализирован успешно.",
-        "circle_success": "Построена окружность с диаметром {} мм.",
-        "text_success": "Текст '{}' успешно добавлен на слой '{}' в точке {}.",
-        "operation_success": "Операция завершена.",
-        "error_in_function": "Ошибка в '{}': {}",
-        "layer_set": "Установлен активный слой '{}'.",
-        "layer_restored": "Восстановлен исходный слой '{}'.",
-        "layer_created": "Создан слой '{}'.",
-        "layer_context_error": "Ошибка в контексте слоя '{}': {}",
-        "layer_restore_error": "Ошибка при восстановлении исходного слоя: {}",
-        "layer_locked": "Слой '{}' заблокирован, разблокируем.",
-        "success_title": "Успех",
-        "prompt_select_point": "Укажите точку: ",
-        "point_not_selected": "Точка не выбрана. Попробуйте снова или нажмите Отмена.",
-        "window_title_ring": "Кольцо",
-        "work_number_label": "Номер работы:",
-        "ok_button": "ОК",
-        "cancel_button": "Отмена",
-        "copyright": "Дизайн и разработка: А.Тутубалин © 2025",
-        "work_number_invalid": "Номер работы не задан!",
-        "diameter_invalid_separator": "В диаметре D должна быть не более одной запятой или точки!",
-        "diameter_invalid_number": "Диаметр D должен быть числом!",
-        "error": "Ошибка",
-        "success": "Успех",
-        "info": "Информация",
-        "rectangle_success": "Прямоугольник создан: ширина {}, высота {}",
-        "rectangle_error": "Ошибка при создании прямоугольника.",
-        "rectangle_points_calculated": "Точки прямоугольника рассчитаны для направления: {}",
-        "polyline_points": "Координаты полилинии: {}",
-        "polyline_success": "Полилиния создана.",
-        "invalid_points_list": "Некорректный список точек: {}",
-        "invalid_points_type": "Все координаты должны быть числами: {}",
-        "autocad_activated": "Окно AutoCAD активировано.",
-        "autocad_activation_error": "Ошибка активации окна AutoCAD: {}",
-        "point_selection_error": "Ошибка при выборе точки: {}",
-        "autocad_window_not_found": "Окно AutoCAD не найдено.",
-        "point_selected": "Точка выбрана: x={}, y={}",
-        "heads_error": "Ошибка построения днища.",
-        "window_title_head": "Параметры днища",
-        "head_type_label": "Тип днища:",
-        "diameter_label": "Диаметр D (мм):",
-        "thickness_label": "Толщина s (мм):",
-        "radius_R_label": "Радиус R (мм):",
-        "radius_r_label": "Радиус r (мм):",
-        "height_h1_label": "Высота h1 (мм):",
-        "insert_point_label": "Точка вставки",
-        "select_point_button": "Выбрать точку",
-        "insert_point_not_selected": "Выберите точку вставки.",
-        "build": "Построить",
-        "preview": "Предпросмотр",
-        "head_built": "Днище построено!",
-        "build_error": "Ошибка построения: {}",
-        "save_value": "Сохранить значение",
-        "language_menu": "Язык",
-        "save_success": "Значение {} сохранено.",
-        "save_error": "Ошибка сохранения значения: {}",
-        "image_not_found": "Изображение не найдено.",
-        "layer_label": "Слой:",
-        "add_custom_layer": "Добавить свой",
-        "dia_error": "Какой диаметр задан?",
-        "zero_error": "Деление на ноль невозможно!",
-        "missing_data": "Недостаточно данных!",
-        "gradient_plus": "Наклон должен быть положительным числом!",
-        "invalid_number": "Некорректное число!",
-        "both_parameters_error": "Требуется только один параметр!",
-        "diameter_base_positive": "Диаметр D должен быть положительным!",
-        "diameter_top_non_negative": "Диаметр d должен быть положительным!",
-        "invalid_gradient": "Некорректный наклон!",
-        "invalid_angle": "Некорректный угол!",
-        "angle_range_error": "Недопустимый диапазон углов!",
-        "math_error": "Математическая ошибка!",
-        "height_positive": "Высота должна быть положительной!",
-        "invalid_result": "Некорректный результат!",
-        "invalid_geometry": "Ошибка геометрии.",
-        "com_release_error": "Ошибка при освобождении COM: {}",
-        "head_build_error": "Ошибка построения в at_add_head",
-        "cone_sheet_error": "Ошибка построения развертки конуса.",
-        "window_title_cone": "Параметры развертки конуса",
-        "main_data_label": "Основные данные",
-        "material_label": "Материал:",
-        "inner_label": "внутренний",
-        "middle_label": "средний",
-        "outer_label": "наружный",
-        "height_label": "Высота",
-        "steigung_label": "Наклон 1:k",
-        "weld_allowance_label": "Припуск на сварку (мм):",
-        "allowance_non_negative": "Припуск на сварку не может быть отрицательным.",
-        "missing_height_data": "Необходимо указать высоту, наклон или угол.",
-        "mm": "мм",
-        "diameter": "Диаметр",
-        "window_title_shell": "Параметры развертки обечайки вертикального сосуда",
-        "shell_tab_label": "Обечайка",
-        "fittings_tab_label": "Штуцеры и отводы",
-        "fittings_placeholder_label": "Параметры штуцеров и отводов (будет реализовано позже)",
-        "seam_angle_label": "Расположение продольного шва",
-        "clockwise_label": "По часовой стрелке",
-        "counterclockwise_label": "Против часовой стрелки",
-        "top_allowance_label": "Припуск сверху, мм",
-        "bottom_allowance_label": "Припуск снизу, мм",
-        "point_not_selected_error": "Ошибка: точка вставки не выбрана или AutoCAD не инициализирован",
-        "diameter_positive_error": "Ошибка: Диаметр должен быть положительным",
-        "thickness_positive_error": "Ошибка: Толщина должна быть положительной",
-        "length_positive_error": "Ошибка: Высота обечайки должна быть положительной",
-        "offset_non_negative_error": "Ошибка: Отступ не может быть отрицательным",
-        "seam_angle_range_error": "Ошибка: Угол шва должен быть в диапазоне от 0 до 360 градусов",
-        "allowance_non_negative_error": "Ошибка: Припуск на сварку не может быть отрицательным",
-        "diameter_result_positive_error": "Ошибка: Средний диаметр должен быть положительным",
-        "invalid_number_format_error": "Ошибка: Неверный формат числа",
-        "diameter_column_label": "Диаметр, мм",
-        "diameter_missing_error": "Не введён ни один диаметр",
-        "invalid_point": "Некорректная точка вставки.",
-        "menu_help": "Справка",
-        "menu_about": "О программе",
-        "about_text": "Информация о программе AT-CAD...",
-        "at_run_cone": "Развертка прямого конуса",
-        "program_shell": "Развертка обечайки",
-        "at_ringe": "Построение колец",
-        "at_run_heads": "Выпуклые днища",
-        "button_exit": "Выйти"
+    "about_text": {
+        "ru": "Информация о программе AT-CAD...",
+        "de": "Informationen über das Programm AT-CAD...",
+        "en": "Information about the AT-CAD program..."
     },
-    "de": {
-        "cad_init_error": "Fehler bei der Initialisierung von AutoCAD.",
-        "cad_init_error_short": "AutoCAD-Initialisierungsfehler.",
-        "cad_init_error_details": "Fehler beim Verbinden mit AutoCAD: {}",
-        "no_input_data": "Eingabe abgebrochen oder keine Daten vorhanden.",
-        "no_diameters": "Keine Durchmesser für den Bau von Kreisen!",
-        "no_center": "Konnte keinen Mittelpunkt auswählen. Bau abgebrochen.",
-        "circle_error": "Fehler beim Erstellen von Kreisen.",
-        "text_error": "Fehler beim Hinzufügen von Text.",
-        "text_error_details": "Fehler beim Hinzufügen von Text: {}",
-        "text_layer_error": "Text konnte nicht auf Ebene '{}' hinzugefügt werden.",
-        "regen_error": "Fehler beim Aktualisieren der Ebene.",
-        "cad_init_success": "AutoCAD erfolgreich initialisiert.",
-        "circle_success": "Kreis mit Durchmesser {} mm erstellt.",
-        "text_success": "Text '{}' erfolgreich auf Ebene '{}' an Punkt {} hinzugefügt.",
-        "operation_success": "Vorgang abgeschlossen.",
-        "error_in_function": "Fehler in '{}': {}",
-        "layer_set": "Aktive Ebene '{}' gesetzt.",
-        "layer_restored": "Ursprüngliche Ebene '{}' wiederhergestellt.",
-        "layer_created": "Ebene '{}' erstellt.",
-        "layer_context_error": "Fehler im Kontext der Ebene '{}': {}",
-        "layer_restore_error": "Fehler beim Wiederherstellen der ursprünglichen Ebene: {}",
-        "layer_locked": "Ebene '{}' ist gesperrt, wird entsperrt.",
-        "success_title": "Erfolg",
-        "prompt_select_point": "Punkt auswählen: ",
-        "point_not_selected": "Kein Punkt ausgewählt. Versuchen Sie es erneut oder klicken Sie auf Abbrechen.",
-        "window_title_ring": "Ring",
-        "work_number_label": "Arbeitsnummer:",
-        "ok_button": "OK",
-        "cancel_button": "Abbrechen",
-        "copyright": "Design und Entwicklung: A.Tutubalin © 2025",
-        "work_number_invalid": "Arbeitsnummer nicht angegeben!",
-        "diameter_invalid_separator": "Im Durchmesser D darf nur ein Komma oder Punkt enthalten sein!",
-        "diameter_invalid_number": "Durchmesser D muss eine Zahl sein!",
-        "error": "Fehler",
-        "success": "Erfolg",
-        "info": "Information",
-        "rectangle_success": "Rechteck erstellt: Breite {}, Höhe {}",
-        "rectangle_error": "Fehler beim Erstellen des Rechtecks.",
-        "rectangle_points_calculated": "Rechteckpunkte für Richtung berechnet: {}",
-        "polyline_points": "Polylinienkoordinaten: {}",
-        "polyline_success": "Polylinie erstellt.",
-        "invalid_points_list": "Ungültige Punkteliste: {}",
-        "invalid_points_type": "Alle Koordinaten müssen Zahlen sein: {}",
-        "autocad_activated": "AutoCAD-Fenster aktiviert.",
-        "autocad_activation_error": "Fehler bei der Aktivierung des AutoCAD-Fensters: {}",
-        "point_selection_error": "Fehler bei der Punktauswahl: {}",
-        "autocad_window_not_found": "AutoCAD-Fenster nicht gefunden.",
-        "point_selected": "Punkt ausgewählt: x={}, y={}",
-        "heads_error": "Fehler beim Erstellen des Bodens.",
-        "window_title_head": "Bodenparameter",
-        "head_type_label": "Bodentyp:",
-        "diameter_label": "Durchmesser D (mm):",
-        "thickness_label": "Dicke s (mm):",
-        "radius_R_label": "Radius R (mm):",
-        "radius_r_label": "Radius r (mm):",
-        "height_h1_label": "Höhe h1 (mm):",
-        "insert_point_label": "Einfügepunkt",
-        "select_point_button": "Punkt auswählen",
-        "insert_point_not_selected": "Einfügepunkt auswählen.",
-        "build": "Erstellen",
-        "preview": "Vorschau",
-        "head_built": "Boden erstellt!",
-        "build_error": "Fehler beim Erstellen: {}",
-        "save_value": "Wert speichern",
-        "language_menu": "Sprache",
-        "save_success": "Wert {} gespeichert.",
-        "save_error": "Fehler beim Speichern des Werts: {}",
-        "image_not_found": "Bild nicht gefunden.",
-        "layer_label": "Ebene:",
-        "add_custom_layer": "Eigene hinzufügen",
-        "dia_error": "Welcher Durchmesser wurde angegeben?",
-        "zero_error": "Division durch Null ist unmöglich!",
-        "missing_data": "Unzureichende Daten!",
-        "gradient_plus": "Die Neigung muss eine positive Zahl sein!",
-        "invalid_number": "Ungültige Zahl!",
-        "both_parameters_error": "Nur ein Parameter erforderlich!",
-        "diameter_base_positive": "Durchmesser D muss positiv sein!",
-        "diameter_top_non_negative": "Durchmesser d muss positiv sein!",
-        "invalid_gradient": "Ungültige Neigung!",
-        "invalid_angle": "Ungültiger Winkel!",
-        "angle_range_error": "Unzulässiger Winkelbereich!",
-        "math_error": "Mathematischer Fehler!",
-        "height_positive": "Höhe muss positiv sein!",
-        "invalid_result": "Ungültiges Ergebnis!",
-        "invalid_geometry": "Geometriefehler.",
-        "com_release_error": "Fehler beim Freigeben von COM: {}",
-        "head_build_error": "Fehler beim Erstellen in at_add_head",
-        "cone_sheet_error": "Fehler beim Erstellen der Kegelabwicklung.",
-        "window_title_cone": "Parameter der Kegelabwicklung",
-        "main_data_label": "Hauptdaten",
-        "material_label": "Material:",
-        "inner_label": "innen",
-        "middle_label": "mitte",
-        "outer_label": "außen",
-        "height_label": "Höhe",
-        "steigung_label": "Neigung 1:k",
-        "weld_allowance_label": "Schweißnahtzugabe (mm):",
-        "allowance_non_negative": "Schweißnahtzugabe darf nicht negativ sein.",
-        "missing_height_data": "Höhe, Neigung oder Winkel müssen angegeben werden.",
-        "mm": "mm",
-        "diameter": "Durchmesser",
-        "window_title_shell": "Parameter der Abwicklung eines vertikalen Behälters",
-        "shell_tab_label": "Behälter",
-        "fittings_tab_label": "Anschlüsse und Abzweige",
-        "fittings_placeholder_label": "Parameter für Anschlüsse und Abzweige (wird später implementiert)",
-        "seam_angle_label": "Position der Längsnaht",
-        "clockwise_label": "Im Uhrzeigersinn",
-        "counterclockwise_label": "Gegen den Uhrzeigersinn",
-        "top_allowance_label": "Zugabe oben, mm",
-        "bottom_allowance_label": "Zugabe unten, mm",
-        "point_not_selected_error": "Fehler: Einfügepunkt nicht ausgewählt oder AutoCAD nicht initialisiert",
-        "diameter_positive_error": "Fehler: Durchmesser muss positiv sein",
-        "thickness_positive_error": "Fehler: Dicke muss positiv sein",
-        "length_positive_error": "Fehler: Höhe des Behälters muss positiv sein",
-        "offset_non_negative_error": "Fehler: Versatz darf nicht negativ sein",
-        "seam_angle_range_error": "Fehler: Nahtwinkel muss zwischen 0 und 360 Grad liegen",
-        "allowance_non_negative_error": "Fehler: Schweißnahtzugabe darf nicht negativ sein",
-        "diameter_result_positive_error": "Fehler: Mittlerer Durchmesser muss positiv sein",
-        "invalid_number_format_error": "Fehler: Ungültiges Zahlenformat",
-        "diameter_column_label": "Durchmesser, mm",
-        "diameter_missing_error": "Kein Durchmesser eingegeben",
-        "invalid_point": "Ungültiger Einfügepunkt.",
-        "menu_help": "Hilfe",
-        "menu_about": "Über das Programm",
-        "about_text": "Informationen über das Programm AT-CAD...",
-        "at_run_cone": "Abwicklung eines geraden Kegels",
-        "program_shell": "Abwicklung eines Behälters",
-        "at_ringe": "Erstellen von Ringen",
-        "at_run_heads": "Konvexe Böden",
-        "button_exit": "Beenden"
+    "allowance_non_negative": {
+        "ru": "Припуск на сварку не может быть отрицательным.",
+        "de": "Schweißnahtzugabe darf nicht negativ sein.",
+        "en": "Weld allowance cannot be negative."
     },
-    "en": {
-        "cad_init_error": "Error initializing AutoCAD.",
-        "cad_init_error_short": "AutoCAD initialization error.",
-        "cad_init_error_details": "Error connecting to AutoCAD: {}",
-        "no_input_data": "Input canceled or no data provided.",
-        "no_diameters": "No diameters for circle creation!",
-        "no_center": "Failed to select center point. Operation canceled.",
-        "circle_error": "Error creating circles.",
-        "text_error": "Error adding text.",
-        "text_error_details": "Error adding text: {}",
-        "text_layer_error": "Failed to add text to layer '{}'.",
-        "regen_error": "Error updating layer.",
-        "cad_init_success": "AutoCAD initialized successfully.",
-        "circle_success": "Circle created with diameter {} mm.",
-        "text_success": "Text '{}' successfully added to layer '{}' at point {}.",
-        "operation_success": "Operation completed.",
-        "error_in_function": "Error in '{}': {}",
-        "layer_set": "Active layer '{}' set.",
-        "layer_restored": "Original layer '{}' restored.",
-        "layer_created": "Layer '{}' created.",
-        "layer_context_error": "Error in layer context '{}': {}",
-        "layer_restore_error": "Error restoring original layer: {}",
-        "layer_locked": "Layer '{}' is locked, unlocking.",
-        "success_title": "Success",
-        "prompt_select_point": "Select point: ",
-        "point_not_selected": "No point selected. Try again or press Cancel.",
-        "window_title_ring": "Ring",
-        "work_number_label": "Work number:",
-        "ok_button": "OK",
-        "cancel_button": "Cancel",
-        "copyright": "Design and development: A.Tutubalin © 2025",
-        "work_number_invalid": "Work number not specified!",
-        "diameter_invalid_separator": "Diameter D must contain no more than one comma or period!",
-        "diameter_invalid_number": "Diameter D must be a number!",
-        "error": "Error",
-        "success": "Success",
-        "info": "Information",
-        "rectangle_success": "Rectangle created: width {}, height {}",
-        "rectangle_error": "Error creating rectangle.",
-        "rectangle_points_calculated": "Rectangle points calculated for direction: {}",
-        "polyline_points": "Polyline coordinates: {}",
-        "polyline_success": "Polyline created.",
-        "invalid_points_list": "Invalid points list: {}",
-        "invalid_points_type": "All coordinates must be numbers: {}",
-        "autocad_activated": "AutoCAD window activated.",
-        "autocad_activation_error": "Error activating AutoCAD window: {}",
-        "point_selection_error": "Error selecting point: {}",
-        "autocad_window_not_found": "AutoCAD window not found.",
-        "point_selected": "Point selected: x={}, y={}",
-        "heads_error": "Error creating head.",
-        "window_title_head": "Head parameters",
-        "head_type_label": "Head type:",
-        "diameter_label": "Diameter D (mm):",
-        "thickness_label": "Thickness s (mm):",
-        "radius_R_label": "Radius R (mm):",
-        "radius_r_label": "Radius r (mm):",
-        "height_h1_label": "Height h1 (mm):",
-        "insert_point_label": "Insertion point",
-        "select_point_button": "Select point",
-        "insert_point_not_selected": "Select insertion point.",
-        "build": "Build",
-        "preview": "Preview",
-        "head_built": "Head created!",
-        "build_error": "Build error: {}",
-        "save_value": "Save value",
-        "language_menu": "Language",
-        "save_success": "Value {} saved.",
-        "save_error": "Error saving value: {}",
-        "image_not_found": "Image not found.",
-        "layer_label": "Layer:",
-        "add_custom_layer": "Add custom",
-        "dia_error": "Which diameter was specified?",
-        "zero_error": "Division by zero is impossible!",
-        "missing_data": "Insufficient data!",
-        "gradient_plus": "Gradient must be a positive number!",
-        "invalid_number": "Invalid number!",
-        "both_parameters_error": "Only one parameter is required!",
-        "diameter_base_positive": "Diameter D must be positive!",
-        "diameter_top_non_negative": "Diameter d must be positive!",
-        "invalid_gradient": "Invalid gradient!",
-        "invalid_angle": "Invalid angle!",
-        "angle_range_error": "Invalid angle range!",
-        "math_error": "Mathematical error!",
-        "height_positive": "Height must be positive!",
-        "invalid_result": "Invalid result!",
-        "invalid_geometry": "Geometry error.",
-        "com_release_error": "Error releasing COM: {}",
-        "head_build_error": "Error building in at_add_head",
-        "cone_sheet_error": "Error creating cone sheet.",
-        "window_title_cone": "Cone sheet parameters",
-        "main_data_label": "Main data",
-        "material_label": "Material:",
-        "inner_label": "inner",
-        "middle_label": "middle",
-        "outer_label": "outer",
-        "height_label": "Height",
-        "steigung_label": "Gradient 1:k",
-        "weld_allowance_label": "Weld allowance (mm):",
-        "allowance_non_negative": "Weld allowance cannot be negative.",
-        "missing_height_data": "Height, gradient, or angle must be specified.",
-        "mm": "mm",
-        "diameter": "Diameter",
-        "window_title_shell": "Vertical vessel shell sheet parameters",
-        "shell_tab_label": "Shell",
-        "fittings_tab_label": "Fittings and branches",
-        "fittings_placeholder_label": "Fittings and branches parameters (to be implemented later)",
-        "seam_angle_label": "Longitudinal seam position",
-        "clockwise_label": "Clockwise",
-        "counterclockwise_label": "Counterclockwise",
-        "top_allowance_label": "Top allowance, mm",
-        "bottom_allowance_label": "Bottom allowance, mm",
-        "point_not_selected_error": "Error: Insertion point not selected or AutoCAD not initialized",
-        "diameter_positive_error": "Error: Diameter must be positive",
-        "thickness_positive_error": "Error: Thickness must be positive",
-        "length_positive_error": "Error: Shell height must be positive",
-        "offset_non_negative_error": "Error: Offset cannot be negative",
-        "seam_angle_range_error": "Error: Seam angle must be between 0 and 360 degrees",
-        "allowance_non_negative_error": "Error: Weld allowance cannot be negative",
-        "diameter_result_positive_error": "Error: Mean diameter must be positive",
-        "invalid_number_format_error": "Error: Invalid number format",
-        "diameter_column_label": "Diameter, mm",
-        "diameter_missing_error": "No diameter entered",
-        "invalid_point": "Invalid insertion point.",
-        "menu_help": "Help",
-        "menu_about": "About the program",
-        "about_text": "Information about the AT-CAD program...",
-        "at_run_cone": "Straight cone sheet",
-        "program_shell": "Vessel shell sheet",
-        "at_ringe": "Ring creation",
-        "at_run_heads": "Convex heads",
-        "button_exit": "Exit"
+    "angle_range_error": {
+        "ru": "Недопустимый диапазон углов!",
+        "de": "Unzulässiger Winkelbereich!",
+        "en": "Invalid angle range!"
+    },
+    "at_ringe": {
+        "ru": "Построение колец",
+        "de": "Erstellen von Ringen",
+        "en": "Ring creation"
+    },
+    "at_run_cone": {
+        "ru": "Развертка прямого конуса",
+        "de": "Abwicklung eines geraden Kegels",
+        "en": "Straight cone sheet"
+    },
+    "at_run_heads": {
+        "ru": "Выпуклые днища",
+        "de": "Konvexe Böden",
+        "en": "Convex heads"
+    },
+    "autocad_activated": {
+        "ru": "Окно AutoCAD активировано.",
+        "de": "AutoCAD-Fenster aktiviert.",
+        "en": "AutoCAD window activated."
+    },
+    "autocad_activation_error": {
+        "ru": "Ошибка активации окна AutoCAD: {}",
+        "de": "Fehler bei der Aktivierung des AutoCAD-Fensters: {}",
+        "en": "Error activating AutoCAD window: {}"
+    },
+    "autocad_window_not_found": {
+        "ru": "Окно AutoCAD не найдено.",
+        "de": "AutoCAD-Fenster nicht gefunden.",
+        "en": "AutoCAD window not found."
+    },
+    "both_parameters_error": {
+        "ru": "Требуется только один параметр!",
+        "de": "Nur ein Parameter erforderlich!",
+        "en": "Only one parameter is required!"
+    },
+    "bottom_allowance_label": {
+        "ru": "Припуск снизу, мм",
+        "de": "Zugabe unten, mm",
+        "en": "Bottom allowance, mm"
+    },
+    "build": {
+        "ru": "Построить",
+        "de": "Erstellen",
+        "en": "Build"
+    },
+    "build_error": {
+        "ru": "Ошибка построения: {}",
+        "de": "Fehler beim Erstellen: {}",
+        "en": "Build error: {}"
+    },
+    "button_exit": {
+        "ru": "Выйти",
+        "de": "Beenden",
+        "en": "Exit"
+    },
+    "cad_init_error": {
+        "ru": "Ошибка инициализации AutoCAD.",
+        "de": "Fehler bei der Initialisierung von AutoCAD.",
+        "en": "Error initializing AutoCAD."
+    },
+    "cad_init_error_details": {
+        "ru": "Ошибка при подключении к AutoCAD: {}",
+        "de": "Fehler beim Verbinden mit AutoCAD: {}",
+        "en": "Error connecting to AutoCAD: {}"
+    },
+    "cad_init_error_short": {
+        "ru": "Ошибка инициализации AutoCAD.",
+        "de": "AutoCAD-Initialisierungsfehler.",
+        "en": "AutoCAD initialization error."
+    },
+    "cad_init_success": {
+        "ru": "AutoCAD инициализирован успешно.",
+        "de": "AutoCAD erfolgreich initialisiert.",
+        "en": "AutoCAD initialized successfully."
+    },
+    "cancel_button": {
+        "ru": "Отмена",
+        "de": "Abbrechen",
+        "en": "Cancel"
+    },
+    "circle_error": {
+        "ru": "Ошибка при построении окружностей.",
+        "de": "Fehler beim Erstellen von Kreisen.",
+        "en": "Error creating circles."
+    },
+    "circle_success": {
+        "ru": "Построена окружность с диаметром {} мм.",
+        "de": "Kreis mit Durchmesser {} mm erstellt.",
+        "en": "Circle created with diameter {} mm."
+    },
+    "clockwise_label": {
+        "ru": "По часовой стрелке",
+        "de": "Im Uhrzeigersinn",
+        "en": "Clockwise"
+    },
+    "com_release_error": {
+        "ru": "Ошибка при освобождении COM: {}",
+        "de": "Fehler beim Freigeben von COM: {}",
+        "en": "Error releasing COM: {}"
+    },
+    "cone_sheet_error": {
+        "ru": "Ошибка построения развертки конуса.",
+        "de": "Fehler beim Erstellen der Kegelabwicklung.",
+        "en": "Error creating cone sheet."
+    },
+    "copyright": {
+        "ru": "Дизайн и разработка: А.Тутубалин © 2025",
+        "de": "Design und Entwicklung: A.Tutubalin © 2025",
+        "en": "Design and development: A.Tutubalin © 2025"
+    },
+    "counterclockwise_label": {
+        "ru": "Против часовой стрелки",
+        "de": "Gegen den Uhrzeigersinn",
+        "en": "Counterclockwise"
+    },
+    "diameter": {
+        "ru": "Диаметр",
+        "de": "Durchmesser",
+        "en": "Diameter"
+    },
+    "diameter_base_positive": {
+        "ru": "Диаметр D должен быть положительным!",
+        "de": "Durchmesser D muss positiv sein!",
+        "en": "Diameter D must be positive!"
+    },
+    "diameter_column_label": {
+        "ru": "Диаметр, мм",
+        "de": "Durchmesser, mm",
+        "en": "Diameter, mm"
+    },
+    "diameter_invalid_number": {
+        "ru": "Диаметр D должен быть числом!",
+        "de": "Durchmesser D muss eine Zahl sein!",
+        "en": "Diameter D must be a number!"
+    },
+    "diameter_invalid_separator": {
+        "ru": "Значения диаметра D должно содержать одну точку либо запятую",
+        "de": "Im Durchmesser D darf nur ein Komma oder Punkt enthalten sein!",
+        "en": "Diameter D must contain no more than one comma or period!"
+    },
+    "diameter_label": {
+        "ru": "Диаметр D (мм):",
+        "de": "Durchmesser D (mm):",
+        "en": "Diameter D (mm):"
+    },
+    "diameter_missing_error": {
+        "ru": "Не введён ни один диаметр",
+        "de": "Kein Durchmesser eingegeben",
+        "en": "No diameter entered"
+    },
+    "diameter_positive_error": {
+        "ru": "Ошибка: Диаметр должен быть положительным",
+        "de": "Fehler: Durchmesser muss positiv sein",
+        "en": "Error: Diameter must be positive"
+    },
+    "diameter_result_positive_error": {
+        "ru": "Ошибка: Средний диаметр должен быть положительным",
+        "de": "Fehler: Mittlerer Durchmesser muss positiv sein",
+        "en": "Error: Mean diameter must be positive"
+    },
+    "diameter_top_non_negative": {
+        "ru": "Диаметр d должен быть положительным!",
+        "de": "Durchmesser d muss positiv sein!",
+        "en": "Diameter d must be positive!"
+    },
+    "dia_error": {
+        "ru": "Какой диаметр задан?",
+        "de": "Welcher Durchmesser wurde angegeben?",
+        "en": "Which diameter was specified?"
+    },
+    "error": {
+        "ru": "Ошибка",
+        "de": "Fehler",
+        "en": "Error"
+    },
+    "error_in_function": {
+        "ru": "Ошибка в '{}': {}",
+        "de": "Fehler in '{}': {}",
+        "en": "Error in '{}': {}"
+    },
+    "fittings_placeholder_label": {
+        "ru": "Параметры штуцеров и отводов (будет реализовано позже)",
+        "de": "Parameter für Anschlüsse und Abzweige (wird später implementiert)",
+        "en": "Fittings and branches parameters (to be implemented later)"
+    },
+    "fittings_tab_label": {
+        "ru": "Штуцеры и отводы",
+        "de": "Anschlüsse und Abzweige",
+        "en": "Fittings and branches"
+    },
+    "gradient_plus": {
+        "ru": "Наклон должен быть положительным числом!",
+        "de": "Die Neigung muss eine positive Zahl sein!",
+        "en": "Gradient must be a positive number!"
+    },
+    "head_built": {
+        "ru": "Днище построено!",
+        "de": "Boden erstellt!",
+        "en": "Head created!"
+    },
+    "head_build_error": {
+        "ru": "Ошибка построения в at_add_head",
+        "de": "Fehler beim Erstellen in at_add_head",
+        "en": "Error building in at_add_head"
+    },
+    "head_type_label": {
+        "ru": "Тип днища:",
+        "de": "Bodentyp:",
+        "en": "Head type:"
+    },
+    "heads_error": {
+        "ru": "Ошибка построения днища.",
+        "de": "Fehler beim Erstellen des Bodens.",
+        "en": "Error creating head."
+    },
+    "height_h1_label": {
+        "ru": "Высота h1 (мм):",
+        "de": "Höhe h1 (mm):",
+        "en": "Height h1 (mm):"
+    },
+    "height_label": {
+        "ru": "Высота",
+        "de": "Höhe",
+        "en": "Height"
+    },
+    "height_positive": {
+        "ru": "Высота должна быть положительной!",
+        "de": "Höhe muss positiv sein!",
+        "en": "Height must be positive!"
+    },
+    "info": {
+        "ru": "Информация",
+        "de": "Information",
+        "en": "Information"
+    },
+    "inner_label": {
+        "ru": "внутренний",
+        "de": "innen",
+        "en": "inner"
+    },
+    "insert_point_label": {
+        "ru": "Точка вставки",
+        "de": "Einfügepunkt",
+        "en": "Insertion point"
+    },
+    "insert_point_not_selected": {
+        "ru": "Выберите точку вставки.",
+        "de": "Einfügepunkt auswählen.",
+        "en": "Select insertion point."
+    },
+    "invalid_angle": {
+        "ru": "Некорректный угол!",
+        "de": "Ungültiger Winkel!",
+        "en": "Invalid angle!"
+    },
+    "invalid_geometry": {
+        "ru": "Ошибка геометрии.",
+        "de": "Geometriefehler.",
+        "en": "Geometry error."
+    },
+    "invalid_gradient": {
+        "ru": "Некорректный наклон!",
+        "de": "Ungültige Neigung!",
+        "en": "Invalid gradient!"
+    },
+    "invalid_number": {
+        "ru": "Некорректное число!",
+        "de": "Ungültige Zahl!",
+        "en": "Invalid number!"
+    },
+    "invalid_number_format_error": {
+        "ru": "Ошибка: Неверный формат числа",
+        "de": "Fehler: Ungültiges Zahlenformat",
+        "en": "Error: Invalid number format"
+    },
+    "invalid_point": {
+        "ru": "Некорректная точка вставки.",
+        "de": "Ungültiger Einfügepunkt.",
+        "en": "Invalid insertion point."
+    },
+    "invalid_points_list": {
+        "ru": "Некорректный список точек: {}",
+        "de": "Ungültige Punkteliste: {}",
+        "en": "Invalid points list: {}"
+    },
+    "invalid_points_type": {
+        "ru": "Все координаты должны быть числами: {}",
+        "de": "Alle Koordinaten müssen Zahlen sein: {}",
+        "en": "All coordinates must be numbers: {}"
+    },
+    "invalid_result": {
+        "ru": "Некорректный результат!",
+        "de": "Ungültiges Ergebnis!",
+        "en": "Invalid result!"
+    },
+    "lang_de": {
+        "ru": "Немецкий",
+        "de": "Deutsch",
+        "en": "German"
+    },
+    "lang_en": {
+        "ru": "Английский",
+        "de": "Englisch",
+        "en": "English"
+    },
+    "lang_ru": {
+        "ru": "Русский",
+        "de": "Russisch",
+        "en": "Russian"
+    },
+    "language_menu": {
+        "ru": "Язык",
+        "de": "Sprache",
+        "en": "Language"
+    },
+    "layer_context_error": {
+        "ru": "Ошибка в контексте слоя '{}': {}",
+        "de": "Fehler im Kontext der Ebene '{}': {}",
+        "en": "Error in layer context '{}': {}"
+    },
+    "layer_created": {
+        "ru": "Создан слой '{}'.",
+        "de": "Ebene '{}' erstellt.",
+        "en": "Layer '{}' created."
+    },
+    "layer_label": {
+        "ru": "Слой:",
+        "de": "Ebene:",
+        "en": "Layer:"
+    },
+    "layer_locked": {
+        "ru": "Слой '{}' заблокирован, разблокируем.",
+        "de": "Ebene '{}' ist gesperrt, wird entsperrt.",
+        "en": "Layer '{}' is locked, unlocking."
+    },
+    "layer_restored": {
+        "ru": "Восстановлен исходный слой '{}'.",
+        "de": "Ursprüngliche Ebene '{}' wiederhergestellt.",
+        "en": "Original layer '{}' restored."
+    },
+    "layer_restore_error": {
+        "ru": "Ошибка при восстановлении исходного слоя: {}",
+        "de": "Fehler beim Wiederherstellen der ursprünglichen Ebene: {}",
+        "en": "Error restoring original layer: {}"
+    },
+    "layer_set": {
+        "ru": "Установлен активный слой '{}'.",
+        "de": "Aktive Ebene '{}' gesetzt.",
+        "en": "Active layer '{}' set."
+    },
+    "length_positive_error": {
+        "ru": "Ошибка: Высота обечайки должна быть положительной",
+        "de": "Fehler: Höhe des Behälters muss positiv sein",
+        "en": "Error: Shell height must be positive"
+    },
+    "main_data_label": {
+        "ru": "Основные данные",
+        "de": "Hauptdaten",
+        "en": "Main data"
+    },
+    "material_label": {
+        "ru": "Материал:",
+        "de": "Material:",
+        "en": "Material:"
+    },
+    "math_error": {
+        "ru": "Математическая ошибка!",
+        "de": "Mathematischer Fehler!",
+        "en": "Mathematical error!"
+    },
+    "menu_about": {
+        "ru": "О программе",
+        "de": "Über das Programm",
+        "en": "About the program"
+    },
+    "menu_file": {
+        "ru": "Файл",
+        "de": "Datei",
+        "en": "File"
+    },
+    "menu_help": {
+        "ru": "Справка",
+        "de": "Hilfe",
+        "en": "Help"
+    },
+    "middle_label": {
+        "ru": "средний",
+        "de": "mitte",
+        "en": "middle"
+    },
+    "missing_data": {
+        "ru": "Недостаточно данных!",
+        "de": "Unzureichende Daten!",
+        "en": "Insufficient data!"
+    },
+    "missing_height_data": {
+        "ru": "Необходимо указать высоту, наклон или угол.",
+        "de": "Höhe, Neigung oder Winkel müssen angegeben werden.",
+        "en": "Height, gradient, or angle must be specified."
+    },
+    "mm": {
+        "ru": "мм",
+        "de": "mm",
+        "en": "mm"
+    },
+    "no_center": {
+        "ru": "Не удалось выбрать точку центра. Построение отменено.",
+        "de": "Konnte keinen Mittelpunkt auswählen. Bau abgebrochen.",
+        "en": "Failed to select center point. Operation canceled."
+    },
+    "no_diameters": {
+        "ru": "Нет диаметров для построения окружностей!",
+        "de": "Keine Durchmesser für den Bau von Kreisen!",
+        "en": "No diameters for circle creation!"
+    },
+    "no_input_data": {
+        "ru": "Ввод отменен или данные отсутствуют.",
+        "de": "Eingabe abgebrochen oder keine Daten vorhanden.",
+        "en": "Input canceled or no data provided."
+    },
+    "offset_non_negative_error": {
+        "ru": "Ошибка: Отступ не может быть отрицательным",
+        "de": "Fehler: Versatz darf nicht negativ sein",
+        "en": "Error: Offset cannot be negative"
+    },
+    "ok_button": {
+        "ru": "ОК",
+        "de": "OK",
+        "en": "OK"
+    },
+    "operation_success": {
+        "ru": "Операция завершена.",
+        "de": "Vorgang abgeschlossen.",
+        "en": "Operation completed."
+    },
+    "outer_label": {
+        "ru": "наружный",
+        "de": "außen",
+        "en": "outer"
+    },
+    "point_not_selected": {
+        "ru": "Точка не выбрана. Попробуйте снова или нажмите Отмена.",
+        "de": "Kein Punkt ausgewählt. Versuchen Sie es erneut oder klicken Sie auf Abbrechen.",
+        "en": "No point selected. Try again or press Cancel."
+    },
+    "point_not_selected_error": {
+        "ru": "Ошибка: точка вставки не выбрана или AutoCAD не инициализирован",
+        "de": "Fehler: Einfügepunkt nicht ausgewählt oder AutoCAD nicht initialisiert",
+        "en": "Error: Insertion point not selected or AutoCAD not initialized"
+    },
+    "point_selected": {
+        "ru": "Точка выбрана: x={}, y={}",
+        "de": "Punkt ausgewählt: x={}, y={}",
+        "en": "Point selected: x={}, y={}"
+    },
+    "point_selection_error": {
+        "ru": "Ошибка при выборе точки: {}",
+        "de": "Fehler bei der Punktauswahl: {}",
+        "en": "Error selecting point: {}"
+    },
+    "polyline_points": {
+        "ru": "Координаты полилинии: {}",
+        "de": "Polylinienkoordinaten: {}",
+        "en": "Polyline coordinates: {}"
+    },
+    "polyline_success": {
+        "ru": "Полилиния создана.",
+        "de": "Polylinie erstellt.",
+        "en": "Polyline created."
+    },
+    "preview": {
+        "ru": "Предпросмотр",
+        "de": "Vorschau",
+        "en": "Preview"
+    },
+    "program_shell": {
+        "ru": "Развертка обечайки",
+        "de": "Abwicklung eines Behälters",
+        "en": "Vessel shell sheet"
+    },
+    "program_title": {
+        "ru": "AT-Metal Unfold Pro System",
+        "de": "AT-Metal Unfold Pro System",
+        "en": "AT-Metal Unfold Pro System"
+    },
+    "prompt_select_point": {
+        "ru": "Укажите точку: ",
+        "de": "Punkt auswählen: ",
+        "en": "Select point: "
+    },
+    "radius_R_label": {
+        "ru": "Радиус R (мм):",
+        "de": "Radius R (mm):",
+        "en": "Radius R (mm):"
+    },
+    "radius_r_label": {
+        "ru": "Радиус r (мм):",
+        "de": "Radius r (mm):",
+        "en": "Radius r (mm):"
+    },
+    "rectangle_error": {
+        "ru": "Ошибка при создании прямоугольника.",
+        "de": "Fehler beim Erstellen des Rechtecks.",
+        "en": "Error creating rectangle."
+    },
+    "rectangle_points_calculated": {
+        "ru": "Точки прямоугольника рассчитаны для направления: {}",
+        "de": "Rechteckpunkte für Richtung berechnet: {}",
+        "en": "Rectangle points calculated for direction: {}"
+    },
+    "rectangle_success": {
+        "ru": "Прямоугольник создан: ширина {}, высота {}",
+        "de": "Rechteck erstellt: Breite {}, Höhe {}",
+        "en": "Rectangle created: width {}, height {}"
+    },
+    "save_error": {
+        "ru": "Ошибка сохранения значения: {}",
+        "de": "Fehler beim Speichern des Werts: {}",
+        "en": "Error saving value: {}"
+    },
+    "save_success": {
+        "ru": "Значение {} сохранено.",
+        "de": "Wert {} gespeichert.",
+        "en": "Value {} saved."
+    },
+    "save_value": {
+        "ru": "Сохранить значение",
+        "de": "Wert speichern",
+        "en": "Save value"
+    },
+    "seam_angle_label": {
+        "ru": "Расположение продольного шва",
+        "de": "Position der Längsnaht",
+        "en": "Longitudinal seam position"
+    },
+    "seam_angle_range_error": {
+        "ru": "Ошибка: Угол шва должен быть в диапазоне от 0 до 360 градусов",
+        "de": "Fehler: Nahtwinkel muss zwischen 0 und 360 Grad liegen",
+        "en": "Error: Seam angle must be between 0 and 360 degrees"
+    },
+    "select_point_button": {
+        "ru": "Выбрать точку",
+        "de": "Punkt auswählen",
+        "en": "Select point"
+    },
+    "shell_tab_label": {
+        "ru": "Обечайка",
+        "de": "Behälter",
+        "en": "Shell"
+    },
+    "status_ready": {
+        "ru": "Готов",
+        "de": "Bereit",
+        "en": "Ready"
+    },
+    "steigung_label": {
+        "ru": "Наклон 1:k",
+        "de": "Neigung 1:k",
+        "en": "Gradient 1:k"
+    },
+    "success": {
+        "ru": "Успех",
+        "de": "Erfolg",
+        "en": "Success"
+    },
+    "success_title": {
+        "ru": "Успех",
+        "de": "Erfolg",
+        "en": "Success"
+    },
+    "text_error": {
+        "ru": "Ошибка при добавлении текста.",
+        "de": "Fehler beim Hinzufügen von Text.",
+        "en": "Error adding text."
+    },
+    "text_error_details": {
+        "ru": "Ошибка при добавлении текста: {}",
+        "de": "Fehler beim Hinzufügen von Text: {}",
+        "en": "Error adding text: {}"
+    },
+    "text_layer_error": {
+        "ru": "Не удалось добавить текст на слой '{}'.",
+        "de": "Text konnte nicht auf Ebene '{}' hinzugefügt werden.",
+        "en": "Failed to add text to layer '{}'."
+    },
+    "text_success": {
+        "ru": "Текст '{}' успешно добавлен на слой '{}' в точке {}.",
+        "de": "Text '{}' erfolgreich auf Ebene '{}' an Punkt {} hinzugefügt.",
+        "en": "Text '{}' successfully added to layer '{}' at point {}."
+    },
+    "thickness_label": {
+        "ru": "Толщина s (мм):",
+        "de": "Dicke s (mm):",
+        "en": "Thickness s (mm):"
+    },
+    "thickness_positive_error": {
+        "ru": "Ошибка: Толщина должна быть положительной",
+        "de": "Fehler: Dicke muss positiv sein",
+        "en": "Error: Thickness must be positive"
+    },
+    "top_allowance_label": {
+        "ru": "Припуск сверху, мм",
+        "de": "Zugabe oben, mm",
+        "en": "Top allowance, mm"
+    },
+    "weld_allowance_label": {
+        "ru": "Припуск на сварку (мм):",
+        "de": "Schweißnahtzugabe (mm):",
+        "en": "Weld allowance (mm):"
+    },
+    "window_title_cone": {
+        "ru": "Параметры развертки конуса",
+        "de": "Parameter der Kegelabwicklung",
+        "en": "Cone sheet parameters"
+    },
+    "window_title_head": {
+        "ru": "Параметры днища",
+        "de": "Bodenparameter",
+        "en": "Head parameters"
+    },
+    "window_title_ring": {
+        "ru": "Кольцо",
+        "de": "Ring",
+        "en": "Ring"
+    },
+    "window_title_shell": {
+        "ru": "Параметры развертки обечайки вертикального сосуда",
+        "de": "Parameter der Abwicklung eines vertikalen Behälters",
+        "en": "Vertical vessel shell sheet parameters"
+    },
+    "work_number_invalid": {
+        "ru": "Номер работы не задан!",
+        "de": "Arbeitsnummer nicht angegeben!",
+        "en": "Work number not specified!"
+    },
+    "work_number_label": {
+        "ru": "Номер работы:",
+        "de": "Arbeitsnummer:",
+        "en": "Work number:"
+    },
+    "zero_error": {
+        "ru": "Деление на ноль невозможно!",
+        "de": "Division durch Null ist unmöglich!",
+        "en": "Division by zero is impossible!"
     }
 }
+
 
 class Localization:
     """
@@ -411,7 +680,19 @@ class Localization:
     """
 
     def __init__(self, language: str = "ru") -> None:
-        self.language = language if language in translations else "ru"
+        self._valid_languages = {"ru", "de", "en"}
+        self.language = language if language in self._valid_languages else "ru"
+        logging.info(f"Localization initialized with language: {self.language}")
+
+    def set_language(self, language: str) -> None:
+        """
+        Устанавливает язык локализации.
+
+        Args:
+            language: Код языка ("ru", "de", "en").
+        """
+        self.language = language if language in self._valid_languages else "ru"
+        logging.info(f"Language set to: {self.language}")
 
     def get(self, key: str, *args) -> str:
         """
@@ -424,7 +705,11 @@ class Localization:
         Returns:
             str: Переведённая строка.
         """
-        text = translations[self.language].get(key, key)
+        if self.language not in self._valid_languages:
+            self.language = "ru"
+            logging.warning(f"Invalid language detected, reverted to: {self.language}")
+        text = translations.get(key, {}).get(self.language, key)
+        logging.debug(f"Localization: key={key}, language={self.language}, result={text}")
         return text.format(*args) if args else text
 
 

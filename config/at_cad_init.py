@@ -9,8 +9,6 @@ from windows.at_gui_utils import show_popup
 from config.at_config import LANGUAGE
 from locales.at_localization import loc
 
-loc.language = LANGUAGE  # Установка языка локализации из конфигурации
-
 
 class ATCadInit:
     """
@@ -36,6 +34,7 @@ class ATCadInit:
         Инициализирует подключение к AutoCAD, если оно еще не выполнено.
         """
         if not self._initialized:
+            loc.set_language(LANGUAGE)  # Установка языка локализации из конфигурации
             self.acad = None  # Экземпляр AutoCAD
             self.adoc = None  # Активный документ
             self.model = None  # Модельное пространство

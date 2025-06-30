@@ -1,11 +1,15 @@
-# at_config.py
 """
 Конфигурационный файл для проекта AT-CAD.
 Содержит настройки языка, шрифта, интерфейса и параметров черчения.
 """
 
 import os
+import logging
 from locales.at_localization import loc
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO, filename="at_cad.log",
+                    format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Путь к папке с ресурсами (иконки, изображения и т.д.)
 IMAGES_DIR: str = "images"
@@ -15,7 +19,7 @@ RESOURCE_DIR: str = "config"
 ICON_PATH: str = os.path.join(IMAGES_DIR, "AT-CAD_8.png")
 
 # Путь к изображению конуса
-CONE_IMAGE_PATH: str = os.path.join(IMAGES_DIR, "cone_image.png")
+CONE_IMAGE_PATH: str = os.path.join(IMAGES_DIR, "done-icon.png")
 
 # Путь к файлу с последними введёнными данными для конуса
 LAST_CONE_INPUT_FILE: str = os.path.join(RESOURCE_DIR, "last_cone_input.json")
@@ -29,6 +33,15 @@ LANGUAGE_ICONS: dict = {
 
 # Размер полей ввода и выпадающих списков
 INPUT_FIELD_SIZE: tuple[int, int] = (200, -1)
+
+# Настройка высоты баннера
+BANNER_HIGH: int = 100  # Высота баннера в пикселях
+
+# Размер логотипа в баннере
+LOGO_SIZE: tuple[int, int] = (BANNER_HIGH-10, BANNER_HIGH-10)  # Ширина и высота логотипа в пикселях
+
+# Настройка окна
+WINDOW_SIZE: tuple[int, int] = (1024, 768)
 
 # Язык локализации
 LANGUAGE: str = "ru"  # Устанавливает язык интерфейса и сообщений ('ru', 'de', 'en')
@@ -62,19 +75,12 @@ def set_language(lang: str) -> None:
 
     Args:
         lang: Код языка ('ru', 'de', 'en').
-
-    Raises:
-        ValueError: Если передан неподдерживаемый код языка.
     """
     global LANGUAGE
     valid_languages = ["ru", "de", "en"]
     if lang not in valid_languages:
-        lang = "ru"  # Язык по умолчанию
-        print(f"Предупреждение: Указан неверный язык '{lang}'. Установлен язык по умолчанию: 'ru'.")
+        lang = "ru"
+        logging.warning(f"Invalid language '{lang}', reverted to 'ru'")
     LANGUAGE = lang
-    loc.language = lang
-    print(f"set_language: LANGUAGE обновлён на {LANGUAGE}, loc.language = {loc.language}")
-
-
-# if __name__ == "__main__":
-#     print(ICON_PATH)
+    loc.set_language(lang)
+    logging.info(f"set_language: LANGUAGE={LANGUAGE}, loc.language={loc.language}")

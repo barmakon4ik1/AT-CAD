@@ -1,4 +1,4 @@
-# at_main_window.py
+# old_at_main_window.py
 """
 Модуль главного окна программы AT-CAD.
 Содержит основное окно с меню, ссылками на программы и кнопкой выхода.
@@ -9,6 +9,9 @@ import os
 import logging
 import traceback
 from typing import Optional, Dict, Callable
+
+from config import at_config
+from locales import at_localization
 from windows.at_cone_input_window import ConeInputWindow
 from windows.at_shell_input_window import ShellInputWindow
 from windows.at_ringe_window import RingInputWindow
@@ -327,7 +330,7 @@ class MainWindow(wx.Frame):
             new_index = (current_index + 1) % len(current_langs)
             new_lang = current_langs[new_index]
             logging.info(f"Смена языка на: {new_lang}")
-            at_config.set_language(new_lang)
+            at_localization.set_language(new_lang)
             logging.info(f"После set_language, at_config.LANGUAGE: {at_config.LANGUAGE}, loc.language: {loc.language}")
             self._refresh_ui()
         except Exception as e:
