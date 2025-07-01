@@ -6,41 +6,56 @@
 import wx
 import os
 import logging
-from config.at_config import ICON_PATH, LANGUAGE, LANGUAGE_ICONS, BANNER_COLOR, BANNER_TEXT_COLOR, set_language, \
-    BACKGROUND_COLOR, EXIT_BUTTON_COLOR, BANNER_HIGH, WINDOW_SIZE, LOGO_SIZE, FONT_SIZE
-from windows.at_style import style_label
-from locales.at_localization import loc
-from windows.at_window_utils import load_last_position, save_last_position, apply_styles_to_panel, get_button_font
+from config.at_config import (
+    ICON_PATH,
+    LANGUAGE,
+    LANGUAGE_ICONS,
+    BANNER_COLOR,
+    BANNER_TEXT_COLOR,
+    BACKGROUND_COLOR,
+    EXIT_BUTTON_COLOR,
+    BANNER_HIGH,
+    WINDOW_SIZE,
+    LOGO_SIZE,
+    FONT_SIZE,
+    FONT_TYPE,
+    STATUS_FONT_SIZE,
+    STATUS_TEXT_COLOR,
+    FONT_NAME,
+)
+from locales.at_localization import loc, Localization
+from windows.at_window_utils import load_last_position, save_last_position, get_button_font
 from windows.at_gui_utils import show_popup
 from config.at_cad_init import ATCadInit
+
 
 # Устанавливаем текущую рабочую директорию в корень проекта
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # Настройка логирования для отладки
-logging.basicConfig(level=logging.INFO, filename="at_cad.log",
-                    format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    filename="at_cad.log",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
 
 class ATMainWindow(wx.Frame):
     def __init__(self):
         # Инициализируем локализацию
         logging.info(f"Initial language: {loc.language}, program_title: {loc.get('program_title')}")
-        super().__init__(parent=None, title=loc.get("program_title"), size=WINDOW_SIZE,
-                         style=wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX))
+        super().__init__(
+            parent=None,
+            title=loc.get("program_title"),
+            size=WINDOW_SIZE,
+            style=wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX),
+        )
         self.SetMinSize(WINDOW_SIZE)
         self.SetMaxSize(WINDOW_SIZE)
 
         # Создаем главную панель для всего содержимого
         self.panel = wx.Panel(self)
         self.panel.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
-
-        # Инициализация AutoCAD
-        # self.cad = ATCadInit()
-        # if not self.cad.is_initialized():
-        #     show_popup(loc.get("cad_init_error_short"), popup_type="error")
-        #     self.Close()
-        #     return
 
         # Отладка: вывод текущей рабочей директории и путей
         logging.info(f"Current working directory: {os.getcwd()}")
@@ -98,9 +113,6 @@ class ATMainWindow(wx.Frame):
         # Устанавливаем сайзер для панели
         self.panel.SetSizer(self.main_sizer)
         self.panel.Layout()
-
-        # Применяем стили ко всем элементам
-        apply_styles_to_panel(self.panel)
 
         # Привязываем обработчик закрытия окна для сохранения позиции
         self.Bind(wx.EVT_CLOSE, self.on_close)
@@ -162,14 +174,18 @@ class ATMainWindow(wx.Frame):
         banner_sizer.AddStretchSpacer()
 
         # Название программы по центру
-        title = wx.StaticText(banner_panel, label=loc.get("program_title"))
-        style_label(title)
-        title.SetForegroundColour(wx.Colour(BANNER_TEXT_COLOR))
-        if BANNER_HIGH >= 100:
-            font = title.GetFont()
-            font.SetPointSize(FONT_SIZE + 10)  # Увеличиваем шрифт для крупного баннера
-            title.SetFont(font)
-        banner_sizer.Add(title, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.ALL, border=10)
+        self.title = wx.StaticText(banner_panel, label=loc.get("program_title"))
+        font = wx.Font(
+            FONT_SIZE + 10,
+            wx.FONTFAMILY_DEFAULT,
+            wx.FONTSTYLE_NORMAL if FONT_TYPE == "normal" else wx.FONTSTYLE_ITALIC,
+            wx.FONTWEIGHT_BOLD if FONT_TYPE in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL,
+            faceName=FONT_NAME,
+        )
+        self.title.SetFont(font)
+        self.title.SetForegroundColour(wx.Colour(BANNER_TEXT_COLOR))
+        banner_sizer.Add(self.title, proportion=0, flag=wx.ALIGN_CENTER | wx.ALL, border=10)
+        logging.info(f"Banner title font size: {FONT_SIZE + 10}, color: {BANNER_TEXT_COLOR}")
 
         banner_sizer.AddStretchSpacer()
 
@@ -182,10 +198,8 @@ class ATMainWindow(wx.Frame):
                     flag_bitmap = self.scale_bitmap(flag_bitmap, BANNER_HIGH - 10, BANNER_HIGH - 10)
                     self.flag_button = wx.StaticBitmap(banner_panel, bitmap=flag_bitmap)
                     self.flag_button.Bind(wx.EVT_LEFT_DOWN, self.on_change_language)
-                    banner_sizer.Add(self.flag_button, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
-                                     border=10)
-                    logging.info(
-                        f"Flag icon loaded: {lang_icon_path}, size: {flag_bitmap.GetWidth()}x{flag_bitmap.GetHeight()}")
+                    banner_sizer.Add(self.flag_button, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=10)
+                    logging.info(f"Flag icon loaded: {lang_icon_path}, size: {flag_bitmap.GetWidth()}x{flag_bitmap.GetHeight()}")
                 else:
                     logging.error(f"Invalid bitmap: {lang_icon_path}")
                     flag_label = wx.StaticText(banner_panel, label=f"[{LANGUAGE}]")
@@ -200,6 +214,8 @@ class ATMainWindow(wx.Frame):
             banner_sizer.Add(flag_label, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=10)
 
         banner_panel.SetSizer(banner_sizer)
+        banner_panel.Layout()
+        banner_panel.Refresh()
         self.main_sizer.Add(banner_panel, proportion=0, flag=wx.EXPAND | wx.ALL, border=5)
 
     def create_menu(self):
@@ -216,7 +232,7 @@ class ATMainWindow(wx.Frame):
         self.lang_items = {
             "ru": self.language_menu.Append(wx.ID_ANY, loc.get("lang_ru"), kind=wx.ITEM_RADIO),
             "de": self.language_menu.Append(wx.ID_ANY, loc.get("lang_de"), kind=wx.ITEM_RADIO),
-            "en": self.language_menu.Append(wx.ID_ANY, loc.get("lang_en"), kind=wx.ITEM_RADIO)
+            "en": self.language_menu.Append(wx.ID_ANY, loc.get("lang_en"), kind=wx.ITEM_RADIO),
         }
         self.lang_items[LANGUAGE].Check(True)
         menu_bar.Append(self.language_menu, loc.get("language_menu"))
@@ -243,13 +259,24 @@ class ATMainWindow(wx.Frame):
 
         # Строка статуса
         self.status_text = wx.StaticText(status_panel, label=loc.get("status_ready"))
-        style_label(self.status_text)
+        font = wx.Font(
+            STATUS_FONT_SIZE,
+            wx.FONTFAMILY_DEFAULT,
+            wx.FONTSTYLE_NORMAL if FONT_TYPE == "normal" else wx.FONTSTYLE_ITALIC,
+            wx.FONTWEIGHT_BOLD if FONT_TYPE in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL,
+            faceName=FONT_NAME,
+        )
+        self.status_text.SetFont(font)
+        self.status_text.SetForegroundColour(wx.Colour(STATUS_TEXT_COLOR))
         status_sizer.Add(self.status_text, proportion=1, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=5)
+        logging.info(f"Status label font size: {STATUS_FONT_SIZE}, color: {STATUS_TEXT_COLOR}")
 
         # Копирайт
         self.copyright_text = wx.StaticText(status_panel, label=loc.get("copyright"))
-        style_label(self.copyright_text)
+        self.copyright_text.SetFont(font)
+        self.copyright_text.SetForegroundColour(wx.Colour(STATUS_TEXT_COLOR))
         status_sizer.Add(self.copyright_text, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=5)
+        logging.info(f"Copyright label font size: {STATUS_FONT_SIZE}, color: {STATUS_TEXT_COLOR}")
 
         status_panel.SetSizer(status_sizer)
         self.main_sizer.Add(status_panel, proportion=0, flag=wx.EXPAND | wx.ALL, border=5)
@@ -265,9 +292,9 @@ class ATMainWindow(wx.Frame):
 
         # Рассчитываем максимальную ширину кнопки для всех языков
         max_width = 0
-        languages = ['ru', 'en', 'de']
+        languages = ["ru", "en", "de"]
         for lang in languages:
-            temp_loc = loc.__class__(lang)
+            temp_loc = Localization(lang)
             label = temp_loc.get("button_exit")
             dc = wx.ClientDC(self.exit_button)
             dc.SetFont(button_font)
@@ -283,13 +310,13 @@ class ATMainWindow(wx.Frame):
         lang_map = {
             self.lang_items["ru"].GetId(): "ru",
             self.lang_items["de"].GetId(): "de",
-            self.lang_items["en"].GetId(): "en"
+            self.lang_items["en"].GetId(): "en",
         }
         event_id = event.GetId()
         new_lang = lang_map.get(event_id)
         if new_lang:
             logging.info(f"Смена языка через меню на: {new_lang}")
-            set_language(new_lang)
+            loc.set_language(new_lang)
             self.update_language_icon(new_lang)
             self.update_ui()
 
@@ -300,7 +327,7 @@ class ATMainWindow(wx.Frame):
         new_index = (current_index + 1) % len(current_langs)
         new_lang = current_langs[new_index]
         logging.info(f"Смена языка через значок на: {new_lang}")
-        set_language(new_lang)
+        loc.set_language(new_lang)
         self.update_language_icon(new_lang)
         self.update_ui()
 
@@ -313,8 +340,7 @@ class ATMainWindow(wx.Frame):
                 if flag_bitmap.IsOk():
                     flag_bitmap = self.scale_bitmap(flag_bitmap, BANNER_HIGH - 10, BANNER_HIGH - 10)
                     self.flag_button.SetBitmap(flag_bitmap)
-                    logging.info(
-                        f"Flag icon updated: {lang_icon_path}, size: {flag_bitmap.GetWidth()}x{flag_bitmap.GetHeight()}")
+                    logging.info(f"Flag icon updated: {lang_icon_path}, size: {flag_bitmap.GetWidth()}x{flag_bitmap.GetHeight()}")
                 else:
                     logging.error(f"Invalid bitmap for flag update: {lang_icon_path}")
                     self.flag_button = wx.StaticText(self.flag_button.GetParent(), label=f"[{new_lang}]")
@@ -332,15 +358,39 @@ class ATMainWindow(wx.Frame):
     def update_ui(self):
         """Обновляет текст элементов интерфейса после смены языка."""
         self.SetTitle(loc.get("program_title"))
+        if hasattr(self, "title"):
+            self.title.SetLabel(loc.get("program_title"))
+            font = wx.Font(
+                FONT_SIZE + 10,
+                wx.FONTFAMILY_DEFAULT,
+                wx.FONTSTYLE_NORMAL if FONT_TYPE == "normal" else wx.FONTSTYLE_ITALIC,
+                wx.FONTWEIGHT_BOLD if FONT_TYPE in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL,
+                faceName=FONT_NAME,
+            )
+            self.title.SetFont(font)
+            self.title.SetForegroundColour(wx.Colour(BANNER_TEXT_COLOR))
+            logging.info(f"Updated banner title font size: {FONT_SIZE + 10}, color: {BANNER_TEXT_COLOR}")
         self.status_text.SetLabel(loc.get("status_ready"))
+        font = wx.Font(
+            STATUS_FONT_SIZE,
+            wx.FONTFAMILY_DEFAULT,
+            wx.FONTSTYLE_NORMAL if FONT_TYPE == "normal" else wx.FONTSTYLE_ITALIC,
+            wx.FONTWEIGHT_BOLD if FONT_TYPE in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL,
+            faceName=FONT_NAME,
+        )
+        self.status_text.SetFont(font)
+        self.status_text.SetForegroundColour(wx.Colour(STATUS_TEXT_COLOR))
+        logging.info(f"Updated status label font size: {STATUS_FONT_SIZE}, color: {STATUS_TEXT_COLOR}")
         self.copyright_text.SetLabel(loc.get("copyright"))
+        self.copyright_text.SetFont(font)
+        self.copyright_text.SetForegroundColour(wx.Colour(STATUS_TEXT_COLOR))
+        logging.info(f"Updated copyright label font size: {STATUS_FONT_SIZE}, color: {STATUS_TEXT_COLOR}")
         self.exit_button.SetLabel(loc.get("button_exit"))
         self.GetMenuBar().SetMenuLabel(0, loc.get("menu_file"))
         self.GetMenuBar().SetMenuLabel(1, loc.get("language_menu"))
         self.GetMenuBar().SetMenuLabel(2, loc.get("menu_help"))
         for lang, item in self.lang_items.items():
             item.SetItemLabel(loc.get(f"lang_{lang}"))
-        apply_styles_to_panel(self.panel)
         self.panel.Layout()
         self.Refresh()
 

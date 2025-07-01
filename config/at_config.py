@@ -5,11 +5,14 @@
 
 import os
 import logging
-from locales.at_localization import loc
+
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO, filename="at_cad.log",
-                    format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    filename="at_cad.log",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
 # Путь к папке с ресурсами (иконки, изображения и т.д.)
 IMAGES_DIR: str = "images"
@@ -28,7 +31,7 @@ LAST_CONE_INPUT_FILE: str = os.path.join(RESOURCE_DIR, "last_cone_input.json")
 LANGUAGE_ICONS: dict = {
     "ru": os.path.join(IMAGES_DIR, "ru.png"),
     "de": os.path.join(IMAGES_DIR, "de.png"),
-    "en": os.path.join(IMAGES_DIR, "en.png")
+    "en": os.path.join(IMAGES_DIR, "en.png"),
 }
 
 # Размер полей ввода и выпадающих списков
@@ -38,7 +41,7 @@ INPUT_FIELD_SIZE: tuple[int, int] = (200, -1)
 BANNER_HIGH: int = 100  # Высота баннера в пикселях
 
 # Размер логотипа в баннере
-LOGO_SIZE: tuple[int, int] = (BANNER_HIGH-10, BANNER_HIGH-10)  # Ширина и высота логотипа в пикселях
+LOGO_SIZE: tuple[int, int] = (BANNER_HIGH - 10, BANNER_HIGH - 10)  # Ширина и высота логотипа в пикселях
 
 # Настройка окна
 WINDOW_SIZE: tuple[int, int] = (1024, 768)
@@ -49,11 +52,13 @@ LANGUAGE: str = "ru"  # Устанавливает язык интерфейса
 # Настройки шрифта
 FONT_NAME: str = "Times New Roman"  # Название шрифта для интерфейса
 FONT_TYPE: str = "normal"  # Стиль шрифта ('italic', 'normal', 'bold', 'bolditalic')
-FONT_SIZE: int = 14  # Размер шрифта в интерфейсе
+FONT_SIZE: int = 16  # Размер шрифта в интерфейсе (для баннера +10)
+STATUS_FONT_SIZE: int = 8  # Размер шрифта для статусной строки
+STATUS_TEXT_COLOR: str = "white"  # Цвет текста статусной строки
 
 # Настройки цвета
 BACKGROUND_COLOR: str = "#508050"  # Цвет фона (зеленый, как на ДНЦ-пульте Нева)
-FOREGROUND_COLOR: str = "white"  # Цвет текста
+FOREGROUND_COLOR: str = "white"  # Цвет текста (для элементов, кроме баннера и статусной строки)
 BANNER_COLOR: str = "light blue"  # Цвет баннера
 BANNER_TEXT_COLOR: str = "black"  # Цвет текста баннера
 EXIT_BUTTON_COLOR: str = "#FF0000"  # Цвет кнопки выхода
@@ -67,20 +72,3 @@ HEADS_LAYER: str = "0"  # Слой для построения днищ
 TEXT_HEIGHT_BIG: int = 60  # Высота большого текста
 TEXT_HEIGHT_SMALL: int = 30  # Высота малого текста
 TEXT_DISTANCE: int = 80  # Расстояние между текстами
-
-
-def set_language(lang: str) -> None:
-    """
-    Устанавливает язык интерфейса и обновляет локализацию.
-
-    Args:
-        lang: Код языка ('ru', 'de', 'en').
-    """
-    global LANGUAGE
-    valid_languages = ["ru", "de", "en"]
-    if lang not in valid_languages:
-        lang = "ru"
-        logging.warning(f"Invalid language '{lang}', reverted to 'ru'")
-    LANGUAGE = lang
-    loc.set_language(lang)
-    logging.info(f"set_language: LANGUAGE={LANGUAGE}, loc.language={loc.language}")

@@ -5,10 +5,15 @@
 
 from typing import Union
 import logging
+from config.at_config import LANGUAGE
+
 
 # Настройка логирования для отладки
-logging.basicConfig(level=logging.INFO, filename="at_cad.log",
-                    format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    filename="at_cad.log",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
 translations = {
     "about_text": {
@@ -679,7 +684,13 @@ class Localization:
     Класс для управления локализацией текстовых сообщений.
     """
 
-    def __init__(self, language: str = "ru") -> None:
+    def __init__(self, language: str = LANGUAGE):
+        """
+        Инициализирует локализацию с заданным языком.
+
+        Args:
+            language: Код языка ("ru", "de", "en"). По умолчанию берётся из at_config.LANGUAGE.
+        """
         self._valid_languages = {"ru", "de", "en"}
         self.language = language if language in self._valid_languages else "ru"
         logging.info(f"Localization initialized with language: {self.language}")
@@ -703,7 +714,7 @@ class Localization:
             *args: Параметры форматирования.
 
         Returns:
-            str: Переведённая строка.
+            str: Переведённая строка или ключ, если перевод не найден.
         """
         if self.language not in self._valid_languages:
             self.language = "ru"
