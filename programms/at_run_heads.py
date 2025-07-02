@@ -5,7 +5,7 @@
 
 import pythoncom
 from at_addhead import at_add_head
-from at_run_dialog_window import at_run_dialog_window
+from windows.at_run_dialog_window import at_run_dialog_window
 from typing import Optional, Dict, Any
 
 from at_localization import loc

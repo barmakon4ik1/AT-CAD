@@ -27,7 +27,7 @@ from locales.at_localization import loc, Localization
 from windows.at_window_utils import load_last_position, save_last_position, get_button_font, fit_text_to_height
 from windows.at_gui_utils import show_popup
 from config.at_cad_init import ATCadInit
-
+from windows.at_run_dialog_window import load_content, at_load_content
 
 # Устанавливаем текущую рабочую директорию в корень проекта
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -42,6 +42,7 @@ logging.basicConfig(
 
 class ATMainWindow(wx.Frame):
     def __init__(self):
+        self.last_input = {}  # Для хранения последних введенных данных
         # Инициализируем локализацию
         logging.info(f"Initial language: {loc.language}, program_title: {loc.get('program_title')}")
         super().__init__(
@@ -97,7 +98,13 @@ class ATMainWindow(wx.Frame):
         # Основная область (контейнер для будущего контента)
         self.content_panel = wx.Panel(self.panel)
         self.content_panel.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
+        self.content_sizer = wx.BoxSizer(wx.VERTICAL)  # Сайзер для динамического контента
+        self.content_panel.SetSizer(self.content_sizer)
+        self.current_content = None  # Текущая панель контента
         self.main_sizer.Add(self.content_panel, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
+
+        # Загружаем начальную страницу
+        self.switch_content("content_apps")
 
         # Область кнопок
         self.button_panel = wx.Panel(self.panel)
@@ -135,6 +142,36 @@ class ATMainWindow(wx.Frame):
             return wx.Bitmap(image)
         return bitmap
 
+    def switch_content(self, content_name: str):
+        """
+        Переключает содержимое content_panel на указанную панель.
+
+        Args:
+            content_name: Имя модуля контента (например, 'content_apps').
+        """
+        # Удаляем текущий контент, если он есть
+        if self.current_content:
+            self.current_content.Destroy()
+            self.current_content = None
+
+        # Загружаем новый контент через at_load_content
+        try:
+            new_content = at_load_content(content_name, self.content_panel)
+            if new_content and isinstance(new_content, wx.Panel):
+                self.current_content = new_content
+                self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
+                logging.info(f"Switched to content: {content_name}")
+            else:
+                logging.error(f"Invalid content returned for {content_name}")
+                self.current_content = wx.StaticText(self.content_panel, label=f"Error loading {content_name}")
+                self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
+        except Exception as e:
+            logging.error(f"Error switching to content {content_name}: {e}")
+            self.current_content = wx.StaticText(self.content_panel, label=f"Error loading {content_name}")
+            self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
+
+        self.content_panel.Layout()
+        self.Refresh()
 
     def create_banner(self):
         """Создает баннер с логотипом, названием и флажком языка."""
@@ -243,6 +280,17 @@ class ATMainWindow(wx.Frame):
         exit_item = file_menu.Append(wx.ID_EXIT, loc.get("button_exit"))
         menu_bar.Append(file_menu, loc.get("menu_file"))
 
+        # Меню "Контент" для переключения страниц
+        content_menu = wx.Menu()
+        # Получаем список доступных страниц из at_run_dialog_window
+        content_items = load_content("get_content_menu", self) or []
+        self.content_menu_items = {}
+        for content_name, content_label in content_items:
+            item = content_menu.Append(wx.ID_ANY, content_label)
+            self.content_menu_items[item.GetId()] = content_name
+            self.Bind(wx.EVT_MENU, self.on_content_menu, item)
+        menu_bar.Append(content_menu, "Контент")  # Временная заглушка для названия
+
         # Меню "Язык"
         self.language_menu = wx.Menu()
         self.lang_items = {
@@ -265,6 +313,12 @@ class ATMainWindow(wx.Frame):
         for lang, item in self.lang_items.items():
             self.Bind(wx.EVT_MENU, self.on_language_change, item)
         self.Bind(wx.EVT_MENU, self.on_about, about_item)
+
+    def on_content_menu(self, event):
+        """Обработчик выбора пункта меню 'Контент'."""
+        content_name = self.content_menu_items.get(event.GetId())
+        if content_name:
+            self.switch_content(content_name)
 
     def create_status_bar(self):
         """Создает строку статуса и копирайт."""
@@ -356,7 +410,8 @@ class ATMainWindow(wx.Frame):
                 if flag_bitmap.IsOk():
                     flag_bitmap = self.scale_bitmap(flag_bitmap, BANNER_HIGH - 10, BANNER_HIGH - 10)
                     self.flag_button.SetBitmap(flag_bitmap)
-                    logging.info(f"Flag icon updated: {lang_icon_path}, size: {flag_bitmap.GetWidth()}x{flag_bitmap.GetHeight()}")
+                    logging.info(
+                        f"Flag icon updated: {lang_icon_path}, size: {flag_bitmap.GetWidth()}x{flag_bitmap.GetHeight()}")
                 else:
                     logging.error(f"Invalid bitmap for flag update: {lang_icon_path}")
                     self.flag_button = wx.StaticText(self.flag_button.GetParent(), label=f"[{new_lang}]")
