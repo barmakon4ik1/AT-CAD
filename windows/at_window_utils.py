@@ -162,3 +162,34 @@ def get_button_font() -> wx.Font:
     font = get_standard_font()
     font.SetPointSize(FONT_SIZE + 2)
     return font
+
+
+def fit_text_to_height(ctrl, text, max_width, max_height, font_name, style_flags):
+    """
+    Подбирает наибольший размер шрифта, при котором текст помещается по высоте.
+    """
+    font_size = 48  # начнем с большого размера
+    min_size = 8
+
+    while font_size >= min_size:
+        font = wx.Font(
+            font_size,
+            wx.FONTFAMILY_DEFAULT,
+            style_flags.get("style", wx.FONTSTYLE_NORMAL),
+            style_flags.get("weight", wx.FONTWEIGHT_NORMAL),
+            faceName=font_name,
+        )
+        ctrl.SetFont(font)
+        ctrl.SetLabel(text)
+        ctrl.Wrap(max_width)
+
+        dc = wx.ClientDC(ctrl)
+        dc.SetFont(font)
+        _, text_height = dc.GetMultiLineTextExtent(ctrl.GetLabel())
+
+        if text_height <= max_height:
+            return font_size  # нашли подходящий размер
+
+        font_size -= 1  # уменьшаем и пробуем снова
+
+    return min_size  # минимально допустимый

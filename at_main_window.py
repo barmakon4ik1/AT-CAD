@@ -21,10 +21,10 @@ from config.at_config import (
     FONT_TYPE,
     STATUS_FONT_SIZE,
     STATUS_TEXT_COLOR,
-    FONT_NAME,
+    FONT_NAME, BANNER_FONT_SIZE,
 )
 from locales.at_localization import loc, Localization
-from windows.at_window_utils import load_last_position, save_last_position, get_button_font
+from windows.at_window_utils import load_last_position, save_last_position, get_button_font, fit_text_to_height
 from windows.at_gui_utils import show_popup
 from config.at_cad_init import ATCadInit
 
@@ -135,17 +135,16 @@ class ATMainWindow(wx.Frame):
             return wx.Bitmap(image)
         return bitmap
 
+
     def create_banner(self):
         """Создает баннер с логотипом, названием и флажком языка."""
         banner_panel = wx.Panel(self.panel)
         banner_panel.SetBackgroundColour(wx.Colour(BANNER_COLOR))
-        if BANNER_HIGH < 20:
-            logging.warning(f"BANNER_HIGH ({BANNER_HIGH}) is too small, setting to 20")
-            banner_height = 20
-        else:
-            banner_height = BANNER_HIGH
+
+        banner_height = max(BANNER_HIGH, 20)
         banner_panel.SetMinSize((-1, banner_height))
         banner_panel.SetMaxSize((-1, banner_height))
+
         banner_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         # Логотип слева
@@ -157,11 +156,8 @@ class ATMainWindow(wx.Frame):
                     logo_bitmap = self.scale_bitmap(logo_bitmap, LOGO_SIZE[0], LOGO_SIZE[1])
                     logo = wx.StaticBitmap(banner_panel, bitmap=logo_bitmap)
                     banner_sizer.Add(logo, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=10)
-                    logging.info(f"Logo loaded: {logo_path}, size: {logo_bitmap.GetWidth()}x{logo_bitmap.GetHeight()}")
                 else:
-                    logging.error(f"Invalid bitmap: {logo_path}")
-                    logo = wx.StaticText(banner_panel, label="[Logo]")
-                    banner_sizer.Add(logo, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=10)
+                    raise ValueError("Invalid bitmap")
             except Exception as e:
                 logging.error(f"Error loading logo {logo_path}: {e}")
                 logo = wx.StaticText(banner_panel, label="[Logo]")
@@ -173,19 +169,40 @@ class ATMainWindow(wx.Frame):
 
         banner_sizer.AddStretchSpacer()
 
-        # Название программы по центру
-        self.title = wx.StaticText(banner_panel, label=loc.get("program_title"))
+        # Название программы по центру с переносом строк и адаптивным шрифтом
+        max_width = 800
+        max_height = banner_height - 20  # отступы сверху и снизу
+
+        self.title = wx.StaticText(
+            banner_panel,
+            label="",
+            style=wx.ST_NO_AUTORESIZE
+        )
+        self.title.SetMinSize((max_width, -1))
+
+        # Вычисляем оптимальный размер шрифта
+        title_text = loc.get("program_title")
+        style_flags = {
+            "style": wx.FONTSTYLE_NORMAL if FONT_TYPE == "normal" else wx.FONTSTYLE_ITALIC,
+            "weight": wx.FONTWEIGHT_BOLD if FONT_TYPE in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL
+        }
+        optimal_size = fit_text_to_height(
+            self.title, title_text, max_width, max_height, FONT_NAME, style_flags
+        )
+
         font = wx.Font(
-            FONT_SIZE + 10,
+            optimal_size,
             wx.FONTFAMILY_DEFAULT,
-            wx.FONTSTYLE_NORMAL if FONT_TYPE == "normal" else wx.FONTSTYLE_ITALIC,
-            wx.FONTWEIGHT_BOLD if FONT_TYPE in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL,
-            faceName=FONT_NAME,
+            style_flags["style"],
+            style_flags["weight"],
+            faceName=FONT_NAME
         )
         self.title.SetFont(font)
         self.title.SetForegroundColour(wx.Colour(BANNER_TEXT_COLOR))
+        self.title.SetLabel(title_text)
+        self.title.Wrap(max_width)
+
         banner_sizer.Add(self.title, proportion=0, flag=wx.ALIGN_CENTER | wx.ALL, border=10)
-        logging.info(f"Banner title font size: {FONT_SIZE + 10}, color: {BANNER_TEXT_COLOR}")
 
         banner_sizer.AddStretchSpacer()
 
@@ -195,15 +212,13 @@ class ATMainWindow(wx.Frame):
             try:
                 flag_bitmap = wx.Bitmap(lang_icon_path, wx.BITMAP_TYPE_ANY)
                 if flag_bitmap.IsOk():
-                    flag_bitmap = self.scale_bitmap(flag_bitmap, BANNER_HIGH - 10, BANNER_HIGH - 10)
+                    flag_bitmap = self.scale_bitmap(flag_bitmap, banner_height - 10, banner_height - 10)
                     self.flag_button = wx.StaticBitmap(banner_panel, bitmap=flag_bitmap)
                     self.flag_button.Bind(wx.EVT_LEFT_DOWN, self.on_change_language)
-                    banner_sizer.Add(self.flag_button, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=10)
-                    logging.info(f"Flag icon loaded: {lang_icon_path}, size: {flag_bitmap.GetWidth()}x{flag_bitmap.GetHeight()}")
+                    banner_sizer.Add(self.flag_button, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+                                     border=10)
                 else:
-                    logging.error(f"Invalid bitmap: {lang_icon_path}")
-                    flag_label = wx.StaticText(banner_panel, label=f"[{LANGUAGE}]")
-                    banner_sizer.Add(flag_label, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=10)
+                    raise ValueError("Invalid flag bitmap")
             except Exception as e:
                 logging.error(f"Error loading flag icon {lang_icon_path}: {e}")
                 flag_label = wx.StaticText(banner_panel, label=f"[{LANGUAGE}]")
@@ -216,6 +231,7 @@ class ATMainWindow(wx.Frame):
         banner_panel.SetSizer(banner_sizer)
         banner_panel.Layout()
         banner_panel.Refresh()
+
         self.main_sizer.Add(banner_panel, proportion=0, flag=wx.EXPAND | wx.ALL, border=5)
 
     def create_menu(self):
@@ -358,18 +374,37 @@ class ATMainWindow(wx.Frame):
     def update_ui(self):
         """Обновляет текст элементов интерфейса после смены языка."""
         self.SetTitle(loc.get("program_title"))
+
         if hasattr(self, "title"):
-            self.title.SetLabel(loc.get("program_title"))
+            title_text = loc.get("program_title")
+            self.title.SetLabel("")  # временно сбрасываем
+
+            max_width = 800
+            max_height = max(BANNER_HIGH, 20) - 20  # с учётом отступов
+            style_flags = {
+                "style": wx.FONTSTYLE_NORMAL if FONT_TYPE == "normal" else wx.FONTSTYLE_ITALIC,
+                "weight": wx.FONTWEIGHT_BOLD if FONT_TYPE in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL
+            }
+
+            optimal_size = fit_text_to_height(
+                self.title, title_text, max_width, max_height, FONT_NAME, style_flags
+            )
+
             font = wx.Font(
-                FONT_SIZE + 10,
+                optimal_size,
                 wx.FONTFAMILY_DEFAULT,
-                wx.FONTSTYLE_NORMAL if FONT_TYPE == "normal" else wx.FONTSTYLE_ITALIC,
-                wx.FONTWEIGHT_BOLD if FONT_TYPE in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL,
-                faceName=FONT_NAME,
+                style_flags["style"],
+                style_flags["weight"],
+                faceName=FONT_NAME
             )
             self.title.SetFont(font)
             self.title.SetForegroundColour(wx.Colour(BANNER_TEXT_COLOR))
-            logging.info(f"Updated banner title font size: {FONT_SIZE + 10}, color: {BANNER_TEXT_COLOR}")
+            self.title.SetLabel(title_text)
+            self.title.Wrap(max_width)
+
+            logging.info(f"Updated banner title font size: {optimal_size}, color: {BANNER_TEXT_COLOR}")
+
+        # Остальная часть без изменений
         self.status_text.SetLabel(loc.get("status_ready"))
         font = wx.Font(
             STATUS_FONT_SIZE,
@@ -381,16 +416,19 @@ class ATMainWindow(wx.Frame):
         self.status_text.SetFont(font)
         self.status_text.SetForegroundColour(wx.Colour(STATUS_TEXT_COLOR))
         logging.info(f"Updated status label font size: {STATUS_FONT_SIZE}, color: {STATUS_TEXT_COLOR}")
+
         self.copyright_text.SetLabel(loc.get("copyright"))
         self.copyright_text.SetFont(font)
         self.copyright_text.SetForegroundColour(wx.Colour(STATUS_TEXT_COLOR))
-        logging.info(f"Updated copyright label font size: {STATUS_FONT_SIZE}, color: {STATUS_TEXT_COLOR}")
+        logging.info(f"Updated copyright label")
+
         self.exit_button.SetLabel(loc.get("button_exit"))
         self.GetMenuBar().SetMenuLabel(0, loc.get("menu_file"))
         self.GetMenuBar().SetMenuLabel(1, loc.get("language_menu"))
         self.GetMenuBar().SetMenuLabel(2, loc.get("menu_help"))
         for lang, item in self.lang_items.items():
             item.SetItemLabel(loc.get(f"lang_{lang}"))
+
         self.panel.Layout()
         self.Refresh()
 

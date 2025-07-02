@@ -52,9 +52,10 @@ LANGUAGE: str = "ru"  # Устанавливает язык интерфейса
 # Настройки шрифта
 FONT_NAME: str = "Times New Roman"  # Название шрифта для интерфейса
 FONT_TYPE: str = "normal"  # Стиль шрифта ('italic', 'normal', 'bold', 'bolditalic')
-FONT_SIZE: int = 16  # Размер шрифта в интерфейсе (для баннера +10)
+FONT_SIZE: int = 16  # Размер шрифта в интерфейсе
 STATUS_FONT_SIZE: int = 8  # Размер шрифта для статусной строки
 STATUS_TEXT_COLOR: str = "white"  # Цвет текста статусной строки
+BANNER_FONT_SIZE: int = 24  # (для баннера)
 
 # Настройки цвета
 BACKGROUND_COLOR: str = "#508050"  # Цвет фона (зеленый, как на ДНЦ-пульте Нева)
