@@ -22,7 +22,7 @@ RESOURCE_DIR: str = "config"
 ICON_PATH: str = os.path.join(IMAGES_DIR, "AT-CAD_8.png")
 
 # Путь к изображению конуса
-CONE_IMAGE_PATH: str = os.path.join(IMAGES_DIR, "done-icon.png")
+CONE_IMAGE_PATH: str = os.path.join(IMAGES_DIR, "cone.png")
 
 # Путь к файлу с последними введёнными данными для конуса
 LAST_CONE_INPUT_FILE: str = os.path.join(RESOURCE_DIR, "last_cone_input.json")
@@ -44,7 +44,7 @@ BANNER_HIGH: int = 100  # Высота баннера в пикселях
 LOGO_SIZE: tuple[int, int] = (BANNER_HIGH - 10, BANNER_HIGH - 10)  # Ширина и высота логотипа в пикселях
 
 # Настройка окна
-WINDOW_SIZE: tuple[int, int] = (1024, 768)
+WINDOW_SIZE: tuple[int, int] = (1280, 1024)
 
 # Язык локализации
 LANGUAGE: str = "ru"  # Устанавливает язык интерфейса и сообщений ('ru', 'de', 'en')

@@ -128,3 +128,16 @@ def style_staticbox(box: wx.StaticBox) -> None:
     )
     box.SetFont(font)
     box.SetForegroundColour(wx.Colour(FOREGROUND_COLOR))
+
+
+def style_label(label: wx.StaticText) -> None:
+    """
+    Применяет стиль к метке (wx.StaticText).
+
+    Args:
+        label: Метка для стилизации.
+    """
+    font = wx.Font(FONT_SIZE, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+    font.SetFaceName(FONT_NAME if FONT_NAME else "Times New Roman")
+    label.SetFont(font)
+    label.SetForegroundColour(wx.Colour(FOREGROUND_COLOR))

@@ -8,13 +8,13 @@ import os
 import json
 import logging
 import time
-from typing import Tuple, Dict, Optional
+from typing import Tuple, Dict, Optional, List
 import wx
 from config.at_config import FONT_NAME, FONT_TYPE, FONT_SIZE, BACKGROUND_COLOR
 from locales.at_localization import loc
 from programms.at_base import init_autocad
 from programms.at_input import at_point_input
-from windows.at_style import style_textctrl, style_combobox, style_radiobutton, style_staticbox
+from windows.at_style import style_textctrl, style_combobox, style_radiobutton, style_staticbox, style_label
 
 
 # Настройка логирования
@@ -474,3 +474,39 @@ def apply_styles_to_panel(panel: wx.Window) -> None:
         panel: Панель для стилизации.
     """
     apply_styles_recursively(panel)
+
+
+def create_standard_buttons(parent: wx.Window, on_select_point, on_ok, on_cancel) -> List[wx.Button]:
+    """
+    Создаёт стандартные кнопки (Insert Point, OK, Cancel) с привязкой событий.
+
+    Args:
+        parent: Родительский элемент (wx.Window).
+        on_select_point: Обработчик для кнопки выбора точки.
+        on_ok: Обработчик для кнопки OK.
+        on_cancel: Обработчик для кнопки Cancel.
+
+    Returns:
+        List[wx.Button]: Список кнопок [point_button, ok_button, cancel_button].
+    """
+    button_font = get_button_font()
+    point_button = wx.Button(parent, label=loc.get("insert_point_label"))
+    point_button.SetFont(button_font)
+    point_button.SetBackgroundColour(wx.Colour(0, 0, 255))
+    point_button.SetForegroundColour(wx.WHITE)
+    point_button.Bind(wx.EVT_BUTTON, on_select_point)
+
+    ok_button = wx.Button(parent, label=loc.get("ok_button"))
+    ok_button.SetFont(button_font)
+    ok_button.SetBackgroundColour(wx.Colour(0, 128, 0))
+    ok_button.SetForegroundColour(wx.WHITE)
+    ok_button.Bind(wx.EVT_BUTTON, on_ok)
+
+    cancel_button = wx.Button(parent, label=loc.get("cancel_button"))
+    cancel_button.SetFont(button_font)
+    cancel_button.SetBackgroundColour(wx.Colour(255, 0, 0))
+    cancel_button.SetForegroundColour(wx.WHITE)
+    cancel_button.Bind(wx.EVT_BUTTON, on_cancel)
+
+    return [point_button, ok_button, cancel_button]
+

@@ -20,7 +20,7 @@ from programms.at_input import at_point_input
 from locales.at_localization import loc
 from windows.at_window_utils import (
     CanvasPanel, save_last_input, show_popup,
-    get_standard_font, create_standard_buttons, apply_styles_to_panel
+    get_standard_font, apply_styles_to_panel, create_standard_buttons
 )
 from programms.at_run_cone import run_application
 
@@ -30,6 +30,7 @@ logging.basicConfig(
     filename="at_cad.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
+
 
 def create_window(parent: wx.Window) -> wx.Panel:
     """
@@ -48,6 +49,7 @@ class ConeContentPanel(wx.Panel):
     """
     Панель для ввода параметров развертки конуса.
     """
+
     def __init__(self, parent):
         """
         Инициализирует панель, создаёт элементы управления.
@@ -69,7 +71,8 @@ class ConeContentPanel(wx.Panel):
             logging.error("AutoCAD не инициализирован")
 
         # Загрузка последних введённых данных
-        self.last_input = wx.GetApp().GetTopWindow().last_input if hasattr(wx.GetApp().GetTopWindow(), 'last_input') else {}
+        self.last_input = wx.GetApp().GetTopWindow().last_input if hasattr(wx.GetApp().GetTopWindow(),
+                                                                           'last_input') else {}
         self.setup_ui()
         self.order_input.SetFocus()
         logging.info("ConeContentPanel успешно инициализировано")
@@ -120,12 +123,14 @@ class ConeContentPanel(wx.Panel):
         order_sizer = wx.BoxSizer(wx.HORIZONTAL)
         order_label = wx.StaticText(main_data_box, label="К-№")
         order_label.SetFont(font)
-        self.order_input = wx.TextCtrl(main_data_box, value=self.last_input.get("order_number", ""), size=INPUT_FIELD_SIZE)
+        self.order_input = wx.TextCtrl(main_data_box, value=self.last_input.get("order_number", ""),
+                                       size=INPUT_FIELD_SIZE)
         self.order_input.SetFont(font)
         order_sizer.AddStretchSpacer()
         order_sizer.Add(order_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
         order_sizer.Add(self.order_input, 0, wx.RIGHT, 10)
-        self.detail_input = wx.TextCtrl(main_data_box, value=self.last_input.get("detail_number", ""), size=INPUT_FIELD_SIZE)
+        self.detail_input = wx.TextCtrl(main_data_box, value=self.last_input.get("detail_number", ""),
+                                        size=INPUT_FIELD_SIZE)
         self.detail_input.SetFont(font)
         order_sizer.Add(self.detail_input, 0, wx.RIGHT, 5)
         main_data_sizer.Add(order_sizer, 0, wx.ALL | wx.EXPAND, 5)
@@ -135,8 +140,8 @@ class ConeContentPanel(wx.Panel):
         material_label = wx.StaticText(main_data_box, label=loc.get("material_label", "Материал"))
         material_label.SetFont(font)
         self.material_combo = wx.ComboBox(main_data_box, choices=material_options,
-                                         value=self.last_input.get("material", material_options[0]),
-                                         style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
+                                          value=self.last_input.get("material", material_options[0]),
+                                          style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
         self.material_combo.SetFont(font)
         material_sizer.AddStretchSpacer()
         material_sizer.Add(material_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
@@ -150,13 +155,14 @@ class ConeContentPanel(wx.Panel):
         last_thickness = str(self.last_input.get("thickness", "")).replace(',', '.')
         try:
             last_thickness_float = float(last_thickness)
-            last_thickness = str(int(last_thickness_float)) if last_thickness_float.is_integer() else str(last_thickness_float)
+            last_thickness = str(int(last_thickness_float)) if last_thickness_float.is_integer() else str(
+                last_thickness_float)
         except ValueError:
             last_thickness = ""
         thickness_value = last_thickness if last_thickness in thickness_options else thickness_options[0]
         self.thickness_combo = wx.ComboBox(main_data_box, choices=thickness_options,
-                                          value=thickness_value,
-                                          style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
+                                           value=thickness_value,
+                                           style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
         self.thickness_combo.SetFont(font)
         thickness_sizer.AddStretchSpacer()
         thickness_sizer.Add(thickness_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
@@ -175,7 +181,8 @@ class ConeContentPanel(wx.Panel):
         d_sizer = wx.BoxSizer(wx.HORIZONTAL)
         d_label = wx.StaticText(diameter_box, label="d, мм")
         d_label.SetFont(font)
-        self.d_input = wx.TextCtrl(diameter_box, value=str(self.last_input.get("diameter_top", "")), size=INPUT_FIELD_SIZE)
+        self.d_input = wx.TextCtrl(diameter_box, value=str(self.last_input.get("diameter_top", "")),
+                                   size=INPUT_FIELD_SIZE)
         self.d_input.SetFont(font)
         d_sizer.AddStretchSpacer()
         d_sizer.Add(d_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
@@ -202,7 +209,8 @@ class ConeContentPanel(wx.Panel):
         D_sizer = wx.BoxSizer(wx.HORIZONTAL)
         D_label = wx.StaticText(diameter_box, label="D, мм")
         D_label.SetFont(font)
-        self.D_input = wx.TextCtrl(diameter_box, value=str(self.last_input.get("diameter_base", "")), size=INPUT_FIELD_SIZE)
+        self.D_input = wx.TextCtrl(diameter_box, value=str(self.last_input.get("diameter_base", "")),
+                                   size=INPUT_FIELD_SIZE)
         self.D_input.SetFont(font)
         D_sizer.AddStretchSpacer()
         D_sizer.Add(D_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
@@ -234,7 +242,8 @@ class ConeContentPanel(wx.Panel):
         height_box.SetForegroundColour(wx.Colour(FOREGROUND_COLOR))
 
         self.height_input = wx.TextCtrl(height_box, value=str(self.last_input.get("height", "")), size=INPUT_FIELD_SIZE)
-        self.steigung_input = wx.TextCtrl(height_box, value=str(self.last_input.get("steigung", "")), size=INPUT_FIELD_SIZE)
+        self.steigung_input = wx.TextCtrl(height_box, value=str(self.last_input.get("steigung", "")),
+                                          size=INPUT_FIELD_SIZE)
         self.angle_input = wx.TextCtrl(height_box, value=str(self.last_input.get("angle", "")), size=INPUT_FIELD_SIZE)
         self.height_input.SetFont(font)
         self.steigung_input.SetFont(font)
@@ -276,8 +285,8 @@ class ConeContentPanel(wx.Panel):
         allowance_label.SetFont(font)
         allowance_options = [str(i) for i in range(11)]
         self.allowance_combo = wx.ComboBox(self, choices=allowance_options,
-                                          value=self.last_input.get("weld_allowance", "0"),
-                                          style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
+                                           value=self.last_input.get("weld_allowance", "0"),
+                                           style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
         self.allowance_combo.SetFont(font)
         allowance_sizer.AddStretchSpacer()
         allowance_sizer.Add(allowance_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
@@ -451,23 +460,29 @@ class ConeContentPanel(wx.Panel):
                 return
             if d > D:
                 d, D = D, d
-            thickness = float(self.thickness_combo.GetValue().replace(',', '.')) if self.thickness_combo.GetValue().strip() else None
-            allowance = float(self.allowance_combo.GetValue().replace(',', '.')) if self.allowance_combo.GetValue().strip() else 0
+            thickness = float(
+                self.thickness_combo.GetValue().replace(',', '.')) if self.thickness_combo.GetValue().strip() else None
+            allowance = float(
+                self.allowance_combo.GetValue().replace(',', '.')) if self.allowance_combo.GetValue().strip() else 0
 
             if thickness is None:
                 show_popup(loc.get("error_thickness_required", "Требуется выбрать толщину"), popup_type="error")
                 logging.error("Толщина не выбрана")
                 return
             if D <= 0:
-                show_popup(loc.get("error_base_diameter_positive", "Диаметр основания должен быть положительным"), popup_type="error")
+                show_popup(loc.get("error_base_diameter_positive", "Диаметр основания должен быть положительным"),
+                           popup_type="error")
                 logging.error("Диаметр основания должен быть положительным")
                 return
             if d < 0:
-                show_popup(loc.get("error_top_diameter_non_negative", "Диаметр вершины не может быть отрицательным"), popup_type="error")
+                show_popup(loc.get("error_top_diameter_non_negative", "Диаметр вершины не может быть отрицательным"),
+                           popup_type="error")
                 logging.error("Диаметр вершины не может быть отрицательным")
                 return
             if allowance < 0:
-                show_popup(loc.get("error_weld_allowance_non_negative", "Припуск на сварку не может быть отрицательным"), popup_type="error")
+                show_popup(
+                    loc.get("error_weld_allowance_non_negative", "Припуск на сварку не может быть отрицательным"),
+                    popup_type="error")
                 logging.error("Припуск на сварку не может быть отрицательным")
                 return
             if thickness <= 0:
@@ -482,16 +497,19 @@ class ConeContentPanel(wx.Panel):
                 diameter_top = at_diameter(d, thickness, d_type)
                 diameter_base = at_diameter(D, thickness, D_type)
             except Exception as e:
-                show_popup(loc.get("error_diameter_calculation", f"Ошибка расчёта диаметра: {str(e)}"), popup_type="error")
+                show_popup(loc.get("error_diameter_calculation", f"Ошибка расчёта диаметра: {str(e)}"),
+                           popup_type="error")
                 logging.error(f"Ошибка расчёта диаметра: {e}")
                 return
 
             if diameter_base <= 0:
-                show_popup(loc.get("error_base_diameter_positive", "Диаметр основания должен быть положительным"), popup_type="error")
+                show_popup(loc.get("error_base_diameter_positive", "Диаметр основания должен быть положительным"),
+                           popup_type="error")
                 logging.error("Средний диаметр основания должен быть положительным")
                 return
             if diameter_top < 0:
-                show_popup(loc.get("error_top_diameter_non_negative", "Диаметр вершины не должен быть отрицательным"), popup_type="error")
+                show_popup(loc.get("error_top_diameter_non_negative", "Диаметр вершины не должен быть отрицательным"),
+                           popup_type="error")
                 logging.error("Средний диаметр вершины не должен быть отрицательным")
                 return
 
@@ -505,19 +523,22 @@ class ConeContentPanel(wx.Panel):
             elif self.steigung_input.GetValue().strip():
                 steigung = float(self.steigung_input.GetValue().replace(',', '.'))
                 if steigung <= 0:
-                    show_popup(loc.get("error_steigung_positive", "Наклон должен быть положительным"), popup_type="error")
+                    show_popup(loc.get("error_steigung_positive", "Наклон должен быть положительным"),
+                               popup_type="error")
                     logging.error("Наклон должен быть положительным")
                     return
                 height = at_cone_height(D, d, steigung=steigung)
             elif self.angle_input.GetValue().strip():
                 angle = float(self.angle_input.GetValue().replace(',', '.'))
                 if angle <= 0 or angle >= 180:
-                    show_popup(loc.get("error_angle_range", "Угол должен быть в диапазоне от 0 до 180 градусов"), popup_type="error")
+                    show_popup(loc.get("error_angle_range", "Угол должен быть в диапазоне от 0 до 180 градусов"),
+                               popup_type="error")
                     logging.error("Угол должен быть в диапазоне от 0 до 180 градусов")
                     return
                 height = at_cone_height(D, d, angle=angle)
             else:
-                show_popup(loc.get("error_height_steigung_angle_required", "Необходимо ввести высоту, наклон или угол"), popup_type="error")
+                show_popup(loc.get("error_height_steigung_angle_required", "Необходимо ввести высоту, наклон или угол"),
+                           popup_type="error")
                 logging.error("Необходимо ввести высоту, наклон или угол")
                 return
 
@@ -565,7 +586,8 @@ class ConeContentPanel(wx.Panel):
                     show_popup(loc.get("cone_build_success", "Развертка конуса успешно построена"), popup_type="info")
                     self.on_clear(None)
                 else:
-                    show_popup(loc.get("cone_build_failed", "Построение отменено или завершилось с ошибкой"), popup_type="error")
+                    show_popup(loc.get("cone_build_failed", "Построение отменено или завершилось с ошибкой"),
+                               popup_type="error")
             except Exception as e:
                 show_popup(loc.get("cone_build_error", f"Ошибка построения: {str(e)}"), popup_type="error")
                 logging.error(f"Ошибка в run_application: {e}")
