@@ -44,7 +44,7 @@ BANNER_HIGH: int = 100  # Высота баннера в пикселях
 LOGO_SIZE: tuple[int, int] = (BANNER_HIGH - 10, BANNER_HIGH - 10)  # Ширина и высота логотипа в пикселях
 
 # Настройка окна
-WINDOW_SIZE: tuple[int, int] = (1280, 1024)
+WINDOW_SIZE: tuple[int, int] = (1280, 980)
 
 # Язык локализации
 LANGUAGE: str = "ru"  # Устанавливает язык интерфейса и сообщений ('ru', 'de', 'en')
