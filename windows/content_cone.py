@@ -1,9 +1,3 @@
-"""
-Модуль для создания панели ввода параметров развертки конуса.
-Предоставляет интерфейс для ввода данных о заказе, материале, диаметрах, высоте и припуске,
-возвращая данные для функции at_cone_sheet через вызов at_run_cone.run_application.
-"""
-
 import math
 import logging
 import os
@@ -30,7 +24,6 @@ logging.basicConfig(
     filename="at_cad.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
-
 
 def create_window(parent: wx.Window) -> wx.Panel:
     """
@@ -75,8 +68,45 @@ class ConeContentPanel(wx.Panel):
         # Загрузка последних введённых данных
         self.last_input = wx.GetApp().GetTopWindow().last_input if hasattr(wx.GetApp().GetTopWindow(),
                                                                            'last_input') else {}
+        # Загрузка точки вставки
+        if "insert_point" in self.last_input and self.last_input["insert_point"]:
+            self.insert_point = self.last_input["insert_point"]
+            self.update_status_bar_point_selected()
+        else:
+            self.update_status_bar_no_point()
+
         self.setup_ui()
         self.order_input.SetFocus()
+
+    def update_status_bar_no_point(self):
+        """
+        Обновляет статусную строку, если точка не выбрана.
+        """
+        main_window = wx.GetTopLevelParent(self)
+        if hasattr(main_window, "status_text"):
+            main_window.status_text.SetLabel(
+                loc.get("point_not_selected", "Точка не определена, выберите точку или нажмите Отмена для выхода в главное окно")
+            )
+        else:
+            logging.warning("Строка состояния (status_text) не доступна в главном окне")
+
+    def update_status_bar_point_selected(self):
+        """
+        Обновляет статусную строку с координатами выбранной точки.
+        """
+        main_window = wx.GetTopLevelParent(self)
+        if hasattr(main_window, "status_text"):
+            if hasattr(self, "insert_point"):
+                main_window.status_text.SetLabel(
+                    loc.get("point_selected", f"Точка выбрана. Координаты точки: {self.insert_point}")
+                )
+            else:
+                main_window.status_text.SetLabel(
+                    loc.get("point_not_selected",
+                            "Точка не определена, выберите точку или нажмите Отмена для выхода в главное окно")
+                )
+        else:
+            logging.warning("Строка состояния (status_text) не доступна в главном окне")
 
     def setup_ui(self) -> None:
         """
@@ -106,7 +136,7 @@ class ConeContentPanel(wx.Panel):
         self.buttons = create_standard_buttons(self, self.on_select_point, self.on_ok, self.on_cancel, self.on_clear)
         for button in self.buttons:
             button_sizer.Add(button, 0, wx.RIGHT, 5)
-        adjust_button_widths(self.buttons)  # Используем новую функцию
+        adjust_button_widths(self.buttons)
         self.left_sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT | wx.ALL, 10)
 
         # Правая часть: поля ввода
@@ -243,7 +273,7 @@ class ConeContentPanel(wx.Panel):
         self.D_inner.SetFont(font)
         self.D_middle.SetFont(font)
         self.D_outer.SetFont(font)
-        self.D_inner.SetValue(self.last_input.get("D_type", "inner") == "inner")
+        self.D_inner.SetValue(self.last_input.get("D_type", "inner") =="inner")
         self.D_middle.SetValue(self.last_input.get("D_type", "inner") == "middle")
         self.D_outer.SetValue(self.last_input.get("D_type", "inner") == "outer")
         self.labels["D_inner"] = self.D_inner
@@ -481,7 +511,7 @@ class ConeContentPanel(wx.Panel):
 
     def on_select_point(self, event: wx.Event) -> None:
         """
-        Запрашивает точку вставки в AutoCAD.
+        Запрашивает точку вставки в AutoCAD и сохраняет её в last_input.json.
 
         Args:
             event: Событие нажатия кнопки.
@@ -492,11 +522,16 @@ class ConeContentPanel(wx.Panel):
         point = at_point_input(self.cad.adoc)
         if point:
             self.insert_point = point
+            # Сохраняем точку в last_input
+            self.last_input["insert_point"] = point
+            save_last_input(LAST_CONE_INPUT_FILE, self.last_input)
+            self.update_status_bar_point_selected()
             show_popup(loc.get("point_selected", "Точка вставки выбрана"), popup_type="info")
             logging.info(f"Точка вставки выбрана: {point}")
         else:
             show_popup(loc.get("point_selection_error", "Ошибка выбора точки"), popup_type="error")
             logging.error("Точка вставки не выбрана")
+            self.update_status_bar_no_point()
 
     def on_ok(self, event: wx.Event) -> None:
         """
@@ -627,6 +662,7 @@ class ConeContentPanel(wx.Panel):
                 "thickness_text": thickness_text
             }
 
+            # Сохраняем данные в last_input.json
             save_last_input(LAST_CONE_INPUT_FILE, {
                 "order_number": self.order_input.GetValue(),
                 "detail_number": self.detail_input.GetValue(),
@@ -639,7 +675,8 @@ class ConeContentPanel(wx.Panel):
                 "D_type": D_type,
                 "height": self.height_input.GetValue(),
                 "steigung": self.steigung_input.GetValue(),
-                "angle": self.angle_input.GetValue()
+                "angle": self.angle_input.GetValue(),
+                "insert_point": self.insert_point
             })
 
             # Вызов run_application
@@ -662,6 +699,7 @@ class ConeContentPanel(wx.Panel):
     def on_clear(self, event: wx.Event) -> None:
         """
         Очищает все поля ввода и сбрасывает значения комбобоксов на значения по умолчанию из common_data.json.
+        Сохраняет очищенные данные в last_input.json.
 
         Args:
             event: Событие нажатия кнопки.
@@ -685,11 +723,29 @@ class ConeContentPanel(wx.Panel):
         self.allowance_combo.SetValue("0")
         if hasattr(self, "insert_point"):
             del self.insert_point
-        logging.info("Поля ввода очищены")
+        self.update_status_bar_no_point()
+
+        # Сохраняем очищенные данные
+        save_last_input(LAST_CONE_INPUT_FILE, {
+            "order_number": "",
+            "detail_number": "",
+            "material": material_options[0],
+            "thickness": thickness_options[0],
+            "weld_allowance": "0",
+            "diameter_top": "",
+            "diameter_base": "",
+            "d_type": "inner",
+            "D_type": "inner",
+            "height": "",
+            "steigung": "",
+            "angle": "",
+            "insert_point": None
+        })
+        logging.info("Поля ввода очищены и сохранены в last_input.json")
 
     def on_cancel(self, event: wx.Event) -> None:
         """
-        Возвращает в главное окно с контентом content_apps.
+        Возвращает в главное окно с контентом content_apps и сбрасывает строку состояния.
 
         Args:
             event: Событие нажатия кнопки.
@@ -697,6 +753,10 @@ class ConeContentPanel(wx.Panel):
         main_window = wx.GetTopLevelParent(self)
         if hasattr(main_window, "switch_content"):
             main_window.switch_content("content_apps")
+            if hasattr(main_window, "status_text"):
+                main_window.status_text.SetLabel(loc.get("status_ready", "Готов"))
+            else:
+                logging.warning("Строка состояния (status_text) не доступна для сброса")
             logging.info("Переключение на панель content_apps")
         else:
             logging.error("Главное окно не имеет метода switch_content")
@@ -706,4 +766,4 @@ class ConeContentPanel(wx.Panel):
         """
         Устанавливает одинаковую ширину для всех кнопок.
         """
-        adjust_button_widths(self.buttons)  # Используем новую функцию из at_window_utils.py
+        adjust_button_widths(self.buttons)

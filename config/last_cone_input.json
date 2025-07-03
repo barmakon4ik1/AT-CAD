@@ -1,14 +1,2 @@
 {
-  "order_number": "20177",
-  "detail_number": "",
-  "material": "2.4602 (alloy C-22)",
-  "thickness": "3.2",
-  "weld_allowance": "2.0",
-  "diameter_top": "41,5",
-  "diameter_base": "109,5",
-  "d_type": "inner",
-  "D_type": "inner",
-  "height": "340",
-  "steigung": "0.20",
-  "angle": "11.42"
-}
+  "insert_point": 
