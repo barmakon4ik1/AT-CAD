@@ -10,19 +10,98 @@ import logging
 import time
 from typing import Tuple, Dict, Optional, List
 import wx
-from config.at_config import FONT_NAME, FONT_TYPE, FONT_SIZE, BACKGROUND_COLOR
+from config.at_config import FONT_NAME, FONT_TYPE, FONT_SIZE, BACKGROUND_COLOR, LABEL_FONT_NAME, LABEL_FONT_TYPE, \
+    LABEL_FONT_COLOR, LABEL_FONT_SIZE, LABEL_FONT_WEIGHT
 from locales.at_localization import loc
 from programms.at_base import init_autocad
 from programms.at_input import at_point_input
 from windows.at_style import style_textctrl, style_combobox, style_radiobutton, style_staticbox, style_label
 
-
 # Настройка логирования
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.ERROR,
     filename="at_cad.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
+
+# Кэш для данных из JSON-файлов
+_common_data_cache = None
+
+
+def load_common_data() -> Dict:
+    """
+    Загружает данные о материалах, толщинах и конфигурации днищ из файлов 'config/common_data.json' и 'config/config.json'
+    с кэшированием.
+
+    Returns:
+        Dict: Словарь с ключами 'material', 'thicknesses', 'h1_table', 'head_types', 'fields'.
+
+    Raises:
+        FileNotFoundError: Если файлы 'config/common_data.json' или 'config/config.json' отсутствуют.
+        json.JSONDecodeError: Если файлы содержат некорректный JSON.
+        ValueError: Если структура JSON некорректна (например, отсутствует ключ 'dimensions').
+    """
+    global _common_data_cache
+    if _common_data_cache is not None:
+        logging.debug("Использование кэшированных данных из common_data.json и config.json")
+        return _common_data_cache
+
+    _common_data_cache = {
+        "material": [],
+        "thicknesses": [],
+        "h1_table": {},
+        "head_types": {},
+        "fields": [{}]
+    }
+
+    # Загрузка common_data.json
+    common_data_path = os.path.join("config", "common_data.json")
+    with open(common_data_path, "r", encoding='utf-8') as f:
+        data = json.load(f)
+        logging.info(f"Сырые данные из {common_data_path}: {data}")
+        if not isinstance(data.get("dimensions"), dict):
+            raise ValueError("Некорректная структура common_data.json: отсутствует ключ 'dimensions'")
+        dimensions = data.get("dimensions", {})
+        _common_data_cache["material"] = dimensions.get("material", []) if isinstance(
+            dimensions.get("material"), list) else []
+        _common_data_cache["thicknesses"] = dimensions.get("thicknesses", []) if isinstance(
+            dimensions.get("thicknesses"), list) else []
+        # Валидация толщин
+        for t in _common_data_cache["thicknesses"]:
+            try:
+                float(t)
+            except ValueError:
+                logging.error(f"Недопустимое значение толщины в common_data.json: {t}")
+                show_popup(loc.get("invalid_thickness", f"Недопустимое значение толщины: {t}"), popup_type="error")
+                _common_data_cache["thicknesses"] = []
+                break
+    logging.info(f"Данные успешно загружены из {common_data_path}: материалы={_common_data_cache['material']}, "
+                 f"толщины={_common_data_cache['thicknesses']}")
+
+    # Загрузка config.json
+    config_path = os.path.join("config", "config.json")
+    with open(config_path, "r", encoding='utf-8') as f:
+        config = json.load(f)
+        logging.info(f"Сырые данные из {config_path}: {config}")
+        _common_data_cache["h1_table"] = config.get("h1_table", {}) if isinstance(
+            config.get("h1_table"), dict) else {}
+        _common_data_cache["head_types"] = config.get("head_types", {}) if isinstance(
+            config.get("head_types"), dict) else {}
+        _common_data_cache["fields"] = config.get("fields", [{}]) if isinstance(
+            config.get("fields"), list) else [{}]
+    logging.info(f"Данные успешно загружены из {config_path}: h1_table={_common_data_cache['h1_table']}, "
+                 f"head_types={_common_data_cache['head_types']}, fields={_common_data_cache['fields']}")
+
+    return _common_data_cache
+
+
+def reset_common_data_cache() -> None:
+    """
+    Сбрасывает кэш данных из common_data.json и config.json.
+    """
+    global _common_data_cache
+    _common_data_cache = None
+    logging.info("Кэш common_data.json и config.json сброшен")
 
 
 def load_last_position() -> Tuple[int, int]:
@@ -34,7 +113,7 @@ def load_last_position() -> Tuple[int, int]:
     """
     config_path = os.path.join("config", "last_position.json")
     try:
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding='utf-8') as f:
             data = json.load(f)
             return (data.get("x", -1), data.get("y", -1))
     except (FileNotFoundError, json.JSONDecodeError) as e:
@@ -52,44 +131,11 @@ def save_last_position(x: int, y: int) -> None:
     """
     config_path = os.path.join("config", "last_position.json")
     try:
-        with open(config_path, "w") as f:
-            json.dump({"x": x, "y": y}, f, indent=2)
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+        with open(config_path, "w", encoding='utf-8') as f:
+            json.dump({"x": x, "y": y}, f, indent=2, ensure_ascii=False)
     except (PermissionError, OSError) as e:
         logging.error(f"Ошибка сохранения {config_path}: {e}")
-
-
-def load_common_data() -> Dict:
-    """
-    Загружает данные о материалах, толщинах и конфигурации днищ из файлов 'common_data.json' и 'config.json'.
-
-    Returns:
-        Dict: Словарь с ключами 'material', 'thicknesses', 'h1_table', 'head_types', 'fields'.
-              Возвращает пустые значения при ошибке.
-    """
-    result = {"material": [], "thicknesses": [], "h1_table": {}, "head_types": {}, "fields": [{}]}
-    try:
-        with open("common_data.json", "r") as f:
-            data = json.load(f)
-            if not isinstance(data.get("dimensions"), dict):
-                raise ValueError("Некорректная структура common_data.json")
-            dimensions = data.get("dimensions", {})
-            result["material"] = dimensions.get("material", []) if isinstance(dimensions.get("material"), list) else []
-            result["thicknesses"] = dimensions.get("thicknesses", []) if isinstance(dimensions.get("thicknesses"), list) else []
-    except (FileNotFoundError, json.JSONDecodeError, ValueError) as e:
-        logging.error(f"Ошибка загрузки common_data.json: {e}")
-        show_popup(loc.get("config_file_missing", "common_data.json"), popup_type="error")
-
-    try:
-        with open("config.json", "r") as f:
-            config = json.load(f)
-            result["h1_table"] = config.get("h1_table", {}) if isinstance(config.get("h1_table"), dict) else {}
-            result["head_types"] = config.get("head_types", {}) if isinstance(config.get("head_types"), dict) else {}
-            result["fields"] = config.get("fields", [{}]) if isinstance(config.get("fields"), list) else [{}]
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        logging.error(f"Ошибка загрузки config.json: {e}")
-        show_popup(loc.get("config_file_missing", "config.json"), popup_type="error")
-
-    return result
 
 
 def load_last_input(filename: str) -> Dict:
@@ -103,7 +149,7 @@ def load_last_input(filename: str) -> Dict:
         Dict: Словарь с данными или пустой словарь при ошибке.
     """
     try:
-        with open(filename, "r") as f:
+        with open(filename, "r", encoding='utf-8') as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
         logging.error(f"Ошибка загрузки {filename}: {e}")
@@ -119,7 +165,8 @@ def save_last_input(filename: str, data: Dict) -> None:
         data: Словарь с данными.
     """
     try:
-        with open(filename, "w") as f:
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        with open(filename, "w", encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     except (PermissionError, OSError) as e:
         logging.error(f"Ошибка сохранения {filename}: {e}")
@@ -476,18 +523,19 @@ def apply_styles_to_panel(panel: wx.Window) -> None:
     apply_styles_recursively(panel)
 
 
-def create_standard_buttons(parent: wx.Window, on_select_point, on_ok, on_cancel) -> List[wx.Button]:
+def create_standard_buttons(parent: wx.Window, on_select_point, on_ok, on_cancel, on_clear=None) -> List[wx.Button]:
     """
-    Создаёт стандартные кнопки (Insert Point, OK, Cancel) с привязкой событий.
+    Создаёт стандартные кнопки (Insert Point, OK, Cancel, Clear) с привязкой событий.
 
     Args:
         parent: Родительский элемент (wx.Window).
         on_select_point: Обработчик для кнопки выбора точки.
         on_ok: Обработчик для кнопки OK.
         on_cancel: Обработчик для кнопки Cancel.
+        on_clear: Обработчик для кнопки Clear (опционально, если None, кнопка не создаётся).
 
     Returns:
-        List[wx.Button]: Список кнопок [point_button, ok_button, cancel_button].
+        List[wx.Button]: Список кнопок [point_button, ok_button, cancel_button, clear_button] (clear_button опционально).
     """
     button_font = get_button_font()
     point_button = wx.Button(parent, label=loc.get("insert_point_label"))
@@ -502,11 +550,75 @@ def create_standard_buttons(parent: wx.Window, on_select_point, on_ok, on_cancel
     ok_button.SetForegroundColour(wx.WHITE)
     ok_button.Bind(wx.EVT_BUTTON, on_ok)
 
+    clear_button = wx.Button(parent, label=loc.get("clear_button"))
+    clear_button.SetFont(button_font)
+    clear_button.SetBackgroundColour(wx.Colour(64, 64, 64))  # Тёмно-серый цвет
+    clear_button.SetForegroundColour(wx.WHITE)
+    clear_button.Bind(wx.EVT_BUTTON, on_clear)
+
     cancel_button = wx.Button(parent, label=loc.get("cancel_button"))
     cancel_button.SetFont(button_font)
     cancel_button.SetBackgroundColour(wx.Colour(255, 0, 0))
     cancel_button.SetForegroundColour(wx.WHITE)
     cancel_button.Bind(wx.EVT_BUTTON, on_cancel)
 
-    return [point_button, ok_button, cancel_button]
+    buttons = [point_button, ok_button, clear_button, cancel_button]
+
+    return buttons
+
+
+def adjust_button_widths(buttons: List[wx.Button]) -> None:
+    """
+    Устанавливает одинаковую ширину для переданных кнопок с учётом локализации текста.
+
+    Args:
+        buttons: Список кнопок для стилизации.
+    """
+    if not buttons:
+        return
+    button_font = buttons[0].GetFont()
+    max_width = 0
+    languages = ['ru', 'de', 'en']
+    for button in buttons:
+        for lang in languages:
+            temp_loc = loc.__class__(lang)
+            label = temp_loc.get(button.GetLabel())
+            dc = wx.ClientDC(button)
+            dc.SetFont(button_font)
+            width, _ = dc.GetTextExtent(label)
+            max_width = max(max_width, width + 20)
+    for button in buttons:
+        _, height = button.GetMinSize()
+        button.SetMinSize((max_width, height))
+
+
+def get_link_font() -> wx.Font:
+    """
+    Возвращает шрифт для текстовых ссылок на основе параметров из at_config.py.
+
+    Returns:
+        wx.Font: Шрифт для ссылок.
+    """
+    # Преобразование LABEL_FONT_TYPE в wx.FontStyle и wx.FontWeight
+    style_map = {
+        "normal": wx.FONTSTYLE_NORMAL,
+        "italic": wx.FONTSTYLE_ITALIC,
+        "slant": wx.FONTSTYLE_SLANT
+    }
+    weight_map = {
+        "normal": wx.FONTWEIGHT_NORMAL,
+        "bold": wx.FONTWEIGHT_BOLD,
+        "light": wx.FONTWEIGHT_LIGHT
+    }
+
+    font_style = style_map.get(LABEL_FONT_TYPE.lower(), wx.FONTSTYLE_NORMAL)
+    font_weight = weight_map.get(LABEL_FONT_WEIGHT.lower(), wx.FONTWEIGHT_NORMAL)
+
+    return wx.Font(
+        pointSize=LABEL_FONT_SIZE,
+        family=wx.FONTFAMILY_ROMAN,  # Times New Roman относится к семейству Roman
+        style=font_style,
+        weight=font_weight,
+        faceName=LABEL_FONT_NAME
+    )
 

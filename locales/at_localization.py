@@ -1,3 +1,4 @@
+# locales/at_localization.py
 """
 Модуль для локализации текстовых сообщений в проекте.
 Поддерживает переводы на русский, немецкий и английский языки.
@@ -120,6 +121,11 @@ translations = {
         "ru": "Построена окружность с диаметром {} мм.",
         "de": "Kreis mit Durchmesser {} mm erstellt.",
         "en": "Circle created with diameter {} mm."
+    },
+    "clear_button": {
+        "ru": "Очистить",
+        "de": "Löschen",
+        "en": "Clear"
     },
     "clockwise_label": {
         "ru": "По часовой стрелке",

@@ -1,3 +1,4 @@
+# content_apps.py
 """
 Модуль для создания панели со списком доступных программ.
 Отображает текстовые ссылки на программы в несколько колонок.
@@ -5,8 +6,8 @@
 
 import wx
 import logging
-from config.at_config import BACKGROUND_COLOR
-from windows.at_window_utils import show_popup, get_standard_font
+from config.at_config import BACKGROUND_COLOR, LABEL_FONT_COLOR
+from windows.at_window_utils import show_popup, get_standard_font, get_link_font
 from locales.at_localization import loc
 from windows.at_run_dialog_window import load_content
 
@@ -16,6 +17,7 @@ logging.basicConfig(
     filename="at_cad.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
+
 
 def create_window(parent: wx.Window) -> wx.Panel:
     """
@@ -38,13 +40,18 @@ class AppsContentPanel(wx.Panel):
         super().__init__(parent)
         self.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
         self.parent = parent
+        self.links = []  # Список ссылок для последующего обновления
         self.setup_ui()
-        logging.info("AppsContentPanel успешно инициализировано")
 
     def setup_ui(self):
         """
         Настраивает интерфейс с текстовыми ссылками в несколько колонок.
         """
+        # Очищаем существующий sizer, если он есть
+        if self.GetSizer():
+            self.GetSizer().Clear(True)
+        self.links.clear()
+
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         main_sizer.AddSpacer(20)
 
@@ -64,10 +71,11 @@ class AppsContentPanel(wx.Panel):
         for content_name, label_key in programs:
             label = loc.get(label_key, label_key)  # Получаем локализованную метку
             link = wx.StaticText(self, label=label, style=wx.ALIGN_LEFT)
-            link.SetForegroundColour(wx.Colour(0, 0, 255))  # Синий цвет для ссылок
-            link.SetFont(get_standard_font())
+            link.SetForegroundColour(wx.Colour(LABEL_FONT_COLOR))  # Устанавливаем цвет текста
+            link.SetFont(get_link_font())  # Устанавливаем шрифт
             link.SetCursor(wx.Cursor(wx.CURSOR_HAND))
             link.Bind(wx.EVT_LEFT_DOWN, lambda evt, name=content_name: self.on_link_click(name))
+            self.links.append(link)  # Сохраняем ссылку
             grid_sizer.Add(link, 0, wx.ALL, 5)
 
         # Добавляем пустые элементы, если нужно заполнить сетку
@@ -76,6 +84,24 @@ class AppsContentPanel(wx.Panel):
 
         main_sizer.Add(grid_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 10)
         self.SetSizer(main_sizer)
+        self.Layout()
+
+    def update_ui_language(self):
+        """
+        Обновляет текст ссылок при смене языка.
+        """
+        programs = load_content("get_content_menu", self)
+        if not programs:
+            logging.error("Не удалось загрузить список программ для обновления языка")
+            return
+
+        for i, (content_name, label_key) in enumerate(programs):
+            if i < len(self.links):
+                new_label = loc.get(label_key, label_key)
+                self.links[i].SetLabel(new_label)
+                self.links[i].SetFont(get_link_font())  # Обновляем шрифт
+                self.links[i].SetForegroundColour(wx.Colour(LABEL_FONT_COLOR))  # Обновляем цвет
+
         self.Layout()
 
     def on_link_click(self, content_name: str):

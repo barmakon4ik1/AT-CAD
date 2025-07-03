@@ -20,7 +20,7 @@ from programms.at_input import at_point_input
 from locales.at_localization import loc
 from windows.at_window_utils import (
     CanvasPanel, save_last_input, show_popup,
-    get_standard_font, apply_styles_to_panel, create_standard_buttons
+    get_standard_font, apply_styles_to_panel, create_standard_buttons, load_common_data, adjust_button_widths
 )
 from programms.at_run_cone import run_application
 
@@ -62,6 +62,8 @@ class ConeContentPanel(wx.Panel):
         self.parent = parent
         self._updating = False
         self._debounce_timer = wx.Timer(self)
+        self.labels = {}  # Для хранения текстовых меток
+        self.static_boxes = {}  # Для хранения StaticBox
         self.Bind(wx.EVT_TIMER, self.on_debounce_timeout, self._debounce_timer)
 
         # Инициализация AutoCAD
@@ -75,13 +77,17 @@ class ConeContentPanel(wx.Panel):
                                                                            'last_input') else {}
         self.setup_ui()
         self.order_input.SetFocus()
-        logging.info("ConeContentPanel успешно инициализировано")
 
     def setup_ui(self) -> None:
         """
         Настраивает элементы интерфейса, создавая компоновку с левой (изображение, кнопки)
         и правой (поля ввода) частями.
         """
+        if self.GetSizer():
+            self.GetSizer().Clear(True)
+        self.labels.clear()
+        self.static_boxes.clear()
+
         main_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.left_sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -97,10 +103,10 @@ class ConeContentPanel(wx.Panel):
 
         # Кнопки
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.buttons = create_standard_buttons(self, self.on_select_point, self.on_ok, self.on_clear)
+        self.buttons = create_standard_buttons(self, self.on_select_point, self.on_ok, self.on_cancel, self.on_clear)
         for button in self.buttons:
             button_sizer.Add(button, 0, wx.RIGHT, 5)
-        self.adjust_button_widths()
+        adjust_button_widths(self.buttons)  # Используем новую функцию
         self.left_sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT | wx.ALL, 10)
 
         # Правая часть: поля ввода
@@ -109,20 +115,26 @@ class ConeContentPanel(wx.Panel):
         # Единый размер для всех полей ввода и выпадающих списков
         font = get_standard_font()
 
-        # Данные для выпадающих списков
-        material_options = ["Сталь", "Алюминий", "Нержавейка"]
-        thickness_options = ["1", "1.5", "2", "3", "4", "5", "6", "8", "10", "12", "14", "15"]
+        # Загрузка данных из common_data.json
+        common_data = load_common_data()
+        logging.info(f"Сырые данные common_data в setup_ui: {common_data}")
+        material_options = common_data.get("material", [])
+        thickness_options = common_data.get("thicknesses", [])
+        logging.info(f"Загружены материалы: {material_options}")
+        logging.info(f"Загружены толщины: {thickness_options}")
 
         # Группа "Основные данные"
         main_data_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, loc.get("main_data_label", "Основные данные"))
         main_data_box = main_data_sizer.GetStaticBox()
         main_data_box.SetFont(font)
         main_data_box.SetForegroundColour(wx.Colour(FOREGROUND_COLOR))
+        self.static_boxes["main_data"] = main_data_box
 
         # Номер заказа и детали
         order_sizer = wx.BoxSizer(wx.HORIZONTAL)
         order_label = wx.StaticText(main_data_box, label="К-№")
         order_label.SetFont(font)
+        self.labels["order"] = order_label
         self.order_input = wx.TextCtrl(main_data_box, value=self.last_input.get("order_number", ""),
                                        size=INPUT_FIELD_SIZE)
         self.order_input.SetFont(font)
@@ -139,9 +151,11 @@ class ConeContentPanel(wx.Panel):
         material_sizer = wx.BoxSizer(wx.HORIZONTAL)
         material_label = wx.StaticText(main_data_box, label=loc.get("material_label", "Материал"))
         material_label.SetFont(font)
+        self.labels["material"] = material_label
+        last_material = self.last_input.get("material", "")
+        material_value = last_material if last_material in material_options else material_options[0]
         self.material_combo = wx.ComboBox(main_data_box, choices=material_options,
-                                          value=self.last_input.get("material", material_options[0]),
-                                          style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
+                                          value=material_value, style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
         self.material_combo.SetFont(font)
         material_sizer.AddStretchSpacer()
         material_sizer.Add(material_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
@@ -152,6 +166,7 @@ class ConeContentPanel(wx.Panel):
         thickness_sizer = wx.BoxSizer(wx.HORIZONTAL)
         thickness_label = wx.StaticText(main_data_box, label=loc.get("thickness_label", "Толщина"))
         thickness_label.SetFont(font)
+        self.labels["thickness"] = thickness_label
         last_thickness = str(self.last_input.get("thickness", "")).replace(',', '.')
         try:
             last_thickness_float = float(last_thickness)
@@ -161,8 +176,7 @@ class ConeContentPanel(wx.Panel):
             last_thickness = ""
         thickness_value = last_thickness if last_thickness in thickness_options else thickness_options[0]
         self.thickness_combo = wx.ComboBox(main_data_box, choices=thickness_options,
-                                           value=thickness_value,
-                                           style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
+                                           value=thickness_value, style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
         self.thickness_combo.SetFont(font)
         thickness_sizer.AddStretchSpacer()
         thickness_sizer.Add(thickness_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
@@ -176,11 +190,13 @@ class ConeContentPanel(wx.Panel):
         diameter_box = diameter_sizer.GetStaticBox()
         diameter_box.SetFont(font)
         diameter_box.SetForegroundColour(wx.Colour(FOREGROUND_COLOR))
+        self.static_boxes["diameter"] = diameter_box
 
         # Диаметр вершины (d)
         d_sizer = wx.BoxSizer(wx.HORIZONTAL)
         d_label = wx.StaticText(diameter_box, label="d, мм")
         d_label.SetFont(font)
+        self.labels["d"] = d_label
         self.d_input = wx.TextCtrl(diameter_box, value=str(self.last_input.get("diameter_top", "")),
                                    size=INPUT_FIELD_SIZE)
         self.d_input.SetFont(font)
@@ -198,6 +214,9 @@ class ConeContentPanel(wx.Panel):
         self.d_inner.SetValue(self.last_input.get("d_type", "inner") == "inner")
         self.d_middle.SetValue(self.last_input.get("d_type", "inner") == "middle")
         self.d_outer.SetValue(self.last_input.get("d_type", "inner") == "outer")
+        self.labels["d_inner"] = self.d_inner
+        self.labels["d_middle"] = self.d_middle
+        self.labels["d_outer"] = self.d_outer
         d_radio_sizer.AddStretchSpacer()
         d_radio_sizer.Add(self.d_inner, 0, wx.RIGHT, 5)
         d_radio_sizer.Add(self.d_middle, 0, wx.RIGHT, 5)
@@ -209,6 +228,7 @@ class ConeContentPanel(wx.Panel):
         D_sizer = wx.BoxSizer(wx.HORIZONTAL)
         D_label = wx.StaticText(diameter_box, label="D, мм")
         D_label.SetFont(font)
+        self.labels["D"] = D_label
         self.D_input = wx.TextCtrl(diameter_box, value=str(self.last_input.get("diameter_base", "")),
                                    size=INPUT_FIELD_SIZE)
         self.D_input.SetFont(font)
@@ -226,6 +246,9 @@ class ConeContentPanel(wx.Panel):
         self.D_inner.SetValue(self.last_input.get("D_type", "inner") == "inner")
         self.D_middle.SetValue(self.last_input.get("D_type", "inner") == "middle")
         self.D_outer.SetValue(self.last_input.get("D_type", "inner") == "outer")
+        self.labels["D_inner"] = self.D_inner
+        self.labels["D_middle"] = self.D_middle
+        self.labels["D_outer"] = self.D_outer
         D_radio_sizer.AddStretchSpacer()
         D_radio_sizer.Add(self.D_inner, 0, wx.RIGHT, 5)
         D_radio_sizer.Add(self.D_middle, 0, wx.RIGHT, 5)
@@ -240,6 +263,7 @@ class ConeContentPanel(wx.Panel):
         height_box = height_sizer.GetStaticBox()
         height_box.SetFont(font)
         height_box.SetForegroundColour(wx.Colour(FOREGROUND_COLOR))
+        self.static_boxes["height"] = height_box
 
         self.height_input = wx.TextCtrl(height_box, value=str(self.last_input.get("height", "")), size=INPUT_FIELD_SIZE)
         self.steigung_input = wx.TextCtrl(height_box, value=str(self.last_input.get("steigung", "")),
@@ -255,6 +279,9 @@ class ConeContentPanel(wx.Panel):
         height_label.SetFont(font)
         steigung_label.SetFont(font)
         angle_label.SetFont(font)
+        self.labels["height"] = height_label
+        self.labels["steigung"] = steigung_label
+        self.labels["angle"] = angle_label
 
         height_input_sizer = wx.BoxSizer(wx.HORIZONTAL)
         height_input_sizer.AddStretchSpacer()
@@ -283,6 +310,7 @@ class ConeContentPanel(wx.Panel):
         allowance_sizer = wx.BoxSizer(wx.HORIZONTAL)
         allowance_label = wx.StaticText(self, label=loc.get("weld_allowance_label", "Припуск на сварку"))
         allowance_label.SetFont(font)
+        self.labels["allowance"] = allowance_label
         allowance_options = [str(i) for i in range(11)]
         self.allowance_combo = wx.ComboBox(self, choices=allowance_options,
                                            value=self.last_input.get("weld_allowance", "0"),
@@ -300,15 +328,32 @@ class ConeContentPanel(wx.Panel):
         self.Layout()
         logging.info("Интерфейс панели ConeContentPanel успешно настроен")
 
-    def adjust_button_widths(self):
-        """Устанавливает одинаковую ширину для всех кнопок."""
-        max_width = 0
-        for button in self.buttons:
-            dc = wx.ClientDC(button)
-            width, _ = dc.GetTextExtent(button.GetLabel())
-            max_width = max(max_width, width + 20)
-        for button in self.buttons:
-            button.SetMinSize((max_width, 30))
+    def update_ui_language(self):
+        """
+        Обновляет текст меток и групп при смене языка.
+        """
+        self.static_boxes["main_data"].SetLabel(loc.get("main_data_label", "Основные данные"))
+        self.static_boxes["diameter"].SetLabel(loc.get("diameter", "Диаметр"))
+        self.static_boxes["height"].SetLabel(loc.get("height_label", "Высота"))
+        self.labels["material"].SetLabel(loc.get("material_label", "Материал"))
+        self.labels["thickness"].SetLabel(loc.get("thickness_label", "Толщина"))
+        self.labels["d_inner"].SetLabel(loc.get("inner_label", "Внутренний"))
+        self.labels["d_middle"].SetLabel(loc.get("middle_label", "Средний"))
+        self.labels["d_outer"].SetLabel(loc.get("outer_label", "Внешний"))
+        self.labels["D_inner"].SetLabel(loc.get("inner_label", "Внутренний"))
+        self.labels["D_middle"].SetLabel(loc.get("middle_label", "Средний"))
+        self.labels["D_outer"].SetLabel(loc.get("outer_label", "Внешний"))
+        self.labels["steigung"].SetLabel(loc.get("steigung_label", "Наклон"))
+        self.labels["allowance"].SetLabel(loc.get("weld_allowance_label", "Припуск на сварку"))
+
+        # Обновление текста кнопок
+        self.buttons[0].SetLabel(loc.get("insert_point_label", "Точка вставки"))
+        self.buttons[1].SetLabel(loc.get("ok_button", "ОК"))
+        self.buttons[2].SetLabel(loc.get("clear_button", "Очистить"))
+        self.buttons[3].SetLabel(loc.get("cancel_button", "Отмена"))
+        self.adjust_button_widths()
+
+        self.Layout()
 
     def _clear_height_fields(self) -> None:
         """
@@ -321,6 +366,9 @@ class ConeContentPanel(wx.Panel):
     def on_height_text(self, event: wx.Event) -> None:
         """
         Запускает обработку ввода высоты с задержкой (debounce).
+
+        Args:
+            event: Событие ввода текста.
         """
         self._debounce_timer.Stop()
         self._debounce_timer.Start(500, oneShot=True)
@@ -329,6 +377,9 @@ class ConeContentPanel(wx.Panel):
     def on_steigung_text(self, event: wx.Event) -> None:
         """
         Запускает обработку ввода наклона с задержкой (debounce).
+
+        Args:
+            event: Событие ввода текста.
         """
         self._debounce_timer.Stop()
         self._debounce_timer.Start(500, oneShot=True)
@@ -337,6 +388,9 @@ class ConeContentPanel(wx.Panel):
     def on_angle_text(self, event: wx.Event) -> None:
         """
         Запускает обработку ввода угла с задержкой (debounce).
+
+        Args:
+            event: Событие ввода текста.
         """
         self._debounce_timer.Stop()
         self._debounce_timer.Start(500, oneShot=True)
@@ -345,6 +399,9 @@ class ConeContentPanel(wx.Panel):
     def on_debounce_timeout(self, event: wx.Event) -> None:
         """
         Выполняет расчёты высоты, наклона или угла после задержки.
+
+        Args:
+            event: Событие таймера.
         """
         if self._updating:
             return
@@ -425,6 +482,9 @@ class ConeContentPanel(wx.Panel):
     def on_select_point(self, event: wx.Event) -> None:
         """
         Запрашивает точку вставки в AutoCAD.
+
+        Args:
+            event: Событие нажатия кнопки.
         """
         if not self.cad.is_initialized():
             show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
@@ -441,6 +501,9 @@ class ConeContentPanel(wx.Panel):
     def on_ok(self, event: wx.Event) -> None:
         """
         Проверяет данные и вызывает run_application для построения развертки.
+
+        Args:
+            event: Событие нажатия кнопки.
         """
         if not self.cad.is_initialized():
             show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
@@ -598,12 +661,20 @@ class ConeContentPanel(wx.Panel):
 
     def on_clear(self, event: wx.Event) -> None:
         """
-        Очищает все поля ввода.
+        Очищает все поля ввода и сбрасывает значения комбобоксов на значения по умолчанию из common_data.json.
+
+        Args:
+            event: Событие нажатия кнопки.
         """
+        # Загружаем данные из common_data.json
+        common_data = load_common_data()
+        material_options = common_data.get("dimensions", {}).get("material", ["1.4301", "1.4404", "1.4571"])
+        thickness_options = common_data.get("dimensions", {}).get("thicknesses", ["1", "1.5", "2", "3", "4", "5", "6", "8", "10", "12", "14", "15"])
+
         self.order_input.SetValue("")
         self.detail_input.SetValue("")
-        self.material_combo.SetValue(self.material_combo.GetString(0))
-        self.thickness_combo.SetValue(self.thickness_combo.GetString(0))
+        self.material_combo.SetValue(material_options[0])
+        self.thickness_combo.SetValue(thickness_options[0])
         self.d_input.SetValue("")
         self.D_input.SetValue("")
         self.d_inner.SetValue(True)
@@ -615,3 +686,24 @@ class ConeContentPanel(wx.Panel):
         if hasattr(self, "insert_point"):
             del self.insert_point
         logging.info("Поля ввода очищены")
+
+    def on_cancel(self, event: wx.Event) -> None:
+        """
+        Возвращает в главное окно с контентом content_apps.
+
+        Args:
+            event: Событие нажатия кнопки.
+        """
+        main_window = wx.GetTopLevelParent(self)
+        if hasattr(main_window, "switch_content"):
+            main_window.switch_content("content_apps")
+            logging.info("Переключение на панель content_apps")
+        else:
+            logging.error("Главное окно не имеет метода switch_content")
+            show_popup(loc.get("error_switch_content", "Ошибка: невозможно переключить контент"), popup_type="error")
+
+    def adjust_button_widths(self) -> None:
+        """
+        Устанавливает одинаковую ширину для всех кнопок.
+        """
+        adjust_button_widths(self.buttons)  # Используем новую функцию из at_window_utils.py

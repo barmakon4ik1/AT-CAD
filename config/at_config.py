@@ -56,13 +56,18 @@ FONT_SIZE: int = 16  # Размер шрифта в интерфейсе
 STATUS_FONT_SIZE: int = 8  # Размер шрифта для статусной строки
 STATUS_TEXT_COLOR: str = "white"  # Цвет текста статусной строки
 BANNER_FONT_SIZE: int = 24  # (для баннера)
+LABEL_FONT_SIZE: int = 24
+LABEL_FONT_NAME: str = "Times New Roman"
+LABEL_FONT_TYPE: str = "normal"
+LABEL_FONT_WEIGHT: str = "bold" # normal, bold, light
 
 # Настройки цвета
 BACKGROUND_COLOR: str = "#508050"  # Цвет фона (зеленый, как на ДНЦ-пульте Нева)
 FOREGROUND_COLOR: str = "white"  # Цвет текста (для элементов, кроме баннера и статусной строки)
 BANNER_COLOR: str = "light blue"  # Цвет баннера
 BANNER_TEXT_COLOR: str = "black"  # Цвет текста баннера
-EXIT_BUTTON_COLOR: str = "#FF0000"  # Цвет кнопки выхода
+EXIT_BUTTON_COLOR: str = "dark grey"  # Цвет кнопки выхода
+LABEL_FONT_COLOR: str = "blue"
 
 # Слои по умолчанию для объектов AutoCAD
 RECTANGLE_LAYER: str = "0"  # Слой для прямоугольников

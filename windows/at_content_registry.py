@@ -1,3 +1,4 @@
+# at_content_registry.py
 """
 Модуль для хранения реестра контента AT-CAD.
 """
@@ -6,7 +7,7 @@
 CONTENT_REGISTRY = {
     "cone": {
         "module": "windows.content_cone",
-        "label": "cone_app_button"
+        "label": "at_run_cone"
     },
     "content_apps": {
         "module": "windows.content_apps",

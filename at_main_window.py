@@ -1,3 +1,4 @@
+# at_main_window.py
 """
 Главное окно приложения AT-CAD.
 Содержит меню, баннер, основную область, область кнопок и строку статуса.
@@ -34,7 +35,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # Настройка логирования для отладки
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.error,
     filename="at_cad.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
@@ -44,7 +45,6 @@ class ATMainWindow(wx.Frame):
     def __init__(self):
         self.last_input = {}  # Для хранения последних введенных данных
         # Инициализируем локализацию
-        logging.info(f"Initial language: {loc.language}, program_title: {loc.get('program_title')}")
         super().__init__(
             parent=None,
             title=loc.get("program_title"),
@@ -58,11 +58,6 @@ class ATMainWindow(wx.Frame):
         self.panel = wx.Panel(self)
         self.panel.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
 
-        # Отладка: вывод текущей рабочей директории и путей
-        logging.info(f"Current working directory: {os.getcwd()}")
-        logging.info(f"ICON_PATH: {ICON_PATH}")
-        logging.info(f"LANGUAGE_ICONS: {LANGUAGE_ICONS}")
-
         # Устанавливаем иконку приложения
         icon_path = os.path.abspath(ICON_PATH)
         if os.path.exists(icon_path):
@@ -71,7 +66,6 @@ class ATMainWindow(wx.Frame):
                 if icon_bitmap.IsOk():
                     icon_bitmap = self.scale_bitmap(icon_bitmap, 32, 32)
                     self.SetIcon(wx.Icon(icon_bitmap))
-                    logging.info(f"App icon loaded: {icon_path}")
                 else:
                     logging.error(f"Invalid bitmap for app icon: {icon_path}")
             except Exception as e:
@@ -95,7 +89,7 @@ class ATMainWindow(wx.Frame):
         # Создаем меню
         self.create_menu()
 
-        # Основная область (контейнер для будущего контента)
+        # Основная область (контейнер для контента)
         self.content_panel = wx.Panel(self.panel)
         self.content_panel.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
         self.content_sizer = wx.BoxSizer(wx.VERTICAL)  # Сайзер для динамического контента
@@ -160,7 +154,6 @@ class ATMainWindow(wx.Frame):
             if new_content and isinstance(new_content, wx.Panel):
                 self.current_content = new_content
                 self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
-                logging.info(f"Switched to content: {content_name}")
             else:
                 logging.error(f"Invalid content returned for {content_name}")
                 self.current_content = wx.StaticText(self.content_panel, label=f"Error loading {content_name}")
@@ -207,7 +200,7 @@ class ATMainWindow(wx.Frame):
         banner_sizer.AddStretchSpacer()
 
         # Название программы по центру с переносом строк и адаптивным шрифтом
-        max_width = 800
+        max_width = WINDOW_SIZE[0] - 2 * LOGO_SIZE[0] - 50
         max_height = banner_height - 20  # отступы сверху и снизу
 
         self.title = wx.StaticText(
@@ -339,14 +332,14 @@ class ATMainWindow(wx.Frame):
         self.status_text.SetFont(font)
         self.status_text.SetForegroundColour(wx.Colour(STATUS_TEXT_COLOR))
         status_sizer.Add(self.status_text, proportion=1, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=5)
-        logging.info(f"Status label font size: {STATUS_FONT_SIZE}, color: {STATUS_TEXT_COLOR}")
+        logging.error(f"Status label font size: {STATUS_FONT_SIZE}, color: {STATUS_TEXT_COLOR}")
 
         # Копирайт
         self.copyright_text = wx.StaticText(status_panel, label=loc.get("copyright"))
         self.copyright_text.SetFont(font)
         self.copyright_text.SetForegroundColour(wx.Colour(STATUS_TEXT_COLOR))
         status_sizer.Add(self.copyright_text, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=5)
-        logging.info(f"Copyright label font size: {STATUS_FONT_SIZE}, color: {STATUS_TEXT_COLOR}")
+        logging.error(f"Copyright label font size: {STATUS_FONT_SIZE}, color: {STATUS_TEXT_COLOR}")
 
         status_panel.SetSizer(status_sizer)
         self.main_sizer.Add(status_panel, proportion=0, flag=wx.EXPAND | wx.ALL, border=5)
@@ -385,7 +378,7 @@ class ATMainWindow(wx.Frame):
         event_id = event.GetId()
         new_lang = lang_map.get(event_id)
         if new_lang:
-            logging.info(f"Смена языка через меню на: {new_lang}")
+            logging.error(f"Смена языка через меню на: {new_lang}")
             loc.set_language(new_lang)
             self.update_language_icon(new_lang)
             self.update_ui()
@@ -396,7 +389,7 @@ class ATMainWindow(wx.Frame):
         current_index = current_langs.index(loc.language) if loc.language in current_langs else 0
         new_index = (current_index + 1) % len(current_langs)
         new_lang = current_langs[new_index]
-        logging.info(f"Смена языка через значок на: {new_lang}")
+        logging.error(f"Смена языка через значок на: {new_lang}")
         loc.set_language(new_lang)
         self.update_language_icon(new_lang)
         self.update_ui()
@@ -410,7 +403,7 @@ class ATMainWindow(wx.Frame):
                 if flag_bitmap.IsOk():
                     flag_bitmap = self.scale_bitmap(flag_bitmap, BANNER_HIGH - 10, BANNER_HIGH - 10)
                     self.flag_button.SetBitmap(flag_bitmap)
-                    logging.info(
+                    logging.error(
                         f"Flag icon updated: {lang_icon_path}, size: {flag_bitmap.GetWidth()}x{flag_bitmap.GetHeight()}")
                 else:
                     logging.error(f"Invalid bitmap for flag update: {lang_icon_path}")
@@ -434,7 +427,7 @@ class ATMainWindow(wx.Frame):
             title_text = loc.get("program_title")
             self.title.SetLabel("")  # временно сбрасываем
 
-            max_width = 800
+            max_width = WINDOW_SIZE[0] - 2 * LOGO_SIZE[0] - 50
             max_height = max(BANNER_HIGH, 20) - 20  # с учётом отступов
             style_flags = {
                 "style": wx.FONTSTYLE_NORMAL if FONT_TYPE == "normal" else wx.FONTSTYLE_ITALIC,
@@ -457,9 +450,6 @@ class ATMainWindow(wx.Frame):
             self.title.SetLabel(title_text)
             self.title.Wrap(max_width)
 
-            logging.info(f"Updated banner title font size: {optimal_size}, color: {BANNER_TEXT_COLOR}")
-
-        # Остальная часть без изменений
         self.status_text.SetLabel(loc.get("status_ready"))
         font = wx.Font(
             STATUS_FONT_SIZE,
@@ -470,12 +460,10 @@ class ATMainWindow(wx.Frame):
         )
         self.status_text.SetFont(font)
         self.status_text.SetForegroundColour(wx.Colour(STATUS_TEXT_COLOR))
-        logging.info(f"Updated status label font size: {STATUS_FONT_SIZE}, color: {STATUS_TEXT_COLOR}")
 
         self.copyright_text.SetLabel(loc.get("copyright"))
         self.copyright_text.SetFont(font)
         self.copyright_text.SetForegroundColour(wx.Colour(STATUS_TEXT_COLOR))
-        logging.info(f"Updated copyright label")
 
         self.exit_button.SetLabel(loc.get("button_exit"))
         self.GetMenuBar().SetMenuLabel(0, loc.get("menu_file"))
@@ -483,6 +471,18 @@ class ATMainWindow(wx.Frame):
         self.GetMenuBar().SetMenuLabel(2, loc.get("menu_help"))
         for lang, item in self.lang_items.items():
             item.SetItemLabel(loc.get(f"lang_{lang}"))
+
+        # Обновляем текущую панель контента
+        if self.current_content and hasattr(self.current_content, "update_ui_language"):
+            try:
+                self.current_content.update_ui_language()
+            except Exception as e:
+                logging.error(f"Ошибка при обновлении языка панели {self.current_content.__class__.__name__}: {e}")
+                show_popup(
+                    loc.get("error",
+                            "Ошибка") + f": {loc.get('error_in_function', 'Ошибка в {}: {}').format('update_ui_language', str(e))}",
+                    popup_type="error"
+                )
 
         self.panel.Layout()
         self.Refresh()
