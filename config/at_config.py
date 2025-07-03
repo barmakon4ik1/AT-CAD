@@ -34,6 +34,14 @@ LANGUAGE_ICONS: dict = {
     "en": os.path.join(IMAGES_DIR, "en.png"),
 }
 
+MENU_ICONS = {
+    "exit": "images/exit_icon.png",
+    "about": "images/about_icon.png",
+    "lang_ru": "images/lang_ru_icon.png",
+    "lang_de": "images/lang_de_icon.png",
+    "lang_en": "images/lang_en_icon.png",
+}
+
 # Размер полей ввода и выпадающих списков
 INPUT_FIELD_SIZE: tuple[int, int] = (200, -1)
 

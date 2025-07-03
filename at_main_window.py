@@ -22,7 +22,7 @@ from config.at_config import (
     FONT_TYPE,
     STATUS_FONT_SIZE,
     STATUS_TEXT_COLOR,
-    FONT_NAME, BANNER_FONT_SIZE,
+    FONT_NAME, BANNER_FONT_SIZE, MENU_ICONS,
 )
 from locales.at_localization import loc, Localization
 from windows.at_window_utils import load_last_position, save_last_position, get_button_font, fit_text_to_height
@@ -53,6 +53,10 @@ class ATMainWindow(wx.Frame):
         )
         self.SetMinSize(WINDOW_SIZE)
         self.SetMaxSize(WINDOW_SIZE)
+
+        # Инициализируем атрибуты для пунктов меню
+        self.exit_item = None
+        self.about_item = None
 
         # Создаем главную панель для всего содержимого
         self.panel = wx.Panel(self)
@@ -270,19 +274,22 @@ class ATMainWindow(wx.Frame):
 
         # Меню "Файл"
         file_menu = wx.Menu()
-        exit_item = file_menu.Append(wx.ID_EXIT, loc.get("button_exit"))
+        self.exit_item = file_menu.Append(wx.ID_EXIT, loc.get("button_exit"))  # Сохраняем как атрибут
+        # Устанавливаем иконку для пункта "Выход"
+        exit_icon_path = os.path.abspath(MENU_ICONS.get("exit", ""))
+        if os.path.exists(exit_icon_path):
+            try:
+                exit_bitmap = wx.Bitmap(exit_icon_path, wx.BITMAP_TYPE_ANY)
+                if exit_bitmap.IsOk():
+                    exit_bitmap = self.scale_bitmap(exit_bitmap, 16, 16)  # Масштабируем до 16x16
+                    self.exit_item.SetBitmap(exit_bitmap)
+                else:
+                    logging.error(f"Invalid bitmap for exit_item: {exit_icon_path}")
+            except Exception as e:
+                logging.error(f"Error loading exit icon {exit_icon_path}: {e}")
+        else:
+            logging.error(f"Exit icon not found: {exit_icon_path}")
         menu_bar.Append(file_menu, loc.get("menu_file"))
-
-        # Меню "Контент" для переключения страниц
-        content_menu = wx.Menu()
-        # Получаем список доступных страниц из at_run_dialog_window
-        content_items = load_content("get_content_menu", self) or []
-        self.content_menu_items = {}
-        for content_name, content_label in content_items:
-            item = content_menu.Append(wx.ID_ANY, content_label)
-            self.content_menu_items[item.GetId()] = content_name
-            self.Bind(wx.EVT_MENU, self.on_content_menu, item)
-        menu_bar.Append(content_menu, "Контент")  # Временная заглушка для названия
 
         # Меню "Язык"
         self.language_menu = wx.Menu()
@@ -292,20 +299,50 @@ class ATMainWindow(wx.Frame):
             "en": self.language_menu.Append(wx.ID_ANY, loc.get("lang_en"), kind=wx.ITEM_RADIO),
         }
         self.lang_items[LANGUAGE].Check(True)
+        # Устанавливаем иконки для пунктов языка
+        for lang, item in self.lang_items.items():
+            lang_icon_path = os.path.abspath(MENU_ICONS.get(f"lang_{lang}", ""))
+            if os.path.exists(lang_icon_path):
+                try:
+                    lang_bitmap = wx.Bitmap(lang_icon_path, wx.BITMAP_TYPE_ANY)
+                    if lang_bitmap.IsOk():
+                        lang_bitmap = self.scale_bitmap(lang_bitmap, 16, 16)
+                        item.SetBitmap(lang_bitmap)
+                    else:
+                        logging.error(f"Invalid bitmap for lang_{lang}: {lang_icon_path}")
+                except Exception as e:
+                    logging.error(f"Error loading lang_{lang} icon {lang_icon_path}: {e}")
+            else:
+                logging.error(f"Lang_{lang} icon not found: {lang_icon_path}")
         menu_bar.Append(self.language_menu, loc.get("language_menu"))
 
         # Меню "Справка"
         help_menu = wx.Menu()
-        about_item = help_menu.Append(wx.ID_ABOUT, loc.get("menu_about"))
+        self.about_item = help_menu.Append(wx.ID_ABOUT, loc.get("menu_about"))  # Сохраняем как атрибут
+
+        # Устанавливаем иконку для пункта "О программе"
+        about_icon_path = os.path.abspath(MENU_ICONS.get("about", ""))
+        if os.path.exists(about_icon_path):
+            try:
+                about_bitmap = wx.Bitmap(about_icon_path, wx.BITMAP_TYPE_ANY)
+                if about_bitmap.IsOk():
+                    about_bitmap = self.scale_bitmap(about_bitmap, 16, 16)
+                    self.about_item.SetBitmap(about_bitmap)
+                else:
+                    logging.error(f"Invalid bitmap for about_item: {about_icon_path}")
+            except Exception as e:
+                logging.error(f"Error loading about icon {about_icon_path}: {e}")
+        else:
+            logging.error(f"About icon not found: {about_icon_path}")
         menu_bar.Append(help_menu, loc.get("menu_help"))
 
         self.SetMenuBar(menu_bar)
 
         # Привязываем обработчики
-        self.Bind(wx.EVT_MENU, self.on_exit, exit_item)
+        self.Bind(wx.EVT_MENU, self.on_exit, self.exit_item)
         for lang, item in self.lang_items.items():
             self.Bind(wx.EVT_MENU, self.on_language_change, item)
-        self.Bind(wx.EVT_MENU, self.on_about, about_item)
+        self.Bind(wx.EVT_MENU, self.on_about, self.about_item)
 
     def on_content_menu(self, event):
         """Обработчик выбора пункта меню 'Контент'."""
@@ -469,8 +506,31 @@ class ATMainWindow(wx.Frame):
         self.GetMenuBar().SetMenuLabel(0, loc.get("menu_file"))
         self.GetMenuBar().SetMenuLabel(1, loc.get("language_menu"))
         self.GetMenuBar().SetMenuLabel(2, loc.get("menu_help"))
+
+        # Обновляем иконки для пунктов меню языка
         for lang, item in self.lang_items.items():
             item.SetItemLabel(loc.get(f"lang_{lang}"))
+            lang_icon_path = os.path.abspath(MENU_ICONS.get(f"lang_{lang}", ""))
+            if os.path.exists(lang_icon_path):
+                try:
+                    lang_bitmap = wx.Bitmap(lang_icon_path, wx.BITMAP_TYPE_ANY)
+                    if lang_bitmap.IsOk():
+                        lang_bitmap = self.scale_bitmap(lang_bitmap, 16, 16)
+                        item.SetBitmap(lang_bitmap)
+                    else:
+                        logging.error(f"Invalid bitmap for lang_{lang} in update_ui: {lang_icon_path}")
+                except Exception as e:
+                    logging.error(f"Error updating lang_{lang} icon {lang_icon_path}: {e}")
+            else:
+                logging.error(f"Lang_{lang} icon not found in update_ui: {lang_icon_path}")
+
+        # Обновляем текст пунктов подменю
+        if self.exit_item:
+            self.exit_item.SetItemLabel(loc.get("button_exit"))
+            logging.error(f"Updated exit_item label to: {loc.get('button_exit')}")
+        if self.about_item:
+            self.about_item.SetItemLabel(loc.get("menu_about"))
+            logging.error(f"Updated about_item label to: {loc.get('menu_about')}")
 
         # Обновляем текущую панель контента
         if self.current_content and hasattr(self.current_content, "update_ui_language"):

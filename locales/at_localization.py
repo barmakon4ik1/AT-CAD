@@ -83,9 +83,9 @@ translations = {
         "en": "Build error: {}"
     },
     "button_exit": {
-        "ru": "Выйти",
-        "de": "Beenden",
-        "en": "Exit"
+        "ru": "&Выйти",
+        "de": "&Beenden",
+        "en": "&Exit"
     },
     "cad_init_error": {
         "ru": "Ошибка инициализации AutoCAD.",
@@ -348,9 +348,9 @@ translations = {
         "en": "Russian"
     },
     "language_menu": {
-        "ru": "Язык",
-        "de": "Sprache",
-        "en": "Language"
+        "ru": "&Язык",
+        "de": "&Sprache",
+        "en": "&Language"
     },
     "layer_context_error": {
         "ru": "Ошибка в контексте слоя '{}': {}",
@@ -408,19 +408,19 @@ translations = {
         "en": "Mathematical error!"
     },
     "menu_about": {
-        "ru": "О программе",
-        "de": "Über das Programm",
-        "en": "About the program"
+        "ru": "&О программе",
+        "de": "&Über das Programm",
+        "en": "&About the program"
     },
     "menu_file": {
-        "ru": "Файл",
-        "de": "Datei",
-        "en": "File"
+        "ru": "&Файл",
+        "de": "&Datei",
+        "en": "&File"
     },
     "menu_help": {
-        "ru": "Справка",
-        "de": "Hilfe",
-        "en": "Help"
+        "ru": "&Справка",
+        "de": "&Hilfe",
+        "en": "&Help"
     },
     "middle_label": {
         "ru": "средний",
