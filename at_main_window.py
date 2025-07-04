@@ -35,7 +35,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # Настройка логирования для отладки
 logging.basicConfig(
-    level=logging.error,
+    level=logging.ERROR,
     filename="at_cad.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )

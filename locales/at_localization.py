@@ -11,7 +11,7 @@ from config.at_config import LANGUAGE
 
 # Настройка логирования для отладки
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.ERROR,
     filename="at_cad.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )

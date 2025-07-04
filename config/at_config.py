@@ -1,3 +1,4 @@
+# config/at_config.py
 """
 Конфигурационный файл для проекта AT-CAD.
 Содержит настройки языка, шрифта, интерфейса и параметров черчения.
@@ -9,7 +10,7 @@ import logging
 
 # Настройка логирования
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.ERROR,
     filename="at_cad.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
@@ -25,7 +26,7 @@ ICON_PATH: str = os.path.join(IMAGES_DIR, "AT-CAD_8.png")
 CONE_IMAGE_PATH: str = os.path.join(IMAGES_DIR, "cone.png")
 
 # Путь к файлу с последними введёнными данными для конуса
-LAST_CONE_INPUT_FILE: str = os.path.join(RESOURCE_DIR, "last_cone_input.json")
+LAST_CONE_INPUT_FILE: str = os.path.join(RESOURCE_DIR, "last_input.json")
 
 # Иконки для языков
 LANGUAGE_ICONS: dict = {

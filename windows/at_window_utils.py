@@ -1,3 +1,4 @@
+# windows/at_window_utils.py
 """
 Модуль с утилитами для главного окна AT-CAD.
 
@@ -165,11 +166,14 @@ def save_last_input(filename: str, data: Dict) -> None:
         data: Словарь с данными.
     """
     try:
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-        with open(filename, "w", encoding='utf-8') as f:
+        abs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", filename))
+        logging.info(f"Попытка сохранить данные в абсолютный путь: {abs_path}")
+        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+        with open(abs_path, "w", encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+        logging.info(f"Данные успешно сохранены в {abs_path}: {data}")
     except (PermissionError, OSError) as e:
-        logging.error(f"Ошибка сохранения {filename}: {e}")
+        logging.error(f"Ошибка сохранения {abs_path}: {e}")
 
 
 def show_popup(message: str, popup_type: str = "info") -> None:
@@ -456,14 +460,16 @@ class BaseInputWindow(wx.Frame):
         try:
             self.Iconize(True)
             self.insert_point = at_point_input(self.adoc)
-            if self.insert_point:
-                self.SetStatusText(loc.get("point_selected", self.insert_point[0], self.insert_point[1]))
+            if self.insert_point and hasattr(self.insert_point, "x") and hasattr(self.insert_point, "y"):
+                update_status_bar_point_selected(self, self.insert_point)
             else:
-                self.SetStatusText(loc.get("point_not_selected"), 0)
+                show_popup(loc.get("point_selection_error", "Ошибка выбора точки"), popup_type="error")
+                logging.error(f"Точка не выбрана или некорректна: {self.insert_point}")
+                update_status_bar_point_selected(self, None)
         except Exception as e:
             show_popup(loc.get("point_selection_error", str(e)), popup_type="error")
             logging.error(f"Ошибка выбора точки: {e}")
-            self.SetStatusText(loc.get("point_not_selected"), 0)
+            update_status_bar_point_selected(self, None)
         finally:
             self.Iconize(False)
             self.Raise()
@@ -621,4 +627,33 @@ def get_link_font() -> wx.Font:
         weight=font_weight,
         faceName=LABEL_FONT_NAME
     )
+
+
+def update_status_bar_point_selected(window: wx.Window, insert_point: Optional[object] = None) -> None:
+    """
+    Обновляет статусную строку окна с координатами выбранной точки.
+
+    Args:
+        window: Окно или панель, содержащее строку состояния.
+        insert_point: Объект точки с атрибутами x, y (например, APoint).
+    """
+    main_window = wx.GetTopLevelParent(window)
+    if hasattr(main_window, "status_text"):
+        if insert_point and hasattr(insert_point, "x") and hasattr(insert_point, "y"):
+            try:
+                main_window.status_text.SetLabel(
+                    loc.get("point_selected").format(insert_point.x, insert_point.y)
+                )
+            except Exception as e:
+                logging.error(f"Ошибка при обновлении строки состояния: {e}")
+                main_window.status_text.SetLabel(
+                    loc.get("point_selection_error", "Ошибка выбора точки")
+                )
+        else:
+            main_window.status_text.SetLabel(
+                loc.get("point_not_selected",
+                        "Точка не определена, выберите точку или нажмите Отмена для выхода в главное окно")
+            )
+    else:
+        logging.warning("Строка состояния (status_text) не доступна в главном окне")
 

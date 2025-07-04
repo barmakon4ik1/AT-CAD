@@ -7,6 +7,7 @@ from pyautocad import APoint
 
 from programms.at_base import *
 from programms.at_geometry import *
+from programms.at_input import at_point_input
 
 
 @handle_errors
