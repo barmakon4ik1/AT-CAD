@@ -55,13 +55,14 @@ def run_application(data: Dict[str, Any]) -> bool:
 
         k_text = f"{data['order_number']}"
         if data['detail_number']:
-            k_text += f"-{data['detail_number']}"
+            f_text = k_text + f"-{data['detail_number']}"
         text_ab = TEXT_DISTANCE
         text_h = TEXT_HEIGHT_BIG
         text_s = TEXT_HEIGHT_SMALL
         text_point = polar_point(input_point, 300, 0)
 
         # Список текстов для добавления
+
         text_configs = [
             {
                 "point": input_point,
@@ -70,23 +71,23 @@ def run_application(data: Dict[str, Any]) -> bool:
                 "text_height": 7,
                 "text_angle": 0,
                 "text_alignment": 4
-            },
+            }, # Гравировка
             {
                 "point": polar_point(input_point, distance=20, alpha=-90),
-                "text": k_text,
+                "text": f_text,
                 "layer_name": "schrift",
                 "text_height": text_s,
                 "text_angle": 0,
                 "text_alignment": 4
-            },
+            }, # Маркировка
             {
                 "point": text_point,
-                "text": f"Komm.Nr. {k_text}",
+                "text": f"Komm.Nr. {f_text}",
                 "layer_name": "TEXT",
                 "text_height": text_h,
                 "text_angle": 0,
                 "text_alignment": 0
-            },
+            }, # Строка К-№
             {
                 "point": polar_point(text_point, distance=text_ab, alpha=-90),
                 "text": f"D = {data['diameter_base']} {(loc.get('mm'))}",
