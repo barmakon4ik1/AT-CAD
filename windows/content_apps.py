@@ -19,31 +19,29 @@ logging.basicConfig(
 )
 
 
-def create_window(parent: wx.Window, cad) -> wx.Panel:
+def create_window(parent: wx.Window) -> wx.Panel:
     """
     Создаёт панель со списком программ в виде текстовых ссылок.
 
     Args:
         parent: Родительский wx.Window (content_panel из ATMainWindow).
-        cad: Экземпляр ATCadInit (не используется, для совместимости).
 
     Returns:
         wx.Panel: Панель со списком программ.
     """
-    return AppsContentPanel(parent, cad)
+    return AppsContentPanel(parent)
 
 
 class AppsContentPanel(wx.Panel):
     """
     Панель для отображения списка программ в виде текстовых ссылок.
     """
-    def __init__(self, parent, cad=None):
+    def __init__(self, parent):
         """
         Инициализирует панель со списком программ.
 
         Args:
             parent: Родительский wx.Window.
-            cad: Экземпляр ATCadInit (не используется, для совместимости).
         """
         super().__init__(parent)
         self.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))

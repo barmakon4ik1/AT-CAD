@@ -31,18 +31,17 @@ logging.basicConfig(
 )
 
 
-def create_window(parent: wx.Window, cad) -> wx.Panel:
+def create_window(parent: wx.Window) -> wx.Panel:
     """
     Создаёт панель контента для ввода параметров конуса.
 
     Args:
         parent: Родительский wx.Window (content_panel из ATMainWindow).
-        cad: Экземпляр ATCadInit для работы с AutoCAD.
 
     Returns:
         wx.Panel: Панель с интерфейсом для ввода параметров конуса.
     """
-    return ConeContentPanel(parent, cad)
+    return ConeContentPanel(parent)
 
 
 class ConeContentPanel(wx.Panel):
@@ -50,18 +49,16 @@ class ConeContentPanel(wx.Panel):
     Панель для ввода параметров развертки конуса.
     """
 
-    def __init__(self, parent, cad):
+    def __init__(self, parent):
         """
         Инициализирует панель, создаёт элементы управления.
 
         Args:
             parent: Родительский wx.Window (content_panel).
-            cad: Экземпляр ATCadInit для работы с AutoCAD.
-        """
+         """
         super().__init__(parent)
         self.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
         self.parent = parent
-        self.cad = cad
         self._updating = False
         self._debounce_timer = wx.Timer(self)
         self.labels = {}  # Для хранения текстовых меток
@@ -501,14 +498,6 @@ class ConeContentPanel(wx.Panel):
         Args:
             event: Событие нажатия кнопки.
         """
-        if not self.cad or not self.cad.is_initialized():
-            # Попытка переподключения
-            self.cad.reinitialize()
-            if not self.cad.is_initialized():
-                show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
-                logging.error("AutoCAD не инициализирован")
-                return
-
         try:
             point = at_point_input(self.cad.adoc)
             if point and hasattr(point, "x") and hasattr(point, "y"):
@@ -535,14 +524,6 @@ class ConeContentPanel(wx.Panel):
         Args:
             event: Событие нажатия кнопки.
         """
-        if not self.cad or not self.cad.is_initialized():
-            # Попытка переподключения
-            self.cad.reinitialize()
-            if not self.cad.is_initialized():
-                show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
-                logging.error("AutoCAD не инициализирован")
-                return
-
         if not hasattr(self, "insert_point") or not self.insert_point:
             show_popup(loc.get("point_not_selected", "Точка вставки не выбрана"), popup_type="error")
             logging.error("Точка вставки не выбрана")

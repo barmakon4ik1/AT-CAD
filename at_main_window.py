@@ -60,11 +60,11 @@ class ATMainWindow(wx.Frame):
         self.SetMinSize(WINDOW_SIZE)
         self.SetMaxSize(WINDOW_SIZE)
 
-        # Инициализация AutoCAD
-        self.cad = ATCadInit()
-        if not self.cad.is_initialized():
-            show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
-            logging.error("AutoCAD не инициализирован")
+        # # Инициализация AutoCAD
+        # self.cad = ATCadInit()
+        # if not self.cad.is_initialized():
+        #     show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
+        #     logging.error("AutoCAD не инициализирован")
 
         # Инициализируем атрибуты для пунктов меню
         self.exit_item = None
@@ -164,21 +164,10 @@ class ATMainWindow(wx.Frame):
             self.current_content.Destroy()
             self.current_content = None
 
-        # Проверяем, требуется ли AutoCAD для контента
-        content_info = CONTENT_REGISTRY.get(content_name, {})
-        if content_info.get("requires_cad", False) and not self.cad.is_initialized():
-            show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
-            logging.error(f"Не удалось загрузить контент {content_name}: AutoCAD не инициализирован")
-            self.current_content = wx.StaticText(self.content_panel, label=f"Ошибка: AutoCAD не доступен")
-            self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
-            self.content_panel.Layout()
-            self.Refresh()
-            return
-
         # Загружаем новый контент через at_load_content
         try:
-            logging.info(f"Переключение на контент {content_name}, cad={'доступен' if self.cad.is_initialized() else 'недоступен'}")
-            new_content = at_load_content(content_name, self.content_panel, cad=self.cad)
+            logging.info(f"Переключение на контент {content_name}")
+            new_content = at_load_content(content_name, self.content_panel)
             if new_content and isinstance(new_content, wx.Window):
                 self.current_content = new_content
                 self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
