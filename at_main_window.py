@@ -22,20 +22,23 @@ from config.at_config import (
     FONT_TYPE,
     STATUS_FONT_SIZE,
     STATUS_TEXT_COLOR,
-    FONT_NAME, BANNER_FONT_SIZE, MENU_ICONS,
+    FONT_NAME,
+    BANNER_FONT_SIZE,
+    MENU_ICONS,
 )
 from locales.at_localization import loc, Localization
 from windows.at_window_utils import load_last_position, save_last_position, get_button_font, fit_text_to_height
 from windows.at_gui_utils import show_popup
 from config.at_cad_init import ATCadInit
 from windows.at_run_dialog_window import load_content, at_load_content
+from windows.at_content_registry import CONTENT_REGISTRY
 
 # Устанавливаем текущую рабочую директорию в корень проекта
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # Настройка логирования для отладки
 logging.basicConfig(
-    level=logging.ERROR,
+    level=logging.INFO,  # Изменено на INFO для захвата всех сообщений
     filename="at_cad.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
@@ -43,6 +46,9 @@ logging.basicConfig(
 
 class ATMainWindow(wx.Frame):
     def __init__(self):
+        """
+        Инициализирует главное окно приложения.
+        """
         self.last_input = {}  # Для хранения последних введенных данных
         # Инициализируем локализацию
         super().__init__(
@@ -53,6 +59,12 @@ class ATMainWindow(wx.Frame):
         )
         self.SetMinSize(WINDOW_SIZE)
         self.SetMaxSize(WINDOW_SIZE)
+
+        # Инициализация AutoCAD
+        self.cad = ATCadInit()
+        if not self.cad.is_initialized():
+            show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
+            logging.error("AutoCAD не инициализирован")
 
         # Инициализируем атрибуты для пунктов меню
         self.exit_item = None
@@ -71,11 +83,11 @@ class ATMainWindow(wx.Frame):
                     icon_bitmap = self.scale_bitmap(icon_bitmap, 32, 32)
                     self.SetIcon(wx.Icon(icon_bitmap))
                 else:
-                    logging.error(f"Invalid bitmap for app icon: {icon_path}")
+                    logging.error(f"Недопустимый формат иконки приложения: {icon_path}")
             except Exception as e:
-                logging.error(f"Error loading app icon {icon_path}: {e}")
+                logging.error(f"Ошибка загрузки иконки приложения {icon_path}: {e}")
         else:
-            logging.error(f"App icon not found: {icon_path}")
+            logging.error(f"Иконка приложения не найдена: {icon_path}")
 
         # Загружаем последнее положение окна
         x, y = load_last_position()
@@ -152,19 +164,31 @@ class ATMainWindow(wx.Frame):
             self.current_content.Destroy()
             self.current_content = None
 
+        # Проверяем, требуется ли AutoCAD для контента
+        content_info = CONTENT_REGISTRY.get(content_name, {})
+        if content_info.get("requires_cad", False) and not self.cad.is_initialized():
+            show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
+            logging.error(f"Не удалось загрузить контент {content_name}: AutoCAD не инициализирован")
+            self.current_content = wx.StaticText(self.content_panel, label=f"Ошибка: AutoCAD не доступен")
+            self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
+            self.content_panel.Layout()
+            self.Refresh()
+            return
+
         # Загружаем новый контент через at_load_content
         try:
-            new_content = at_load_content(content_name, self.content_panel)
-            if new_content and isinstance(new_content, wx.Panel):
+            logging.info(f"Переключение на контент {content_name}, cad={'доступен' if self.cad.is_initialized() else 'недоступен'}")
+            new_content = at_load_content(content_name, self.content_panel, cad=self.cad)
+            if new_content and isinstance(new_content, wx.Window):
                 self.current_content = new_content
                 self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
             else:
-                logging.error(f"Invalid content returned for {content_name}")
-                self.current_content = wx.StaticText(self.content_panel, label=f"Error loading {content_name}")
+                logging.error(f"Некорректный контент возвращён для {content_name}")
+                self.current_content = wx.StaticText(self.content_panel, label=f"Ошибка загрузки {content_name}")
                 self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
         except Exception as e:
-            logging.error(f"Error switching to content {content_name}: {e}")
-            self.current_content = wx.StaticText(self.content_panel, label=f"Error loading {content_name}")
+            logging.error(f"Ошибка переключения на контент {content_name}: {e}")
+            self.current_content = wx.StaticText(self.content_panel, label=f"Ошибка загрузки {content_name}")
             self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
 
         self.content_panel.Layout()
@@ -191,13 +215,13 @@ class ATMainWindow(wx.Frame):
                     logo = wx.StaticBitmap(banner_panel, bitmap=logo_bitmap)
                     banner_sizer.Add(logo, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=10)
                 else:
-                    raise ValueError("Invalid bitmap")
+                    raise ValueError("Недопустимый формат логотипа")
             except Exception as e:
-                logging.error(f"Error loading logo {logo_path}: {e}")
+                logging.error(f"Ошибка загрузки логотипа {logo_path}: {e}")
                 logo = wx.StaticText(banner_panel, label="[Logo]")
                 banner_sizer.Add(logo, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=10)
         else:
-            logging.error(f"Logo file not found: {logo_path}")
+            logging.error(f"Файл логотипа не найден: {logo_path}")
             logo = wx.StaticText(banner_panel, label="[Logo]")
             banner_sizer.Add(logo, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=10)
 
@@ -249,16 +273,15 @@ class ATMainWindow(wx.Frame):
                     flag_bitmap = self.scale_bitmap(flag_bitmap, banner_height - 10, banner_height - 10)
                     self.flag_button = wx.StaticBitmap(banner_panel, bitmap=flag_bitmap)
                     self.flag_button.Bind(wx.EVT_LEFT_DOWN, self.on_change_language)
-                    banner_sizer.Add(self.flag_button, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
-                                     border=10)
+                    banner_sizer.Add(self.flag_button, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=10)
                 else:
-                    raise ValueError("Invalid flag bitmap")
+                    raise ValueError("Недопустимый формат иконки флага")
             except Exception as e:
-                logging.error(f"Error loading flag icon {lang_icon_path}: {e}")
+                logging.error(f"Ошибка загрузки иконки флага {lang_icon_path}: {e}")
                 flag_label = wx.StaticText(banner_panel, label=f"[{LANGUAGE}]")
                 banner_sizer.Add(flag_label, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=10)
         else:
-            logging.error(f"Flag icon file not found: {lang_icon_path}")
+            logging.error(f"Файл иконки флага не найден: {lang_icon_path}")
             flag_label = wx.StaticText(banner_panel, label=f"[{LANGUAGE}]")
             banner_sizer.Add(flag_label, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=10)
 
@@ -284,11 +307,11 @@ class ATMainWindow(wx.Frame):
                     exit_bitmap = self.scale_bitmap(exit_bitmap, 16, 16)  # Масштабируем до 16x16
                     self.exit_item.SetBitmap(exit_bitmap)
                 else:
-                    logging.error(f"Invalid bitmap for exit_item: {exit_icon_path}")
+                    logging.error(f"Недопустимый формат иконки выхода: {exit_icon_path}")
             except Exception as e:
-                logging.error(f"Error loading exit icon {exit_icon_path}: {e}")
+                logging.error(f"Ошибка загрузки иконки выхода {exit_icon_path}: {e}")
         else:
-            logging.error(f"Exit icon not found: {exit_icon_path}")
+            logging.error(f"Иконка выхода не найдена: {exit_icon_path}")
         menu_bar.Append(file_menu, loc.get("menu_file"))
 
         # Меню "Язык"
@@ -309,17 +332,16 @@ class ATMainWindow(wx.Frame):
                         lang_bitmap = self.scale_bitmap(lang_bitmap, 16, 16)
                         item.SetBitmap(lang_bitmap)
                     else:
-                        logging.error(f"Invalid bitmap for lang_{lang}: {lang_icon_path}")
+                        logging.error(f"Недопустимый формат иконки lang_{lang}: {lang_icon_path}")
                 except Exception as e:
-                    logging.error(f"Error loading lang_{lang} icon {lang_icon_path}: {e}")
+                    logging.error(f"Ошибка загрузки иконки lang_{lang} {lang_icon_path}: {e}")
             else:
-                logging.error(f"Lang_{lang} icon not found: {lang_icon_path}")
+                logging.error(f"Иконка lang_{lang} не найдена: {lang_icon_path}")
         menu_bar.Append(self.language_menu, loc.get("language_menu"))
 
         # Меню "Справка"
         help_menu = wx.Menu()
         self.about_item = help_menu.Append(wx.ID_ABOUT, loc.get("menu_about"))  # Сохраняем как атрибут
-
         # Устанавливаем иконку для пункта "О программе"
         about_icon_path = os.path.abspath(MENU_ICONS.get("about", ""))
         if os.path.exists(about_icon_path):
@@ -329,11 +351,11 @@ class ATMainWindow(wx.Frame):
                     about_bitmap = self.scale_bitmap(about_bitmap, 16, 16)
                     self.about_item.SetBitmap(about_bitmap)
                 else:
-                    logging.error(f"Invalid bitmap for about_item: {about_icon_path}")
+                    logging.error(f"Недопустимый формат иконки about: {about_icon_path}")
             except Exception as e:
-                logging.error(f"Error loading about icon {about_icon_path}: {e}")
+                logging.error(f"Ошибка загрузки иконки about {about_icon_path}: {e}")
         else:
-            logging.error(f"About icon not found: {about_icon_path}")
+            logging.error(f"Иконка about не найдена: {about_icon_path}")
         menu_bar.Append(help_menu, loc.get("menu_help"))
 
         self.SetMenuBar(menu_bar)
@@ -369,14 +391,14 @@ class ATMainWindow(wx.Frame):
         self.status_text.SetFont(font)
         self.status_text.SetForegroundColour(wx.Colour(STATUS_TEXT_COLOR))
         status_sizer.Add(self.status_text, proportion=1, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=5)
-        logging.error(f"Status label font size: {STATUS_FONT_SIZE}, color: {STATUS_TEXT_COLOR}")
+        logging.info(f"Строка статуса создана: размер шрифта={STATUS_FONT_SIZE}, цвет={STATUS_TEXT_COLOR}")
 
         # Копирайт
         self.copyright_text = wx.StaticText(status_panel, label=loc.get("copyright"))
         self.copyright_text.SetFont(font)
         self.copyright_text.SetForegroundColour(wx.Colour(STATUS_TEXT_COLOR))
         status_sizer.Add(self.copyright_text, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=5)
-        logging.error(f"Copyright label font size: {STATUS_FONT_SIZE}, color: {STATUS_TEXT_COLOR}")
+        logging.info(f"Копирайт создан: размер шрифта={STATUS_FONT_SIZE}, цвет={STATUS_TEXT_COLOR}")
 
         status_panel.SetSizer(status_sizer)
         self.main_sizer.Add(status_panel, proportion=0, flag=wx.EXPAND | wx.ALL, border=5)
@@ -415,7 +437,7 @@ class ATMainWindow(wx.Frame):
         event_id = event.GetId()
         new_lang = lang_map.get(event_id)
         if new_lang:
-            logging.error(f"Смена языка через меню на: {new_lang}")
+            logging.info(f"Смена языка через меню на: {new_lang}")
             loc.set_language(new_lang)
             self.update_language_icon(new_lang)
             self.update_ui()
@@ -426,7 +448,7 @@ class ATMainWindow(wx.Frame):
         current_index = current_langs.index(loc.language) if loc.language in current_langs else 0
         new_index = (current_index + 1) % len(current_langs)
         new_lang = current_langs[new_index]
-        logging.error(f"Смена языка через значок на: {new_lang}")
+        logging.info(f"Смена языка через значок на: {new_lang}")
         loc.set_language(new_lang)
         self.update_language_icon(new_lang)
         self.update_ui()
@@ -440,16 +462,15 @@ class ATMainWindow(wx.Frame):
                 if flag_bitmap.IsOk():
                     flag_bitmap = self.scale_bitmap(flag_bitmap, BANNER_HIGH - 10, BANNER_HIGH - 10)
                     self.flag_button.SetBitmap(flag_bitmap)
-                    logging.error(
-                        f"Flag icon updated: {lang_icon_path}, size: {flag_bitmap.GetWidth()}x{flag_bitmap.GetHeight()}")
+                    logging.info(f"Иконка флага обновлена: {lang_icon_path}, размер: {flag_bitmap.GetWidth()}x{flag_bitmap.GetHeight()}")
                 else:
-                    logging.error(f"Invalid bitmap for flag update: {lang_icon_path}")
+                    logging.error(f"Недопустимый формат иконки флага: {lang_icon_path}")
                     self.flag_button = wx.StaticText(self.flag_button.GetParent(), label=f"[{new_lang}]")
             except Exception as e:
-                logging.error(f"Error updating flag icon {lang_icon_path}: {e}")
+                logging.error(f"Ошибка обновления иконки флага {lang_icon_path}: {e}")
                 self.flag_button = wx.StaticText(self.flag_button.GetParent(), label=f"[{new_lang}]")
         else:
-            logging.error(f"Flag icon file not found for update: {lang_icon_path}")
+            logging.error(f"Файл иконки флага не найден: {lang_icon_path}")
             self.flag_button = wx.StaticText(self.flag_button.GetParent(), label=f"[{new_lang}]")
 
         # Обновляем радиокнопки
@@ -518,19 +539,19 @@ class ATMainWindow(wx.Frame):
                         lang_bitmap = self.scale_bitmap(lang_bitmap, 16, 16)
                         item.SetBitmap(lang_bitmap)
                     else:
-                        logging.error(f"Invalid bitmap for lang_{lang} in update_ui: {lang_icon_path}")
+                        logging.error(f"Недопустимый формат иконки lang_{lang} в update_ui: {lang_icon_path}")
                 except Exception as e:
-                    logging.error(f"Error updating lang_{lang} icon {lang_icon_path}: {e}")
+                    logging.error(f"Ошибка обновления иконки lang_{lang} {lang_icon_path}: {e}")
             else:
-                logging.error(f"Lang_{lang} icon not found in update_ui: {lang_icon_path}")
+                logging.error(f"Иконка lang_{lang} не найдена в update_ui: {lang_icon_path}")
 
         # Обновляем текст пунктов подменю
         if self.exit_item:
             self.exit_item.SetItemLabel(loc.get("button_exit"))
-            logging.error(f"Updated exit_item label to: {loc.get('button_exit')}")
+            logging.info(f"Обновлён текст пункта меню выхода: {loc.get('button_exit')}")
         if self.about_item:
             self.about_item.SetItemLabel(loc.get("menu_about"))
-            logging.error(f"Updated about_item label to: {loc.get('menu_about')}")
+            logging.info(f"Обновлён текст пункта меню 'О программе': {loc.get('menu_about')}")
 
         # Обновляем текущую панель контента
         if self.current_content and hasattr(self.current_content, "update_ui_language"):
@@ -539,8 +560,7 @@ class ATMainWindow(wx.Frame):
             except Exception as e:
                 logging.error(f"Ошибка при обновлении языка панели {self.current_content.__class__.__name__}: {e}")
                 show_popup(
-                    loc.get("error",
-                            "Ошибка") + f": {loc.get('error_in_function', 'Ошибка в {}: {}').format('update_ui_language', str(e))}",
+                    loc.get("error", "Ошибка") + f": {loc.get('error_in_function', 'Ошибка в {}: {}').format('update_ui_language', str(e))}",
                     popup_type="error"
                 )
 
@@ -559,6 +579,10 @@ class ATMainWindow(wx.Frame):
         """Обработчик закрытия окна."""
         x, y = self.GetPosition()
         save_last_position(x, y)
+        # Освобождаем ресурсы AutoCAD
+        if hasattr(self, "cad") and self.cad is not None:
+            self.cad.cleanup()
+            self.cad = None
         event.Skip()
 
 

@@ -1,16 +1,21 @@
-# at_content_registry.py
+# windows/at_content_registry.py
 """
 Модуль для хранения реестра контента AT-CAD.
+
+Содержит словарь CONTENT_REGISTRY, в котором хранятся данные о панелях контента,
+включая путь к модулю, метку для отображения и флаг зависимости от AutoCAD.
 """
 
 # Словарь с именами модулей контента и их метками для отображения
 CONTENT_REGISTRY = {
     "cone": {
-        "module": "windows.content_cone",
-        "label": "at_run_cone"
+        "module": "windows.content_cone",  # Модуль для панели развертки конуса
+        "label": "at_run_cone",            # Ключ локализации для отображения названия
+        "requires_cad": True               # Требуется ли AutoCAD для этой панели
     },
     "content_apps": {
-        "module": "windows.content_apps",
-        "label": "apps_title"
+        "module": "windows.content_apps",  # Модуль для панели приложений
+        "label": "apps_title",             # Ключ локализации для отображения названия
+        "requires_cad": False              # AutoCAD не требуется
     }
 }

@@ -1,3 +1,8 @@
+# windows/content_cone.py
+"""
+Модуль для создания панели для ввода параметров развертки конуса.
+"""
+
 import math
 import logging
 import os
@@ -8,7 +13,6 @@ from config.at_config import (
     FONT_NAME, FONT_SIZE, FONT_TYPE, BACKGROUND_COLOR, FOREGROUND_COLOR,
     CONE_IMAGE_PATH, INPUT_FIELD_SIZE, LAST_CONE_INPUT_FILE
 )
-from config.at_cad_init import ATCadInit
 from programms.at_construction import at_diameter, at_cone_height, at_steigung
 from programms.at_input import at_point_input
 from locales.at_localization import loc
@@ -21,23 +25,24 @@ from programms.at_run_cone import run_application
 
 # Настройка логирования
 logging.basicConfig(
-    level=logging.ERROR,
+    level=logging.INFO,
     filename="at_cad.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
 
-def create_window(parent: wx.Window) -> wx.Panel:
+def create_window(parent: wx.Window, cad) -> wx.Panel:
     """
     Создаёт панель контента для ввода параметров конуса.
 
     Args:
         parent: Родительский wx.Window (content_panel из ATMainWindow).
+        cad: Экземпляр ATCadInit для работы с AutoCAD.
 
     Returns:
         wx.Panel: Панель с интерфейсом для ввода параметров конуса.
     """
-    return ConeContentPanel(parent)
+    return ConeContentPanel(parent, cad)
 
 
 class ConeContentPanel(wx.Panel):
@@ -45,27 +50,23 @@ class ConeContentPanel(wx.Panel):
     Панель для ввода параметров развертки конуса.
     """
 
-    def __init__(self, parent):
+    def __init__(self, parent, cad):
         """
         Инициализирует панель, создаёт элементы управления.
 
         Args:
             parent: Родительский wx.Window (content_panel).
+            cad: Экземпляр ATCadInit для работы с AutoCAD.
         """
         super().__init__(parent)
         self.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
         self.parent = parent
+        self.cad = cad
         self._updating = False
         self._debounce_timer = wx.Timer(self)
         self.labels = {}  # Для хранения текстовых меток
         self.static_boxes = {}  # Для хранения StaticBox
         self.Bind(wx.EVT_TIMER, self.on_debounce_timeout, self._debounce_timer)
-
-        # Инициализация AutoCAD
-        self.cad = ATCadInit()
-        if not self.cad.is_initialized():
-            show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
-            logging.error("AutoCAD не инициализирован")
 
         # Загрузка последних введённых данных
         self.last_input = wx.GetApp().GetTopWindow().last_input if hasattr(wx.GetApp().GetTopWindow(),
@@ -500,10 +501,14 @@ class ConeContentPanel(wx.Panel):
         Args:
             event: Событие нажатия кнопки.
         """
-        if not self.cad.is_initialized():
-            show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
-            logging.error("AutoCAD не инициализирован")
-            return
+        if not self.cad or not self.cad.is_initialized():
+            # Попытка переподключения
+            self.cad.reinitialize()
+            if not self.cad.is_initialized():
+                show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
+                logging.error("AutoCAD не инициализирован")
+                return
+
         try:
             point = at_point_input(self.cad.adoc)
             if point and hasattr(point, "x") and hasattr(point, "y"):
@@ -530,10 +535,14 @@ class ConeContentPanel(wx.Panel):
         Args:
             event: Событие нажатия кнопки.
         """
-        if not self.cad.is_initialized():
-            show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
-            logging.error("AutoCAD не инициализирован")
-            return
+        if not self.cad or not self.cad.is_initialized():
+            # Попытка переподключения
+            self.cad.reinitialize()
+            if not self.cad.is_initialized():
+                show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
+                logging.error("AutoCAD не инициализирован")
+                return
+
         if not hasattr(self, "insert_point") or not self.insert_point:
             show_popup(loc.get("point_not_selected", "Точка вставки не выбрана"), popup_type="error")
             logging.error("Точка вставки не выбрана")
@@ -725,7 +734,7 @@ class ConeContentPanel(wx.Panel):
 
     def on_cancel(self, event: wx.Event) -> None:
         """
-        Возвращает в главное окно с контентом content_apps и сбрасывает строку состояния.
+        Переключает контент на начальную страницу (content_apps) при нажатии кнопки "Отмена".
 
         Args:
             event: Событие нажатия кнопки.
@@ -733,17 +742,7 @@ class ConeContentPanel(wx.Panel):
         main_window = wx.GetTopLevelParent(self)
         if hasattr(main_window, "switch_content"):
             main_window.switch_content("content_apps")
-            if hasattr(main_window, "status_text"):
-                main_window.status_text.SetLabel(loc.get("status_ready", "Готов"))
-            else:
-                logging.warning("Строка состояния (status_text) не доступна для сброса")
-            logging.info("Переключение на панель content_apps")
+            logging.info("Переключение на content_apps по нажатию кнопки 'Отмена'")
         else:
             logging.error("Главное окно не имеет метода switch_content")
             show_popup(loc.get("error_switch_content", "Ошибка: невозможно переключить контент"), popup_type="error")
-
-    def adjust_button_widths(self) -> None:
-        """
-        Устанавливает одинаковую ширину для всех кнопок.
-        """
-        adjust_button_widths(self.buttons)

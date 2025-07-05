@@ -1,4 +1,4 @@
-# at_cad_init.py
+# config/at_cad_init.py
 """
 Модуль для инициализации AutoCAD через COM-интерфейс с использованием синглтона.
 Обеспечивает однократное подключение к AutoCAD и предоставляет доступ к его объектам.
@@ -8,6 +8,8 @@ from pyautocad import Autocad
 from windows.at_gui_utils import show_popup
 from config.at_config import LANGUAGE
 from locales.at_localization import loc
+import pythoncom  # Для управления COM-объектами
+import logging
 
 
 class ATCadInit:
@@ -67,6 +69,32 @@ class ATCadInit:
             bool: True, если AutoCAD готов к работе, иначе False.
         """
         return self.model is not None and self.adoc is not None
+
+    def cleanup(self):
+        """
+        Освобождает ресурсы, связанные с AutoCAD.
+        """
+        try:
+            if self.acad is not None:
+                # Сбрасываем ссылки на объекты AutoCAD
+                self.model = None
+                self.adoc = None
+                self.original_layer = None
+                self.acad = None
+                # Освобождаем COM-объект
+                pythoncom.CoUninitialize()
+                logging.info("Ресурсы AutoCAD освобождены")
+        except Exception as e:
+            logging.error(f"Ошибка при освобождении ресурсов AutoCAD: {e}")
+
+    def reinitialize(self):
+        """
+        Переподключается к AutoCAD, если соединение потеряно.
+        """
+        if not self.is_initialized():
+            self._initialized = False
+            self._initialize()
+            logging.info("AutoCAD переинициализирован")
 
 
 if __name__ == "__main__":
