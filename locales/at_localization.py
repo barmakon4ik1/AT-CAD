@@ -23,7 +23,7 @@ translations = {
         "en": "Information about the AT-CAD program..."
     },
     "allowance_non_negative": {
-        "ru": "Припуск на сварку не может быть отрицательным.",
+        "ru": "Припуск на сварку не может быть отрицательной.",
         "de": "Schweißnahtzugabe darf nicht negativ sein.",
         "en": "Weld allowance cannot be negative."
     },
@@ -711,23 +711,32 @@ class Localization:
         self.language = language if language in self._valid_languages else "ru"
         logging.info(f"Language set to: {self.language}")
 
-    def get(self, key: str, *args) -> str:
+    def get(self, key: str, default: str = None, *args) -> str:
         """
         Возвращает переведённое сообщение.
 
         Args:
             key: Ключ строки.
+            default: Значение по умолчанию, если ключ не найден.
             *args: Параметры форматирования.
 
         Returns:
-            str: Переведённая строка или ключ, если перевод не найден.
+            str: Переведённая строка или значение по умолчанию, если перевод не найден.
         """
         if self.language not in self._valid_languages:
             self.language = "ru"
             logging.warning(f"Invalid language detected, reverted to: {self.language}")
-        text = translations.get(key, {}).get(self.language, key)
+
+        text = translations.get(key, {}).get(self.language, default if default is not None else key)
         logging.debug(f"Localization: key={key}, language={self.language}, result={text}")
-        return text.format(*args) if args else text
+
+        if not args:
+            return text
+        try:
+            return text.format(*args)
+        except (IndexError, KeyError, ValueError) as e:
+            logging.error(f"Error formatting localization string: key={key}, text={text}, args={args}, error={e}")
+            return text  # Возвращаем текст без форматирования в случае ошибки
 
 
 # Глобальный объект локализации

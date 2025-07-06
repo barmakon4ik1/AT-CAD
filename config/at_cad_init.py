@@ -5,7 +5,6 @@
 """
 
 from pyautocad import Autocad
-from windows.at_gui_utils import show_popup
 from config.at_config import LANGUAGE
 from locales.at_localization import loc
 import pythoncom  # Для управления COM-объектами
@@ -47,15 +46,16 @@ class ATCadInit:
     def _initialize(self):
         """
         Выполняет подключение к AutoCAD и настройку объектов.
-        В случае ошибки показывает всплывающее окно с сообщением.
+        Логирует ошибку в случае неудачи, но не показывает всплывающее окно.
         """
         try:
             self.acad = Autocad(create_if_not_exists=True)  # Подключение или запуск AutoCAD
             self.adoc = self.acad.ActiveDocument
             self.model = self.acad.model
             self.original_layer = self.adoc.ActiveLayer
-        except Exception:
-            show_popup(loc.get('cad_init_error'), popup_type="error")
+            logging.info("AutoCAD успешно инициализирован")
+        except Exception as e:
+            logging.error(f"Ошибка инициализации AutoCAD: {e}")
             self.acad = None
             self.adoc = None
             self.model = None
@@ -101,6 +101,7 @@ if __name__ == "__main__":
     """
     Тестирование инициализации AutoCAD при прямом запуске модуля.
     """
+    from windows.at_gui_utils import show_popup
     cad = ATCadInit()
     show_popup(loc.get('cad_init_success') if cad.is_initialized() else loc.get('cad_init_error_short'),
                popup_type="success" if cad.is_initialized() else "error")

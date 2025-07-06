@@ -6,9 +6,12 @@
 import math
 import logging
 import os
+import time
 from typing import Optional, Dict
 
 import wx
+
+from config.at_cad_init import ATCadInit
 from config.at_config import (
     FONT_NAME, FONT_SIZE, FONT_TYPE, BACKGROUND_COLOR, FOREGROUND_COLOR,
     CONE_IMAGE_PATH, INPUT_FIELD_SIZE, LAST_CONE_INPUT_FILE
@@ -63,13 +66,12 @@ class ConeContentPanel(wx.Panel):
         self._debounce_timer = wx.Timer(self)
         self.labels = {}  # Для хранения текстовых меток
         self.static_boxes = {}  # Для хранения StaticBox
+        self.insert_point = None  # Точка вставки
         self.Bind(wx.EVT_TIMER, self.on_debounce_timeout, self._debounce_timer)
 
         # Загрузка последних введённых данных
         self.last_input = wx.GetApp().GetTopWindow().last_input if hasattr(wx.GetApp().GetTopWindow(),
                                                                            'last_input') else {}
-        # Точка вставки не загружается из JSON
-        self.insert_point = None
         self.update_status_bar_no_point()
 
         self.setup_ui()
@@ -112,7 +114,7 @@ class ConeContentPanel(wx.Panel):
 
         # Кнопки
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.buttons = create_standard_buttons(self, self.on_select_point, self.on_ok, self.on_cancel, self.on_clear)
+        self.buttons = create_standard_buttons(self, self.on_ok, self.on_cancel, self.on_clear)
         for button in self.buttons:
             button_sizer.Add(button, 0, wx.RIGHT, 5)
         adjust_button_widths(self.buttons)
@@ -359,11 +361,10 @@ class ConeContentPanel(wx.Panel):
         self.labels["allowance"].SetLabel(loc.get("weld_allowance_label", "Припуск на сварку"))
 
         # Обновление текста кнопок
-        self.buttons[0].SetLabel(loc.get("insert_point_label", "Точка вставки"))
-        self.buttons[1].SetLabel(loc.get("ok_button", "ОК"))
-        self.buttons[2].SetLabel(loc.get("clear_button", "Очистить"))
-        self.buttons[3].SetLabel(loc.get("cancel_button", "Отмена"))
-        self.adjust_button_widths()
+        self.buttons[0].SetLabel(loc.get("ok_button", "ОК"))
+        self.buttons[1].SetLabel(loc.get("clear_button", "Очистить"))
+        self.buttons[2].SetLabel(loc.get("cancel_button", "Отмена"))
+        adjust_button_widths(self.buttons)
 
         self.Layout()
 
@@ -491,15 +492,26 @@ class ConeContentPanel(wx.Panel):
         finally:
             self._updating = False
 
-    def on_select_point(self, event: wx.Event) -> None:
+    def on_ok(self, event: wx.Event) -> None:
         """
-        Запрашивает точку вставки в AutoCAD и сохраняет её в переменной.
+        Проверяет данные, запрашивает точку вставки в AutoCAD и вызывает run_application для построения развертки.
+        Очищает поля, не указанные в last_input.json, и оставляет окно content_cone для нового ввода.
 
         Args:
             event: Событие нажатия кнопки.
         """
         try:
-            point = at_point_input(self.cad.adoc)
+            # Минимизируем окно для выбора точки
+            main_window = self.GetTopLevelParent()
+            main_window.Iconize(True)
+            show_popup(loc.get("select_point_prompt", "Выберите точку в AutoCAD"), popup_type="info")
+            point = at_point_input()  # Без передачи adoc, инициализация в at_point_input
+            main_window.Iconize(False)
+            main_window.Raise()
+            main_window.SetFocus()
+            wx.Yield()
+            time.sleep(0.1)
+
             if point and hasattr(point, "x") and hasattr(point, "y"):
                 self.insert_point = point
                 update_status_bar_point_selected(self, self.insert_point)
@@ -511,178 +523,188 @@ class ConeContentPanel(wx.Panel):
             else:
                 show_popup(loc.get("point_selection_error", "Ошибка выбора точки"), popup_type="error")
                 logging.error(f"Точка вставки не выбрана или некорректна: {point}")
-                update_status_bar_point_selected(self, None)
+                self.update_status_bar_no_point()
+                return
+
+            # Проверка и обработка остальных данных
+            try:
+                d = float(self.d_input.GetValue().replace(',', '.')) if self.d_input.GetValue().strip() else None
+                D = float(self.D_input.GetValue().replace(',', '.')) if self.D_input.GetValue().strip() else None
+                if d is None or D is None:
+                    show_popup(loc.get("error_diameter_required", "Требуется ввести диаметры"), popup_type="error")
+                    logging.error("Диаметр вершины или основания не введён")
+                    return
+                if d > D:
+                    d, D = D, d
+                thickness = float(
+                    self.thickness_combo.GetValue().replace(',',
+                                                            '.')) if self.thickness_combo.GetValue().strip() else None
+                allowance = float(
+                    self.allowance_combo.GetValue().replace(',',
+                                                            '.')) if self.allowance_combo.GetValue().strip() else 0
+
+                if thickness is None:
+                    show_popup(loc.get("error_thickness_required", "Требуется выбрать толщину"), popup_type="error")
+                    logging.error("Толщина не выбрана")
+                    return
+                if D <= 0:
+                    show_popup(
+                        loc.get("error_base_diameter_positive", "Диаметр основания должен быть положительным"),
+                        popup_type="error")
+                    logging.error("Диаметр основания должен быть положительным")
+                    return
+                if d < 0:
+                    show_popup(
+                        loc.get("error_top_diameter_non_negative", "Диаметр вершины не может быть отрицательным"),
+                        popup_type="error")
+                    logging.error("Диаметр вершины не может быть отрицательным")
+                    return
+                if allowance < 0:
+                    show_popup(
+                        loc.get("error_weld_allowance_non_negative",
+                                "Припуск на сварку не может быть отрицательным"),
+                        popup_type="error")
+                    logging.error("Припуск на сварку не может быть отрицательным")
+                    return
+                if thickness <= 0:
+                    show_popup(loc.get("error_thickness_positive", "Толщина должна быть положительной"),
+                               popup_type="error")
+                    logging.error("Толщина должна быть положительной")
+                    return
+
+                d_type = "inner" if self.d_inner.GetValue() else "middle" if self.d_middle.GetValue() else "outer"
+                D_type = "inner" if self.D_inner.GetValue() else "middle" if self.D_middle.GetValue() else "outer"
+
+                try:
+                    diameter_top = at_diameter(d, thickness, d_type)
+                    diameter_base = at_diameter(D, thickness, D_type)
+                except Exception as e:
+                    show_popup(loc.get("error_diameter_calculation", f"Ошибка расчёта диаметра: {str(e)}"),
+                               popup_type="error")
+                    logging.error(f"Ошибка расчёта диаметра: {e}")
+                    return
+
+                if diameter_base <= 0:
+                    show_popup(
+                        loc.get("error_base_diameter_positive", "Диаметр основания должен быть положительным"),
+                        popup_type="error")
+                    logging.error("Средний диаметр основания должен быть положительным")
+                    return
+                if diameter_top < 0:
+                    show_popup(
+                        loc.get("error_top_diameter_non_negative", "Диаметр вершины не должен быть отрицательным"),
+                        popup_type="error")
+                    logging.error("Средний диаметр вершины не должен быть отрицательным")
+                    return
+
+                height = None
+                if self.height_input.GetValue().strip():
+                    height = float(self.height_input.GetValue().replace(',', '.'))
+                    if height <= 0:
+                        show_popup(loc.get("error_height_positive", "Высота должна быть положительной"),
+                                   popup_type="error")
+                        logging.error("Высота должна быть положительной")
+                        return
+                elif self.steigung_input.GetValue().strip():
+                    steigung = float(self.steigung_input.GetValue().replace(',', '.'))
+                    if steigung <= 0:
+                        show_popup(loc.get("error_steigung_positive", "Наклон должен быть положительным"),
+                                   popup_type="error")
+                        logging.error("Наклон должен быть положительным")
+                        return
+                    height = at_cone_height(D, d, steigung=steigung)
+                elif self.angle_input.GetValue().strip():
+                    angle = float(self.angle_input.GetValue().replace(',', '.'))
+                    if angle <= 0 or angle >= 180:
+                        show_popup(
+                            loc.get("error_angle_range", "Угол должен быть в диапазоне от 0 до 180 градусов"),
+                            popup_type="error")
+                        logging.error("Угол должен быть в диапазоне от 0 до 180 градусов")
+                        return
+                    height = at_cone_height(D, d, angle=angle)
+                else:
+                    show_popup(loc.get("error_height_steigung_angle_required",
+                                       "Необходимо ввести высоту, наклон или угол"),
+                               popup_type="error")
+                    logging.error("Необходимо ввести высоту, наклон или угол")
+                    return
+
+                if height is None or height <= 0:
+                    show_popup(loc.get("error_height_positive", "Высота должна быть положительной"),
+                               popup_type="error")
+                    logging.error("Высота должна быть положительной")
+                    return
+
+                height += allowance
+
+                thickness_text = f"{thickness:.2f} {loc.get('mm', 'мм')}"
+
+                # Инициализация AutoCAD для получения model
+                cad = ATCadInit()
+                if not cad.is_initialized():
+                    show_popup(loc.get('cad_init_error', 'Ошибка инициализации AutoCAD'), popup_type="error")
+                    logging.error("Не удалось инициализировать AutoCAD")
+                    return
+                model = cad.model
+
+                data = {
+                    "model": self.cad.model,
+                    "input_point": self.insert_point,
+                    "diameter_base": diameter_base,
+                    "diameter_top": diameter_top,
+                    "height": height,
+                    "layer_name": "0",
+                    "order_number": self.order_input.GetValue(),
+                    "detail_number": self.detail_input.GetValue(),
+                    "material": self.material_combo.GetValue(),
+                    "thickness_text": thickness_text
+                }
+
+                # Сохраняем только необходимые данные в last_input.json
+                last_input_data = {
+                    "order_number": str(self.order_input.GetValue()),
+                    "material": str(self.material_combo.GetValue()),
+                    "thickness": str(self.thickness_combo.GetValue()),
+                    "weld_allowance": str(self.allowance_combo.GetValue())
+                }
+                main_window = wx.GetTopLevelParent(self)
+                main_window.last_input = last_input_data
+                save_last_input(LAST_CONE_INPUT_FILE, last_input_data)
+                logging.info(f"Данные сохранены в {LAST_CONE_INPUT_FILE}: {last_input_data}")
+
+                # Вызов run_application
+                try:
+                    success = run_application(data)
+                    if success:
+                        self.adoc.Regen(0)  # Обновление активного видового экрана
+                        show_popup(loc.get("cone_build_success", "Развертка конуса успешно построена"), popup_type="info")
+                        # Очищаем только поля, связанные с геометрией
+                        self.detail_input.SetValue("")
+                        self.d_input.SetValue("")
+                        self.D_input.SetValue("")
+                        self.d_inner.SetValue(True)
+                        self.D_inner.SetValue(True)
+                        self.height_input.SetValue("")
+                        self.steigung_input.SetValue("")
+                        self.angle_input.SetValue("")
+                        if hasattr(self, "insert_point"):
+                            del self.insert_point
+                        self.update_status_bar_no_point()
+                        logging.info("Поля геометрии очищены после успешного построения")
+                    else:
+                        show_popup(loc.get("cone_build_failed", "Построение отменено или завершилось с ошибкой"),
+                                   popup_type="error")
+                except Exception as e:
+                    show_popup(loc.get("cone_build_error", f"Ошибка построения: {str(e)}"), popup_type="error")
+                    logging.error(f"Ошибка в run_application: {e}")
+
+            except (ValueError, TypeError) as e:
+                show_popup(loc.get("error_invalid_number_format", "Неверный формат числа"), popup_type="error")
+                logging.error(f"Ошибка формата числа в on_ok: {e}")
         except Exception as e:
             show_popup(loc.get("point_selection_error", "Ошибка выбора точки: {}").format(str(e)), popup_type="error")
             logging.error(f"Ошибка выбора точки: {e}")
             update_status_bar_point_selected(self, None)
-
-    def on_ok(self, event: wx.Event) -> None:
-        """
-        Проверяет данные и вызывает run_application для построения развертки.
-
-        Args:
-            event: Событие нажатия кнопки.
-        """
-        if not hasattr(self, "insert_point") or not self.insert_point:
-            show_popup(loc.get("point_not_selected", "Точка вставки не выбрана"), popup_type="error")
-            logging.error("Точка вставки не выбрана")
-            return
-
-        try:
-            d = float(self.d_input.GetValue().replace(',', '.')) if self.d_input.GetValue().strip() else None
-            D = float(self.D_input.GetValue().replace(',', '.')) if self.D_input.GetValue().strip() else None
-            if d is None or D is None:
-                show_popup(loc.get("error_diameter_required", "Требуется ввести диаметры"), popup_type="error")
-                logging.error("Диаметр вершины или основания не введён")
-                return
-            if d > D:
-                d, D = D, d
-            thickness = float(
-                self.thickness_combo.GetValue().replace(',', '.')) if self.thickness_combo.GetValue().strip() else None
-            allowance = float(
-                self.allowance_combo.GetValue().replace(',', '.')) if self.allowance_combo.GetValue().strip() else 0
-
-            if thickness is None:
-                show_popup(loc.get("error_thickness_required", "Требуется выбрать толщину"), popup_type="error")
-                logging.error("Толщина не выбрана")
-                return
-            if D <= 0:
-                show_popup(loc.get("error_base_diameter_positive", "Диаметр основания должен быть положительным"),
-                           popup_type="error")
-                logging.error("Диаметр основания должен быть положительным")
-                return
-            if d < 0:
-                show_popup(loc.get("error_top_diameter_non_negative", "Диаметр вершины не может быть отрицательным"),
-                           popup_type="error")
-                logging.error("Диаметр вершины не может быть отрицательным")
-                return
-            if allowance < 0:
-                show_popup(
-                    loc.get("error_weld_allowance_non_negative", "Припуск на сварку не может быть отрицательным"),
-                    popup_type="error")
-                logging.error("Припуск на сварку не может быть отрицательным")
-                return
-            if thickness <= 0:
-                show_popup(loc.get("error_thickness_positive", "Толщина должна быть положительной"), popup_type="error")
-                logging.error("Толщина должна быть положительной")
-                return
-
-            d_type = "inner" if self.d_inner.GetValue() else "middle" if self.d_middle.GetValue() else "outer"
-            D_type = "inner" if self.D_inner.GetValue() else "middle" if self.D_middle.GetValue() else "outer"
-
-            try:
-                diameter_top = at_diameter(d, thickness, d_type)
-                diameter_base = at_diameter(D, thickness, D_type)
-            except Exception as e:
-                show_popup(loc.get("error_diameter_calculation", f"Ошибка расчёта диаметра: {str(e)}"),
-                           popup_type="error")
-                logging.error(f"Ошибка расчёта диаметра: {e}")
-                return
-
-            if diameter_base <= 0:
-                show_popup(loc.get("error_base_diameter_positive", "Диаметр основания должен быть положительным"),
-                           popup_type="error")
-                logging.error("Средний диаметр основания должен быть положительным")
-                return
-            if diameter_top < 0:
-                show_popup(loc.get("error_top_diameter_non_negative", "Диаметр вершины не должен быть отрицательным"),
-                           popup_type="error")
-                logging.error("Средний диаметр вершины не должен быть отрицательным")
-                return
-
-            height = None
-            if self.height_input.GetValue().strip():
-                height = float(self.height_input.GetValue().replace(',', '.'))
-                if height <= 0:
-                    show_popup(loc.get("error_height_positive", "Высота должна быть положительной"), popup_type="error")
-                    logging.error("Высота должна быть положительной")
-                    return
-            elif self.steigung_input.GetValue().strip():
-                steigung = float(self.steigung_input.GetValue().replace(',', '.'))
-                if steigung <= 0:
-                    show_popup(loc.get("error_steigung_positive", "Наклон должен быть положительным"),
-                               popup_type="error")
-                    logging.error("Наклон должен быть положительным")
-                    return
-                height = at_cone_height(D, d, steigung=steigung)
-            elif self.angle_input.GetValue().strip():
-                angle = float(self.angle_input.GetValue().replace(',', '.'))
-                if angle <= 0 or angle >= 180:
-                    show_popup(loc.get("error_angle_range", "Угол должен быть в диапазоне от 0 до 180 градусов"),
-                               popup_type="error")
-                    logging.error("Угол должен быть в диапазоне от 0 до 180 градусов")
-                    return
-                height = at_cone_height(D, d, angle=angle)
-            else:
-                show_popup(loc.get("error_height_steigung_angle_required", "Необходимо ввести высоту, наклон или угол"),
-                           popup_type="error")
-                logging.error("Необходимо ввести высоту, наклон или угол")
-                return
-
-            if height is None or height <= 0:
-                show_popup(loc.get("error_height_positive", "Высота должна быть положительной"), popup_type="error")
-                logging.error("Высота должна быть положительной")
-                return
-
-            height += allowance
-
-            thickness_text = f"{thickness:.2f} {loc.get('mm', 'мм')}"
-
-            data = {
-                "model": self.cad.model,
-                "input_point": self.insert_point,
-                "diameter_base": diameter_base,
-                "diameter_top": diameter_top,
-                "height": height,
-                "layer_name": "0",
-                "order_number": self.order_input.GetValue(),
-                "detail_number": self.detail_input.GetValue(),
-                "material": self.material_combo.GetValue(),
-                "thickness_text": thickness_text
-            }
-
-            # Сохраняем только необходимые данные в last_input.json
-            last_input_data = {
-                "order_number": str(self.order_input.GetValue()),
-                "material": str(self.material_combo.GetValue()),
-                "thickness": str(self.thickness_combo.GetValue()),
-                "weld_allowance": str(self.allowance_combo.GetValue())
-            }
-            main_window = wx.GetTopLevelParent(self)
-            main_window.last_input = last_input_data
-            save_last_input(LAST_CONE_INPUT_FILE, last_input_data)
-            logging.info(f"Данные сохранены в {LAST_CONE_INPUT_FILE}: {last_input_data}")
-
-            # Вызов run_application
-            try:
-                success = run_application(data)
-                if success:
-                    self.cad.adoc.Regen(0)  # Обновление активного видового экрана
-                    # show_popup(loc.get("cone_build_success", "Развертка конуса успешно построена"), popup_type="info")
-                    # Очищаем только поля, связанные с геометрией
-                    self.detail_input.SetValue("")
-                    self.d_input.SetValue("")
-                    self.D_input.SetValue("")
-                    self.d_inner.SetValue(True)
-                    self.D_inner.SetValue(True)
-                    self.height_input.SetValue("")
-                    self.steigung_input.SetValue("")
-                    self.angle_input.SetValue("")
-                    if hasattr(self, "insert_point"):
-                        del self.insert_point
-                    self.update_status_bar_no_point()
-                    logging.info("Поля геометрии очищены после успешного построения")
-                else:
-                    show_popup(loc.get("cone_build_failed", "Построение отменено или завершилось с ошибкой"),
-                               popup_type="error")
-            except Exception as e:
-                show_popup(loc.get("cone_build_error", f"Ошибка построения: {str(e)}"), popup_type="error")
-                logging.error(f"Ошибка в run_application: {e}")
-
-        except (ValueError, TypeError) as e:
-            show_popup(loc.get("error_invalid_number_format", "Неверный формат числа"), popup_type="error")
-            logging.error(f"Ошибка формата числа в on_ok: {e}")
 
     def on_clear(self, event: wx.Event) -> None:
         """

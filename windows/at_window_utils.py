@@ -12,7 +12,7 @@ import time
 from typing import Tuple, Dict, Optional, List
 import wx
 from config.at_config import FONT_NAME, FONT_TYPE, FONT_SIZE, BACKGROUND_COLOR, LABEL_FONT_NAME, LABEL_FONT_TYPE, \
-    LABEL_FONT_COLOR, LABEL_FONT_SIZE, LABEL_FONT_WEIGHT
+    LABEL_FONT_COLOR, LABEL_FONT_SIZE, LABEL_FONT_WEIGHT, BUTTON_FONT_COLOR
 from locales.at_localization import loc
 from programms.at_base import init_autocad
 from programms.at_input import at_point_input
@@ -453,19 +453,15 @@ class BaseInputWindow(wx.Frame):
         Args:
             event: Событие кнопки (wx.EVT_BUTTON).
         """
-        if not self.adoc or not self.model:
-            show_popup(loc.get("cad_not_initialized"), popup_type="error")
-            logging.error("AutoCAD не инициализирован")
-            return
         try:
             self.Iconize(True)
             self.insert_point = at_point_input(self.adoc)
-            if self.insert_point and hasattr(self.insert_point, "x") and hasattr(self.insert_point, "y"):
-                update_status_bar_point_selected(self, self.insert_point)
-            else:
-                show_popup(loc.get("point_selection_error", "Ошибка выбора точки"), popup_type="error")
-                logging.error(f"Точка не выбрана или некорректна: {self.insert_point}")
-                update_status_bar_point_selected(self, None)
+            # if self.insert_point and hasattr(self.insert_point, "x") and hasattr(self.insert_point, "y"):
+            #     update_status_bar_point_selected(self, self.insert_point)
+            # else:
+            #     show_popup(loc.get("point_selection_error", "Ошибка выбора точки"), popup_type="error")
+            #     logging.error(f"Точка не выбрана или некорректна: {self.insert_point}")
+            #     update_status_bar_point_selected(self, None)
         except Exception as e:
             show_popup(loc.get("point_selection_error", str(e)), popup_type="error")
             logging.error(f"Ошибка выбора точки: {e}")
@@ -529,46 +525,40 @@ def apply_styles_to_panel(panel: wx.Window) -> None:
     apply_styles_recursively(panel)
 
 
-def create_standard_buttons(parent: wx.Window, on_select_point, on_ok, on_cancel, on_clear=None) -> List[wx.Button]:
+def create_standard_buttons(parent: wx.Window, on_ok, on_cancel, on_clear=None) -> List[wx.Button]:
     """
-    Создаёт стандартные кнопки (Insert Point, OK, Cancel, Clear) с привязкой событий.
+    Создаёт стандартные кнопки (OK, Cancel, Clear) с привязкой событий.
 
     Args:
         parent: Родительский элемент (wx.Window).
-        on_select_point: Обработчик для кнопки выбора точки.
         on_ok: Обработчик для кнопки OK.
         on_cancel: Обработчик для кнопки Cancel.
         on_clear: Обработчик для кнопки Clear (опционально, если None, кнопка не создаётся).
 
     Returns:
-        List[wx.Button]: Список кнопок [point_button, ok_button, cancel_button, clear_button] (clear_button опционально).
+        List[wx.Button]: Список кнопок [ok_button, cancel_button, clear_button] (clear_button опционально).
     """
     button_font = get_button_font()
-    point_button = wx.Button(parent, label=loc.get("insert_point_label"))
-    point_button.SetFont(button_font)
-    point_button.SetBackgroundColour(wx.Colour(0, 0, 255))
-    point_button.SetForegroundColour(wx.WHITE)
-    point_button.Bind(wx.EVT_BUTTON, on_select_point)
 
     ok_button = wx.Button(parent, label=loc.get("ok_button"))
     ok_button.SetFont(button_font)
     ok_button.SetBackgroundColour(wx.Colour(0, 128, 0))
-    ok_button.SetForegroundColour(wx.WHITE)
+    ok_button.SetForegroundColour(wx.Colour(BUTTON_FONT_COLOR))
     ok_button.Bind(wx.EVT_BUTTON, on_ok)
 
     clear_button = wx.Button(parent, label=loc.get("clear_button"))
     clear_button.SetFont(button_font)
     clear_button.SetBackgroundColour(wx.Colour(64, 64, 64))  # Тёмно-серый цвет
-    clear_button.SetForegroundColour(wx.WHITE)
+    clear_button.SetForegroundColour(wx.Colour(BUTTON_FONT_COLOR))
     clear_button.Bind(wx.EVT_BUTTON, on_clear)
 
     cancel_button = wx.Button(parent, label=loc.get("cancel_button"))
     cancel_button.SetFont(button_font)
     cancel_button.SetBackgroundColour(wx.Colour(255, 0, 0))
-    cancel_button.SetForegroundColour(wx.WHITE)
+    cancel_button.SetForegroundColour(wx.Colour(BUTTON_FONT_COLOR))
     cancel_button.Bind(wx.EVT_BUTTON, on_cancel)
 
-    buttons = [point_button, ok_button, clear_button, cancel_button]
+    buttons = [ok_button, clear_button, cancel_button]
 
     return buttons
 

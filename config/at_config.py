@@ -77,6 +77,7 @@ BANNER_COLOR: str = "light blue"  # Цвет баннера
 BANNER_TEXT_COLOR: str = "black"  # Цвет текста баннера
 EXIT_BUTTON_COLOR: str = "dark grey"  # Цвет кнопки выхода
 LABEL_FONT_COLOR: str = "blue"
+BUTTON_FONT_COLOR: str = "white"
 
 # Слои по умолчанию для объектов AutoCAD
 RECTANGLE_LAYER: str = "0"  # Слой для прямоугольников
