@@ -672,7 +672,7 @@ class ConeContentPanel(wx.Panel):
                     success = run_application(data)
                     if success:
                         cad.adoc.Regen(0)  # Обновление активного видового экрана
-                        show_popup(loc.get("cone_build_success", "Развертка конуса успешно построена"), popup_type="info")
+                        # show_popup(loc.get("cone_build_success", "Развертка конуса успешно построена"), popup_type="info")
                         # Очищаем только поля, связанные с геометрией
                         self.detail_input.SetValue("")
                         self.d_input.SetValue("")
