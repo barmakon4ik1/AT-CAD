@@ -15,12 +15,16 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 # Путь к папке с ресурсами (иконки, изображения и т.д.)
 IMAGES_DIR: str = "images"
 RESOURCE_DIR: str = "config"
 
 # Путь к иконке приложения
 ICON_PATH: str = os.path.join(IMAGES_DIR, "AT-CAD_8.png")
+
+DONE_ICON_PATH: str = os.path.join(IMAGES_DIR, "done-icon.png")
 
 # Путь к изображению конуса
 CONE_IMAGE_PATH: str = os.path.join(IMAGES_DIR, "cone.png")

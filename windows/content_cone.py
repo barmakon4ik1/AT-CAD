@@ -185,7 +185,7 @@ class ConeContentPanel(wx.Panel):
                 last_thickness_float)
         except ValueError:
             last_thickness = ""
-        thickness_value = last_thickness if last_thickness in thickness_options else thickness_options[0]
+        thickness_value = last_thickness if last_thickness in thickness_options else thickness_options[4]
         self.thickness_combo = wx.ComboBox(main_data_box, choices=thickness_options,
                                            value=thickness_value, style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
         self.thickness_combo.SetFont(font)
@@ -324,7 +324,7 @@ class ConeContentPanel(wx.Panel):
         self.labels["allowance"] = allowance_label
         allowance_options = [str(i) for i in range(11)]
         self.allowance_combo = wx.ComboBox(self, choices=allowance_options,
-                                           value=self.last_input.get("weld_allowance", "0"),
+                                           value=self.last_input.get("weld_allowance", "3"),
                                            style=wx.CB_READONLY, size=INPUT_FIELD_SIZE)
         self.allowance_combo.SetFont(font)
         allowance_sizer.AddStretchSpacer()
@@ -504,7 +504,6 @@ class ConeContentPanel(wx.Panel):
             # Минимизируем окно для выбора точки
             main_window = self.GetTopLevelParent()
             main_window.Iconize(True)
-            show_popup(loc.get("select_point_prompt", "Выберите точку в AutoCAD"), popup_type="info")
             point = at_point_input()  # Без передачи adoc, инициализация в at_point_input
             main_window.Iconize(False)
             main_window.Raise()
@@ -515,10 +514,6 @@ class ConeContentPanel(wx.Panel):
             if point and hasattr(point, "x") and hasattr(point, "y"):
                 self.insert_point = point
                 update_status_bar_point_selected(self, self.insert_point)
-                show_popup(
-                    loc.get("point_selected").format(point.x, point.y),
-                    popup_type="info"
-                )
                 logging.info(f"Точка вставки выбрана: x={point.x}, y={point.y}, type={type(point)}")
             else:
                 show_popup(loc.get("point_selection_error", "Ошибка выбора точки"), popup_type="error")
@@ -566,7 +561,7 @@ class ConeContentPanel(wx.Panel):
                         popup_type="error")
                     logging.error("Припуск на сварку не может быть отрицательным")
                     return
-                if thickness <= 0:
+                if thickness < 0:
                     show_popup(loc.get("error_thickness_positive", "Толщина должна быть положительной"),
                                popup_type="error")
                     logging.error("Толщина должна быть положительной")
@@ -648,7 +643,7 @@ class ConeContentPanel(wx.Panel):
                 model = cad.model
 
                 data = {
-                    "model": self.cad.model,
+                    "model": model,
                     "input_point": self.insert_point,
                     "diameter_base": diameter_base,
                     "diameter_top": diameter_top,
@@ -676,7 +671,7 @@ class ConeContentPanel(wx.Panel):
                 try:
                     success = run_application(data)
                     if success:
-                        self.adoc.Regen(0)  # Обновление активного видового экрана
+                        cad.adoc.Regen(0)  # Обновление активного видового экрана
                         show_popup(loc.get("cone_build_success", "Развертка конуса успешно построена"), popup_type="info")
                         # Очищаем только поля, связанные с геометрией
                         self.detail_input.SetValue("")

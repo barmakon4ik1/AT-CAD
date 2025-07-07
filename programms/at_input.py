@@ -32,6 +32,7 @@ def at_point_input(adoc: object = None) -> Optional[APoint]:
         adoc = cad.adoc
 
     try:
+        adoc.Utility.Prompt("Укажите точку: ")
         point_data = adoc.Utility.GetPoint()
         return APoint(point_data) if point_data else None
     except Exception:

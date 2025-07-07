@@ -1,4 +1,5 @@
-from config.at_config import FONT_NAME, FONT_TYPE, FONT_SIZE
+# at_gui_utils.py
+from config.at_config import FONT_NAME, FONT_TYPE, FONT_SIZE, IMAGES_DIR, DONE_ICON_PATH
 from locales.at_localization import loc
 import wx
 import os
@@ -36,9 +37,8 @@ def show_popup(message: str, title: str = None, popup_type: str = "error", icon_
 
     # Выбор иконки
     if popup_type.lower() == "success":
-        icon_path = os.path.join("..", "ICONS", "done-icon.png")
         try:
-            icon_bitmap = wx.Bitmap(icon_path, wx.BITMAP_TYPE_PNG)
+            icon_bitmap = wx.Bitmap(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), DONE_ICON_PATH), wx.BITMAP_TYPE_ANY)
             if not icon_bitmap.IsOk():
                 raise ValueError(loc.get("image_not_found"))
             icon = wx.Icon(icon_bitmap)
