@@ -182,9 +182,9 @@ translations = {
         "en": "Invalid separator format in row {0}"
     },
     "diameter_label": {
-        "ru": "Диаметры",
+        "ru": "Диаметр",
         "de": "Durchmesser",
-        "en": "Diameters"
+        "en": "Diameter"
     },
     "diameters_label": {
         "ru": "Диаметры (через запятую)",

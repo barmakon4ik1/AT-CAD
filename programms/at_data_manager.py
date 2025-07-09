@@ -5,19 +5,28 @@
 """
 
 import json
+import os
 from typing import Any, List, Dict
+import logging
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    filename="at_cad.log",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
 
 class DataManager:
     """
     Класс для загрузки и доступа к данным из JSON-файла.
     """
-    def __init__(self, filepath: str = "common_data.json") -> None:
+    def __init__(self, filepath: str) -> None:
         """
         Инициализирует менеджер данных с указанным файлом.
 
         Args:
-            filepath: Путь к JSON-файлу с данными (по умолчанию 'common_data.json').
+            filepath: Путь к JSON-файлу с данными.
         """
         self.filepath = filepath
         self.data = self.load_data()
@@ -30,9 +39,15 @@ class DataManager:
             dict: Данные из файла или пустой словарь при ошибке.
         """
         try:
+            if not os.path.exists(self.filepath):
+                logging.error(f"Файл конфигурации '{self.filepath}' не найден")
+                return {}
             with open(self.filepath, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception:
+                data = json.load(f)
+                logging.info(f"Конфигурация загружена из '{self.filepath}'")
+                return data
+        except Exception as e:
+            logging.error(f"Ошибка загрузки конфигурации из '{self.filepath}': {e}")
             return {}
 
     def get_data(self, path: str) -> List[Any]:
@@ -50,10 +65,12 @@ class DataManager:
         try:
             for key in keys:
                 data = data[key]
-            return data
-        except (KeyError, TypeError):
+            return [str(item) for item in data] if isinstance(data, list) else []
+        except (KeyError, TypeError) as e:
+            logging.error(f"Ошибка получения данных по пути '{path}': {e}")
             return []
 
 
-# Создание глобального экземпляра менеджера данных
-data_manager = DataManager()
+# Глобальные экземпляры менеджера данных
+config_manager = DataManager("config/config.json")  # Для config.json
+common_data_manager = DataManager("config/common_data.json")  # Для common_data.json

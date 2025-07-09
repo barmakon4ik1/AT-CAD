@@ -19,5 +19,9 @@ CONTENT_REGISTRY = {
     "rings": {
         "module": "windows.content_rings",  # Модуль для панели ввода параметров колец
         "label": "at_run_rings"            # Ключ локализации для отображения названия
+    },
+    "head": {
+        "module": "windows.content_head",
+        "label": "at_run_heads"
     }
 }

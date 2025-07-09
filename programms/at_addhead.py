@@ -4,14 +4,7 @@
 Создает внутреннюю и внешнюю полилинии днища на основе заданных параметров.
 """
 
-# import math
-# from typing import List
-#
-# from at_base import *
-# from at_localization import loc
-# from at_gui_utils import show_popup
-# from at_geometry import *
-from at_construction import *
+from programms.at_construction import *
 
 try:
     from at_config import HEADS_LAYER
