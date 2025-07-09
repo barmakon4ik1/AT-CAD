@@ -189,8 +189,8 @@ class ATMainWindow(wx.Frame):
         banner_panel.SetBackgroundColour(wx.Colour(BANNER_COLOR))
 
         banner_height = max(BANNER_HIGH, 20)
-        banner_panel.SetMinSize((-1, banner_height))
-        banner_panel.SetMaxSize((-1, banner_height))
+        banner_panel.SetMinSize((wx.DefaultCoord, banner_height))
+        banner_panel.SetMaxSize((wx.DefaultCoord, banner_height))
 
         banner_sizer = wx.BoxSizer(wx.HORIZONTAL)
 

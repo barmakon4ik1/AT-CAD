@@ -1,7 +1,8 @@
-from at_cad_init import ATCadInit
-from at_gui_utils import show_popup
-from at_config import LANGUAGE
-from at_localization import loc
+# programms/at_text_input.py
+from config.at_cad_init import ATCadInit
+from windows.at_gui_utils import show_popup
+from config.at_config import LANGUAGE
+from locales.at_localization import loc
 # Установка языка для локализации
 loc.language = LANGUAGE
 

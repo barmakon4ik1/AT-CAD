@@ -366,6 +366,8 @@ class ConeContentPanel(wx.Panel):
         self.buttons[2].SetLabel(loc.get("cancel_button", "Отмена"))
         adjust_button_widths(self.buttons)
 
+        self.update_status_bar_no_point()
+
         self.Layout()
 
     def _clear_height_fields(self) -> None:
@@ -672,8 +674,7 @@ class ConeContentPanel(wx.Panel):
                     success = run_application(data)
                     if success:
                         cad.adoc.Regen(0)  # Обновление активного видового экрана
-                        # show_popup(loc.get("cone_build_success", "Развертка конуса успешно построена"), popup_type="info")
-                        # Очищаем только поля, связанные с геометрией
+                       # Очищаем только поля, связанные с геометрией
                         self.detail_input.SetValue("")
                         self.d_input.SetValue("")
                         self.D_input.SetValue("")

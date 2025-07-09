@@ -32,11 +32,6 @@ translations = {
         "de": "Unzulässiger Winkelbereich!",
         "en": "Invalid angle range!"
     },
-    "at_ringe": {
-        "ru": "Построение колец",
-        "de": "Erstellen von Ringen",
-        "en": "Ring creation"
-    },
     "at_run_cone": {
         "ru": "Развертка прямого конуса",
         "de": "Abwicklung eines geraden Kegels",
@@ -46,6 +41,11 @@ translations = {
         "ru": "Выпуклые днища",
         "de": "Konvexe Böden",
         "en": "Convex heads"
+    },
+    "at_run_rings": {
+        "ru": "Кольца",
+        "de": "Ringe",
+        "en": "Rings"
     },
     "autocad_activated": {
         "ru": "Окно AutoCAD активировано.",
@@ -156,6 +156,10 @@ translations = {
         "ru": "Диаметр",
         "de": "Durchmesser",
         "en": "Diameter"
+    },    "diameters": {
+        "ru": "Диаметры",
+        "de": "Durchmesser",
+        "en": "Diameters"
     },
     "diameter_base_positive": {
         "ru": "Диаметр D должен быть положительным!",
@@ -168,19 +172,24 @@ translations = {
         "en": "Diameter, mm"
     },
     "diameter_invalid_number": {
-        "ru": "Диаметр D должен быть числом!",
-        "de": "Durchmesser D muss eine Zahl sein!",
-        "en": "Diameter D must be a number!"
+        "ru": "Недопустимое число в строке {0}",
+        "de": "Ungültige Zahl in Zeile {0}",
+        "en": "Invalid number in row {0}"
     },
     "diameter_invalid_separator": {
-        "ru": "Значения диаметра D должно содержать одну точку либо запятую",
-        "de": "Im Durchmesser D darf nur ein Komma oder Punkt enthalten sein!",
-        "en": "Diameter D must contain no more than one comma or period!"
+        "ru": "Недопустимый формат разделителя в строке {0}",
+        "de": "Ungültiges Trennzeichenformat in Zeile {0}",
+        "en": "Invalid separator format in row {0}"
     },
     "diameter_label": {
-        "ru": "Диаметр D (мм):",
-        "de": "Durchmesser D (mm):",
-        "en": "Diameter D (mm):"
+        "ru": "Диаметры",
+        "de": "Durchmesser",
+        "en": "Diameters"
+    },
+    "diameters_label": {
+        "ru": "Диаметры (через запятую)",
+        "de": "Durchmesser (durch Kommas getrennt)",
+        "en": "Diameters (separated by commas)"
     },
     "diameter_missing_error": {
         "ru": "Не введён ни один диаметр",
@@ -443,14 +452,14 @@ translations = {
         "en": "mm"
     },
     "no_center": {
-        "ru": "Не удалось выбрать точку центра. Построение отменено.",
-        "de": "Konnte keinen Mittelpunkt auswählen. Bau abgebrochen.",
-        "en": "Failed to select center point. Operation canceled."
+        "ru": "Не указана центральная точка",
+        "de": "Kein Mittelpunkt angegeben",
+        "en": "No center point specified"
     },
     "no_diameters": {
-        "ru": "Нет диаметров для построения окружностей!",
-        "de": "Keine Durchmesser für den Bau von Kreisen!",
-        "en": "No diameters for circle creation!"
+        "ru": "Не указаны диаметры",
+        "de": "Keine Durchmesser angegeben",
+        "en": "No diameters specified"
     },
     "no_input_data": {
         "ru": "Ввод отменен или данные отсутствуют.",
@@ -551,6 +560,21 @@ translations = {
         "ru": "Прямоугольник создан: ширина {}, высота {}",
         "de": "Rechteck erstellt: Breite {}, Höhe {}",
         "en": "Rectangle created: width {}, height {}"
+    },
+    "regen_error": {
+        "ru": "Ошибка обновления вида",
+        "de": "Fehler beim Aktualisieren der Ansicht",
+        "en": "Error regenerating view"
+    },
+    "ring_build_error": {
+        "ru": "Ошибка построения колец: {0}",
+        "de": "Fehler beim Erstellen von Ringen: {0}",
+        "en": "Ring construction error: {0}"
+    },
+    "ring_build_failed": {
+        "ru": "Построение колец отменено или завершилось с ошибкой",
+        "de": "Ringbau abgebrochen oder fehlerhaft",
+        "en": "Ring construction cancelled or failed"
     },
     "save_error": {
         "ru": "Ошибка сохранения значения: {}",
@@ -654,13 +678,14 @@ translations = {
     },
     "window_title_head": {
         "ru": "Параметры днища",
-        "de": "Bodenparameter",
+        "de.":
+        "Bodenparameter",
         "en": "Head parameters"
     },
     "window_title_ring": {
-        "ru": "Кольцо",
-        "de": "Ring",
-        "en": "Ring"
+        "ru": "Параметры колец",
+        "de": "Ringparameter",
+        "en": "Ring parameters"
     },
     "window_title_shell": {
         "ru": "Параметры развертки обечайки вертикального сосуда",

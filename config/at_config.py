@@ -24,6 +24,8 @@ RESOURCE_DIR: str = "config"
 # Путь к иконке приложения
 ICON_PATH: str = os.path.join(IMAGES_DIR, "AT-CAD_8.png")
 
+RING_IMAGE_PATH = os.path.join(IMAGES_DIR, "ring_image.png")
+
 DONE_ICON_PATH: str = os.path.join(IMAGES_DIR, "done-icon.png")
 
 # Путь к изображению конуса
@@ -87,6 +89,7 @@ BUTTON_FONT_COLOR: str = "white"
 RECTANGLE_LAYER: str = "0"  # Слой для прямоугольников
 DEFAULT_CIRCLE_LAYER: str = "0"  # Слой для окружностей
 HEADS_LAYER: str = "0"  # Слой для построения днищ
+DEFAULT_TEXT_LAYER = "schrift"
 
 # Текстовые параметры для черчения
 TEXT_HEIGHT_BIG: int = 60  # Высота большого текста

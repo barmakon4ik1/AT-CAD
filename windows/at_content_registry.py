@@ -15,5 +15,9 @@ CONTENT_REGISTRY = {
     "content_apps": {
         "module": "windows.content_apps",  # Модуль для панели приложений
         "label": "apps_title"             # Ключ локализации для отображения названия
+    },
+    "rings": {
+        "module": "windows.content_rings",  # Модуль для панели ввода параметров колец
+        "label": "at_run_rings"            # Ключ локализации для отображения названия
     }
 }
