@@ -17,6 +17,7 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
+
 def run_plate(plate_data: Dict[str, Any]) -> bool:
     """
     Выполняет построение листа для лазерной резки на основе предоставленных данных.

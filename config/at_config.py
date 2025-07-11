@@ -98,3 +98,5 @@ DEFAULT_TEXT_LAYER = "schrift"
 TEXT_HEIGHT_BIG: int = 60  # Высота большого текста
 TEXT_HEIGHT_SMALL: int = 30  # Высота малого текста
 TEXT_DISTANCE: int = 80  # Расстояние между текстами
+CHECK_MARK = "✅"
+ERROR_MARK ="⚠️"

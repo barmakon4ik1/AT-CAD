@@ -3,7 +3,7 @@
 """
 import array
 
-from pyautocad import APoint
+from pyautocad import APoint, Autocad
 
 from programms.at_base import *
 from programms.at_geometry import *
@@ -297,5 +297,10 @@ if __name__ == "__main__":
     # at_cone_sheet(cad.model, input_point, 300, 100, 500, "schrift")
     at_addText(cad.model, input_point, "text")
     cad.adoc.Regen(0)
+
+
+
+
+
 
 
