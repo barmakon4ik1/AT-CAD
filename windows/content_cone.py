@@ -129,7 +129,7 @@ class ConeContentPanel(wx.Panel):
         # Загрузка данных из common_data.json
         common_data = load_common_data()
         logging.info(f"Сырые данные common_data в setup_ui: {common_data}")
-        material_options = common_data.get("material", [])
+        material_options = [mat["name"] for mat in common_data.get("material", [])]
         thickness_options = common_data.get("thicknesses", [])
         logging.info(f"Загружены материалы: {material_options}")
         logging.info(f"Загружены толщины: {thickness_options}")
@@ -712,7 +712,7 @@ class ConeContentPanel(wx.Panel):
         """
         # Загружаем данные из common_data.json
         common_data = load_common_data()
-        material_options = common_data.get("material", ["1.4301", "1.4404", "1.4571"])
+        material_options = [mat["name"] for mat in common_data.get("material", [])]
         thickness_options = common_data.get("thicknesses",
                                             ["1", "1.5", "2", "3", "4", "5", "6", "8", "10", "12", "14", "15"])
         self.order_input.SetValue("")
