@@ -13,7 +13,7 @@ from typing import Tuple, Dict, Optional, List
 import wx
 from config.at_config import FONT_NAME, FONT_TYPE, FONT_SIZE, BACKGROUND_COLOR, LABEL_FONT_NAME, LABEL_FONT_TYPE, \
     LABEL_FONT_COLOR, LABEL_FONT_SIZE, LABEL_FONT_WEIGHT, BUTTON_FONT_COLOR
-from locales.at_localization import loc
+from locales.at_localization_class import loc
 from programms.at_base import init_autocad
 from programms.at_input import at_point_input
 from windows.at_style import style_textctrl, style_combobox, style_radiobutton, style_staticbox, style_label

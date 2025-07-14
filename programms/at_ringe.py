@@ -10,7 +10,7 @@ import logging
 from pyautocad import APoint
 from config.at_cad_init import ATCadInit
 from config.at_config import DEFAULT_CIRCLE_LAYER, DEFAULT_TEXT_LAYER
-from locales.at_localization import loc
+from locales.at_localization_class import loc
 from programms.at_construction import add_circle
 from programms.at_text_input import ATTextInput
 from programms.at_base import layer_context, init_autocad, regen

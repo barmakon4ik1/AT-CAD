@@ -6,7 +6,7 @@
 
 from pyautocad import Autocad
 from config.at_config import LANGUAGE
-from locales.at_localization import loc
+from locales.at_localization_class import loc
 import pythoncom  # Для управления COM-объектами
 import logging
 

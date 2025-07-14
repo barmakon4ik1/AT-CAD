@@ -4,7 +4,7 @@ import pythoncom
 from pyautocad import APoint
 from programms.at_construction import at_cone_sheet, polar_point, at_addText
 from typing import Dict, Any
-from locales.at_localization import loc
+from locales.at_localization_class import loc
 from config.at_config import LANGUAGE, TEXT_DISTANCE, TEXT_HEIGHT_BIG, TEXT_HEIGHT_SMALL
 from windows.at_gui_utils import show_popup
 from programms.at_base import ensure_layer, regen

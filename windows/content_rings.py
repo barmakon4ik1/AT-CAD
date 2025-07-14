@@ -12,7 +12,7 @@ from pyautocad import APoint
 
 from config.at_cad_init import ATCadInit
 from config.at_config import BACKGROUND_COLOR, RING_IMAGE_PATH, FONT_NAME, FONT_SIZE, FONT_TYPE, INPUT_FIELD_SIZE
-from locales.at_localization import loc
+from locales.at_localization_class import loc
 from windows.at_window_utils import (
     CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel, create_standard_buttons, adjust_button_widths,
     update_status_bar_point_selected

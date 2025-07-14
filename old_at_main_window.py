@@ -17,7 +17,7 @@ from windows.at_shell_input_window import ShellInputWindow
 from windows.at_ringe_window import RingInputWindow
 from windows.at_head_input_window import HeadInputWindow
 from windows.at_window_utils import create_window, show_popup, get_button_font
-from locales.at_localization import loc
+from locales.at_localization_class import loc
 from config.at_config import IMAGES_DIR, RESOURCE_DIR, ICON_PATH, BACKGROUND_COLOR, FOREGROUND_COLOR, BANNER_COLOR, \
     LANGUAGE_ICONS, BANNER_TEXT_COLOR, EXIT_BUTTON_COLOR
 from programms.at_run_cone import run_application

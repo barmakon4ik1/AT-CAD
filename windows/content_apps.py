@@ -8,7 +8,7 @@ import wx
 import logging
 from config.at_config import BACKGROUND_COLOR, LABEL_FONT_COLOR
 from windows.at_window_utils import show_popup, get_standard_font, get_link_font
-from locales.at_localization import loc
+from locales.at_localization_class import loc
 from windows.at_run_dialog_window import load_content
 
 # Настройка логирования

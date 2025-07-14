@@ -17,7 +17,7 @@ from config.at_config import (
     CONE_IMAGE_PATH, LAST_CONE_INPUT_FILE, INPUT_FIELD_SIZE
 )
 from programms.at_construction import at_diameter, at_cone_height, at_steigung
-from locales.at_localization import loc
+from locales.at_localization_class import loc
 from windows.at_window_utils import (
     BaseInputWindow, CanvasPanel, save_last_input, show_popup,
     get_standard_font, create_standard_buttons, apply_styles_to_panel

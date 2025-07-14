@@ -1,6 +1,6 @@
 # at_gui_utils.py
 from config.at_config import FONT_NAME, FONT_TYPE, FONT_SIZE, IMAGES_DIR, DONE_ICON_PATH
-from locales.at_localization import loc
+from locales.at_localization_class import loc
 import wx
 import os
 

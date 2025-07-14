@@ -1,26 +1,13 @@
-# locales/at_localization.py
 """
-Модуль для локализации текстовых сообщений в проекте.
+Модуль для хранения словаря переводов.
 Поддерживает переводы на русский, немецкий и английский языки.
 """
 
-from typing import Union
-import logging
-from config.at_config import LANGUAGE
-
-
-# Настройка логирования для отладки
-logging.basicConfig(
-    level=logging.ERROR,
-    filename="at_cad.log",
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
-
 translations = {
     "about_text": {
-        "ru": "Информация о программе AT-CAD...",
-        "de": "Informationen über das Programm AT-CAD...",
-        "en": "Information about the AT-CAD program..."
+        "de": "Die Software AT-CAD ermöglicht die Berechnung und Erstellung von Abwicklungen dünnwandiger Metallteile in der AutoCAD-Umgebung",
+        "en": "The AT-CAD software enables the calculation and creation of sheet metal developments directly within the AutoCAD environment",
+        "ru": "Программа AT-CAD позволяет рассчитывать развертки изделий из тонкостенного металла и строить их в среде AutoCAD"
     },
     "allowance_non_negative": {
         "ru": "Припуск на сварку не может быть отрицательной.",
@@ -108,9 +95,9 @@ translations = {
         "en": "AutoCAD initialized successfully."
     },
     "cancel_button": {
-        "ru": "Отмена",
-        "de": "Abbrechen",
-        "en": "Cancel"
+        "ru": "Возврат",
+        "de": "Zurück",
+        "en": "Return"
     },
     "circle_error": {
         "ru": "Ошибка при построении окружностей.",
@@ -156,7 +143,8 @@ translations = {
         "ru": "Диаметр",
         "de": "Durchmesser",
         "en": "Diameter"
-    },    "diameters": {
+    },
+    "diameters": {
         "ru": "Диаметры",
         "de": "Durchmesser",
         "en": "Diameters"
@@ -487,9 +475,9 @@ translations = {
         "en": "outer"
     },
     "point_not_selected": {
-        "ru": "Точка не выбрана. Попробуйте снова или нажмите Отмена.",
-        "de": "Kein Punkt ausgewählt. Versuchen Sie es erneut oder klicken Sie auf Abbrechen.",
-        "en": "No point selected. Try again or press Cancel."
+        "ru": "Точка не выбрана. Попробуйте снова или нажмите Возврат.",
+        "de": "Kein Punkt ausgewählt. Versuchen Sie es erneut oder klicken Sie auf Zurück.",
+        "en": "No point selected. Try again or press Return."
     },
     "point_not_selected_error": {
         "ru": "Ошибка: точка вставки не выбрана или AutoCAD не инициализирован",
@@ -527,7 +515,7 @@ translations = {
         "en": "Vessel shell sheet"
     },
     "program_title": {
-        "ru": "AT-CAD: Инженерная система автоматизированной развертки металла",
+        "ru": "AT-CAD: Инженерная система автоматизированной развертки изделий из металла",
         "de": "AT-CAD: Automatisiertes Profisystem für Metallabwicklung",
         "en": "AT-CAD Metal Unfold Pro System"
     },
@@ -678,8 +666,7 @@ translations = {
     },
     "window_title_head": {
         "ru": "Параметры днища",
-        "de.":
-        "Bodenparameter",
+        "de.": "Bodenparameter",
         "en": "Head parameters"
     },
     "window_title_ring": {
@@ -708,61 +695,3 @@ translations = {
         "en": "Division by zero is impossible!"
     }
 }
-
-
-class Localization:
-    """
-    Класс для управления локализацией текстовых сообщений.
-    """
-
-    def __init__(self, language: str = LANGUAGE):
-        """
-        Инициализирует локализацию с заданным языком.
-
-        Args:
-            language: Код языка ("ru", "de", "en"). По умолчанию берётся из at_config.LANGUAGE.
-        """
-        self._valid_languages = {"ru", "de", "en"}
-        self.language = language if language in self._valid_languages else "ru"
-        logging.info(f"Localization initialized with language: {self.language}")
-
-    def set_language(self, language: str) -> None:
-        """
-        Устанавливает язык локализации.
-
-        Args:
-            language: Код языка ("ru", "de", "en").
-        """
-        self.language = language if language in self._valid_languages else "ru"
-        logging.info(f"Language set to: {self.language}")
-
-    def get(self, key: str, default: str = None, *args) -> str:
-        """
-        Возвращает переведённое сообщение.
-
-        Args:
-            key: Ключ строки.
-            default: Значение по умолчанию, если ключ не найден.
-            *args: Параметры форматирования.
-
-        Returns:
-            str: Переведённая строка или значение по умолчанию, если перевод не найден.
-        """
-        if self.language not in self._valid_languages:
-            self.language = "ru"
-            logging.warning(f"Invalid language detected, reverted to: {self.language}")
-
-        text = translations.get(key, {}).get(self.language, default if default is not None else key)
-        logging.debug(f"Localization: key={key}, language={self.language}, result={text}")
-
-        if not args:
-            return text
-        try:
-            return text.format(*args)
-        except (IndexError, KeyError, ValueError) as e:
-            logging.error(f"Error formatting localization string: key={key}, text={text}, args={args}, error={e}")
-            return text  # Возвращаем текст без форматирования в случае ошибки
-
-
-# Глобальный объект локализации
-loc = Localization()

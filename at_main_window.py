@@ -26,7 +26,7 @@ from config.at_config import (
     BANNER_FONT_SIZE,
     MENU_ICONS,
 )
-from locales.at_localization import loc, Localization
+from locales.at_localization_class import loc, Localization
 from windows.at_window_utils import load_last_position, save_last_position, get_button_font, fit_text_to_height
 from windows.at_gui_utils import show_popup
 from config.at_cad_init import ATCadInit

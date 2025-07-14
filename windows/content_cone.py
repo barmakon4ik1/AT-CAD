@@ -18,7 +18,7 @@ from config.at_config import (
 )
 from programms.at_construction import at_diameter, at_cone_height, at_steigung
 from programms.at_input import at_point_input
-from locales.at_localization import loc
+from locales.at_localization_class import loc
 from windows.at_window_utils import (
     CanvasPanel, show_popup,
     get_standard_font, apply_styles_to_panel, create_standard_buttons, load_common_data, adjust_button_widths,

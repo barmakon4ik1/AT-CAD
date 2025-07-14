@@ -6,7 +6,7 @@
 from pyautocad import APoint
 from config.at_cad_init import ATCadInit
 from programms.at_input import at_point_input
-from locales.at_localization import loc
+from locales.at_localization_class import loc
 from windows.at_gui_utils import show_popup
 import logging
 
