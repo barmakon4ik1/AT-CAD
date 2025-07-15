@@ -11,6 +11,7 @@ from programms.at_base import ensure_layer, regen
 
 loc.language = LANGUAGE
 
+
 def run_application(data: Dict[str, Any]) -> bool:
     """
     Выполняет построение развертки конуса на основе предоставленных данных.
@@ -54,8 +55,9 @@ def run_application(data: Dict[str, Any]) -> bool:
             return False
 
         k_text = f"{data['order_number']}"
+        f_text = k_text
         if data['detail_number']:
-            f_text = k_text + f"-{data['detail_number']}"
+            f_text += f"-{data['detail_number']}"
         text_ab = TEXT_DISTANCE
         text_h = TEXT_HEIGHT_BIG
         text_s = TEXT_HEIGHT_SMALL
@@ -71,7 +73,7 @@ def run_application(data: Dict[str, Any]) -> bool:
                 "text_height": 7,
                 "text_angle": 0,
                 "text_alignment": 4
-            }, # Гравировка
+            },  # Гравировка
             {
                 "point": polar_point(input_point, distance=20, alpha=-90),
                 "text": f_text,
@@ -79,7 +81,7 @@ def run_application(data: Dict[str, Any]) -> bool:
                 "text_height": text_s,
                 "text_angle": 0,
                 "text_alignment": 4
-            }, # Маркировка
+            },  # Маркировка
             {
                 "point": text_point,
                 "text": f"Komm.Nr. {f_text}",
@@ -87,7 +89,7 @@ def run_application(data: Dict[str, Any]) -> bool:
                 "text_height": text_h,
                 "text_angle": 0,
                 "text_alignment": 0
-            }, # Строка К-№
+            },  # Строка К-№
             {
                 "point": polar_point(text_point, distance=text_ab, alpha=-90),
                 "text": f"D = {data['diameter_base']} {(loc.get('mm'))}",
