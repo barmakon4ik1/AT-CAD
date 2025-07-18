@@ -9,10 +9,20 @@ translations = {
         "en": "The AT-CAD software enables the calculation and creation of sheet metal developments directly within the AutoCAD environment",
         "ru": "Программа AT-CAD позволяет рассчитывать развертки изделий из тонкостенного металла и строить их в среде AutoCAD"
     },
+    "allowance_label": {
+        "ru": "Отступ от края A, мм",
+        "de": "Randabstand A, mm",
+        "en": "Edge offset A, mm"
+    },
     "allowance_non_negative": {
         "ru": "Припуск на сварку не может быть отрицательной.",
         "de": "Schweißnahtzugabe darf nicht negativ sein.",
         "en": "Weld allowance cannot be negative."
+    },
+    "allowance_too_large_error": {
+        "ru": "Отступ не может превышать половину минимального размера",
+        "de": "Der Randabstand darf die Hälfte der minimalen Abmessung nicht überschreiten",
+        "en": "Edge offset cannot exceed half of the minimum dimension"
     },
     "angle_range_error": {
         "ru": "Недопустимый диапазон углов!",
@@ -28,6 +38,11 @@ translations = {
         "ru": "Выпуклые днища",
         "de": "Konvexe Böden",
         "en": "Convex heads"
+    },
+    "at_run_plate": {
+        "ru": "Лист",
+        "de": "Platte",
+        "en": "Plate"
     },
     "at_run_rings": {
         "ru": "Кольца",
@@ -204,6 +219,11 @@ translations = {
         "de": "Welcher Durchmesser wurde angegeben?",
         "en": "Which diameter was specified?"
     },
+    "dimensions_label": {
+        "ru": "Размеры",
+        "de": "Abmessungen",
+        "en": "Dimensions"
+    },
     "error": {
         "ru": "Ошибка",
         "de": "Fehler",
@@ -255,9 +275,9 @@ translations = {
         "en": "Height h1 (mm):"
     },
     "height_label": {
-        "ru": "Высота",
-        "de": "Höhe",
-        "en": "Height"
+        "ru": "Высота H, мм",
+        "de": "Höhe H, mm",
+        "en": "Height H, mm"
     },
     "height_positive": {
         "ru": "Высота должна быть положительной!",
@@ -384,6 +404,11 @@ translations = {
         "de": "Aktive Ebene '{}' gesetzt.",
         "en": "Active layer '{}' set."
     },
+    "length_label": {
+        "ru": "Длина L, мм",
+        "de": "Länge L, mm",
+        "en": "Length L, mm"
+    },
     "length_positive_error": {
         "ru": "Ошибка: Высота обечайки должна быть положительной",
         "de": "Fehler: Höhe des Behälters muss positiv sein",
@@ -394,6 +419,11 @@ translations = {
         "de": "Hauptdaten",
         "en": "Main data"
     },
+    "manual_input_label": {
+        "ru": "Ручной ввод",
+        "de": "Manuelle Eingabe",
+        "en": "Manual input"
+    },
     "material_label": {
         "ru": "Материал:",
         "de": "Material:",
@@ -403,6 +433,11 @@ translations = {
         "ru": "Математическая ошибка!",
         "de": "Mathematischer Fehler!",
         "en": "Mathematical error!"
+    },
+    "melt_no_label": {
+        "ru": "Номер плавки",
+        "de": "Schmelznummer",
+        "en": "Melt number"
     },
     "menu_about": {
         "ru": "&О программе",
@@ -444,6 +479,11 @@ translations = {
         "de": "Kein Mittelpunkt angegeben",
         "en": "No center point specified"
     },
+    "no_data_error": {
+        "ru": "Необходимо ввести хотя бы один размер",
+        "de": "Mindestens eine Abmessung muss eingegeben werden",
+        "en": "At least one dimension must be entered"
+    },
     "no_diameters": {
         "ru": "Не указаны диаметры",
         "de": "Keine Durchmesser angegeben",
@@ -453,6 +493,11 @@ translations = {
         "ru": "Ввод отменен или данные отсутствуют.",
         "de": "Eingabe abgebrochen oder keine Daten vorhanden.",
         "en": "Input canceled or no data provided."
+    },
+    "no_size_error": {
+        "ru": "Необходимо ввести хотя бы один размер",
+        "de": "Mindestens eine Abmessung muss eingegeben werden",
+        "en": "At least one dimension must be entered"
     },
     "offset_non_negative_error": {
         "ru": "Ошибка: Отступ не может быть отрицательным",
@@ -473,6 +518,16 @@ translations = {
         "ru": "наружный",
         "de": "außen",
         "en": "outer"
+    },
+    "plate_build_failed": {
+        "ru": "Построение листа отменено или завершилось с ошибкой",
+        "de": "Plattenbau abgebrochen oder fehlerhaft",
+        "en": "Plate construction cancelled or failed"
+    },
+    "plate_build_error": {
+        "ru": "Ошибка построения листа: {0}",
+        "de": "Fehler beim Erstellen der Platte: {0}",
+        "en": "Plate construction error: {0}"
     },
     "point_not_selected": {
         "ru": "Точка не выбрана. Попробуйте снова или нажмите Возврат.",
@@ -598,6 +653,16 @@ translations = {
         "ru": "Обечайка",
         "de": "Behälter",
         "en": "Shell"
+    },
+    "size_label": {
+        "ru": "Размер",
+        "de": "Größe",
+        "en": "Size"
+    },
+    "size_positive_error": {
+        "ru": "Размеры должны быть положительными",
+        "de": "Abmessungen müssen positiv sein",
+        "en": "Dimensions must be positive"
     },
     "status_ready": {
         "ru": "Готов",

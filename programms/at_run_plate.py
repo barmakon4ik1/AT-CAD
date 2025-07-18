@@ -1,3 +1,4 @@
+# programms/at_run_plate
 import logging
 import pythoncom
 from pyautocad import APoint
@@ -23,7 +24,13 @@ def run_plate(plate_data: Dict[str, Any]) -> bool:
     Выполняет построение листа для лазерной резки на основе предоставленных данных.
 
     Args:
-        plate_data: Словарь с параметрами листа (insert_point, point_list, material, thickness_text, melt_no, allowance).
+        plate_data: Словарь с параметрами листа, включая:
+            - insert_point: Точка вставки (APoint).
+            - polyline_points: Список точек полилинии [(x0, y0), (x1, y0), ...].
+            - material: Материал.
+            - thickness_text: Толщина.
+            - melt_no: Номер плавки.
+            - allowance: Отступ.
 
     Returns:
         bool: True если выполнено успешно, False если ошибка.
@@ -45,41 +52,37 @@ def run_plate(plate_data: Dict[str, Any]) -> bool:
 
         # Извлекаем данные
         insert_point = plate_data.get("insert_point")
-        point_list = plate_data.get("point_list", [])
-        if not point_list:
-            show_popup(loc.get("no_input_data"), popup_type="error")
-            logging.error("Не заданы координаты точек")
+        polyline_points = plate_data.get("polyline_points", [])
+        if not polyline_points:
+            show_popup(loc.get("no_input_data", "Не заданы координаты точек полилинии"), popup_type="error")
+            logging.error("Не заданы точки полилинии")
             return False
         if not insert_point or not model:
-            show_popup(loc.get("invalid_point"), popup_type="error")
+            show_popup(loc.get("invalid_point", "Не указана точка вставки или модель"), popup_type="error")
             logging.error("Не указана точка вставки или модель")
             return False
 
-        # Точки для полилинии
-        x0, y0 = insert_point[0], insert_point[1]
-
-        # Подготовка списка точек для полилинии с учетом точки вставки
-        polyline_points = []
-        for point in point_list:
-            if len(point) != 2:
+        # Преобразуем точки в плоский список для add_LWpolyline
+        flat_points = []
+        for x, y in polyline_points:
+            if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
                 show_popup(loc.get("invalid_point_format", "Неверный формат точки"), popup_type="error")
-                logging.error(f"Неверный формат точки: {point}")
+                logging.error(f"Неверный формат точки: ({x}, {y})")
                 return False
-            # Смещаем точки относительно точки вставки
-            polyline_points.extend([x0 + point[0], y0 + point[1]])
+            flat_points.extend([x, y])
 
         # Создание слоя, если не существует
         ensure_layer(adoc, "SF-TEXT")
 
         # Построение замкнутой полилинии
-        polyline = add_LWpolyline(model, polyline_points, layer_name="SF-TEXT")
+        polyline = add_LWpolyline(model, flat_points, layer_name="SF-TEXT")
         if polyline is None:
             show_popup(loc.get("polyline_creation_error", "Ошибка создания полилинии"), popup_type="error")
             logging.error("Не удалось создать полилинию")
             return False
 
         # Регенерация чертежа
-        regen(model)
+        regen(adoc)
 
         logging.info("Полилиния успешно создана")
         return True
@@ -89,28 +92,3 @@ def run_plate(plate_data: Dict[str, Any]) -> bool:
         logging.error(f"Ошибка в run_plate: {str(e)}")
         return False
 
-
-if __name__ == "__main__":
-    # Тестовые данные
-    test_plate_data = {
-        "insert_point": [0, 0],  # Точка вставки (x0, y0)
-        "point_list": [
-            [0, 0],    # Точка 1
-            [3000, 0],   # Точка 2
-            [3000, 500],  # Точка 3
-            [1500, 500],    # Точка 4
-            [1500, 1500],    # Точка 5
-            [0, 1500]    # Точка 6
-        ],
-        "material": "1.4571",
-        "thickness_text": "3 mm",
-        "melt_no": "12345",
-        "allowance": 10
-    }
-
-    # Запуск функции с тестовыми данными
-    result = run_plate(test_plate_data)
-    if result:
-        print("Тестовый запуск успешен: полилиния создана")
-    else:
-        print("Тестовый запуск не удался: проверьте лог at_cad.log")
