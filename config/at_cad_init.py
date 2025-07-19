@@ -9,6 +9,7 @@ from config.at_config import LANGUAGE
 from locales.at_localization_class import loc
 import pythoncom  # Для управления COM-объектами
 import logging
+from programms.at_create_layer import at_create_layer
 
 
 class ATCadInit:
@@ -53,6 +54,7 @@ class ATCadInit:
             self.adoc = self.acad.ActiveDocument
             self.model = self.acad.model
             self.original_layer = self.adoc.ActiveLayer
+            at_create_layer()
             logging.info("AutoCAD успешно инициализирован")
         except Exception as e:
             logging.error(f"Ошибка инициализации AutoCAD: {e}")

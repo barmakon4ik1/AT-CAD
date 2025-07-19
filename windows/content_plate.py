@@ -450,34 +450,29 @@ class PlateContentPanel(wx.Panel):
             if len(point_list) > 5:
                 raise ValueError("Максимальное количество точек - 5")
 
-            # Создаем список точек полилинии
-            polyline_points = [(x0, y0)]  # Начальная точка
-            max_x = point_list[0][0]
+            # Вычисляем точки относительно (0, 0)
+            polyline_points = [(0, 0)]  # Начальная точка
 
-            # Проходим по всем точкам из point_list
-            for i, point in enumerate(point_list):
-                x, y = point
-                # Прибавляем относительные координаты к начальной точке
-                abs_x = x0 + x
-                abs_y = y0 + y
+            if point_list:  # Проверяем, что point_list не пустой
+                x = point_list[0][0]  # x1 = point_list[0][0]
+                y = point_list[0][1]  # y1 = point_list[0][1]
+                polyline_points.append((x, 0))  # (x1, 0)
+                polyline_points.append((x, y))  # (x1, y1)
 
-                # Добавляем промежуточные точки
-                if i == 0:
-                    # Для первой точки добавляем (x1, y0)
-                    polyline_points.append((abs_x, y0))
-                else:
-                    # Для последующих точек добавляем (xi, y(i-1)) и (xi, yi)
-                    prev_y = y0 + point_list[i - 1][1]
-                    polyline_points.append((abs_x, prev_y))
+                x1 = x  # Фиксируем x1 для последующих вычислений
+                prev_y = y  # Сохраняем y1 для следующей точки
+                for i, (dx, dy) in enumerate(point_list[1:], 1):
+                    x, y = x1 - dx, dy
+                    polyline_points.extend([(x, prev_y), (x, y)])
+                    prev_y = y
 
-                polyline_points.append((abs_x, abs_y))
-
-            # Добавляем последнюю точку (x0, yn)
-            if point_list:
-                polyline_points.append((x0, y0 + point_list[-1][1]))
-
+                # Добавляем предпоследнюю точку (0, yi)
+                polyline_points.append((0, y))
             # Замыкаем полилинию
-            polyline_points.append((x0, y0))
+            polyline_points.append((0, 0))
+
+            # Смещаем все точки на (x0, y0)
+            polyline_points = [(x + x0, y + y0) for x, y in polyline_points]
 
             logging.debug(f"Созданы точки полилинии: {polyline_points}")
             return polyline_points
