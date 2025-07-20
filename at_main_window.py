@@ -1,7 +1,10 @@
-# at_main_window.py
 """
-Главное окно приложения AT-CAD.
-Содержит меню, баннер, основную область, область кнопок и строку статуса.
+Файл: at_main_window.py
+Путь: windows\at_main_window.py
+
+Описание:
+Главное окно приложения AT-CAD. Содержит меню, баннер, основную область для контента,
+область кнопок и строку статуса. Управляет переключением контента и локализацией интерфейса.
 """
 
 import wx
@@ -9,22 +12,14 @@ import os
 import logging
 from config.at_config import (
     ICON_PATH,
-    LANGUAGE,
-    LANGUAGE_ICONS,
-    BANNER_COLOR,
-    BANNER_TEXT_COLOR,
-    BACKGROUND_COLOR,
-    EXIT_BUTTON_COLOR,
     BANNER_HIGH,
     WINDOW_SIZE,
     LOGO_SIZE,
-    FONT_SIZE,
-    FONT_TYPE,
-    STATUS_FONT_SIZE,
-    STATUS_TEXT_COLOR,
-    FONT_NAME,
-    BANNER_FONT_SIZE,
     MENU_ICONS,
+    LANGUAGE_ICONS,
+    DEFAULT_SETTINGS,
+    load_user_settings,
+    save_user_settings,
 )
 from locales.at_localization_class import loc, Localization
 from windows.at_window_utils import load_last_position, save_last_position, get_button_font, fit_text_to_height
@@ -38,19 +33,45 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # Настройка логирования для отладки
 logging.basicConfig(
-    level=logging.INFO,  # Изменено на INFO для захвата всех сообщений
+    level=logging.INFO,
     filename="at_cad.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
 
 class ATMainWindow(wx.Frame):
+    """
+    Класс главного окна приложения AT-CAD.
+
+    Атрибуты:
+        last_input (dict): Словарь для хранения последних введённых данных.
+        settings (dict): Текущие настройки приложения.
+        exit_item (wx.MenuItem): Пункт меню "Выход".
+        about_item (wx.MenuItem): Пункт меню "О программе".
+        settings_item (wx.MenuItem): Пункт меню "Настройки".
+        panel (wx.Panel): Главная панель окна.
+        content_panel (wx.Panel): Панель для отображения контента.
+        content_sizer (wx.BoxSizer): Сайзер для контента.
+        current_content (wx.Window | None): Текущий контент в content_panel.
+        button_panel (wx.Panel): Панель для кнопок.
+        button_sizer (wx.BoxSizer): Сайзер для кнопок.
+        exit_button (wx.Button): Кнопка выхода.
+        main_sizer (wx.BoxSizer): Главный сайзер окна.
+        banner_panel (wx.Panel): Панель баннера.
+        title (wx.StaticText): Заголовок в баннере.
+        flag_button (wx.StaticBitmap | wx.StaticText): Иконка языка в баннере.
+        language_menu (wx.Menu): Меню выбора языка.
+        lang_items (dict): Словарь пунктов меню для языков.
+        status_text (wx.StaticText): Текст строки статуса.
+        copyright_text (wx.StaticText): Текст копирайта.
+    """
+
     def __init__(self):
         """
-        Инициализирует главное окно приложения.
+        Инициализирует главное окно приложения AT-CAD.
         """
-        self.last_input = {}  # Для хранения последних введенных данных
-        # Инициализируем локализацию
+        self.last_input = {}  # Для хранения последних введённых данных
+        self.settings = load_user_settings()  # Загружаем настройки
         super().__init__(
             parent=None,
             title=loc.get("program_title"),
@@ -60,21 +81,16 @@ class ATMainWindow(wx.Frame):
         self.SetMinSize(WINDOW_SIZE)
         self.SetMaxSize(WINDOW_SIZE)
 
-        # # Инициализация AutoCAD
-        # self.cad = ATCadInit()
-        # if not self.cad.is_initialized():
-        #     show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
-        #     logging.error("AutoCAD не инициализирован")
-
-        # Инициализируем атрибуты для пунктов меню
+        # Инициализация атрибутов для пунктов меню
         self.exit_item = None
         self.about_item = None
+        self.settings_item = None
 
-        # Создаем главную панель для всего содержимого
+        # Создание главной панели
         self.panel = wx.Panel(self)
-        self.panel.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
+        self.panel.SetBackgroundColour(wx.Colour(self.settings["BACKGROUND_COLOR"]))
 
-        # Устанавливаем иконку приложения
+        # Установка иконки приложения
         icon_path = os.path.abspath(ICON_PATH)
         if os.path.exists(icon_path):
             try:
@@ -89,61 +105,64 @@ class ATMainWindow(wx.Frame):
         else:
             logging.error(f"Иконка приложения не найдена: {icon_path}")
 
-        # Загружаем последнее положение окна
+        # Загрузка последнего положения окна
         x, y = load_last_position()
         if x != -1 and y != -1:
             self.SetPosition((x, y))
         else:
             self.Centre()
 
-        # Создаем главный сайзер (вертикальный)
+        # Создание главного сайзера (вертикального)
         self.main_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        # Создаем баннер
+        # Создание баннера
         self.create_banner()
 
-        # Создаем меню
+        # Создание меню
         self.create_menu()
 
-        # Основная область (контейнер для контента)
+        # Создание основной области для контента
         self.content_panel = wx.Panel(self.panel)
-        self.content_panel.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
-        self.content_sizer = wx.BoxSizer(wx.VERTICAL)  # Сайзер для динамического контента
+        self.content_panel.SetBackgroundColour(wx.Colour(self.settings["BACKGROUND_COLOR"]))
+        self.content_sizer = wx.BoxSizer(wx.VERTICAL)
         self.content_panel.SetSizer(self.content_sizer)
-        self.current_content = None  # Текущая панель контента
+        self.current_content = None
         self.main_sizer.Add(self.content_panel, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
 
-        # Загружаем начальную страницу
+        # Загрузка начальной страницы
         self.switch_content("content_apps")
 
-        # Область кнопок
+        # Создание области кнопок
         self.button_panel = wx.Panel(self.panel)
-        self.button_panel.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
+        self.button_panel.SetBackgroundColour(wx.Colour(self.settings["BACKGROUND_COLOR"]))
         self.button_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.create_exit_button()
         self.button_panel.SetSizer(self.button_sizer)
         self.main_sizer.Add(self.button_panel, proportion=0, flag=wx.EXPAND | wx.ALL, border=5)
 
-        # Строка статуса и копирайт
+        # Создание строки статуса и копирайта
         self.create_status_bar()
 
-        # Устанавливаем сайзер для панели
+        # Установка сайзера для панели
         self.panel.SetSizer(self.main_sizer)
         self.panel.Layout()
 
-        # Привязываем обработчик закрытия окна для сохранения позиции
+        # Привязка обработчика закрытия окна
         self.Bind(wx.EVT_CLOSE, self.on_close)
+
+        # Обновление UI с текущими настройками
+        self.update_ui(self.settings)
 
     def scale_bitmap(self, bitmap: wx.Bitmap, width: int, height: int) -> wx.Bitmap:
         """
-        Масштабирует изображение с сохранением пропорций.
+        Масштабирует изображение до заданных размеров.
 
-        Args:
-            bitmap: wx.Bitmap для масштабирования.
-            width: Целевая ширина.
-            height: Целевая высота.
+        Аргументы:
+            bitmap (wx.Bitmap): Исходное изображение.
+            width (int): Целевая ширина.
+            height (int): Целевая высота.
 
-        Returns:
+        Возвращает:
             wx.Bitmap: Масштабированное изображение.
         """
         if bitmap.IsOk():
@@ -152,25 +171,26 @@ class ATMainWindow(wx.Frame):
             return wx.Bitmap(image)
         return bitmap
 
-    def switch_content(self, content_name: str):
+    def switch_content(self, content_name: str) -> None:
         """
-        Переключает содержимое content_panel на указанную панель.
+        Переключает содержимое основной области на указанный контент.
 
-        Args:
-            content_name: Имя модуля контента (например, 'content_apps').
+        Аргументы:
+            content_name (str): Имя контента для отображения.
         """
-        # Удаляем текущий контент, если он есть
         if self.current_content:
             self.current_content.Destroy()
             self.current_content = None
 
-        # Загружаем новый контент через at_load_content
         try:
             logging.info(f"Переключение на контент {content_name}")
             new_content = at_load_content(content_name, self.content_panel)
             if new_content and isinstance(new_content, wx.Window):
                 self.current_content = new_content
                 self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
+                # Обновляем UI контента с текущими настройками
+                if hasattr(self.current_content, 'update_ui_language'):
+                    self.current_content.update_ui_language(self.settings)
             else:
                 logging.error(f"Некорректный контент возвращён для {content_name}")
                 self.current_content = wx.StaticText(self.content_panel, label=f"Ошибка загрузки {content_name}")
@@ -183,14 +203,16 @@ class ATMainWindow(wx.Frame):
         self.content_panel.Layout()
         self.Refresh()
 
-    def create_banner(self):
-        """Создает баннер с логотипом, названием и флажком языка."""
-        banner_panel = wx.Panel(self.panel)
-        banner_panel.SetBackgroundColour(wx.Colour(BANNER_COLOR))
+    def create_banner(self) -> None:
+        """
+        Создаёт баннер в верхней части окна с логотипом, названием и иконкой языка.
+        """
+        self.banner_panel = wx.Panel(self.panel)
+        self.banner_panel.SetBackgroundColour(wx.Colour(self.settings["BANNER_COLOR"]))
 
         banner_height = max(BANNER_HIGH, 20)
-        banner_panel.SetMinSize((wx.DefaultCoord, banner_height))
-        banner_panel.SetMaxSize((wx.DefaultCoord, banner_height))
+        self.banner_panel.SetMinSize((wx.DefaultCoord, banner_height))
+        self.banner_panel.SetMaxSize((wx.DefaultCoord, banner_height))
 
         banner_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -201,51 +223,44 @@ class ATMainWindow(wx.Frame):
                 logo_bitmap = wx.Bitmap(logo_path, wx.BITMAP_TYPE_ANY)
                 if logo_bitmap.IsOk():
                     logo_bitmap = self.scale_bitmap(logo_bitmap, LOGO_SIZE[0], LOGO_SIZE[1])
-                    logo = wx.StaticBitmap(banner_panel, bitmap=logo_bitmap)
-                    banner_sizer.Add(logo, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=10)
+                    self.logo = wx.StaticBitmap(self.banner_panel, bitmap=logo_bitmap)
+                    banner_sizer.Add(self.logo, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=10)
                 else:
                     raise ValueError("Недопустимый формат логотипа")
             except Exception as e:
                 logging.error(f"Ошибка загрузки логотипа {logo_path}: {e}")
-                logo = wx.StaticText(banner_panel, label="[Logo]")
-                banner_sizer.Add(logo, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=10)
+                self.logo = wx.StaticText(self.banner_panel, label="[Logo]")
+                banner_sizer.Add(self.logo, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=10)
         else:
             logging.error(f"Файл логотипа не найден: {logo_path}")
-            logo = wx.StaticText(banner_panel, label="[Logo]")
-            banner_sizer.Add(logo, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=10)
+            self.logo = wx.StaticText(self.banner_panel, label="[Logo]")
+            banner_sizer.Add(self.logo, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=10)
 
         banner_sizer.AddStretchSpacer()
 
-        # Название программы по центру с переносом строк и адаптивным шрифтом
+        # Название программы по центру
         max_width = WINDOW_SIZE[0] - 2 * LOGO_SIZE[0] - 50
-        max_height = banner_height - 20  # отступы сверху и снизу
+        max_height = banner_height - 20
 
-        self.title = wx.StaticText(
-            banner_panel,
-            label="",
-            style=wx.ST_NO_AUTORESIZE
-        )
+        self.title = wx.StaticText(self.banner_panel, label="", style=wx.ST_NO_AUTORESIZE)
         self.title.SetMinSize((max_width, -1))
 
-        # Вычисляем оптимальный размер шрифта
         title_text = loc.get("program_title")
         style_flags = {
-            "style": wx.FONTSTYLE_NORMAL if FONT_TYPE == "normal" else wx.FONTSTYLE_ITALIC,
-            "weight": wx.FONTWEIGHT_BOLD if FONT_TYPE in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL
+            "style": wx.FONTSTYLE_NORMAL if self.settings["FONT_TYPE"] == "normal" else wx.FONTSTYLE_ITALIC,
+            "weight": wx.FONTWEIGHT_BOLD if self.settings["FONT_TYPE"] in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL
         }
-        optimal_size = fit_text_to_height(
-            self.title, title_text, max_width, max_height, FONT_NAME, style_flags
-        )
+        optimal_size = fit_text_to_height(self.title, title_text, max_width, max_height, self.settings["FONT_NAME"], style_flags)
 
         font = wx.Font(
             optimal_size,
             wx.FONTFAMILY_DEFAULT,
             style_flags["style"],
             style_flags["weight"],
-            faceName=FONT_NAME
+            faceName=self.settings["FONT_NAME"]
         )
         self.title.SetFont(font)
-        self.title.SetForegroundColour(wx.Colour(BANNER_TEXT_COLOR))
+        self.title.SetForegroundColour(wx.Colour(self.settings["BANNER_TEXT_COLOR"]))
         self.title.SetLabel(title_text)
         self.title.Wrap(max_width)
 
@@ -254,53 +269,52 @@ class ATMainWindow(wx.Frame):
         banner_sizer.AddStretchSpacer()
 
         # Флажок языка справа
-        lang_icon_path = os.path.abspath(LANGUAGE_ICONS.get(LANGUAGE, LANGUAGE_ICONS["ru"]))
+        lang_icon_path = os.path.abspath(LANGUAGE_ICONS.get(self.settings["LANGUAGE"], LANGUAGE_ICONS["ru"]))
         if os.path.exists(lang_icon_path):
             try:
                 flag_bitmap = wx.Bitmap(lang_icon_path, wx.BITMAP_TYPE_ANY)
                 if flag_bitmap.IsOk():
                     flag_bitmap = self.scale_bitmap(flag_bitmap, banner_height - 10, banner_height - 10)
-                    self.flag_button = wx.StaticBitmap(banner_panel, bitmap=flag_bitmap)
+                    self.flag_button = wx.StaticBitmap(self.banner_panel, bitmap=flag_bitmap)
                     self.flag_button.Bind(wx.EVT_LEFT_DOWN, self.on_change_language)
                     banner_sizer.Add(self.flag_button, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=10)
                 else:
                     raise ValueError("Недопустимый формат иконки флага")
             except Exception as e:
                 logging.error(f"Ошибка загрузки иконки флага {lang_icon_path}: {e}")
-                flag_label = wx.StaticText(banner_panel, label=f"[{LANGUAGE}]")
-                banner_sizer.Add(flag_label, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=10)
+                self.flag_button = wx.StaticText(self.banner_panel, label=f"[{self.settings['LANGUAGE']}]")
+                banner_sizer.Add(self.flag_button, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=10)
         else:
             logging.error(f"Файл иконки флага не найден: {lang_icon_path}")
-            flag_label = wx.StaticText(banner_panel, label=f"[{LANGUAGE}]")
-            banner_sizer.Add(flag_label, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=10)
+            self.flag_button = wx.StaticText(self.banner_panel, label=f"[{self.settings['LANGUAGE']}]")
+            banner_sizer.Add(self.flag_button, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=10)
 
-        banner_panel.SetSizer(banner_sizer)
-        banner_panel.Layout()
-        banner_panel.Refresh()
+        self.banner_panel.SetSizer(banner_sizer)
+        self.banner_panel.Layout()
+        self.banner_panel.Refresh()
 
-        self.main_sizer.Add(banner_panel, proportion=0, flag=wx.EXPAND | wx.ALL, border=5)
+        self.main_sizer.Add(self.banner_panel, proportion=0, flag=wx.EXPAND | wx.ALL, border=5)
 
-    def create_menu(self):
-        """Создает меню приложения."""
+    def create_menu(self) -> None:
+        """
+        Создаёт меню приложения.
+        """
         menu_bar = wx.MenuBar()
 
         # Меню "Файл"
         file_menu = wx.Menu()
-        self.exit_item = file_menu.Append(wx.ID_EXIT, loc.get("button_exit"))  # Сохраняем как атрибут
-        # Устанавливаем иконку для пункта "Выход"
+        self.exit_item = file_menu.Append(wx.ID_EXIT, loc.get("button_exit"))
         exit_icon_path = os.path.abspath(MENU_ICONS.get("exit", ""))
         if os.path.exists(exit_icon_path):
             try:
                 exit_bitmap = wx.Bitmap(exit_icon_path, wx.BITMAP_TYPE_ANY)
                 if exit_bitmap.IsOk():
-                    exit_bitmap = self.scale_bitmap(exit_bitmap, 16, 16)  # Масштабируем до 16x16
+                    exit_bitmap = self.scale_bitmap(exit_bitmap, 16, 16)
                     self.exit_item.SetBitmap(exit_bitmap)
                 else:
                     logging.error(f"Недопустимый формат иконки выхода: {exit_icon_path}")
             except Exception as e:
                 logging.error(f"Ошибка загрузки иконки выхода {exit_icon_path}: {e}")
-        else:
-            logging.error(f"Иконка выхода не найдена: {exit_icon_path}")
         menu_bar.Append(file_menu, loc.get("menu_file"))
 
         # Меню "Язык"
@@ -310,8 +324,7 @@ class ATMainWindow(wx.Frame):
             "de": self.language_menu.Append(wx.ID_ANY, loc.get("lang_de"), kind=wx.ITEM_RADIO),
             "en": self.language_menu.Append(wx.ID_ANY, loc.get("lang_en"), kind=wx.ITEM_RADIO),
         }
-        self.lang_items[LANGUAGE].Check(True)
-        # Устанавливаем иконки для пунктов языка
+        self.lang_items[self.settings["LANGUAGE"]].Check(True)
         for lang, item in self.lang_items.items():
             lang_icon_path = os.path.abspath(MENU_ICONS.get(f"lang_{lang}", ""))
             if os.path.exists(lang_icon_path):
@@ -330,9 +343,10 @@ class ATMainWindow(wx.Frame):
 
         # Меню "Справка"
         help_menu = wx.Menu()
-        self.about_item = help_menu.Append(wx.ID_ABOUT, loc.get("menu_about"))  # Сохраняем как атрибут
-        # Устанавливаем иконку для пункта "О программе"
+        self.settings_item = help_menu.Append(wx.ID_ANY, loc.get("settings_title"))
+        self.about_item = help_menu.Append(wx.ID_ABOUT, loc.get("menu_about"))
         about_icon_path = os.path.abspath(MENU_ICONS.get("about", ""))
+        settings_icon_path = os.path.abspath(MENU_ICONS.get("settings", ""))
         if os.path.exists(about_icon_path):
             try:
                 about_bitmap = wx.Bitmap(about_icon_path, wx.BITMAP_TYPE_ANY)
@@ -343,65 +357,80 @@ class ATMainWindow(wx.Frame):
                     logging.error(f"Недопустимый формат иконки about: {about_icon_path}")
             except Exception as e:
                 logging.error(f"Ошибка загрузки иконки about {about_icon_path}: {e}")
-        else:
-            logging.error(f"Иконка about не найдена: {about_icon_path}")
+        if os.path.exists(settings_icon_path):
+            try:
+                settings_bitmap = wx.Bitmap(settings_icon_path, wx.BITMAP_TYPE_ANY)
+                if settings_bitmap.IsOk():
+                    settings_bitmap = self.scale_bitmap(settings_bitmap, 16, 16)
+                    self.settings_item.SetBitmap(settings_bitmap)
+                else:
+                    logging.error(f"Недопустимый формат иконки settings: {settings_icon_path}")
+            except Exception as e:
+                logging.error(f"Ошибка загрузки иконки settings {settings_icon_path}: {e}")
         menu_bar.Append(help_menu, loc.get("menu_help"))
 
         self.SetMenuBar(menu_bar)
 
         # Привязываем обработчики
         self.Bind(wx.EVT_MENU, self.on_exit, self.exit_item)
-        for lang, item in self.lang_items.items():
-            self.Bind(wx.EVT_MENU, self.on_language_change, item)
+        self.Bind(wx.EVT_MENU, self.on_settings, self.settings_item)
         self.Bind(wx.EVT_MENU, self.on_about, self.about_item)
+        for lang, item in self.lang_items.items():
+            self.Bind(wx.EVT_MENU, lambda evt, l=lang: self.on_language_change(l), item)
 
-    def on_content_menu(self, event):
-        """Обработчик выбора пункта меню 'Контент'."""
-        content_name = self.content_menu_items.get(event.GetId())
-        if content_name:
-            self.switch_content(content_name)
+    def on_settings(self, event) -> None:
+        """
+        Открывает окно настроек.
+        """
+        from windows.at_settings_window import SettingsWindow
+        dialog = SettingsWindow(self)
+        dialog.ShowModal()
+        dialog.Destroy()
 
-    def create_status_bar(self):
-        """Создает строку статуса и копирайт."""
+    def create_status_bar(self) -> None:
+        """
+        Создаёт строку статуса и копирайт в нижней части окна.
+        """
         status_panel = wx.Panel(self.panel)
-        status_panel.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
+        status_panel.SetBackgroundColour(wx.Colour(self.settings["BACKGROUND_COLOR"]))
         status_panel.SetMinSize((-1, 30))
         status_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         # Строка статуса
         self.status_text = wx.StaticText(status_panel, label=loc.get("status_ready"))
         font = wx.Font(
-            STATUS_FONT_SIZE,
+            self.settings["FONT_SIZE"],
             wx.FONTFAMILY_DEFAULT,
-            wx.FONTSTYLE_NORMAL if FONT_TYPE == "normal" else wx.FONTSTYLE_ITALIC,
-            wx.FONTWEIGHT_BOLD if FONT_TYPE in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL,
-            faceName=FONT_NAME,
+            wx.FONTSTYLE_NORMAL if self.settings["FONT_TYPE"] == "normal" else wx.FONTSTYLE_ITALIC,
+            wx.FONTWEIGHT_BOLD if self.settings["FONT_TYPE"] in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL,
+            faceName=self.settings["FONT_NAME"],
         )
         self.status_text.SetFont(font)
-        self.status_text.SetForegroundColour(wx.Colour(STATUS_TEXT_COLOR))
+        self.status_text.SetForegroundColour(wx.Colour(self.settings["STATUS_TEXT_COLOR"]))
         status_sizer.Add(self.status_text, proportion=1, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=5)
-        logging.info(f"Строка статуса создана: размер шрифта={STATUS_FONT_SIZE}, цвет={STATUS_TEXT_COLOR}")
+        logging.info(f"Строка статуса создана: размер шрифта={self.settings['FONT_SIZE']}, цвет={self.settings['STATUS_TEXT_COLOR']}")
 
         # Копирайт
         self.copyright_text = wx.StaticText(status_panel, label=loc.get("copyright"))
         self.copyright_text.SetFont(font)
-        self.copyright_text.SetForegroundColour(wx.Colour(STATUS_TEXT_COLOR))
+        self.copyright_text.SetForegroundColour(wx.Colour(self.settings["STATUS_TEXT_COLOR"]))
         status_sizer.Add(self.copyright_text, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=5)
-        logging.info(f"Копирайт создан: размер шрифта={STATUS_FONT_SIZE}, цвет={STATUS_TEXT_COLOR}")
+        logging.info(f"Копирайт создан: размер шрифта={self.settings['FONT_SIZE']}, цвет={self.settings['STATUS_TEXT_COLOR']}")
 
         status_panel.SetSizer(status_sizer)
         self.main_sizer.Add(status_panel, proportion=0, flag=wx.EXPAND | wx.ALL, border=5)
 
-    def create_exit_button(self):
-        """Создает кнопку выхода в button_panel."""
+    def create_exit_button(self) -> None:
+        """
+        Создаёт кнопку выхода.
+        """
         self.exit_button = wx.Button(self.button_panel, label=loc.get("button_exit"))
         button_font = get_button_font()
         self.exit_button.SetFont(button_font)
-        self.exit_button.SetBackgroundColour(wx.Colour(EXIT_BUTTON_COLOR))
-        self.exit_button.SetForegroundColour(wx.Colour("white"))
+        self.exit_button.SetBackgroundColour(wx.Colour(self.settings["EXIT_BUTTON_COLOR"]))
+        self.exit_button.SetForegroundColour(wx.Colour(self.settings["BUTTON_FONT_COLOR"]))
         self.exit_button.Bind(wx.EVT_BUTTON, self.on_exit)
 
-        # Рассчитываем максимальную ширину кнопки для всех языков
         max_width = 0
         languages = ["ru", "en", "de"]
         for lang in languages:
@@ -416,34 +445,42 @@ class ATMainWindow(wx.Frame):
         self.button_sizer.AddStretchSpacer()
         self.button_sizer.Add(self.exit_button, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.ALL, border=10)
 
-    def on_language_change(self, event):
-        """Обработчик смены языка через меню."""
-        lang_map = {
-            self.lang_items["ru"].GetId(): "ru",
-            self.lang_items["de"].GetId(): "de",
-            self.lang_items["en"].GetId(): "en",
-        }
-        event_id = event.GetId()
-        new_lang = lang_map.get(event_id)
-        if new_lang:
-            logging.info(f"Смена языка через меню на: {new_lang}")
-            loc.set_language(new_lang)
-            self.update_language_icon(new_lang)
-            self.update_ui()
+    def on_language_change(self, new_lang: str) -> None:
+        """
+        Обрабатывает смену языка через меню.
 
-    def on_change_language(self, event):
-        """Обработчик смены языка через значок."""
-        current_langs = ["ru", "en", "de"]
-        current_index = current_langs.index(loc.language) if loc.language in current_langs else 0
-        new_index = (current_index + 1) % len(current_langs)
-        new_lang = current_langs[new_index]
-        logging.info(f"Смена языка через значок на: {new_lang}")
+        Аргументы:
+            new_lang (str): Новый язык (ru, en, de).
+        """
+        self.settings["LANGUAGE"] = new_lang
+        save_user_settings(self.settings)
         loc.set_language(new_lang)
         self.update_language_icon(new_lang)
-        self.update_ui()
+        self.update_ui(self.settings)
+        logging.info(f"Смена языка через меню на: {new_lang}")
 
-    def update_language_icon(self, new_lang: str):
-        """Обновляет иконку языка."""
+    def on_change_language(self, event) -> None:
+        """
+        Обрабатывает смену языка через иконку флага.
+        """
+        current_langs = ["ru", "en", "de"]
+        current_index = current_langs.index(self.settings["LANGUAGE"]) if self.settings["LANGUAGE"] in current_langs else 0
+        new_index = (current_index + 1) % len(current_langs)
+        new_lang = current_langs[new_index]
+        self.settings["LANGUAGE"] = new_lang
+        save_user_settings(self.settings)
+        loc.set_language(new_lang)
+        self.update_language_icon(new_lang)
+        self.update_ui(self.settings)
+        logging.info(f"Смена языка через значок на: {new_lang}")
+
+    def update_language_icon(self, new_lang: str) -> None:
+        """
+        Обновляет иконку флага в баннере.
+
+        Аргументы:
+            new_lang (str): Код языка (ru, en, de).
+        """
         lang_icon_path = os.path.abspath(LANGUAGE_ICONS.get(new_lang, LANGUAGE_ICONS["ru"]))
         if os.path.exists(lang_icon_path):
             try:
@@ -466,58 +503,74 @@ class ATMainWindow(wx.Frame):
         for lang, item in self.lang_items.items():
             item.Check(lang == new_lang)
 
-    def update_ui(self):
-        """Обновляет текст элементов интерфейса после смены языка."""
+    def update_ui(self, settings: dict) -> None:
+        """
+        Обновляет пользовательский интерфейс с использованием указанных настроек.
+
+        Аргументы:
+            settings (dict): Словарь с настройками интерфейса.
+        """
+        self.settings = settings.copy()  # Обновляем локальные настройки
+        logging.info(f"Вызов update_ui: {settings}")
+
+        # Обновляем заголовок окна
         self.SetTitle(loc.get("program_title"))
 
+        # Обновляем баннер
+        self.banner_panel.SetBackgroundColour(wx.Colour(settings["BANNER_COLOR"]))
         if hasattr(self, "title"):
             title_text = loc.get("program_title")
-            self.title.SetLabel("")  # временно сбрасываем
-
+            self.title.SetLabel("")
             max_width = WINDOW_SIZE[0] - 2 * LOGO_SIZE[0] - 50
-            max_height = max(BANNER_HIGH, 20) - 20  # с учётом отступов
+            max_height = max(BANNER_HIGH, 20) - 20
             style_flags = {
-                "style": wx.FONTSTYLE_NORMAL if FONT_TYPE == "normal" else wx.FONTSTYLE_ITALIC,
-                "weight": wx.FONTWEIGHT_BOLD if FONT_TYPE in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL
+                "style": wx.FONTSTYLE_NORMAL if settings["FONT_TYPE"] == "normal" else wx.FONTSTYLE_ITALIC,
+                "weight": wx.FONTWEIGHT_BOLD if settings["FONT_TYPE"] in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL
             }
-
-            optimal_size = fit_text_to_height(
-                self.title, title_text, max_width, max_height, FONT_NAME, style_flags
-            )
-
+            optimal_size = fit_text_to_height(self.title, title_text, max_width, max_height, settings["FONT_NAME"], style_flags)
             font = wx.Font(
                 optimal_size,
                 wx.FONTFAMILY_DEFAULT,
                 style_flags["style"],
                 style_flags["weight"],
-                faceName=FONT_NAME
+                faceName=settings["FONT_NAME"]
             )
             self.title.SetFont(font)
-            self.title.SetForegroundColour(wx.Colour(BANNER_TEXT_COLOR))
+            self.title.SetForegroundColour(wx.Colour(settings["BANNER_TEXT_COLOR"]))
             self.title.SetLabel(title_text)
             self.title.Wrap(max_width)
 
+        # Обновляем цвета панелей
+        self.panel.SetBackgroundColour(wx.Colour(settings["BACKGROUND_COLOR"]))
+        self.content_panel.SetBackgroundColour(wx.Colour(settings["BACKGROUND_COLOR"]))
+        self.button_panel.SetBackgroundColour(wx.Colour(settings["BACKGROUND_COLOR"]))
+
+        # Обновляем кнопку выхода
+        self.exit_button.SetBackgroundColour(wx.Colour(settings["EXIT_BUTTON_COLOR"]))
+        self.exit_button.SetForegroundColour(wx.Colour(settings["BUTTON_FONT_COLOR"]))
+        self.exit_button.SetLabel(loc.get("button_exit"))
+        button_font = get_button_font()
+        self.exit_button.SetFont(button_font)
+
+        # Обновляем строку статуса и копирайт
         self.status_text.SetLabel(loc.get("status_ready"))
         font = wx.Font(
-            STATUS_FONT_SIZE,
+            settings["FONT_SIZE"],
             wx.FONTFAMILY_DEFAULT,
-            wx.FONTSTYLE_NORMAL if FONT_TYPE == "normal" else wx.FONTSTYLE_ITALIC,
-            wx.FONTWEIGHT_BOLD if FONT_TYPE in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL,
-            faceName=FONT_NAME,
+            wx.FONTSTYLE_NORMAL if settings["FONT_TYPE"] == "normal" else wx.FONTSTYLE_ITALIC,
+            wx.FONTWEIGHT_BOLD if settings["FONT_TYPE"] in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL,
+            faceName=settings["FONT_NAME"],
         )
         self.status_text.SetFont(font)
-        self.status_text.SetForegroundColour(wx.Colour(STATUS_TEXT_COLOR))
-
+        self.status_text.SetForegroundColour(wx.Colour(settings["STATUS_TEXT_COLOR"]))
         self.copyright_text.SetLabel(loc.get("copyright"))
         self.copyright_text.SetFont(font)
-        self.copyright_text.SetForegroundColour(wx.Colour(STATUS_TEXT_COLOR))
+        self.copyright_text.SetForegroundColour(wx.Colour(settings["STATUS_TEXT_COLOR"]))
 
-        self.exit_button.SetLabel(loc.get("button_exit"))
+        # Обновляем меню
         self.GetMenuBar().SetMenuLabel(0, loc.get("menu_file"))
         self.GetMenuBar().SetMenuLabel(1, loc.get("language_menu"))
         self.GetMenuBar().SetMenuLabel(2, loc.get("menu_help"))
-
-        # Обновляем иконки для пунктов меню языка
         for lang, item in self.lang_items.items():
             item.SetItemLabel(loc.get(f"lang_{lang}"))
             lang_icon_path = os.path.abspath(MENU_ICONS.get(f"lang_{lang}", ""))
@@ -531,21 +584,18 @@ class ATMainWindow(wx.Frame):
                         logging.error(f"Недопустимый формат иконки lang_{lang} в update_ui: {lang_icon_path}")
                 except Exception as e:
                     logging.error(f"Ошибка обновления иконки lang_{lang} {lang_icon_path}: {e}")
-            else:
-                logging.error(f"Иконка lang_{lang} не найдена в update_ui: {lang_icon_path}")
 
-        # Обновляем текст пунктов подменю
         if self.exit_item:
             self.exit_item.SetItemLabel(loc.get("button_exit"))
-            logging.info(f"Обновлён текст пункта меню выхода: {loc.get('button_exit')}")
         if self.about_item:
             self.about_item.SetItemLabel(loc.get("menu_about"))
-            logging.info(f"Обновлён текст пункта меню 'О программе': {loc.get('menu_about')}")
+        if self.settings_item:
+            self.settings_item.SetItemLabel(loc.get("settings_title"))
 
-        # Обновляем текущую панель контента
+        # Обновляем текущий контент
         if self.current_content and hasattr(self.current_content, "update_ui_language"):
             try:
-                self.current_content.update_ui_language()
+                self.current_content.update_ui_language(settings)
             except Exception as e:
                 logging.error(f"Ошибка при обновлении языка панели {self.current_content.__class__.__name__}: {e}")
                 show_popup(
@@ -553,25 +603,32 @@ class ATMainWindow(wx.Frame):
                     popup_type="error"
                 )
 
+        # Перерисовываем интерфейс
         self.panel.Layout()
+        self.banner_panel.Layout()
+        self.content_panel.Layout()
+        self.button_panel.Layout()
         self.Refresh()
+        self.Update()
 
-    def on_about(self, event):
-        """Обработчик пункта меню 'О программе'."""
+    def on_about(self, event) -> None:
+        """
+        Показывает информацию о программе.
+        """
         show_popup(loc.get("about_text"), title=loc.get("menu_about"), popup_type="info")
 
-    def on_exit(self, event):
-        """Обработчик выхода из приложения."""
+    def on_exit(self, event) -> None:
+        """
+        Закрывает приложение.
+        """
         self.Close()
 
-    def on_close(self, event):
-        """Обработчик закрытия окна."""
+    def on_close(self, event) -> None:
+        """
+        Сохраняет позицию окна при закрытии.
+        """
         x, y = self.GetPosition()
         save_last_position(x, y)
-        # Освобождаем ресурсы AutoCAD
-        if hasattr(self, "cad") and self.cad is not None:
-            self.cad.cleanup()
-            self.cad = None
         event.Skip()
 
 

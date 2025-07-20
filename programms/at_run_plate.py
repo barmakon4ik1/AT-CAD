@@ -5,7 +5,7 @@ from pyautocad import APoint
 from programms.at_construction import add_LWpolyline
 from typing import Dict, Any, List
 from locales.at_localization_class import loc
-from config.at_config import LANGUAGE
+from config.at_config import get_language
 from windows.at_gui_utils import show_popup
 from programms.at_base import ensure_layer, regen, init_autocad
 

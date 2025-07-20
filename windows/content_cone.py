@@ -12,10 +12,7 @@ from typing import Optional, Dict
 import wx
 
 from config.at_cad_init import ATCadInit
-from config.at_config import (
-    FONT_NAME, FONT_SIZE, FONT_TYPE, BACKGROUND_COLOR, FOREGROUND_COLOR,
-    CONE_IMAGE_PATH, INPUT_FIELD_SIZE, LAST_CONE_INPUT_FILE
-)
+from config.at_config import *
 from programms.at_construction import at_diameter, at_cone_height, at_steigung
 from programms.at_input import at_point_input
 from locales.at_localization_class import loc
@@ -60,7 +57,8 @@ class ConeContentPanel(wx.Panel):
             parent: Родительский wx.Window (content_panel).
          """
         super().__init__(parent)
-        self.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
+        self.settings = load_user_settings()  # Загружаем настройки
+        self.SetBackgroundColour(wx.Colour(self.settings["BACKGROUND_COLOR"]))
         self.parent = parent
         self._updating = False
         self._debounce_timer = wx.Timer(self)
@@ -138,7 +136,7 @@ class ConeContentPanel(wx.Panel):
         main_data_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, loc.get("main_data_label", "Основные данные"))
         main_data_box = main_data_sizer.GetStaticBox()
         main_data_box.SetFont(font)
-        main_data_box.SetForegroundColour(wx.Colour(FOREGROUND_COLOR))
+        main_data_box.SetForegroundColour(wx.Colour(self.settings["FOREGROUND_COLOR"]))
         self.static_boxes["main_data"] = main_data_box
 
         # Номер заказа и детали
@@ -200,7 +198,7 @@ class ConeContentPanel(wx.Panel):
         diameter_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, loc.get("diameter", "Диаметр"))
         diameter_box = diameter_sizer.GetStaticBox()
         diameter_box.SetFont(font)
-        diameter_box.SetForegroundColour(wx.Colour(FOREGROUND_COLOR))
+        diameter_box.SetForegroundColour(wx.Colour(self.settings["FOREGROUND_COLOR"]))
         self.static_boxes["diameter"] = diameter_box
 
         # Диаметр вершины (d)
@@ -273,7 +271,7 @@ class ConeContentPanel(wx.Panel):
         height_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, loc.get("height_label", "Высота"))
         height_box = height_sizer.GetStaticBox()
         height_box.SetFont(font)
-        height_box.SetForegroundColour(wx.Colour(FOREGROUND_COLOR))
+        height_box.SetForegroundColour(wx.Colour(self.settings["FOREGROUND_COLOR"]))
         self.static_boxes["height"] = height_box
 
         self.height_input = wx.TextCtrl(height_box, value=str(self.last_input.get("height", "")), size=INPUT_FIELD_SIZE)

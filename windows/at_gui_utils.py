@@ -1,9 +1,18 @@
-# at_gui_utils.py
-from config.at_config import FONT_NAME, FONT_TYPE, FONT_SIZE, IMAGES_DIR, DONE_ICON_PATH
+"""
+Файл: at_gui_utils.py
+Путь: windows\at_gui_utils.py
+
+Описание:
+Модуль с утилитами для создания графического интерфейса в приложении AT-CAD.
+Содержит функцию show_popup для отображения всплывающих окон с сообщениями.
+Использует настройки шрифтов из user_settings.json через get_setting и пути
+к изображениям из at_config.py.
+"""
+
+from config.at_config import get_setting, IMAGES_DIR, DONE_ICON_PATH
 from locales.at_localization_class import loc
 import wx
 import os
-
 
 def show_popup(message: str, title: str = None, popup_type: str = "error", icon_size: int = 32,
                buttons: list = ["OK"]) -> int:
@@ -69,8 +78,8 @@ def show_popup(message: str, title: str = None, popup_type: str = "error", icon_
         "bold": (wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD),
         "normal": (wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
     }
-    style, weight = font_styles.get(FONT_TYPE.lower(), (wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-    font = wx.Font(FONT_SIZE, wx.FONTFAMILY_DEFAULT, style, weight, faceName=FONT_NAME)
+    style, weight = font_styles.get(get_setting("FONT_TYPE").lower(), (wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+    font = wx.Font(int(get_setting("FONT_SIZE")), wx.FONTFAMILY_DEFAULT, style, weight, faceName=get_setting("FONT_NAME"))
 
     # Макет окна
     main_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -99,7 +108,7 @@ def show_popup(message: str, title: str = None, popup_type: str = "error", icon_
     }
 
     for btn_text in buttons:
-        button = wx.Button(dialog, id=button_map.get(btn_text, wx.ID_OK))  # Убрана запятая
+        button = wx.Button(dialog, id=button_map.get(btn_text, wx.ID_OK))
         button.SetFont(font)
         button_sizer.Add(button, 0, wx.ALL, 5)
 

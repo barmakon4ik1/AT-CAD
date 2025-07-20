@@ -5,12 +5,7 @@
 """
 
 import wx
-from config.at_config import (
-    FONT_NAME,
-    FONT_TYPE,
-    FONT_SIZE,
-    FOREGROUND_COLOR,
-)
+from config.at_config import *
 
 
 def style_textctrl(ctrl: wx.TextCtrl) -> None:
@@ -33,11 +28,11 @@ def style_textctrl(ctrl: wx.TextCtrl) -> None:
         "bolditalic": wx.FONTWEIGHT_BOLD,
     }
     font = wx.Font(
-        FONT_SIZE,
+        DEFAULT_SETTINGS["FONT_SIZE"],
         wx.FONTFAMILY_DEFAULT,
-        font_style.get(FONT_TYPE, wx.FONTSTYLE_NORMAL),
-        font_weight.get(FONT_TYPE, wx.FONTWEIGHT_NORMAL),
-        faceName=FONT_NAME if FONT_NAME else "Times New Roman",
+        font_style.get(DEFAULT_SETTINGS["FONT_TYPE"], wx.FONTSTYLE_NORMAL),
+        font_weight.get(DEFAULT_SETTINGS["FONT_TYPE"], wx.FONTWEIGHT_NORMAL),
+        faceName=DEFAULT_SETTINGS["FONT_NAME"] if DEFAULT_SETTINGS["FONT_NAME"] else "Times New Roman",
     )
     ctrl.SetFont(font)
 
@@ -62,11 +57,11 @@ def style_combobox(combo: wx.ComboBox) -> None:
         "bolditalic": wx.FONTWEIGHT_BOLD,
     }
     font = wx.Font(
-        FONT_SIZE,
+        DEFAULT_SETTINGS["FONT_SIZE"],
         wx.FONTFAMILY_DEFAULT,
-        font_style.get(FONT_TYPE, wx.FONTSTYLE_NORMAL),
-        font_weight.get(FONT_TYPE, wx.FONTWEIGHT_NORMAL),
-        faceName=FONT_NAME if FONT_NAME else "Times New Roman",
+        font_style.get(DEFAULT_SETTINGS["FONT_TYPE"], wx.FONTSTYLE_NORMAL),
+        font_weight.get(DEFAULT_SETTINGS["FONT_TYPE"], wx.FONTWEIGHT_NORMAL),
+        faceName=DEFAULT_SETTINGS["FONT_NAME"] if DEFAULT_SETTINGS["FONT_NAME"] else "Times New Roman",
     )
     combo.SetFont(font)
 
@@ -91,11 +86,11 @@ def style_radiobutton(radio: wx.RadioButton) -> None:
         "bolditalic": wx.FONTWEIGHT_BOLD,
     }
     font = wx.Font(
-        FONT_SIZE,
+        DEFAULT_SETTINGS["FONT_SIZE"],
         wx.FONTFAMILY_DEFAULT,
-        font_style.get(FONT_TYPE, wx.FONTSTYLE_NORMAL),
-        font_weight.get(FONT_TYPE, wx.FONTWEIGHT_NORMAL),
-        faceName=FONT_NAME if FONT_NAME else "Times New Roman",
+        font_style.get(DEFAULT_SETTINGS["FONT_TYPE"], wx.FONTSTYLE_NORMAL),
+        font_weight.get(DEFAULT_SETTINGS["FONT_TYPE"], wx.FONTWEIGHT_NORMAL),
+        faceName=DEFAULT_SETTINGS["FONT_NAME"] if DEFAULT_SETTINGS["FONT_NAME"] else "Times New Roman",
     )
     radio.SetFont(font)
 
@@ -120,14 +115,14 @@ def style_staticbox(box: wx.StaticBox) -> None:
         "bolditalic": wx.FONTWEIGHT_BOLD,
     }
     font = wx.Font(
-        FONT_SIZE,
+        DEFAULT_SETTINGS["FONT_SIZE"],
         wx.FONTFAMILY_DEFAULT,
-        font_style.get(FONT_TYPE, wx.FONTSTYLE_NORMAL),
-        font_weight.get(FONT_TYPE, wx.FONTWEIGHT_NORMAL),
-        faceName=FONT_NAME if FONT_NAME else "Times New Roman",
+        font_style.get(DEFAULT_SETTINGS["FONT_TYPE"], wx.FONTSTYLE_NORMAL),
+        font_weight.get(DEFAULT_SETTINGS["FONT_TYPE"], wx.FONTWEIGHT_NORMAL),
+        faceName=DEFAULT_SETTINGS["FONT_NAME"] if DEFAULT_SETTINGS["FONT_NAME"] else "Times New Roman",
     )
     box.SetFont(font)
-    box.SetForegroundColour(wx.Colour(FOREGROUND_COLOR))
+    box.SetForegroundColour(wx.Colour(DEFAULT_SETTINGS["FOREGROUND_COLOR"]))
 
 
 def style_label(label: wx.StaticText) -> None:
@@ -137,7 +132,7 @@ def style_label(label: wx.StaticText) -> None:
     Args:
         label: Метка для стилизации.
     """
-    font = wx.Font(FONT_SIZE, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
-    font.SetFaceName(FONT_NAME if FONT_NAME else "Times New Roman")
+    font = wx.Font(DEFAULT_SETTINGS["FONT_SIZE"], wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+    font.SetFaceName(DEFAULT_SETTINGS["FONT_NAME"] if DEFAULT_SETTINGS["FONT_NAME"] else "Times New Roman")
     label.SetFont(font)
-    label.SetForegroundColour(wx.Colour(FOREGROUND_COLOR))
+    label.SetForegroundColour(wx.Colour(DEFAULT_SETTINGS["FOREGROUND_COLOR"]))

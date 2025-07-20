@@ -6,7 +6,17 @@
 
 import wx
 import logging
-from config.at_config import BACKGROUND_COLOR, LABEL_FONT_COLOR
+from config.at_config import (
+    ICON_PATH,
+    BANNER_HIGH,
+    WINDOW_SIZE,
+    LOGO_SIZE,
+    MENU_ICONS,
+    LANGUAGE_ICONS,
+    DEFAULT_SETTINGS,
+    load_user_settings,
+    save_user_settings,
+)
 from windows.at_window_utils import show_popup, get_standard_font, get_link_font
 from locales.at_localization_class import loc
 from windows.at_run_dialog_window import load_content
@@ -44,7 +54,8 @@ class AppsContentPanel(wx.Panel):
             parent: Родительский wx.Window.
         """
         super().__init__(parent)
-        self.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
+        self.settings = load_user_settings()  # Загружаем настройки
+        self.SetBackgroundColour(wx.Colour(self.settings["BACKGROUND_COLOR"]))
         self.parent = parent
         self.links = []  # Список ссылок для последующего обновления
         self.setup_ui()
@@ -73,7 +84,7 @@ class AppsContentPanel(wx.Panel):
         for content_name, label_key in programs:
             label = loc.get(label_key, label_key)  # Получаем локализованную метку
             link = wx.StaticText(self, label=label, style=wx.ALIGN_LEFT)
-            link.SetForegroundColour(wx.Colour(LABEL_FONT_COLOR))  # Устанавливаем цвет текста
+            link.SetForegroundColour(wx.Colour(self.settings["LABEL_FONT_COLOR"]))  # Устанавливаем цвет текста
             link.SetFont(get_link_font())  # Устанавливаем шрифт
             link.SetCursor(wx.Cursor(wx.CURSOR_HAND))
             link.Bind(wx.EVT_LEFT_DOWN, lambda evt, name=content_name: self.on_link_click(name))
@@ -101,7 +112,7 @@ class AppsContentPanel(wx.Panel):
                     new_label = loc.get(label_key, label_key)
                     self.links[i].SetLabel(new_label)
                     self.links[i].SetFont(get_link_font())  # Обновляем шрифт
-                    self.links[i].SetForegroundColour(wx.Colour(LABEL_FONT_COLOR))  # Обновляем цвет
+                    self.links[i].SetForegroundColour(wx.Colour(self.settings["LABEL_FONT_COLOR"]))  # Обновляем цвет
 
             self.Layout()
             logging.info("Язык UI AppsContentPanel успешно обновлён")

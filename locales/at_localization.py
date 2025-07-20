@@ -1,4 +1,5 @@
 """
+locales/at_localization.py
 Модуль для хранения словаря переводов.
 Поддерживает переводы на русский, немецкий и английский языки.
 """
@@ -109,6 +110,11 @@ translations = {
         "de": "AutoCAD erfolgreich initialisiert.",
         "en": "AutoCAD initialized successfully."
     },
+    "cancel": {
+        "ru": "Отмена",
+        "de": "Abbrechen",
+        "en": "Cancel"
+    },
     "cancel_button": {
         "ru": "Возврат",
         "de": "Zurück",
@@ -133,6 +139,11 @@ translations = {
         "ru": "По часовой стрелке",
         "de": "Im Uhrzeigersinn",
         "en": "Clockwise"
+    },
+    "color_settings": {
+        "ru": "Настройки цвета",
+        "de": "Farbeinstellungen",
+        "en": "Color Settings"
     },
     "com_release_error": {
         "ru": "Ошибка при освобождении COM: {}",
@@ -243,6 +254,26 @@ translations = {
         "ru": "Штуцеры и отводы",
         "de": "Anschlüsse und Abzweige",
         "en": "Fittings and branches"
+    },
+    "font_name": {
+        "ru": "Название шрифта",
+        "de": "Schriftname",
+        "en": "Font Name"
+    },
+    "font_settings": {
+        "ru": "Настройки шрифта",
+        "de": "Schrifteinstellungen",
+        "en": "Font Settings"
+    },
+    "font_size": {
+        "ru": "Размер шрифта",
+        "de": "Schriftgröße",
+        "en": "Font Size"
+    },
+    "font_type": {
+        "ru": "Стиль шрифта",
+        "de": "Schriftstil",
+        "en": "Font Style"
     },
     "gradient_plus": {
         "ru": "Наклон должен быть положительным числом!",
@@ -609,6 +640,11 @@ translations = {
         "de": "Fehler beim Aktualisieren der Ansicht",
         "en": "Error regenerating view"
     },
+    "reset_to_default": {
+        "ru": "Сбросить настройки",
+        "de": "Auf Standard zurücksetzen",
+        "en": "Reset to Default"
+    },
     "ring_build_error": {
         "ru": "Ошибка построения колец: {0}",
         "de": "Fehler beim Erstellen von Ringen: {0}",
@@ -618,6 +654,11 @@ translations = {
         "ru": "Построение колец отменено или завершилось с ошибкой",
         "de": "Ringbau abgebrochen oder fehlerhaft",
         "en": "Ring construction cancelled or failed"
+    },
+    "save": {
+        "ru": "Сохранить",
+        "de": "Speichern",
+        "en": "Save"
     },
     "save_error": {
         "ru": "Ошибка сохранения значения: {}",
@@ -648,6 +689,21 @@ translations = {
         "ru": "Выбрать точку",
         "de": "Punkt auswählen",
         "en": "Select point"
+    },
+    "settings_reset": {
+        "ru": "Настройки сброшены",
+        "de": "Einstellungen zurückgesetzt",
+        "en": "Settings reset"
+    },
+    "settings_saved": {
+        "ru": "Настройки сохранены",
+        "de": "Einstellungen gespeichert",
+        "en": "Settings saved"
+    },
+    "settings_title": {
+        "ru": "Настройки",
+        "de": "Einstellungen",
+        "en": "Settings"
     },
     "shell_tab_label": {
         "ru": "Обечайка",
@@ -731,7 +787,7 @@ translations = {
     },
     "window_title_head": {
         "ru": "Параметры днища",
-        "de.": "Bodenparameter",
+        "de": "Bodenparameter",
         "en": "Head parameters"
     },
     "window_title_ring": {
@@ -758,5 +814,20 @@ translations = {
         "ru": "Деление на ноль невозможно!",
         "de": "Division durch Null ist unmöglich!",
         "en": "Division by zero is impossible!"
+    },
+    "background_color": {
+        "ru": "Цвет фона",
+        "de": "Hintergrundfarbe",
+        "en": "Background Color"
+    },
+    "foreground_color": {
+        "ru": "Цвет текста",
+        "de": "Textfarbe",
+        "en": "Text Color"
+    },
+    "banner_color": {
+        "ru": "Цвет баннера",
+        "de": "Bannerfarbe",
+        "en": "Banner Color"
     }
 }
