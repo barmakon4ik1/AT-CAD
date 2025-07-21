@@ -6,24 +6,14 @@
 
 import wx
 import logging
-from config.at_config import (
-    ICON_PATH,
-    BANNER_HIGH,
-    WINDOW_SIZE,
-    LOGO_SIZE,
-    MENU_ICONS,
-    LANGUAGE_ICONS,
-    DEFAULT_SETTINGS,
-    load_user_settings,
-    save_user_settings,
-)
-from windows.at_window_utils import show_popup, get_standard_font, get_link_font
+from config.at_config import *
+from windows.at_window_utils import *
 from locales.at_localization_class import loc
 from windows.at_run_dialog_window import load_content
 
 # Настройка логирования
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.ERROR,
     filename="at_cad.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
@@ -55,7 +45,8 @@ class AppsContentPanel(wx.Panel):
         """
         super().__init__(parent)
         self.settings = load_user_settings()  # Загружаем настройки
-        self.SetBackgroundColour(wx.Colour(self.settings["BACKGROUND_COLOR"]))
+        background_color = self.settings.get("BACKGROUND_COLOR", DEFAULT_SETTINGS["BACKGROUND_COLOR"])
+        self.SetBackgroundColour(wx.Colour(background_color))
         self.parent = parent
         self.links = []  # Список ссылок для последующего обновления
         self.setup_ui()

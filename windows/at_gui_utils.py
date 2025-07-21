@@ -14,6 +14,7 @@ from locales.at_localization_class import loc
 import wx
 import os
 
+
 def show_popup(message: str, title: str = None, popup_type: str = "error", icon_size: int = 32,
                buttons: list = ["OK"]) -> int:
     """
@@ -47,7 +48,9 @@ def show_popup(message: str, title: str = None, popup_type: str = "error", icon_
     # Выбор иконки
     if popup_type.lower() == "success":
         try:
-            icon_bitmap = wx.Bitmap(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), DONE_ICON_PATH), wx.BITMAP_TYPE_ANY)
+            icon_bitmap = wx.Bitmap(
+                os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), DONE_ICON_PATH),
+                wx.BITMAP_TYPE_ANY)
             if not icon_bitmap.IsOk():
                 raise ValueError(loc.get("image_not_found"))
             icon = wx.Icon(icon_bitmap)
@@ -79,7 +82,8 @@ def show_popup(message: str, title: str = None, popup_type: str = "error", icon_
         "normal": (wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
     }
     style, weight = font_styles.get(get_setting("FONT_TYPE").lower(), (wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-    font = wx.Font(int(get_setting("FONT_SIZE")), wx.FONTFAMILY_DEFAULT, style, weight, faceName=get_setting("FONT_NAME"))
+    font = wx.Font(int(get_setting("FONT_SIZE")), wx.FONTFAMILY_DEFAULT, style, weight,
+                   faceName=get_setting("FONT_NAME"))
 
     # Макет окна
     main_sizer = wx.BoxSizer(wx.VERTICAL)

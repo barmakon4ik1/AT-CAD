@@ -30,6 +30,11 @@ translations = {
         "de": "Unzulässiger Winkelbereich!",
         "en": "Invalid angle range!"
     },
+    "apps_title": {
+        "ru": "Приложение",
+        "de": "Anwendung",
+        "en": "Application",
+    },
     "at_run_cone": {
         "ru": "Развертка прямого конуса",
         "de": "Abwicklung eines geraden Kegels",

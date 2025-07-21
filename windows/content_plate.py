@@ -9,7 +9,7 @@ import wx
 from pyautocad import APoint
 
 from config.at_cad_init import ATCadInit
-from config.at_config import BACKGROUND_COLOR, PLATE_IMAGE_PATH, INPUT_FIELD_SIZE
+from config.at_config import *
 from locales.at_localization_class import loc
 from windows.at_window_utils import (
     CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel,
@@ -61,7 +61,9 @@ class PlateContentPanel(wx.Panel):
         """
         logging.debug("Инициализация PlateContentPanel")
         super().__init__(parent)
-        self.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
+        self.settings = load_user_settings()  # Загружаем настройки
+        background_color = self.settings.get("BACKGROUND_COLOR", DEFAULT_SETTINGS["BACKGROUND_COLOR"])
+        self.SetBackgroundColour(background_color)
         self.parent = parent
         self.labels = {}  # Для хранения текстовых меток
         self.static_boxes = {}  # Для хранения StaticBox

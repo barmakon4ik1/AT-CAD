@@ -1,12 +1,12 @@
 """
 Файл: at_window_utils.py
-Путь: windows\at_window_utils.py
+Путь: windows/at_window_utils.py
 
 Описание:
 Модуль с утилитами для главного окна AT-CAD.
 Содержит функции для работы с позицией окна, всплывающими окнами, шрифтами и стилизацией интерфейса.
 Все настройки (FONT_NAME, FONT_TYPE, FONT_SIZE, BACKGROUND_COLOR и т.д.) читаются из user_settings.json
-через get_setting.
+через get_setting. Локализация текстов осуществляется через loc.get с использованием словаря translations.
 """
 
 import os
@@ -23,7 +23,7 @@ from windows.at_style import style_textctrl, style_combobox, style_radiobutton, 
 
 # Настройка логирования
 logging.basicConfig(
-    level=logging.INFO,  # Изменено на INFO для более подробного логирования
+    level=logging.ERROR,  # Основной уровень для ошибок, INFO и WARNING для локализации и стилизации
     filename="at_cad.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
@@ -31,15 +31,16 @@ logging.basicConfig(
 # Кэш для данных из JSON-файлов
 _common_data_cache = None
 
+
 def load_common_data() -> Dict:
     """
     Загружает данные о материалах, толщинах и конфигурации днищ из файлов 'config/common_data.json' и 'config/config.json'
     с кэшированием.
 
-    Возвращает:
+    Returns:
         Dict: Словарь с ключами 'material', 'thicknesses', 'h1_table', 'head_types', 'fields'.
 
-    Исключения:
+    Raises:
         FileNotFoundError: Если файлы 'config/common_data.json' или 'config/config.json' отсутствуют.
         json.JSONDecodeError: Если файлы содержат некорректный JSON.
         ValueError: Если структура JSON некорректна (например, отсутствует ключ 'dimensions').
@@ -76,7 +77,7 @@ def load_common_data() -> Dict:
                     float(t)
                 except ValueError:
                     logging.error(f"Недопустимое значение толщины в common_data.json: {t}")
-                    show_popup(loc.get("invalid_thickness", f"Недопустимое значение толщины: {t}"), popup_type="error")
+                    show_popup(loc.get("invalid_number", f"Недопустимое значение толщины: {t}"), popup_type="error")
                     _common_data_cache["thicknesses"] = []
                     break
         logging.info(f"Данные успешно загружены из {common_data_path}: материалы={_common_data_cache['material']}, "
@@ -108,6 +109,7 @@ def load_common_data() -> Dict:
 
     return _common_data_cache
 
+
 def reset_common_data_cache() -> None:
     """
     Сбрасывает кэш данных из common_data.json и config.json.
@@ -116,11 +118,12 @@ def reset_common_data_cache() -> None:
     _common_data_cache = None
     logging.info("Кэш common_data.json и config.json сброшен")
 
+
 def load_last_position() -> Tuple[int, int]:
     """
     Загружает координаты последней позиции окна из файла 'config/last_position.json'.
 
-    Возвращает:
+    Returns:
         Tuple[int, int]: Координаты окна (x, y) или (-1, -1) при ошибке или отсутствии файла.
     """
     config_path = os.path.join("config", "last_position.json")
@@ -132,13 +135,14 @@ def load_last_position() -> Tuple[int, int]:
         logging.error(f"Ошибка загрузки {config_path}: {e}")
         return (-1, -1)
 
+
 def save_last_position(x: int, y: int) -> None:
     """
     Сохраняет координаты позиции окна в файл 'config/last_position.json'.
 
-    Аргументы:
-        x: Координата x окна.
-        y: Координата y окна.
+    Args:
+        x (int): Координата x окна.
+        y (int): Координата y окна.
     """
     config_path = os.path.join("config", "last_position.json")
     try:
@@ -148,14 +152,15 @@ def save_last_position(x: int, y: int) -> None:
     except (PermissionError, OSError) as e:
         logging.error(f"Ошибка сохранения {config_path}: {e}")
 
+
 def load_last_input(filename: str) -> Dict:
     """
     Загружает последние введённые данные из указанного файла.
 
-    Аргументы:
-        filename: Имя файла для загрузки (например, 'last_cone_input.json').
+    Args:
+        filename (str): Имя файла для загрузки (например, 'last_cone_input.json').
 
-    Возвращает:
+    Returns:
         Dict: Словарь с данными или пустой словарь при ошибке.
     """
     try:
@@ -165,13 +170,14 @@ def load_last_input(filename: str) -> Dict:
         logging.error(f"Ошибка загрузки {filename}: {e}")
         return {}
 
+
 def save_last_input(filename: str, data: Dict) -> None:
     """
     Сохраняет введённые данные в указанный файл.
 
-    Аргументы:
-        filename: Имя файла для сохранения.
-        data: Словарь с данными.
+    Args:
+        filename (str): Имя файла для сохранения.
+        data (Dict): Словарь с данными.
     """
     try:
         abs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", filename))
@@ -183,22 +189,28 @@ def save_last_input(filename: str, data: Dict) -> None:
     except (PermissionError, OSError) as e:
         logging.error(f"Ошибка сохранения {abs_path}: {e}")
 
+
 def show_popup(message: str, popup_type: str = "info") -> None:
     """
     Отображает всплывающее окно с сообщением.
 
-    Аргументы:
-        message: Текст сообщения.
-        popup_type: Тип сообщения ("info" для информационного, "error" для ошибки).
+    Args:
+        message (str): Текст сообщения.
+        popup_type (str): Тип сообщения ("info" для информационного, "error" для ошибки).
     """
+    title_key = "error" if popup_type == "error" else "info"
+    title = loc.get(title_key, title_key)  # Используем ключ или сам ключ как запасной вариант
+    if title == title_key:
+        logging.warning(f"Перевод для ключа '{title_key}' не найден в translations, использовано значение: {title}")
     style = wx.OK | (wx.ICON_INFORMATION if popup_type == "info" else wx.ICON_ERROR)
-    wx.MessageBox(message, loc.get("error" if popup_type == "error" else "info"), style)
+    wx.MessageBox(message, title, style)
+
 
 def get_standard_font() -> wx.Font:
     """
     Возвращает стандартный шрифт на основе конфигурации из user_settings.json.
 
-    Возвращает:
+    Returns:
         wx.Font: Объект шрифта с заданным размером, стилем и именем.
     """
     font_name = get_setting("FONT_NAME") or DEFAULT_SETTINGS["FONT_NAME"]
@@ -209,30 +221,31 @@ def get_standard_font() -> wx.Font:
         "bolditalic": (wx.FONTSTYLE_ITALIC, wx.FONTWEIGHT_BOLD),
     }
     style, weight = font_styles.get(get_setting("FONT_TYPE").lower(), (wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-    return wx.Font(
-        int(get_setting("FONT_SIZE") or DEFAULT_SETTINGS["FONT_SIZE"]),
-        wx.FONTFAMILY_DEFAULT,
-        style,
-        weight,
-        faceName=font_name
-    )
+    font_size = int(get_setting("FONT_SIZE") or DEFAULT_SETTINGS["FONT_SIZE"])
+    font = wx.Font(font_size, wx.FONTFAMILY_DEFAULT, style, weight, faceName=font_name)
+    logging.info(f"Создан стандартный шрифт: имя={font_name}, размер={font_size}, стиль={style}, вес={weight}")
+    return font
+
 
 def get_button_font() -> wx.Font:
     """
     Возвращает шрифт для кнопок (на 2 пункта больше стандартного).
 
-    Возвращает:
+    Returns:
         wx.Font: Объект шрифта для кнопок.
     """
     font = get_standard_font()
-    font.SetPointSize(int(get_setting("FONT_SIZE") or DEFAULT_SETTINGS["FONT_SIZE"]) + 2)
+    font_size = int(get_setting("FONT_SIZE") or DEFAULT_SETTINGS["FONT_SIZE"]) + 2
+    font.SetPointSize(font_size)
+    logging.info(f"Создан шрифт для кнопок: размер={font_size}")
     return font
+
 
 def get_link_font() -> wx.Font:
     """
     Возвращает шрифт для текстовых ссылок на основе параметров из user_settings.json.
 
-    Возвращает:
+    Returns:
         wx.Font: Шрифт для ссылок.
     """
     style_map = {
@@ -248,31 +261,29 @@ def get_link_font() -> wx.Font:
 
     font_style = style_map.get(get_setting("LABEL_FONT_TYPE").lower(), wx.FONTSTYLE_NORMAL)
     font_weight = weight_map.get(get_setting("LABEL_FONT_WEIGHT").lower(), wx.FONTWEIGHT_NORMAL)
+    font_size = int(get_setting("LABEL_FONT_SIZE") or DEFAULT_SETTINGS["LABEL_FONT_SIZE"])
+    font_name = get_setting("LABEL_FONT_NAME") or DEFAULT_SETTINGS["LABEL_FONT_NAME"]
+    font = wx.Font(font_size, wx.FONTFAMILY_ROMAN, font_style, font_weight, faceName=font_name)
+    logging.info(f"Создан шрифт для ссылок: имя={font_name}, размер={font_size}, стиль={font_style}, вес={font_weight}")
+    return font
 
-    return wx.Font(
-        pointSize=int(get_setting("LABEL_FONT_SIZE") or DEFAULT_SETTINGS["LABEL_FONT_SIZE"]),
-        family=wx.FONTFAMILY_ROMAN,
-        style=font_style,
-        weight=font_weight,
-        faceName=get_setting("LABEL_FONT_NAME") or DEFAULT_SETTINGS["LABEL_FONT_NAME"]
-    )
 
 def fit_text_to_height(ctrl, text, max_width, max_height, font_name, style_flags):
     """
     Подбирает наибольший размер шрифта, при котором текст помещается по высоте.
 
-    Аргументы:
+    Args:
         ctrl: Виджет для отображения текста.
-        text: Текст для измерения.
-        max_width: Максимальная ширина текста.
-        max_height: Максимальная высота текста.
-        font_name: Имя шрифта.
-        style_flags: Словарь с параметрами стиля шрифта (style, weight).
+        text (str): Текст для измерения.
+        max_width (int): Максимальная ширина текста.
+        max_height (int): Максимальная высота текста.
+        font_name (str): Имя шрифта.
+        style_flags (dict): Словарь с параметрами стиля шрифта (style, weight).
 
-    Возвращает:
+    Returns:
         int: Оптимальный размер шрифта.
     """
-    font_size = 48  # начнем с большого размера
+    font_size = 48  # Начальный размер
     min_size = 8
 
     while font_size >= min_size:
@@ -292,17 +303,20 @@ def fit_text_to_height(ctrl, text, max_width, max_height, font_name, style_flags
         _, text_height = dc.GetMultiLineTextExtent(ctrl.GetLabel())
 
         if text_height <= max_height:
-            return font_size  # нашли подходящий размер
+            logging.info(f"Подобран размер шрифта {font_size} для текста '{text}'")
+            return font_size
 
-        font_size -= 1  # уменьшаем и пробуем снова
+        font_size -= 1
 
-    return min_size  # минимально допустимый
+    logging.warning(f"Достигнут минимальный размер шрифта {min_size} для текста '{text}'")
+    return min_size
+
 
 class CanvasPanel(wx.Panel):
     """
     Панель для отображения изображения с поддержкой масштабирования.
 
-    Атрибуты:
+    Attributes:
         image: Объект wx.Image или None при ошибке загрузки.
         scaled_bitmap: Кэшированное масштабированное изображение.
     """
@@ -311,10 +325,10 @@ class CanvasPanel(wx.Panel):
         """
         Инициализирует панель с заданным изображением и размером.
 
-        Аргументы:
-            parent: Родительский элемент (wx.Window).
-            image_file: Путь к файлу изображения (например, 'shell_image.png').
-            size: Размер панели (ширина, высота).
+        Args:
+            parent (wx.Window): Родительский элемент.
+            image_file (str): Путь к файлу изображения (например, 'shell_image.png').
+            size (Tuple[int, int]): Размер панели (ширина, высота).
         """
         super().__init__(parent, size=size)
         self.SetBackgroundColour(wx.WHITE)
@@ -325,6 +339,7 @@ class CanvasPanel(wx.Panel):
                 self.image = wx.Image(image_file, wx.BITMAP_TYPE_PNG)
                 if not self.image.IsOk():
                     raise ValueError("Некорректное изображение")
+                logging.info(f"Изображение {image_file} успешно загружено")
             except Exception as e:
                 logging.error(f"Ошибка загрузки изображения {image_file}: {e}")
                 self.image = None
@@ -337,8 +352,8 @@ class CanvasPanel(wx.Panel):
         """
         Отрисовывает изображение или сообщение об ошибке, если изображение недоступно.
 
-        Аргументы:
-            event: Событие отрисовки (wx.EVT_PAINT).
+        Args:
+            event (wx.Event): Событие отрисовки (wx.EVT_PAINT).
         """
         dc = wx.PaintDC(self)
         dc.SetBackground(wx.WHITE_BRUSH)
@@ -357,17 +372,23 @@ class CanvasPanel(wx.Panel):
             dc.DrawBitmap(self.scaled_bitmap, x, y)
         else:
             dc.SetTextForeground(wx.BLACK)
-            dc.DrawText(loc.get("image_not_found"), width // 2 - 50, height // 2)
+            # Запасной текст, так как ключ "image_not_found" отсутствует в translations
+            error_text = loc.get("image_not_found", "Изображение не найдено")
+            if error_text == "image_not_found":
+                logging.warning(
+                    "Перевод для ключа 'image_not_found' не найден в translations, использовано значение: Изображение не найдено")
+            dc.DrawText(error_text, width // 2 - 50, height // 2)
 
     def on_resize(self, event: wx.Event) -> None:
         """
         Обновляет отображение при изменении размера панели.
 
-        Аргументы:
-            event: Событие изменения размера (wx.EVT_SIZE).
+        Args:
+            event (wx.Event): Событие изменения размера (wx.EVT_SIZE).
         """
         self.Refresh()
         event.Skip()
+
 
 class BaseInputWindow(wx.Frame):
     """
@@ -380,21 +401,26 @@ class BaseInputWindow(wx.Frame):
         """
         Инициализирует окно с заданным заголовком, файлом данных, размером и родительским окном.
 
-        Аргументы:
-            title_key: Ключ локализации для заголовка окна.
-            last_input_file: Имя файла для сохранения последних введённых данных.
-            window_size: Размер окна (ширина, высота).
+        Args:
+            title_key (str): Ключ локализации для заголовка окна.
+            last_input_file (str): Имя файла для сохранения последних введённых данных.
+            window_size (Tuple[int, int]): Размер окна (ширина, высота).
             parent: Родительское окно (по умолчанию None).
 
-        Исключения:
+        Raises:
             RuntimeError: Если инициализация AutoCAD не удалась.
         """
-        super().__init__(parent, title=loc.get(title_key),
-                         style=wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX))
+        title = loc.get(title_key, title_key)
+        if title == title_key:
+            logging.warning(
+                f"Перевод для ключа '{title_key}' не найден в translations, использовано значение: {title_key}")
+        super().__init__(parent, title=title, style=wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX))
         self.common_data = load_common_data()
         self.last_input = load_last_input(last_input_file)
         self.panel = wx.Panel(self)
-        self.panel.SetBackgroundColour(wx.Colour(get_setting("BACKGROUND_COLOR") or DEFAULT_SETTINGS["BACKGROUND_COLOR"]))
+        background_color = get_setting("BACKGROUND_COLOR") or DEFAULT_SETTINGS["BACKGROUND_COLOR"]
+        self.panel.SetBackgroundColour(wx.Colour(background_color))
+        logging.info(f"Установлен цвет фона панели: {background_color}")
         self.insert_point = None
         self.adoc = None
         self.model = None
@@ -405,11 +431,12 @@ class BaseInputWindow(wx.Frame):
         self.CreateStatusBar()
         self.GetStatusBar().SetFieldsCount(2)
         self.GetStatusBar().SetStatusWidths([-1, 250])
-        self.SetStatusText(loc.get("point_not_selected"), 0)
-        self.SetStatusText(loc.get("copyright"), 1)
-        font = get_standard_font()
-        self.GetStatusBar().SetFont(font)
-        self.GetStatusBar().SetForegroundColour(wx.Colour(get_setting("STATUS_TEXT_COLOR") or DEFAULT_SETTINGS["STATUS_TEXT_COLOR"]))
+        self.GetStatusBar().SetFont(get_standard_font())
+        status_text_color = get_setting("STATUS_TEXT_COLOR") or DEFAULT_SETTINGS["STATUS_TEXT_COLOR"]
+        self.GetStatusBar().SetForegroundColour(wx.Colour(status_text_color))
+        logging.info(f"Установлен цвет текста строки состояния: {status_text_color}")
+        self.SetStatusText(loc.get("point_not_selected", "Точка не выбрана"), 0)
+        self.SetStatusText(loc.get("copyright", "Дизайн и разработка: А.Тутубалин © 2025"), 1)
         self.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
         self.Bind(wx.EVT_CLOSE, self.on_close)
 
@@ -426,13 +453,13 @@ class BaseInputWindow(wx.Frame):
         try:
             init_result = init_autocad()
             if not init_result:
-                show_popup(loc.get("cad_init_error_short"), popup_type="error")
+                show_popup(loc.get("cad_init_error_short", "Ошибка инициализации AutoCAD"), popup_type="error")
                 logging.error("Не удалось инициализировать AutoCAD")
                 self.Destroy()
                 return
             self.adoc, self.model, _ = init_result
         except Exception as e:
-            show_popup(loc.get("cad_init_error_short"), popup_type="error")
+            show_popup(loc.get("cad_init_error_short", "Ошибка инициализации AutoCAD"), popup_type="error")
             logging.error(f"Ошибка инициализации AutoCAD: {e}")
             self.Destroy()
 
@@ -440,8 +467,8 @@ class BaseInputWindow(wx.Frame):
         """
         Отменяет ввод, закрывает окно и восстанавливает родительское окно.
 
-        Аргументы:
-            event: Событие кнопки (wx.EVT_BUTTON).
+        Args:
+            event (wx.Event): Событие кнопки (wx.EVT_BUTTON).
         """
         self.result = None
         if self.GetParent():
@@ -454,8 +481,8 @@ class BaseInputWindow(wx.Frame):
         """
         Сохраняет позицию окна, закрывает его и восстанавливает родительское окно.
 
-        Аргументы:
-            event: Событие закрытия (wx.EVT_CLOSE).
+        Args:
+            event (wx.Event): Событие закрытия (wx.EVT_CLOSE).
         """
         x, y = self.GetPosition()
         save_last_position(x, y)
@@ -467,7 +494,7 @@ class BaseInputWindow(wx.Frame):
 
     def adjust_button_widths(self) -> None:
         """
-        Устанавливает одинаковую ширину для кнопок с учётом локализации текста.
+        Устанавливает одинаков3ую ширину для кнопок с учётом локализации текста.
         """
         if not self.buttons:
             return
@@ -477,7 +504,10 @@ class BaseInputWindow(wx.Frame):
         for button in self.buttons:
             for lang in languages:
                 temp_loc = loc.__class__(lang)
-                label = temp_loc.get(button.GetLabel())
+                label = temp_loc.get(button.GetLabel(), button.GetLabel())
+                if label == button.GetLabel():
+                    logging.warning(
+                        f"Перевод для кнопки '{button.GetLabel()}' не найден в translations, использовано значение: {label}")
                 dc = wx.ClientDC(button)
                 dc.SetFont(button_font)
                 width, _ = dc.GetTextExtent(label)
@@ -485,13 +515,14 @@ class BaseInputWindow(wx.Frame):
         for button in self.buttons:
             _, height = button.GetMinSize()
             button.SetMinSize((max_width, height))
+        logging.info(f"Установлена ширина кнопок: {max_width}px")
 
     def on_key_down(self, event: wx.Event) -> None:
         """
         Обрабатывает нажатие клавиши Esc для отмены.
 
-        Аргументы:
-            event: Событие клавиатуры (wx.EVT_KEY_DOWN).
+        Args:
+            event (wx.Event): Событие клавиатуры (wx.EVT_KEY_DOWN).
         """
         if event.GetKeyCode() == wx.WXK_ESCAPE:
             self.on_cancel(event)
@@ -501,8 +532,8 @@ class BaseInputWindow(wx.Frame):
         """
         Запрашивает выбор точки вставки в AutoCAD, минимизируя окно на время выбора.
 
-        Аргументы:
-            event: Событие кнопки (wx.EVT_BUTTON).
+        Args:
+            event (wx.Event): Событие кнопки (wx.EVT_BUTTON).
         """
         try:
             self.Iconize(True)
@@ -523,27 +554,37 @@ class BaseInputWindow(wx.Frame):
         """
         Обновляет язык и стили интерфейса окна на основе настроек из user_settings.json.
         """
-        self.SetTitle(loc.get(self.GetTitle()))  # Обновляем заголовок
-        self.panel.SetBackgroundColour(wx.Colour(get_setting("BACKGROUND_COLOR") or DEFAULT_SETTINGS["BACKGROUND_COLOR"]))
+        title_key = self.GetTitle()
+        title = loc.get(title_key, title_key)
+        if title == title_key:
+            logging.warning(
+                f"Перевод для ключа заголовка '{title_key}' не найден в translations, использовано значение: {title_key}")
+        self.SetTitle(title)
+        background_color = get_setting("BACKGROUND_COLOR") or DEFAULT_SETTINGS["BACKGROUND_COLOR"]
+        self.panel.SetBackgroundColour(wx.Colour(background_color))
+        logging.info(f"Обновлён цвет фона панели: {background_color}")
         font = get_standard_font()
         self.GetStatusBar().SetFont(font)
-        self.GetStatusBar().SetForegroundColour(wx.Colour(get_setting("STATUS_TEXT_COLOR") or DEFAULT_SETTINGS["STATUS_TEXT_COLOR"]))
-        self.SetStatusText(loc.get("point_not_selected"), 0)
-        self.SetStatusText(loc.get("copyright"), 1)
+        status_text_color = get_setting("STATUS_TEXT_COLOR") or DEFAULT_SETTINGS["STATUS_TEXT_COLOR"]
+        self.GetStatusBar().SetForegroundColour(wx.Colour(status_text_color))
+        logging.info(f"Обновлён цвет текста строки состояния: {status_text_color}")
+        self.SetStatusText(loc.get("point_not_selected", "Точка не выбрана"), 0)
+        self.SetStatusText(loc.get("copyright", "Дизайн и разработка: А.Тутубалин © 2025"), 1)
         apply_styles_to_panel(self.panel)
         self.adjust_button_widths()
         self.Layout()
         self.Refresh()
 
+
 def create_window(window_class, parent=None) -> Optional[Dict]:
     """
     Создаёт и отображает диалоговое окно для ввода параметров.
 
-    Аргументы:
+    Args:
         window_class: Класс окна (например, ConeInputWindow, ShellInputWindow и т.д.).
         parent: Родительское окно (например, MainWindow).
 
-    Возвращает:
+    Returns:
         Optional[Dict]: Данные из диалога или None при отмене.
     """
     window = window_class(parent=parent)
@@ -552,13 +593,14 @@ def create_window(window_class, parent=None) -> Optional[Dict]:
     window.Raise()
     return window.result
 
+
 def apply_styles_recursively(widget: wx.Window) -> None:
     """
     Рекурсивно применяет стили к виджету и его дочерним элементам.
     Поддерживает wx.StaticText, wx.TextCtrl, wx.ComboBox, wx.RadioButton, wx.StaticBox.
 
-    Аргументы:
-        widget: Виджет для стилизации.
+    Args:
+        widget (wx.Window): Виджет для стилизации.
     """
     if isinstance(widget, wx.StaticText):
         style_label(widget)
@@ -574,62 +616,75 @@ def apply_styles_recursively(widget: wx.Window) -> None:
     for child in widget.GetChildren():
         apply_styles_recursively(child)
 
+
 def apply_styles_to_panel(panel: wx.Window) -> None:
     """
     Применяет стили ко всем элементам внутри заданной панели.
 
-    Аргументы:
-        panel: Панель для стилизации.
+    Args:
+        panel (wx.Window): Панель для стилизации.
     """
     apply_styles_recursively(panel)
+    logging.info(f"Стили применены к панели {panel}")
+
 
 def create_standard_buttons(parent: wx.Window, on_ok, on_cancel, on_clear=None) -> List[wx.Button]:
     """
     Создаёт стандартные кнопки (OK, Cancel, Clear) с привязкой событий.
 
-    Аргументы:
-        parent: Родительский элемент (wx.Window).
+    Args:
+        parent (wx.Window): Родительский элемент.
         on_ok: Обработчик для кнопки OK.
         on_cancel: Обработчик для кнопки Cancel.
         on_clear: Обработчик для кнопки Clear (опционально, если None, кнопка не создаётся).
 
-    Возвращает:
+    Returns:
         List[wx.Button]: Список кнопок [ok_button, cancel_button, clear_button] (clear_button опционально).
     """
     button_font = get_button_font()
+    button_color = get_setting("BUTTON_FONT_COLOR") or DEFAULT_SETTINGS["BUTTON_FONT_COLOR"]
 
     ok_button = wx.Button(parent, label=loc.get("ok_button"))
     ok_button.SetFont(button_font)
     ok_button.SetBackgroundColour(wx.Colour(0, 128, 0))
-    ok_button.SetForegroundColour(wx.Colour(get_setting("BUTTON_FONT_COLOR") or DEFAULT_SETTINGS["BUTTON_FONT_COLOR"]))
+    ok_button.SetForegroundColour(wx.Colour(button_color))
     ok_button.Bind(wx.EVT_BUTTON, on_ok)
+    if loc.get("ok_button", "ОК") == "ok_button":
+        logging.warning("Перевод для ключа 'ok_button' не найден в translations, использовано значение: ОК")
 
     clear_button = None
     if on_clear:
         clear_button = wx.Button(parent, label=loc.get("clear_button"))
         clear_button.SetFont(button_font)
         clear_button.SetBackgroundColour(wx.Colour(64, 64, 64))  # Тёмно-серый цвет
-        clear_button.SetForegroundColour(wx.Colour(get_setting("BUTTON_FONT_COLOR") or DEFAULT_SETTINGS["BUTTON_FONT_COLOR"]))
+        clear_button.SetForegroundColour(wx.Colour(button_color))
         clear_button.Bind(wx.EVT_BUTTON, on_clear)
+        if loc.get("clear_button", "Очистить") == "clear_button":
+            logging.warning(
+                "Перевод для ключа 'clear_button' не найден в translations, использовано значение: Очистить")
 
     cancel_button = wx.Button(parent, label=loc.get("cancel_button"))
     cancel_button.SetFont(button_font)
     cancel_button.SetBackgroundColour(wx.Colour(255, 0, 0))
-    cancel_button.SetForegroundColour(wx.Colour(get_setting("BUTTON_FONT_COLOR") or DEFAULT_SETTINGS["BUTTON_FONT_COLOR"]))
+    cancel_button.SetForegroundColour(wx.Colour(button_color))
     cancel_button.Bind(wx.EVT_BUTTON, on_cancel)
+    if loc.get("cancel_button", "Отмена") == "cancel_button":
+        logging.warning("Перевод для ключа 'cancel_button' не найден в translations, использовано значение: Отмена")
 
     buttons = [ok_button, cancel_button]
     if clear_button:
         buttons.insert(1, clear_button)
 
+    logging.info(f"Созданы кнопки: {', '.join([b.GetLabel() for b in buttons])}")
     return buttons
+
 
 def adjust_button_widths(buttons: List[wx.Button]) -> None:
     """
     Устанавливает одинаковую ширину для переданных кнопок с учётом локализации текста.
 
-    Аргументы:
-        buttons: Список кнопок для стилизации.
+    Args:
+        buttons (List[wx.Button]): Список кнопок для стилизации.
     """
     if not buttons:
         return
@@ -639,7 +694,10 @@ def adjust_button_widths(buttons: List[wx.Button]) -> None:
     for button in buttons:
         for lang in languages:
             temp_loc = loc.__class__(lang)
-            label = temp_loc.get(button.GetLabel())
+            label = temp_loc.get(button.GetLabel(), button.GetLabel())
+            if label == button.GetLabel():
+                logging.warning(
+                    f"Перевод для кнопки '{button.GetLabel()}' не найден в translations, использовано значение: {label}")
             dc = wx.ClientDC(button)
             dc.SetFont(button_font)
             width, _ = dc.GetTextExtent(label)
@@ -647,31 +705,32 @@ def adjust_button_widths(buttons: List[wx.Button]) -> None:
     for button in buttons:
         _, height = button.GetMinSize()
         button.SetMinSize((max_width, height))
+    logging.info(f"Установлена ширина кнопок: {max_width}px")
+
 
 def update_status_bar_point_selected(window: wx.Window, insert_point: Optional[object] = None) -> None:
     """
     Обновляет статусную строку окна с координатами выбранной точки.
 
-    Аргументы:
-        window: Окно или панель, содержащее строку состояния.
+    Args:
+        window (wx.Window): Окно или панель, содержащее строку состояния.
         insert_point: Объект точки с атрибутами x, y (например, APoint).
     """
     main_window = wx.GetTopLevelParent(window)
-    if hasattr(main_window, "status_text"):
+    if hasattr(main_window, "GetStatusBar") and main_window.GetStatusBar():
         if insert_point and hasattr(insert_point, "x") and hasattr(insert_point, "y"):
             try:
-                main_window.status_text.SetLabel(
-                    loc.get("point_selected").format(insert_point.x, insert_point.y)
-                )
+                point_text = loc.get("point_selected", "Точка выбрана: x={0}, y={1}").format(insert_point.x,
+                                                                                             insert_point.y)
+                main_window.GetStatusBar().SetStatusText(point_text, 0)
+                logging.info(f"Обновлена строка состояния: {point_text}")
             except Exception as e:
+                error_text = loc.get("point_selection_error", "Ошибка выбора точки: {0}").format(str(e))
+                main_window.GetStatusBar().SetStatusText(error_text, 0)
                 logging.error(f"Ошибка при обновлении строки состояния: {e}")
-                main_window.status_text.SetLabel(
-                    loc.get("point_selection_error", "Ошибка выбора точки")
-                )
         else:
-            main_window.status_text.SetLabel(
-                loc.get("point_not_selected",
-                        "Точка не определена, выберите точку или нажмите Отмена для выхода в главное окно")
-            )
+            point_not_selected = loc.get("point_not_selected", "Точка не выбрана")
+            main_window.GetStatusBar().SetStatusText(point_not_selected, 0)
+            logging.info(f"Обновлена строка состояния: {point_not_selected}")
     else:
-        logging.warning("Строка состояния (status_text) не доступна в главном окне")
+        logging.warning("Строка состояния недоступна в главном окне")

@@ -10,7 +10,7 @@ from typing import Optional, Dict, List
 from pyautocad import APoint
 
 from config.at_cad_init import ATCadInit
-from config.at_config import BACKGROUND_COLOR, FONT_NAME, FONT_SIZE, FONT_TYPE, INPUT_FIELD_SIZE
+from config.at_config import *
 from locales.at_localization_class import loc
 from windows.at_window_utils import (
     CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel, create_standard_buttons, adjust_button_widths,
@@ -88,7 +88,9 @@ class HeadContentPanel(wx.Panel):
         """
         logging.debug("Инициализация HeadContentPanel")
         super().__init__(parent)
-        self.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
+        self.settings = load_user_settings()  # Загружаем настройки
+        background_color = self.settings.get("BACKGROUND_COLOR", DEFAULT_SETTINGS["BACKGROUND_COLOR"])
+        self.SetBackgroundColour(background_color)
         self.parent = parent
         self.labels = {}  # Для хранения текстовых меток
         self.static_boxes = {}  # Для хранения StaticBox
@@ -160,10 +162,21 @@ class HeadContentPanel(wx.Panel):
             D_label = wx.StaticText(params_box, label=loc.get("diameter_label", "Диаметр (D), мм"))
             D_label.SetFont(font)
             self.labels["D"] = D_label
-            D_data_source = self.config.get("fields", [{}])[1].get("data_source", "dimensions.diameters")
+            # Извлечение data_source как строки
+            fields = self.config.get("fields", [{}])
+            D_data_source = fields[1].get("data_source", "dimensions.diameters") if len(fields) > 1 and isinstance(
+                fields[1], dict) else "dimensions.diameters"
+            if not isinstance(D_data_source, str):
+                logging.error(
+                    f"Некорректный data_source для диаметра: тип={type(D_data_source)}, значение={D_data_source}")
+                D_data_source = "dimensions.diameters"
             D_options = common_data_manager.get_data(D_data_source)
+            if not isinstance(D_options, list):
+                logging.error(f"Некорректные данные диаметров: тип={type(D_options)}, значение={D_options}")
+                D_options = []
             default_D = "1000" if "1000" in D_options else D_options[0] if D_options else ""
-            self.D_combo = wx.ComboBox(params_box, choices=D_options, value=default_D, style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
+            self.D_combo = wx.ComboBox(params_box, choices=D_options, value=default_D, style=wx.CB_DROPDOWN,
+                                       size=INPUT_FIELD_SIZE)
             self.D_combo.SetFont(font)
             D_sizer.AddStretchSpacer()
             D_sizer.Add(D_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
@@ -175,10 +188,19 @@ class HeadContentPanel(wx.Panel):
             s_label = wx.StaticText(params_box, label=loc.get("thickness_label", "Толщина (s)"))
             s_label.SetFont(font)
             self.labels["s"] = s_label
-            s_data_source = self.config.get("fields", [{}])[2].get("data_source", "dimensions.thicknesses")
+            s_data_source = fields[2].get("data_source", "dimensions.thicknesses") if len(fields) > 2 and isinstance(
+                fields[2], dict) else "dimensions.thicknesses"
+            if not isinstance(s_data_source, str):
+                logging.error(
+                    f"Некорректный data_source для толщины: тип={type(s_data_source)}, значение={s_data_source}")
+                s_data_source = "dimensions.thicknesses"
             s_options = common_data_manager.get_data(s_data_source)
+            if not isinstance(s_options, list):
+                logging.error(f"Некорректные данные толщин: тип={type(s_options)}, значение={s_options}")
+                s_options = []
             default_s = "5" if "5" in s_options else s_options[0] if s_options else ""
-            self.s_combo = wx.ComboBox(params_box, choices=s_options, value=default_s, style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
+            self.s_combo = wx.ComboBox(params_box, choices=s_options, value=default_s, style=wx.CB_DROPDOWN,
+                                       size=INPUT_FIELD_SIZE)
             self.s_combo.SetFont(font)
             self.s_combo.Bind(wx.EVT_COMBOBOX, self.on_s_change)
             s_sizer.AddStretchSpacer()
@@ -191,7 +213,14 @@ class HeadContentPanel(wx.Panel):
             head_type_label = wx.StaticText(params_box, label=loc.get("head_type_label", "Тип Heads"))
             head_type_label.SetFont(font)
             self.labels["head_type"] = head_type_label
-            head_type_options = self.config.get("fields", [{}])[0].get("options", ["DIN 28011", "DIN 28013", "ASME VB-1", "NFE 81-103", "Custom"])
+            head_type_options = fields[0].get("options",
+                                              ["DIN 28011", "DIN 28013", "ASME VB-1", "NFE 81-103", "Custom"]) if len(
+                fields) > 0 and isinstance(fields[0], dict) else ["DIN 28011", "DIN 28013", "ASME VB-1", "NFE 81-103",
+                                                                  "Custom"]
+            if not isinstance(head_type_options, list):
+                logging.error(
+                    f"Некорректные данные типов головы: тип={type(head_type_options)}, значение={head_type_options}")
+                head_type_options = ["DIN 28011", "DIN 28013", "ASME VB-1", "NFE 81-103", "Custom"]
             self.head_type_combo = wx.ComboBox(params_box, choices=head_type_options, value="DIN 28011",
                                                style=wx.CB_READONLY, size=INPUT_FIELD_SIZE)
             self.head_type_combo.SetFont(font)

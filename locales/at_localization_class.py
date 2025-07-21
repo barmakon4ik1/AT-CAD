@@ -12,6 +12,7 @@ import logging
 from config.at_config import get_setting, load_user_settings, save_user_settings
 from locales.at_localization import translations
 
+
 class Localization:
     """
     Класс для управления локализацией интерфейса приложения.
@@ -50,26 +51,28 @@ class Localization:
         else:
             logging.warning(f"Недопустимый язык: {language}, остаётся: {self.language}")
 
-    def get(self, key: str, default: str = "Translation missing") -> str:
+    def get(self, key: str | dict, default: str = "Translation missing") -> str:
         """
         Возвращает перевод строки по ключу для текущего языка.
 
         Аргументы:
-            key (str): Ключ перевода.
+            key (str | dict): Ключ перевода (строка или словарь).
             default (str): Значение по умолчанию, если перевод отсутствует.
 
         Возвращает:
             str: Перевод строки или значение по умолчанию в случае ошибки.
-
-        Логирует успешное получение перевода или ошибки.
         """
         try:
+            if isinstance(key, dict):
+                logging.warning(f"Получен словарь вместо строки для ключа: {key}")
+                key = key.get('key', default)  # Извлечь строковый ключ или использовать default
             translation = translations.get(key, {}).get(self.language, default)
             logging.debug(f"Получен перевод для ключа '{key}': {translation}")
             return translation
         except Exception as e:
             logging.error(f"Ошибка получения перевода для ключа '{key}': {e}")
             return default
+
 
 # Создаём глобальный экземпляр локализации
 loc = Localization()

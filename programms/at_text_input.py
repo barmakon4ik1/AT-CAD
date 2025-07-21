@@ -1,10 +1,11 @@
 # programms/at_text_input.py
 from config.at_cad_init import ATCadInit
 from windows.at_gui_utils import show_popup
-from config.at_config import get_language
+from config.at_config import *
 from locales.at_localization_class import loc
+
 # Установка языка для локализации
-loc.language = LANGUAGE
+loc.language = load_user_settings()
 
 
 class ATTextInput:
