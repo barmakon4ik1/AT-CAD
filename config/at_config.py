@@ -1,11 +1,10 @@
 """
 Файл: at_config.py
-Путь: config\at_config.py
+Путь: config/at_config.py
 
 Описание:
 Конфигурационный файл для проекта AT-CAD. Содержит пути к ресурсам, настройки по умолчанию
 и функции для загрузки/сохранения пользовательских настроек из user_settings.json.
-Все пользовательские настройки (например, LANGUAGE, FONT_NAME) загружаются через get_setting.
 """
 
 import os
@@ -14,7 +13,7 @@ import logging
 
 # Настройка логирования
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.ERROR,
     filename="at_cad.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
@@ -73,7 +72,6 @@ WINDOW_SIZE: tuple[int, int] = (1280, 980)
 
 # Словарь настроек по умолчанию
 DEFAULT_SETTINGS: dict = {
-    "LANGUAGE": "ru",
     "FONT_NAME": "Times New Roman",
     "FONT_TYPE": "normal",
     "FONT_SIZE": 16,
@@ -109,6 +107,7 @@ ERROR_MARK: str = "⚠️"
 # Кэш для пользовательских настроек
 _cached_settings = None
 
+
 def load_user_settings() -> dict:
     """
     Загружает пользовательские настройки из файла user_settings.json.
@@ -140,6 +139,7 @@ def load_user_settings() -> dict:
         _cached_settings = DEFAULT_SETTINGS.copy()
         return _cached_settings
 
+
 def save_user_settings(settings: dict) -> None:
     """
     Сохраняет настройки в файл user_settings.json.
@@ -160,12 +160,13 @@ def save_user_settings(settings: dict) -> None:
     except Exception as e:
         logging.error(f"Ошибка сохранения пользовательских настроек: {e}")
 
+
 def get_setting(key: str) -> any:
     """
     Возвращает значение настройки по ключу из user_settings.json.
 
     Аргументы:
-        key (str): Ключ настройки (например, "LANGUAGE", "FONT_NAME").
+        key (str): Ключ настройки (например, "FONT_NAME").
 
     Возвращает:
         Значение настройки или значение по умолчанию из DEFAULT_SETTINGS.

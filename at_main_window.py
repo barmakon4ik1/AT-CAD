@@ -6,7 +6,6 @@
 Главное окно приложения AT-CAD. Содержит меню, баннер, основную область для контента,
 область кнопок и строку статуса. Управляет переключением контента и локализацией интерфейса.
 """
-from gettext import translation
 
 import wx
 import os
@@ -76,7 +75,7 @@ class ATMainWindow(wx.Frame):
         logging.info(f"Загруженные настройки: {self.settings}")
         super().__init__(
             parent=None,
-            title=self._get_translation("program_title", "AT-CAD"),
+            title=loc.get("program_title", "AT-CAD"),
             size=self.settings.get("WINDOW_SIZE", WINDOW_SIZE),
             style=wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX),
         )
@@ -159,33 +158,6 @@ class ATMainWindow(wx.Frame):
         # Обновление UI с текущими настройками
         self.update_ui(self.settings)
 
-    def _get_translation(self, key: str | dict, default: str) -> str:
-        """
-        Безопасно получает перевод для указанного ключа, обрабатывая возможные ошибки.
-
-        Args:
-            key (str | dict): Ключ перевода (строка или словарь).
-            default (str): Значение по умолчанию, если перевод не найден.
-
-        Returns:
-            str: Переведённая строка или значение по умолчанию.
-        """
-        try:
-            if isinstance(key, dict):
-                logging.warning(f"Получен словарь вместо строки для ключа: {key}")
-                key = key.get('key', default)  # Извлекаем строковый ключ или используем default
-            if not isinstance(key, str):
-                logging.error(f"Ключ перевода должен быть строкой, получен: {type(key)}")
-                return default
-            translation = loc.get(key, default)
-            if not isinstance(translation, str):
-                logging.error(f"Перевод для ключа '{key}' не является строкой, получен: {type(translation)}")
-                return default
-            return translation
-        except Exception as e:
-            logging.error(f"Ошибка получения перевода для ключа '{key}': {e}")
-            return default
-
     def scale_bitmap(self, bitmap: wx.Bitmap, width: int, height: int) -> wx.Bitmap:
         """
         Масштабирует изображение до заданных размеров.
@@ -211,6 +183,10 @@ class ATMainWindow(wx.Frame):
         Args:
             content_name (str): Имя контента для отображения.
         """
+        if not isinstance(content_name, str):
+            logging.warning(f"Нестроковый content_name: {content_name}, преобразование в строку")
+            content_name = str(content_name)
+
         logging.info(
             f"Переключение на контент: {content_name}, текущий контент: {self.current_content.__class__.__name__ if self.current_content else None}")
 
@@ -226,29 +202,25 @@ class ATMainWindow(wx.Frame):
                 self.current_content = new_content
                 self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
                 if hasattr(self.current_content, 'update_ui_language'):
-                    self.current_content.update_ui_language()  # Без аргументов, как в content_cone.py
+                    self.current_content.update_ui_language()
                     logging.info(f"Обновлён язык для контента: {content_name}")
                 else:
                     logging.warning(f"Контент {content_name} не имеет метода update_ui_language")
             else:
-                # Убедимся, что content_name — строка
-                content_name_str = str(content_name) if not isinstance(content_name, str) else content_name
-                error_msg = self._get_translation("error_content_load", f"Ошибка загрузки {content_name_str}")
-                logging.error(f"Некорректный контент возвращён для {content_name_str}")
+                error_msg = f"Ошибка загрузки {content_name}"
+                logging.error(f"Некорректный контент возвращён для {content_name}")
                 self.current_content = wx.StaticText(self.content_panel, label=error_msg)
                 self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
         except Exception as e:
-            # Убедимся, что content_name — строка
-            content_name_str = str(content_name) if not isinstance(content_name, str) else content_name
-            error_msg = self._get_translation("error_content_load", f"Ошибка загрузки {content_name_str}")
-            logging.error(f"Ошибка переключения на контент {content_name_str}: {e}")
+            error_msg = f"Ошибка загрузки {content_name}: {str(e)}"
+            logging.error(f"Ошибка переключения на контент {content_name}: {e}")
             self.current_content = wx.StaticText(self.content_panel, label=error_msg)
             self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
 
         self.content_panel.Layout()
         self.content_panel.Refresh()
         self.content_panel.Update()
-        self.update_ui(self.settings)  # Обновляем весь UI после переключения
+        self.update_ui(self.settings)
         logging.info(f"Контент переключён на {content_name}, интерфейс обновлён")
 
     def create_banner(self) -> None:
@@ -295,7 +267,7 @@ class ATMainWindow(wx.Frame):
         self.title = wx.StaticText(self.banner_panel, label="", style=wx.ST_NO_AUTORESIZE)
         self.title.SetMinSize((max_width, -1))
 
-        title_text = self._get_translation("program_title", "AT-CAD")
+        title_text = loc.get("program_title", "AT-CAD")
         style_flags = {
             "style": wx.FONTSTYLE_NORMAL if self.settings.get("FONT_TYPE", "normal") == "normal" else wx.FONTSTYLE_ITALIC,
             "weight": wx.FONTWEIGHT_BOLD if self.settings.get("FONT_TYPE", "normal") in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL
@@ -354,7 +326,7 @@ class ATMainWindow(wx.Frame):
 
         # Меню "Файл"
         file_menu = wx.Menu()
-        self.exit_item = file_menu.Append(wx.ID_EXIT, self._get_translation("button_exit", "Выход"))
+        self.exit_item = file_menu.Append(wx.ID_EXIT, loc.get("button_exit", "Выход"))
         exit_icon_path = os.path.abspath(MENU_ICONS.get("exit", ""))
         if os.path.exists(exit_icon_path):
             try:
@@ -367,14 +339,14 @@ class ATMainWindow(wx.Frame):
                     logging.error(f"Недопустимый формат иконки выхода: {exit_icon_path}")
             except Exception as e:
                 logging.error(f"Ошибка загрузки иконки выхода {exit_icon_path}: {e}")
-        menu_bar.Append(file_menu, self._get_translation("menu_file", "Файл"))
+        menu_bar.Append(file_menu, loc.get("menu_file", "Файл"))
 
         # Меню "Язык"
         self.language_menu = wx.Menu()
         self.lang_items = {
-            "ru": self.language_menu.Append(wx.ID_ANY, self._get_translation("lang_ru", "Русский"), kind=wx.ITEM_RADIO),
-            "de": self.language_menu.Append(wx.ID_ANY, self._get_translation("lang_de", "Deutsch"), kind=wx.ITEM_RADIO),
-            "en": self.language_menu.Append(wx.ID_ANY, self._get_translation("lang_en", "English"), kind=wx.ITEM_RADIO),
+            "ru": self.language_menu.Append(wx.ID_ANY, loc.get("lang_ru", "Русский"), kind=wx.ITEM_RADIO),
+            "de": self.language_menu.Append(wx.ID_ANY, loc.get("lang_de", "Deutsch"), kind=wx.ITEM_RADIO),
+            "en": self.language_menu.Append(wx.ID_ANY, loc.get("lang_en", "English"), kind=wx.ITEM_RADIO),
         }
         self.lang_items[loc.language].Check(True)
         for lang, item in self.lang_items.items():
@@ -392,12 +364,12 @@ class ATMainWindow(wx.Frame):
                     logging.error(f"Ошибка загрузки иконки lang_{lang} {lang_icon_path}: {e}")
             else:
                 logging.warning(f"Иконка lang_{lang} не найдена: {lang_icon_path}")
-        menu_bar.Append(self.language_menu, self._get_translation("language_menu", "Язык"))
+        menu_bar.Append(self.language_menu, loc.get("language_menu", "Язык"))
 
         # Меню "Справка"
         help_menu = wx.Menu()
-        self.settings_item = help_menu.Append(wx.ID_ANY, self._get_translation("settings_title", "Настройки"))
-        self.about_item = help_menu.Append(wx.ID_ABOUT, self._get_translation("menu_about", "О программе"))
+        self.settings_item = help_menu.Append(wx.ID_ANY, loc.get("settings_title", "Настройки"))
+        self.about_item = help_menu.Append(wx.ID_ABOUT, loc.get("menu_about", "О программе"))
         about_icon_path = os.path.abspath(MENU_ICONS.get("about", ""))
         settings_icon_path = os.path.abspath(MENU_ICONS.get("settings", ""))
         if os.path.exists(about_icon_path):
@@ -422,7 +394,7 @@ class ATMainWindow(wx.Frame):
                     logging.error(f"Недопустимый формат иконки settings: {settings_icon_path}")
             except Exception as e:
                 logging.error(f"Ошибка загрузки иконки settings {settings_icon_path}: {e}")
-        menu_bar.Append(help_menu, self._get_translation("menu_help", "Справка"))
+        menu_bar.Append(help_menu, loc.get("menu_help", "Справка"))
 
         self.SetMenuBar(menu_bar)
 
@@ -440,9 +412,7 @@ class ATMainWindow(wx.Frame):
         from windows.at_settings_window import SettingsWindow
         dialog = SettingsWindow(self)
         dialog.ShowModal()
-        # Перезагружаем настройки из конфигурации, так как SettingsWindow сохраняет их через save_user_settings
         self.settings = load_user_settings()
-        save_user_settings(self.settings)  # На случай, если нужно синхронизировать
         self.update_ui(self.settings)
         logging.info("Настройки обновлены после закрытия окна настроек")
         dialog.Destroy()
@@ -457,7 +427,7 @@ class ATMainWindow(wx.Frame):
         status_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         # Строка статуса
-        self.status_text = wx.StaticText(status_panel, label=self._get_translation("status_ready", "Готово"))
+        self.status_text = wx.StaticText(status_panel, label=loc.get("status_ready", "Готово"))
         font = wx.Font(
             self.settings.get("FONT_SIZE", DEFAULT_SETTINGS["FONT_SIZE"]),
             wx.FONTFAMILY_DEFAULT,
@@ -471,7 +441,7 @@ class ATMainWindow(wx.Frame):
         logging.info(f"Строка статуса создана: размер шрифта={self.settings.get('FONT_SIZE', DEFAULT_SETTINGS['FONT_SIZE'])}, цвет={self.settings.get('STATUS_TEXT_COLOR', DEFAULT_SETTINGS['STATUS_TEXT_COLOR'])}")
 
         # Копирайт
-        self.copyright_text = wx.StaticText(status_panel, label=self._get_translation("copyright", "© AT-CAD"))
+        self.copyright_text = wx.StaticText(status_panel, label=loc.get("copyright", "© AT-CAD"))
         self.copyright_text.SetFont(font)
         self.copyright_text.SetForegroundColour(wx.Colour(self.settings.get("STATUS_TEXT_COLOR", DEFAULT_SETTINGS["STATUS_TEXT_COLOR"])))
         status_sizer.Add(self.copyright_text, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
@@ -484,7 +454,7 @@ class ATMainWindow(wx.Frame):
         """
         Создаёт кнопку выхода.
         """
-        self.exit_button = wx.Button(self.button_panel, label=self._get_translation("button_exit", "Выход"))
+        self.exit_button = wx.Button(self.button_panel, label=loc.get("button_exit", "Выход"))
         button_font = get_button_font()
         self.exit_button.SetFont(button_font)
         self.exit_button.SetBackgroundColour(
@@ -494,7 +464,7 @@ class ATMainWindow(wx.Frame):
         self.exit_button.Bind(wx.EVT_BUTTON, self.on_exit)
 
         # Рассчитываем минимальную ширину кнопки на основе текущего языка
-        label = self._get_translation("button_exit", "Выход")
+        label = loc.get("button_exit", "Выход")
         dc = wx.ClientDC(self.exit_button)
         dc.SetFont(button_font)
         width, _ = dc.GetTextExtent(label)
@@ -504,7 +474,7 @@ class ATMainWindow(wx.Frame):
         self.button_sizer.AddStretchSpacer()
         self.button_sizer.Add(self.exit_button, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.ALL, border=10)
         logging.info(
-            f"Кнопка выхода создана: текст={self._get_translation('button_exit', 'Выход')}, размер={max_width}x30")
+            f"Кнопка выхода создана: текст={loc.get('button_exit', 'Выход')}, размер={max_width}x30")
 
     def on_language_change(self, new_lang: str) -> None:
         """
@@ -513,9 +483,10 @@ class ATMainWindow(wx.Frame):
         Args:
             new_lang (str): Новый язык (ru, en, de).
         """
+        if not isinstance(new_lang, str):
+            logging.error(f"Нестроковый new_lang в on_language_change: {new_lang}, игнорируется")
+            return
         loc.set_language(new_lang)
-        self.settings["LANGUAGE"] = loc.language
-        save_user_settings(self.settings)
         self.update_language_icon(new_lang)
         self.update_ui(self.settings)
         logging.info(f"Смена языка через меню на: {new_lang}")
@@ -525,12 +496,13 @@ class ATMainWindow(wx.Frame):
         Обрабатывает смену языка через иконку флага.
         """
         current_langs = ["ru", "en", "de"]
+        if not isinstance(loc.language, str):
+            logging.error(f"loc.language не строка в on_change_language: {loc.language}, установка языка по умолчанию: ru")
+            loc.language = "ru"
         current_index = current_langs.index(loc.language) if loc.language in current_langs else 0
         new_index = (current_index + 1) % len(current_langs)
         new_lang = current_langs[new_index]
         loc.set_language(new_lang)
-        self.settings["LANGUAGE"] = loc.language
-        save_user_settings(self.settings)
         self.update_language_icon(new_lang)
         self.update_ui(self.settings)
         logging.info(f"Смена языка через значок на: {new_lang}")
@@ -542,6 +514,9 @@ class ATMainWindow(wx.Frame):
         Args:
             new_lang (str): Код языка (ru, en, de).
         """
+        if not isinstance(new_lang, str):
+            logging.error(f"Нестроковый new_lang в update_language_icon: {new_lang}, использование языка по умолчанию: ru")
+            new_lang = "ru"
         lang_icon_path = os.path.abspath(LANGUAGE_ICONS.get(new_lang, LANGUAGE_ICONS["ru"]))
         if os.path.exists(lang_icon_path):
             try:
@@ -580,6 +555,9 @@ class ATMainWindow(wx.Frame):
         Args:
             new_lang (str): Код языка (ru, en, de).
         """
+        if not isinstance(new_lang, str):
+            logging.error(f"Нестроковый new_lang в replace_flag_button_with_text: {new_lang}, использование языка по умолчанию: ru")
+            new_lang = "ru"
         if isinstance(self.flag_button, wx.StaticBitmap):
             self.flag_button.Destroy()
         self.flag_button = wx.StaticText(self.banner_panel, label=f"[{new_lang}]")
@@ -595,16 +573,16 @@ class ATMainWindow(wx.Frame):
             settings (dict): Словарь с настройками интерфейса.
         """
         self.settings = settings.copy()
-        logging.info(f"Обновление UI: title={self._get_translation('program_title', 'AT-CAD')}, language={loc.language}")
+        logging.info(f"Обновление UI: title={loc.get('program_title', 'AT-CAD')}, language={loc.language}")
 
         # Обновляем заголовок окна
-        self.SetTitle(self._get_translation("program_title", "AT-CAD"))
+        self.SetTitle(loc.get("program_title", "AT-CAD"))
 
         # Обновляем баннер
         if hasattr(self, "banner_panel"):
             self.banner_panel.SetBackgroundColour(wx.Colour(settings.get("BANNER_COLOR", DEFAULT_SETTINGS["BANNER_COLOR"])))
         if hasattr(self, "title"):
-            title_text = self._get_translation("program_title", "AT-CAD")
+            title_text = loc.get("program_title", "AT-CAD")
             self.title.SetLabel("")
             max_width = WINDOW_SIZE[0] - 2 * LOGO_SIZE[0] - 50
             max_height = max(BANNER_HIGH, 20) - 20
@@ -638,14 +616,14 @@ class ATMainWindow(wx.Frame):
         if hasattr(self, "exit_button"):
             self.exit_button.SetBackgroundColour(wx.Colour(settings.get("EXIT_BUTTON_COLOR", DEFAULT_SETTINGS["EXIT_BUTTON_COLOR"])))
             self.exit_button.SetForegroundColour(wx.Colour(settings.get("BUTTON_FONT_COLOR", DEFAULT_SETTINGS["BUTTON_FONT_COLOR"])))
-            self.exit_button.SetLabel(self._get_translation("button_exit", "Выход"))
+            self.exit_button.SetLabel(loc.get("button_exit", "Выход"))
             button_font = get_button_font()
             self.exit_button.SetFont(button_font)
-            logging.info(f"Обновлена кнопка выхода: текст={self._get_translation('button_exit', 'Выход')}")
+            logging.info(f"Обновлена кнопка выхода: текст={loc.get('button_exit', 'Выход')}")
 
         # Обновляем строку статуса и копирайт
         if hasattr(self, "status_text"):
-            self.status_text.SetLabel(self._get_translation("status_ready", "Готово"))
+            self.status_text.SetLabel(loc.get("status_ready", "Готово"))
             font = wx.Font(
                 settings.get("FONT_SIZE", DEFAULT_SETTINGS["FONT_SIZE"]),
                 wx.FONTFAMILY_DEFAULT,
@@ -655,22 +633,22 @@ class ATMainWindow(wx.Frame):
             )
             self.status_text.SetFont(font)
             self.status_text.SetForegroundColour(wx.Colour(settings.get("STATUS_TEXT_COLOR", DEFAULT_SETTINGS["STATUS_TEXT_COLOR"])))
-            logging.info(f"Обновлена строка статуса: текст={self._get_translation('status_ready', 'Готово')}")
+            logging.info(f"Обновлена строка статуса: текст={loc.get('status_ready', 'Готово')}")
 
         if hasattr(self, "copyright_text"):
-            self.copyright_text.SetLabel(self._get_translation("copyright", "© AT-CAD"))
+            self.copyright_text.SetLabel(loc.get("copyright", "© AT-CAD"))
             self.copyright_text.SetFont(font)
             self.copyright_text.SetForegroundColour(wx.Colour(settings.get("STATUS_TEXT_COLOR", DEFAULT_SETTINGS["STATUS_TEXT_COLOR"])))
-            logging.info(f"Обновлён копирайт: текст={self._get_translation('copyright', '© AT-CAD')}")
+            logging.info(f"Обновлён копирайт: текст={loc.get('copyright', '© AT-CAD')}")
 
         # Обновляем меню
         menu_bar = self.GetMenuBar()
         if menu_bar:
-            menu_bar.SetMenuLabel(0, self._get_translation("menu_file", "Файл"))
-            menu_bar.SetMenuLabel(1, self._get_translation("language_menu", "Язык"))
-            menu_bar.SetMenuLabel(2, self._get_translation("menu_help", "Справка"))
+            menu_bar.SetMenuLabel(0, loc.get("menu_file", "Файл"))
+            menu_bar.SetMenuLabel(1, loc.get("language_menu", "Язык"))
+            menu_bar.SetMenuLabel(2, loc.get("menu_help", "Справка"))
             for lang, item in self.lang_items.items():
-                item.SetItemLabel(self._get_translation(f"lang_{lang}", lang.capitalize()))
+                item.SetItemLabel(loc.get(f"lang_{lang}", lang.capitalize()))
                 lang_icon_path = os.path.abspath(MENU_ICONS.get(f"lang_{lang}", ""))
                 if os.path.exists(lang_icon_path):
                     try:
@@ -687,11 +665,11 @@ class ATMainWindow(wx.Frame):
                     logging.warning(f"Иконка lang_{lang} не найдена в update_ui: {lang_icon_path}")
 
         if self.exit_item:
-            self.exit_item.SetItemLabel(self._get_translation("button_exit", "Выход"))
+            self.exit_item.SetItemLabel(loc.get("button_exit", "Выход"))
         if self.about_item:
-            self.about_item.SetItemLabel(self._get_translation("menu_about", "О программе"))
+            self.about_item.SetItemLabel(loc.get("menu_about", "О программе"))
         if self.settings_item:
-            self.settings_item.SetItemLabel(self._get_translation("settings_title", "Настройки"))
+            self.settings_item.SetItemLabel(loc.get("settings_title", "Настройки"))
         logging.info("Меню обновлено")
 
         # Обновляем текущий контент
@@ -700,7 +678,7 @@ class ATMainWindow(wx.Frame):
                 self.current_content.update_ui_language()
                 logging.info(f"Язык контента {self.current_content.__class__.__name__} обновлён")
             except Exception as e:
-                error_msg = self._get_translation("error", "Ошибка") + f": {self._get_translation('error_in_function', 'Ошибка в {}: {}').format('update_ui_language', str(e))}"
+                error_msg = f"Ошибка: Ошибка в update_ui_language: {str(e)}"
                 show_popup(error_msg, popup_type="error")
                 logging.error(f"Ошибка при обновлении языка панели {self.current_content.__class__.__name__}: {e}")
 
@@ -721,7 +699,7 @@ class ATMainWindow(wx.Frame):
         """
         Показывает информацию о программе.
         """
-        show_popup(self._get_translation("about_text", "О программе AT-CAD"), title=self._get_translation("menu_about", "О программе"), popup_type="info")
+        show_popup(loc.get("about_text", "О программе AT-CAD"), title=loc.get("menu_about", "О программе"), popup_type="info")
         logging.info("Открыто окно 'О программе'")
 
     def on_exit(self, event) -> None:

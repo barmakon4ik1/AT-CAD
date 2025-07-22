@@ -24,7 +24,7 @@ from windows.at_window_utils import (
 )
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO, filename="at_cad.log",
+logging.basicConfig(level=logging.ERROR, filename="at_cad.log",
                     format="%(asctime)s - %(levelname)s - %(message)s")
 
 

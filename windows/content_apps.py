@@ -1,4 +1,3 @@
-# windows/content_apps.py
 """
 Модуль для создания панели со списком доступных программ.
 Отображает текстовые ссылки на программы в один столбец.
@@ -72,8 +71,23 @@ class AppsContentPanel(wx.Panel):
             logging.error("Не удалось загрузить список программ для меню")
             programs = []
 
+        # Обрабатываем programs как список кортежей [(content_name, label_key)]
         for content_name, label_key in programs:
+            # Проверяем, что content_name — строка
+            if not isinstance(content_name, str):
+                logging.warning(f"Нестроковый content_name: {content_name}, преобразование в строку")
+                content_name = str(content_name)
+
+            # Проверяем, что label_key — строка
+            if not isinstance(label_key, str):
+                logging.warning(f"Нестроковый label_key: {label_key}, использование content_name в качестве запасного варианта")
+                label_key = content_name
+
             label = loc.get(label_key, label_key)  # Получаем локализованную метку
+            if not isinstance(label, str):
+                logging.warning(f"Нестроковый перевод для ключа '{label_key}': {label}, использование значения по умолчанию")
+                label = label_key
+
             link = wx.StaticText(self, label=label, style=wx.ALIGN_LEFT)
             link.SetForegroundColour(wx.Colour(self.settings["LABEL_FONT_COLOR"]))  # Устанавливаем цвет текста
             link.SetFont(get_link_font())  # Устанавливаем шрифт
@@ -98,9 +112,23 @@ class AppsContentPanel(wx.Panel):
                 logging.error("Не удалось загрузить список программ для обновления языка")
                 return
 
+            # Обрабатываем programs как список кортежей [(content_name, label_key)]
             for i, (content_name, label_key) in enumerate(programs):
+                # Проверяем, что content_name — строка
+                if not isinstance(content_name, str):
+                    logging.warning(f"Нестроковый content_name: {content_name}, преобразование в строку")
+                    content_name = str(content_name)
+
+                # Проверяем, что label_key — строка
+                if not isinstance(label_key, str):
+                    logging.warning(f"Нестроковый label_key: {label_key}, использование content_name в качестве запасного варианта")
+                    label_key = content_name
+
                 if i < len(self.links):
                     new_label = loc.get(label_key, label_key)
+                    if not isinstance(new_label, str):
+                        logging.warning(f"Нестроковый перевод для ключа '{label_key}': {new_label}, использование значения по умолчанию")
+                        new_label = label_key
                     self.links[i].SetLabel(new_label)
                     self.links[i].SetFont(get_link_font())  # Обновляем шрифт
                     self.links[i].SetForegroundColour(wx.Colour(self.settings["LABEL_FONT_COLOR"]))  # Обновляем цвет
@@ -118,6 +146,10 @@ class AppsContentPanel(wx.Panel):
         Args:
             content_name: Имя модуля контента для переключения.
         """
+        if not isinstance(content_name, str):
+            logging.warning(f"Нестроковый content_name в on_link_click: {content_name}, преобразование в строку")
+            content_name = str(content_name)
+
         logging.debug(f"Клик по ссылке: {content_name}")
         try:
             main_window = wx.GetTopLevelParent(self)
@@ -126,7 +158,8 @@ class AppsContentPanel(wx.Panel):
                 logging.info(f"Переключение на контент: {content_name}")
             else:
                 logging.error("Главное окно не имеет метода switch_content")
-                show_popup(loc.get("error_switch_content", "Ошибка: невозможно переключить контент"), popup_type="error")
+                show_popup("Ошибка: невозможно переключить контент", popup_type="error")
         except Exception as e:
             logging.error(f"Ошибка при переключении контента: {e}")
-            show_popup(loc.get("error", f"Ошибка переключения контента: {str(e)}"), popup_type="error")
+            show_popup(f"Ошибка переключения контента: {str(e)}", popup_type="error")
+

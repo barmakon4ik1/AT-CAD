@@ -20,7 +20,7 @@ from locales.at_localization_class import Localization  # Обновлённый
 
 # Настройка логирования
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.ERROR,
     filename="at_cad.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )

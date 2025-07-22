@@ -76,7 +76,12 @@ def load_content(content_key: str, parent: wx.Window) -> list[tuple[str, str]] |
                 if isinstance(label_key, dict):
                     logging.warning(f"Получен словарь вместо строки для label_key в CONTENT_REGISTRY для {name}: {label_key}")
                     label_key = label_key.get('key', name)  # Извлекаем строковый ключ или используем имя
-                translated_label = loc.get(label_key, name)  # Получаем переведённую метку, возвращаем имя, если перевод отсутствует
+                # Получаем переведённую метку, возвращаем имя, если перевод отсутствует
+                translated_label = loc.get(label_key, name)
+                # Проверяем, что translated_label — строка
+                if not isinstance(translated_label, str):
+                    logging.warning(f"Нестроковый перевод для ключа '{label_key}': {translated_label}, использование имени контента: {name}")
+                    translated_label = name
                 if translated_label == label_key:
                     logging.warning(f"Перевод для ключа '{label_key}' не найден в translations, использовано имя контента: {name}")
                 else:
