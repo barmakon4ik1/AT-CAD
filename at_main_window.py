@@ -76,11 +76,11 @@ class ATMainWindow(wx.Frame):
         super().__init__(
             parent=None,
             title=loc.get("program_title", "AT-CAD"),
-            size=self.settings.get("WINDOW_SIZE", WINDOW_SIZE),
+            size=WINDOW_SIZE,  # type: ignore
             style=wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX),
         )
-        self.SetMinSize(self.settings.get("WINDOW_SIZE", WINDOW_SIZE))
-        self.SetMaxSize(self.settings.get("WINDOW_SIZE", WINDOW_SIZE))
+        # self.SetMinSize(self.settings.get("WINDOW_SIZE", WINDOW_SIZE))
+        # self.SetMaxSize(self.settings.get("WINDOW_SIZE", WINDOW_SIZE))
 
         # Инициализация атрибутов для пунктов меню
         self.exit_item = None

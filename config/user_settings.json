@@ -13,7 +13,7 @@
     "FOREGROUND_COLOR": "white",
     "BANNER_COLOR": "light blue",
     "BANNER_TEXT_COLOR": "black",
-    "EXIT_BUTTON_COLOR": "dark grey",
+    "EXIT_BUTTON_COLOR": "#008000",
     "LABEL_FONT_COLOR": "#FFFFFF",
     "BUTTON_FONT_COLOR": "white"
 }
