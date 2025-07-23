@@ -162,5 +162,5 @@ from programms.at_dimension import at_dimension
 start = APoint(0, 0)
 end = APoint(10, 0)
 dim = APoint(5, 5)
-at_dimension("horizontal", start, end, dim, layer="AM_5")
+at_dimension("l", start, end, dim, layer="AM_5")
 """

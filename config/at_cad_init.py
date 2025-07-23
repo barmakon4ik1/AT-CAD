@@ -36,7 +36,6 @@ class ATCadInit:
         Инициализирует подключение к AutoCAD, если оно еще не выполнено.
         """
         if not self._initialized:
-            loc.set_language(load_user_settings())  # Установка языка локализации из конфигурации
             self.acad = None  # Экземпляр AutoCAD
             self.adoc = None  # Активный документ
             self.model = None  # Модельное пространство

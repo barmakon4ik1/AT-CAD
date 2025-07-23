@@ -80,12 +80,13 @@ class ATMainWindow(wx.Frame):
             if os.path.exists(USER_LANGUAGE_PATH):
                 with open(USER_LANGUAGE_PATH, 'r', encoding='utf-8') as f:
                     lang_data = json.load(f)
-                    lang = lang_data.get("language", loc.language)  # Используем текущий язык как запасной
-                    if lang in ["ru", "en", "de"]:
+                    lang = lang_data.get("language")
+                    if isinstance(lang, str) and lang in ["ru", "en", "de"]:
                         loc.set_language(lang)
                         logging.info(f"Язык загружен из user_language.json: {lang}")
                     else:
-                        logging.warning(f"Некорректный язык в user_language.json: {lang}, используется {loc.language}")
+                        logging.warning(
+                            f"Некорректный или отсутствующий язык в user_language.json: {lang}, используется {loc.language}")
             else:
                 logging.info(f"Файл user_language.json не найден, используется язык по умолчанию: {loc.language}")
         except Exception as e:
@@ -98,8 +99,6 @@ class ATMainWindow(wx.Frame):
             size=WINDOW_SIZE,  # type: ignore
             style=wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX),
         )
-        # self.SetMinSize(self.settings.get("WINDOW_SIZE", WINDOW_SIZE))
-        # self.SetMaxSize(self.settings.get("WINDOW_SIZE", WINDOW_SIZE))
 
         # Инициализация атрибутов для пунктов меню
         self.exit_item = None
@@ -742,20 +741,22 @@ class ATMainWindow(wx.Frame):
 
     def on_close(self, event) -> None:
         """
-        Сохраняет позицию окна при закрытии.
+        Сохраняет позицию окна и язык при закрытии.
         """
         x, y = self.GetPosition()
         save_last_position(x, y)
         logging.info(f"Позиция окна сохранена: x={x}, y={y}")
-
         # Сохранение текущего языка в user_language.json
         try:
-            with open(USER_LANGUAGE_PATH, 'w', encoding='utf-8') as f:
-                json.dump({"language": loc.language}, f, indent=4, ensure_ascii=False)
-            logging.info(f"Язык сохранён в user_language.json: {loc.language}")
+            language = loc.language
+            if isinstance(language, str) and language in ["ru", "en", "de"]:
+                with open(USER_LANGUAGE_PATH, 'w', encoding='utf-8') as f:
+                    json.dump({"language": language}, f, indent=4, ensure_ascii=False)
+                logging.info(f"Язык сохранён в user_language.json: {language}")
+            else:
+                logging.warning(f"Не удалось сохранить язык: {language} недопустим, пропуск сохранения")
         except Exception as e:
             logging.error(f"Ошибка сохранения user_language.json: {e}")
-
         event.Skip()
 
 

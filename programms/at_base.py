@@ -8,19 +8,16 @@
 и обновления видового экрана. Использует локализацию из at_localization_class.py
 и настройки из user_settings.json через get_setting.
 """
-
 from contextlib import contextmanager
 from locales.at_localization_class import loc
-from config.at_config import get_setting
 from config.at_cad_init import ATCadInit
 from windows.at_gui_utils import show_popup
 from functools import wraps
 from pythoncom import CoInitialize, CoUninitialize
 from typing import Optional, Tuple
 
-loc.set_language(get_setting("LANGUAGE"))  # Установка языка локализации из user_settings.json
-
 _cad_instance = None  # Глобальный экземпляр AutoCAD
+
 
 def handle_errors(func):
     """
@@ -32,13 +29,16 @@ def handle_errors(func):
     Returns:
         wrapper: Обёрнутая функция с обработкой ошибок.
     """
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
         except Exception:
             return None
+
     return wrapper
+
 
 @handle_errors
 def init_autocad() -> Optional[Tuple[object, object, object]]:
@@ -60,6 +60,7 @@ def init_autocad() -> Optional[Tuple[object, object, object]]:
         return None
     return _cad_instance.adoc, _cad_instance.model, _cad_instance.original_layer
 
+
 @handle_errors
 def regen(adoc: object) -> Optional[object]:
     """
@@ -73,6 +74,7 @@ def regen(adoc: object) -> Optional[object]:
     """
     adoc.Regen(0)
     return adoc
+
 
 @handle_errors
 def set_layer(adoc: object, layer_name: str) -> Optional[object]:
@@ -89,6 +91,7 @@ def set_layer(adoc: object, layer_name: str) -> Optional[object]:
     adoc.ActiveLayer = adoc.Layers.Item(layer_name)
     return adoc
 
+
 @handle_errors
 def restore_layer(adoc: object, original_layer: object) -> Optional[object]:
     """
@@ -103,6 +106,7 @@ def restore_layer(adoc: object, original_layer: object) -> Optional[object]:
     """
     adoc.ActiveLayer = original_layer
     return adoc
+
 
 @handle_errors
 def ensure_layer(adoc: object, layer_name: str) -> Optional[object]:
@@ -119,6 +123,7 @@ def ensure_layer(adoc: object, layer_name: str) -> Optional[object]:
     if layer_name not in [layer.Name for layer in adoc.Layers]:
         adoc.Layers.Add(layer_name)
     return adoc.Layers.Item(layer_name)
+
 
 @contextmanager
 def layer_context(adoc: object, layer_name: str):

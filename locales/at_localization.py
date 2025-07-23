@@ -606,9 +606,9 @@ translations = {
         "en": "Vessel shell sheet"
     },
     "program_title": {
-        "ru": "AT-CAD: Инженерная система автоматизированной развертки изделий из металла",
-        "de": "AT-CAD: Automatisiertes Profisystem für Metallabwicklung",
-        "en": "AT-CAD Metal Unfold Pro System"
+        "ru": "Система автоматизации построения разверток",
+        "de": "Automatisiertes Profisystem für Metallabwicklung",
+        "en": "Metal Unfold Pro System"
     },
     "prompt_select_point": {
         "ru": "Укажите точку: ",

@@ -4,9 +4,7 @@
 
 import math
 from typing import Optional, List, Tuple, Union
-
 from pyautocad import APoint
-
 from programms.at_utils import handle_errors
 
 

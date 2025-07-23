@@ -18,7 +18,7 @@ class Localization:
     Атрибуты:
         language (str): Текущий язык локализации (например, "ru", "en", "de").
     """
-    def __init__(self, language: str | None = None):
+    def __init__(self, language: str = "ru"):
         """
         Инициализирует локализацию с указанным языком или языком по умолчанию.
 
@@ -27,8 +27,10 @@ class Localization:
 
         Логирует инициализацию выбранного языка.
         """
-        self.language = language if isinstance(language, str) and language in ["ru", "en", "de"] else "ru"
-        logging.info(f"Инициализация локализации с языком: {self.language}")
+        self.translations = {}
+        self.language = "ru"
+        logging.info(f"Инициализация Localization с language={language}")
+        self.set_language(language)
 
     def set_language(self, language: str) -> None:
         """
@@ -36,17 +38,20 @@ class Localization:
 
         Аргументы:
             language (str): Код языка для установки (например, "ru", "en", "de").
-
-        Если язык недопустим, сохраняется текущий язык и записывается предупреждение в лог.
         """
+        import traceback
         if not isinstance(language, str):
-            logging.error(f"Попытка установить нестроковый язык: {language}, тип: {type(language)}, остаётся: {self.language}")
+            logging.error(
+                f"Попытка установить нестроковый язык: {language}, тип: {type(language)}, остаётся: {self.language}")
+            logging.error(f"Стек вызовов: {''.join(traceback.format_stack()[:-1])}")
             return
         if language not in ["ru", "en", "de"]:
             logging.warning(f"Недопустимый язык: {language}, остаётся: {self.language}")
             return
+        logging.info(f"Вызов set_language с language={language}")
+        logging.info(f"Стек вызовов: {''.join(traceback.format_stack()[:-1])}")
         self.language = language
-        logging.info(f"Язык локализации изменён на: {self.language}")
+        logging.info(f"Язык локализации изменён на: {language}")
 
     def get(self, key: str, default: str = "Translation missing") -> str:
         """

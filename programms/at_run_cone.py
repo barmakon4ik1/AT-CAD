@@ -9,8 +9,6 @@ from config.at_config import *
 from windows.at_gui_utils import show_popup
 from programms.at_base import ensure_layer, regen
 
-loc.language = load_user_settings()
-
 
 def run_application(data: Dict[str, Any]) -> bool:
     """
