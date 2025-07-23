@@ -27,6 +27,7 @@ RESOURCE_DIR: str = "config"
 
 # Путь к файлу пользовательских настроек
 USER_CONFIG_PATH: str = os.path.join(RESOURCE_DIR, "user_settings.json")
+USER_LANGUAGE_PATH: str = os.path.join(RESOURCE_DIR, "user_language.json")
 
 # Путь к иконке приложения
 ICON_PATH: str = os.path.join(IMAGES_DIR, "AT-CAD_8.png")

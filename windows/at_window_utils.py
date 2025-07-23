@@ -440,9 +440,7 @@ class BaseInputWindow(wx.Frame):
         self.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
         self.Bind(wx.EVT_CLOSE, self.on_close)
 
-        self.SetSize(window_size)
-        self.SetMinSize(window_size)
-        self.SetMaxSize(window_size)
+        self.SetSize(window_size) #
 
         x, y = load_last_position()
         if x != -1 and y != -1:

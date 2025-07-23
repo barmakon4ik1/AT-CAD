@@ -10,6 +10,7 @@
 import wx
 import os
 import logging
+import json
 from config.at_config import (
     ICON_PATH,
     BANNER_HIGH,
@@ -20,6 +21,7 @@ from config.at_config import (
     DEFAULT_SETTINGS,
     load_user_settings,
     save_user_settings,
+    USER_LANGUAGE_PATH,
 )
 from locales.at_localization_class import loc, Localization
 from windows.at_window_utils import load_last_position, save_last_position, get_button_font, fit_text_to_height
@@ -72,6 +74,23 @@ class ATMainWindow(wx.Frame):
         """
         self.last_input = {}  # Для хранения последних введённых данных
         self.settings = load_user_settings()  # Загружаем настройки
+
+        # Загрузка языка из user_language.json
+        try:
+            if os.path.exists(USER_LANGUAGE_PATH):
+                with open(USER_LANGUAGE_PATH, 'r', encoding='utf-8') as f:
+                    lang_data = json.load(f)
+                    lang = lang_data.get("language", loc.language)  # Используем текущий язык как запасной
+                    if lang in ["ru", "en", "de"]:
+                        loc.set_language(lang)
+                        logging.info(f"Язык загружен из user_language.json: {lang}")
+                    else:
+                        logging.warning(f"Некорректный язык в user_language.json: {lang}, используется {loc.language}")
+            else:
+                logging.info(f"Файл user_language.json не найден, используется язык по умолчанию: {loc.language}")
+        except Exception as e:
+            logging.error(f"Ошибка чтения user_language.json: {e}")
+
         logging.info(f"Загруженные настройки: {self.settings}")
         super().__init__(
             parent=None,
@@ -108,14 +127,26 @@ class ATMainWindow(wx.Frame):
         else:
             logging.error(f"Иконка приложения не найдена: {icon_path}")
 
-        # Загрузка последнего положения окна
+        # Загрузка последнего положения окна с проверкой границ всех дисплеев
         x, y = load_last_position()
-        if x != -1 and y != -1:
-            self.SetPosition((x, y))
-            logging.info(f"Установлено последнее положение окна: x={x}, y={y}")
-        else:
+        window_size = self.GetSize()
+        position_valid = False
+
+        # Проверяем все доступные дисплеи
+        for display_idx in range(wx.Display.GetCount()): # для получения количества подключенных дисплеев
+            display = wx.Display(display_idx)
+            screen_rect = display.GetClientArea()  # Область экрана (без учета панели задач)
+            if (x != -1 and y != -1 and
+                    screen_rect.x <= x <= screen_rect.x + screen_rect.width - window_size.width and
+                    screen_rect.y <= y <= screen_rect.y + screen_rect.height - window_size.height):
+                self.SetPosition((x, y))
+                logging.info(f"Установлено последнее положение окна: x={x}, y={y} на дисплее {display_idx}")
+                position_valid = True
+                break
+
+        if not position_valid:
             self.Centre()
-            logging.info("Окно отцентрировано")
+            logging.info("Окно отцентрировано, так как позиция за пределами всех дисплеев или не определена")
 
         # Создание главного сайзера (вертикального)
         self.main_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -716,6 +747,15 @@ class ATMainWindow(wx.Frame):
         x, y = self.GetPosition()
         save_last_position(x, y)
         logging.info(f"Позиция окна сохранена: x={x}, y={y}")
+
+        # Сохранение текущего языка в user_language.json
+        try:
+            with open(USER_LANGUAGE_PATH, 'w', encoding='utf-8') as f:
+                json.dump({"language": loc.language}, f, indent=4, ensure_ascii=False)
+            logging.info(f"Язык сохранён в user_language.json: {loc.language}")
+        except Exception as e:
+            logging.error(f"Ошибка сохранения user_language.json: {e}")
+
         event.Skip()
 
 
