@@ -420,7 +420,7 @@ class PlateContentPanel(wx.Panel):
                 "insert_point": self.insert_point,
                 "point_list": point_list,
                 "material": self.material_combo.GetValue(),
-                "thickness_text": f"{thickness:.2f} {loc.get('mm', 'мм')}",
+                "thickness": thickness,
                 "melt_no": self.melt_no_input.GetValue().strip(),
                 "allowance": allowance
             }
