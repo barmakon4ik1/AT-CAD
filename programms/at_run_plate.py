@@ -5,10 +5,13 @@
 """
 
 import logging
+import math
+import sys
+
 import pythoncom
 from pyautocad import APoint
 from programms.at_calculation import at_plate_weight, at_density
-from programms.at_construction import add_LWpolyline, at_addText
+from programms.at_construction import add_LWpolyline, at_addText, polar_point
 from programms.at_dimension import at_dimension
 from typing import Dict, Any, List
 from locales.at_localization_class import loc
@@ -17,10 +20,13 @@ from windows.at_gui_utils import show_popup
 from programms.at_base import regen, init_autocad
 
 # Настройка логирования
+# Настройка логирования в консоль
 logging.basicConfig(
-    level=logging.ERROR,
-    filename="at_cad.log",
+    level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout)  # Вывод в консоль
+    ]
 )
 
 
@@ -114,88 +120,6 @@ def run_plate(plate_data: Dict[str, Any]) -> bool:
             logging.error(f"Ошибка при вычислении площади: {e}")
             return False
 
-        # # Построение внутренней полилинии с использованием Offset
-        # try:
-        #     # Создаем внутреннюю полилинию, смещенную внутрь на allowance
-        #     offset_objects = polyline.Offset(-allowance)  # Отрицательное значение для смещения внутрь
-        #     if not offset_objects or len(offset_objects) == 0:
-        #         show_popup(loc.get("offset_error", "Ошибка создания внутренней полилинии"), popup_type="error")
-        #         logging.error("Не удалось создать внутреннюю полилинию с помощью Offset")
-        #         return False
-        #     inner_polyline = offset_objects[0]  # Берем первый объект (должен быть полилинией)
-        #     inner_polyline.Layer = "SF-TEXT"
-        #     if not inner_polyline.Closed:
-        #         inner_polyline.Closed = True
-        #     # Проверка корректности внутренней полилинии
-        #     inner_area = inner_polyline.Area
-        #     if inner_area >= area:
-        #         show_popup(loc.get("offset_error", "Внутренняя полилиния больше или равна внешней"), popup_type="error")
-        #         logging.error(f"Некорректная внутренняя полилиния: площадь {inner_area} >= {area}")
-        #         return False
-        #     logging.info(f"Внутренняя полилиния успешно создана с площадью: {inner_area}")
-        # except Exception as e:
-        #     show_popup(loc.get("offset_error", f"Ошибка при создании внутренней полилинии: {str(e)}"), popup_type="error")
-        #     logging.error(f"Ошибка при создании внутренней полилинии с Offset: {e}, polyline_points: {polyline_points}, allowance: {allowance}")
-        #     return False
-
-        # Простановка размеров
-        # Обязательные размеры: 0-1 (горизонтальный, y-70) и 1-2 (вертикальный, x+70)
-        if len(polyline_points) >= 2:
-            # Размер 0-1: горизонтальный
-            start = APoint(polyline_points[0][0], polyline_points[0][1])
-            end = APoint(polyline_points[1][0], polyline_points[1][1])
-            dim_x = (start.x + end.x) / 2
-            dim_y = min(start.y, end.y) - 70
-            dim_point = APoint(dim_x, dim_y)
-            if not at_dimension("H", start, end, dim_point, adoc=adoc, layer="AM_5"):
-                logging.error("Не удалось проставить размер между точками 0 и 1")
-                show_popup(loc.get("dim_creation_error", "Ошибка при создании размера"), popup_type="error")
-
-        if len(polyline_points) >= 3:
-            # Размер 1-2: вертикальный
-            start = APoint(polyline_points[1][0], polyline_points[1][1])
-            end = APoint(polyline_points[2][0], polyline_points[2][1])
-            dim_x = max(start.x, end.x) + 70
-            dim_y = (start.y + end.y) / 2
-            dim_point = APoint(dim_x, dim_y)
-            if not at_dimension("V", start, end, dim_point, adoc=adoc, layer="AM_5"):
-                logging.error("Не удалось проставить размер между точками 1 и 2")
-                show_popup(loc.get("dim_creation_error", "Ошибка при создании размера"), popup_type="error")
-
-        # Дополнительные размеры (только для полилиний с более чем 4 уникальными точками)
-        if len(polyline_points) > 5:
-            # Горизонтальные размеры: 2-3, 2-5, 2-7, 2-9 (шаг по Y +70)
-            horizontal_pairs = [(2, 3), (2, 5), (2, 7), (2, 9)]
-            y_offset = 70
-            for start_idx, end_idx in horizontal_pairs:
-                if end_idx < len(polyline_points):
-                    start = APoint(polyline_points[start_idx][0], polyline_points[start_idx][1])
-                    # Для горизонтального размера используем только разницу по X
-                    end = APoint(polyline_points[end_idx][0], polyline_points[start_idx][1])  # y = y2
-                    dim_x = (start.x + end.x) / 2
-                    dim_y = start.y + y_offset
-                    dim_point = APoint(dim_x, dim_y)
-                    if not at_dimension("H", start, end, dim_point, adoc=adoc, layer="AM_5"):
-                        logging.error(f"Не удалось проставить горизонтальный размер между точками {start_idx} и {end_idx}")
-                        show_popup(loc.get("dim_creation_error", "Ошибка при создании размера"), popup_type="error")
-                    y_offset += 70
-
-            # Вертикальные размеры: 0-9, 0-7, 0-5, 0-3 (шаг по X -70)
-            vertical_pairs = [(0, 9), (0, 7), (0, 5), (0, 3)]
-            x_offset = -70
-            for start_idx, end_idx in vertical_pairs:
-                if end_idx < len(polyline_points):
-                    start = APoint(polyline_points[start_idx][0], polyline_points[start_idx][1])
-                    # Для вертикального размера используем только разницу по Y
-                    end = APoint(polyline_points[start_idx][0], polyline_points[end_idx][1])  # x = x0
-                    dim_x = start.x + x_offset
-                    dim_y = (start.y + end.y) / 2
-                    dim_point = APoint(dim_x, dim_y)
-                    if not at_dimension("V", start, end, dim_point, adoc=adoc, layer="AM_5"):
-                        logging.error(f"Не удалось проставить вертикальный размер между точками {start_idx} и {end_idx}")
-                        show_popup(loc.get("dim_creation_error", "Ошибка при создании размера"), popup_type="error")
-                    x_offset -= 70
-
         # Формирование сопроводительного текста
         material = plate_data.get("material")
         density = at_density(material)
@@ -213,9 +137,45 @@ def run_plate(plate_data: Dict[str, Any]) -> bool:
         text = f'{thickness} mm {material}, {weight} kg, Ch. {melt_no}'
         at_addText(model, point_text, text, layer_name="AM_5", text_height=60, text_angle=0, text_alignment=0)
 
+        # Создание внутренней полилинии
+        try:
+            logging.info("Шаг 1: Начало выполнения Offset")
+            logging.info(f"Шаг 2: Расстояние смещения: {allowance}")
+            offset_polylines = None
+            try:
+                logging.info("Шаг 3: Вызов polyline.Offset(-allowance)")
+                offset_polylines = polyline.Offset(-allowance)
+                logging.info(
+                    f"Шаг 4: Offset выполнен, количество объектов: {len(offset_polylines) if offset_polylines else 0}")
+            except Exception as e:
+                logging.warning(f"Шаг 3.1: Исключение в Offset: {e}")
+                logging.info("Шаг 3.2: Проверка ModelSpace на новые полилинии")
+                offset_polylines = []
+                for obj in adoc.ModelSpace:
+                    if obj.ObjectName == "AcDbPolyline" and obj.Handle != polyline.Handle:
+                        offset_polylines.append(obj)
+                        logging.info(f"Шаг 3.3: Найдена полилиния: Handle={obj.Handle}")
+                        break
+
+            if offset_polylines:
+                logging.info(f"Шаг 5: Обработка {len(offset_polylines)} смещённых полилиний")
+                for offset_poly in offset_polylines:
+                    logging.info(f"Шаг 6: Настройка полилинии Handle={offset_poly.Handle}")
+                    offset_poly.Closed = True
+                    offset_poly.Layer = "SF-TEXT"  # Тот же слой
+                    logging.info(f"Шаг 7: Полилиния настроена: Handle={offset_poly.Handle}, Площадь={offset_poly.Area}")
+            else:
+                show_popup(loc.get("offset_error", "Не удалось создать смещённую полилинию"), popup_type="error")
+                logging.error("Шаг 5.1: Offset не создал полилиний")
+                return False
+
+        except Exception as e:
+            show_popup(loc.get("offset_error", f"Ошибка при создании смещённой полилинии: {e}"), popup_type="error")
+            logging.error(f"Шаг 8: Общая ошибка в Offset: {e}")
+            return False
+
         # Регенерация чертежа
         regen(adoc)
-
         logging.info("Полилиния, внутренняя полилиния, размеры и текст успешно созданы")
         return True
 
@@ -223,3 +183,22 @@ def run_plate(plate_data: Dict[str, Any]) -> bool:
         show_popup(loc.get("general_error", f"Ошибка: {str(e)}"), popup_type="error")
         logging.error(f"Ошибка в run_plate (programms/at_run_plate.py): {e}")
         return False
+
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    input_data = {
+        'insert_point': APoint(0, 0, 0.00),
+        'point_list': [[3000, 1500]],
+        'material': '1.4301',
+        'thickness': 0.0,
+        'melt_no': '',
+        'allowance': 10.0,
+        'polyline_points': [
+            (0, 0),
+            (3000, 0),
+            (3000, 1500),
+            (0, 1500),
+            (0, 0)]
+    }
+    run_plate(input_data)
