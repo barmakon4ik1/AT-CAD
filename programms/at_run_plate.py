@@ -7,6 +7,7 @@
 import logging
 import math
 import sys
+import time
 
 import pythoncom
 from pyautocad import APoint
@@ -18,6 +19,7 @@ from locales.at_localization_class import loc
 from config.at_config import *
 from windows.at_gui_utils import show_popup
 from programms.at_base import regen, init_autocad
+from at_offset import at_offset
 
 # Настройка логирования
 # Настройка логирования в консоль
@@ -139,39 +141,17 @@ def run_plate(plate_data: Dict[str, Any]) -> bool:
 
         # Создание внутренней полилинии
         try:
-            logging.info("Шаг 1: Начало выполнения Offset")
-            logging.info(f"Шаг 2: Расстояние смещения: {allowance}")
-            offset_polylines = None
-            try:
-                logging.info("Шаг 3: Вызов polyline.Offset(-allowance)")
-                offset_polylines = polyline.Offset(-allowance)
-                logging.info(
-                    f"Шаг 4: Offset выполнен, количество объектов: {len(offset_polylines) if offset_polylines else 0}")
-            except Exception as e:
-                logging.warning(f"Шаг 3.1: Исключение в Offset: {e}")
-                logging.info("Шаг 3.2: Проверка ModelSpace на новые полилинии")
-                offset_polylines = []
-                for obj in adoc.ModelSpace:
-                    if obj.ObjectName == "AcDbPolyline" and obj.Handle != polyline.Handle:
-                        offset_polylines.append(obj)
-                        logging.info(f"Шаг 3.3: Найдена полилиния: Handle={obj.Handle}")
-                        break
-
+            offset_polylines = at_offset(polyline, allowance, adoc, model)
             if offset_polylines:
-                logging.info(f"Шаг 5: Обработка {len(offset_polylines)} смещённых полилиний")
-                for offset_poly in offset_polylines:
-                    logging.info(f"Шаг 6: Настройка полилинии Handle={offset_poly.Handle}")
-                    offset_poly.Closed = True
-                    offset_poly.Layer = "SF-TEXT"  # Тот же слой
-                    logging.info(f"Шаг 7: Полилиния настроена: Handle={offset_poly.Handle}, Площадь={offset_poly.Area}")
+                print(f"[{sys._getframe().f_code.co_name}] Внутренняя полилиния создана, количество объектов: {len(offset_polylines)}")
             else:
+                print(f"[{sys._getframe().f_code.co_name}] Не удалось создать смещённую полилинию")
                 show_popup(loc.get("offset_error", "Не удалось создать смещённую полилинию"), popup_type="error")
-                logging.error("Шаг 5.1: Offset не создал полилиний")
                 return False
 
         except Exception as e:
+            print(f"[{sys._getframe().f_code.co_name}] Ошибка при создании смещённой полилинии: {e}")
             show_popup(loc.get("offset_error", f"Ошибка при создании смещённой полилинии: {e}"), popup_type="error")
-            logging.error(f"Шаг 8: Общая ошибка в Offset: {e}")
             return False
 
         # Регенерация чертежа
