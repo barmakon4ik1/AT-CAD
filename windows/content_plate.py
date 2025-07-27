@@ -2,13 +2,8 @@
 Модуль для создания панели для ввода параметров листа.
 """
 
-import logging
-import os
 from typing import Optional, Dict, List
 import wx
-from pyautocad import APoint
-
-from config.at_cad_init import ATCadInit
 from config.at_config import *
 from locales.at_localization_class import loc
 from windows.at_window_utils import (
@@ -115,7 +110,7 @@ class PlateContentPanel(wx.Panel):
 
             # Кнопки
             button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-            self.buttons = create_standard_buttons(self, self.on_ok, self.on_cancel, self.on_clear)
+            self.buttons = create_standard_buttons(self, self.on_ok, on_cancel, self.on_clear)
             for button in self.buttons:
                 button_sizer.Add(button, 0, wx.RIGHT, 5)
             adjust_button_widths(self.buttons)

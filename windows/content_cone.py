@@ -1,7 +1,5 @@
 """
-Файл: content_cone.py
-Путь: windows/content_cone.py
-
+Файл: windows/content_cone.py
 Описание:
 Модуль для создания панели для ввода параметров развертки конуса.
 Обеспечивает интерфейс для ввода данных конуса, обработку расчётов и вызов построения развертки.
@@ -13,7 +11,7 @@ import math
 import logging
 import os
 import time
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 import wx
 
@@ -56,7 +54,7 @@ class ConeContentPanel(wx.Panel):
 
     Attributes:
         settings (Dict): Настройки из user_settings.json.
-        insert_point: Точка вставки в AutoCAD.
+        insert_point: Точка вставки в AutoCAD ([x, y, z]).
         last_input (Dict): Последние введённые данные.
         labels (Dict): Словарь текстовых меток для локализации.
         static_boxes (Dict): Словарь StaticBox для групп.
@@ -630,17 +628,24 @@ class ConeContentPanel(wx.Panel):
             # Минимизируем окно для выбора точки
             main_window = self.GetTopLevelParent()
             main_window.Iconize(True)
-            point = at_point_input()  # Без передачи adoc, инициализация в at_point_input
+            cad = ATCadInit()
+            if not cad.is_initialized():
+                error_msg = loc.get('cad_init_error', 'Ошибка инициализации AutoCAD')
+                show_popup(error_msg, popup_type="error")
+                logging.error(error_msg)
+                return
+            adoc = cad.adoc
+            point = at_point_input(adoc)  # Передаём adoc для корректной инициализации
             main_window.Iconize(False)
             main_window.Raise()
             main_window.SetFocus()
             wx.Yield()
             time.sleep(0.1)
 
-            if point and hasattr(point, "x") and hasattr(point, "y"):
-                self.insert_point = point
+            if point and isinstance(point, (list, tuple)) and len(point) == 3:
+                self.insert_point = list(point)  # Сохраняем как список [x, y, z]
                 self.update_status_bar_point_selected()
-                logging.info(f"Точка вставки выбрана: x={point.x}, y={point.y}, type={type(point)}")
+                logging.info(f"Точка вставки выбрана: {self.insert_point}, type={type(self.insert_point)}")
             else:
                 show_popup(loc.get("point_selection_error", "Ошибка выбора точки"), popup_type="error")
                 logging.error(f"Точка вставки не выбрана или некорректна: {point}")
@@ -755,17 +760,11 @@ class ConeContentPanel(wx.Panel):
                     logging.warning(f"Перевод для ключа 'mm' не найден, использовано значение: мм")
 
                 # Инициализация AutoCAD для получения model
-                cad = ATCadInit()
-                if not cad.is_initialized():
-                    error_msg = loc.get('cad_init_error', 'Ошибка инициализации AutoCAD')
-                    show_popup(error_msg, popup_type="error")
-                    logging.error(error_msg)
-                    return
                 model = cad.model
 
                 data = {
                     "model": model,
-                    "input_point": self.insert_point,
+                    "input_point": self.insert_point,  # Передаём точку как список [x, y, z]
                     "diameter_base": diameter_base,
                     "diameter_top": diameter_top,
                     "height": height,
@@ -792,7 +791,7 @@ class ConeContentPanel(wx.Panel):
                 try:
                     success = run_application(data)
                     if success:
-                        cad.adoc.Regen(0)  # Обновление активного видового экрана
+                        cad.adoc.Regen(1)  # Обновление всех видовых экранов
                         # Очищаем только поля, связанные с геометрией
                         self.detail_input.SetValue("")
                         self.d_input.SetValue("")
@@ -869,3 +868,88 @@ class ConeContentPanel(wx.Panel):
             error_msg = loc.get("error_switch_content", "Ошибка: невозможно переключить контент")
             show_popup(error_msg, popup_type="error")
             logging.error(error_msg)
+
+if __name__ == "__main__":
+    """
+    Тестовый вызов окна для проверки интерфейса и построения развертки конуса.
+    """
+    import wx
+    from config.at_cad_init import ATCadInit
+    from programms.at_input import at_point_input
+
+    app = wx.App(False)
+    frame = wx.Frame(None, title="Тест ConeContentPanel", size=(800, 600))
+    panel = ConeContentPanel(frame)
+
+    # Установка тестовых данных
+    panel.order_input.SetValue("TestOrder")
+    panel.detail_input.SetValue("TestDetail")
+    panel.material_combo.SetValue("Сталь")
+    panel.thickness_combo.SetValue("2")
+    panel.d_input.SetValue("100")
+    panel.D_input.SetValue("500")
+    panel.d_inner.SetValue(True)
+    panel.D_inner.SetValue(True)
+    panel.height_input.SetValue("300")
+    panel.allowance_combo.SetValue("3")
+
+    # Тест выбора точки и построения
+    try:
+        cad = ATCadInit()
+        if not cad.is_initialized():
+            logging.error("Не удалось инициализировать AutoCAD")
+            print("Ошибка: Не удалось инициализировать AutoCAD")
+        else:
+            adoc, model = cad.adoc, cad.model
+            print(f"AutoCAD Version: {adoc.Application.Version}")
+            print(f"Active Document: {adoc.Name}")
+
+            # Тест с фиксированной точкой
+            test_point = [0.0, 0.0, 0.0]
+            panel.insert_point = test_point
+            panel.update_status_bar_point_selected()
+            print(f"Тест с фиксированной точкой: {test_point}")
+
+            data = {
+                "model": model,
+                "input_point": test_point,
+                "diameter_base": 500.0,
+                "diameter_top": 100.0,
+                "height": 303.0,  # 300 + 3 (припуск)
+                "layer_name": "0",
+                "order_number": "TestOrder",
+                "detail_number": "TestDetail",
+                "material": "Сталь",
+                "thickness_text": "2.00 мм"
+            }
+            success = run_application(data)
+            if success:
+                print("Развертка конуса построена успешно")
+                adoc.Regen(1)
+            else:
+                print("Ошибка построения развертки")
+
+            # Тест с точкой от пользователя
+            print("Получение точки от пользователя...")
+            user_point = at_point_input(adoc)
+            if user_point is None:
+                print("Точка не выбрана, используется точка по умолчанию [500.0, 375.0, 0.0]")
+                user_point = [500.0, 375.0, 0.0]
+            panel.insert_point = user_point
+            panel.update_status_bar_point_selected()
+            print(f"Тест с пользовательской точкой: {user_point}")
+
+            data["input_point"] = user_point
+            success = run_application(data)
+            if success:
+                print("Развертка конуса построена успешно")
+                adoc.Regen(1)
+            else:
+                print("Ошибка построения развертки")
+
+    except Exception as e:
+        print(f"Ошибка в тестовом запуске: {e}")
+        logging.error(f"Ошибка в тестовом запуске: {e}")
+
+    frame.Show()
+    app.MainLoop()

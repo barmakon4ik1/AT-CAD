@@ -732,3 +732,5 @@ def update_status_bar_point_selected(window: wx.Window, insert_point: Optional[o
             logging.info(f"Обновлена строка состояния: {point_not_selected}")
     else:
         logging.warning("Строка состояния недоступна в главном окне")
+
+

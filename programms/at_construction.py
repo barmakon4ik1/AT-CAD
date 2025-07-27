@@ -1,3 +1,4 @@
+# programms/at_construction.py
 """
 Модуль для создания геометрических объектов в AutoCAD.
 """
@@ -8,6 +9,11 @@ from pyautocad import APoint, Autocad
 from programms.at_base import *
 from programms.at_geometry import *
 from programms.at_input import at_point_input
+import win32com.client
+import pythoncom
+import array
+from typing import List, Any, Optional
+from win32com.client import VARIANT
 
 
 @handle_errors
@@ -31,24 +37,47 @@ def add_line(model: object, point1: APoint, point2: APoint, layer_name: str = "0
 
 
 @handle_errors
-def add_LWpolyline(model: object, points_list: List[float], layer_name: str = "0") -> Optional[object]:
+# def add_LWpolyline(model: object, points_list: List[float], layer_name: str = "0") -> Optional[object]:
+#     """
+#     Создает легковесную полилинию в модельном пространстве.
+#     """
+#     if not isinstance(points_list, (list, tuple)) or len(points_list) % 2 != 0:
+#         raise ValueError("Invalid points list")
+#     flat_points = [float(coord) for coord in points_list]
+#     points_double = array.array("d", flat_points)
+#     adoc = model.Document
+#     ensure_layer(adoc, layer_name)
+#     layer = adoc.Layers.Item(layer_name)
+#     if layer.Lock:
+#         layer.Lock = False
+#     polyline = model.AddLightWeightPolyline(points_double)
+#     polyline.Closed = True
+#     polyline.Layer = layer_name
+#     return polyline
+def add_LWpolyline(model: Any, points_list: List[float], layer_name: str = "0") -> Any:
     """
-    Создает легковесную полилинию в модельном пространстве.
+        Создает легковесную полилинию в модельном пространстве.
     """
-    if not isinstance(points_list, (list, tuple)) or len(points_list) % 2 != 0:
-        raise ValueError("Invalid points list")
-    flat_points = [float(coord) for coord in points_list]
-    points_double = array.array("d", flat_points)
-    adoc = model.Document
-    ensure_layer(adoc, layer_name)
-    layer = adoc.Layers.Item(layer_name)
-    if layer.Lock:
-        layer.Lock = False
-    polyline = model.AddLightWeightPolyline(points_double)
-    polyline.Closed = True
-    polyline.Layer = layer_name
-    return polyline
+    try:
+        if not isinstance(points_list, (list, tuple)) or len(points_list) % 2 != 0:
+            raise ValueError("Invalid points list")
+        flat_points = [float(coord) for coord in points_list]
 
+        adoc = model.Document
+        layer = adoc.Layers.Item(layer_name)
+        if layer.Lock:
+            layer.Lock = False
+
+        arr = array.array('d', flat_points)
+        variant_array = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, arr)
+        polyline = model.AddLightWeightPolyline(variant_array)
+        polyline.Closed = True
+        polyline.Layer = layer_name
+
+        return polyline
+    except Exception as e:
+        print(f"Ошибка в add_LWpolyline: {e}")
+        return None
 
 @handle_errors
 def add_rectangle(model: object, point: APoint, width: float, height: float, layer_name: str = "0",
@@ -253,7 +282,7 @@ def polar_point(point: Union[APoint, Tuple[float, float]], distance: float, alph
     return APoint(x1, y1)
 
 
-def at_addText(model: object, point: APoint, text: str = "", layer_name: str = "schrift",
+def at_addText(model: object, point: List[float | int], text: str = "", layer_name: str = "schrift",
                text_height: float = 30, text_angle: float = 0, text_alignment: int = 4) -> Optional[object]:
     """
     Создает текст в модельном пространстве в указанной точке.
@@ -275,27 +304,49 @@ def at_addText(model: object, point: APoint, text: str = "", layer_name: str = "
         14: acAlignmentBottomRight
     """
     try:
-        text = model.AddText(text, point, text_height)
-        text.Layer = layer_name
-        text.Alignment = text_alignment
+        # Проверка point
+        if not isinstance(point, (list, tuple)) or len(point) != 3:
+            raise ValueError("Point must be a list or tuple with 3 coordinates [x, y, z]")
+        point_array = [float(coord) for coord in point]
+        print(f"at_addText: point_array: {point_array}, text: {text}, layer: {layer_name}")
+
+        # Проверка слоя
+        adoc = model.Document
+        layer = adoc.Layers.Item(layer_name)
+        if layer.Lock:
+            print(f"Слой {layer_name} заблокирован, разблокировка...")
+            layer.Lock = False
+
+        # Создание текста
+        point_variant = win32com.client.VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, point_array)
+        text_obj = model.AddText(text, point_variant, text_height)
+
+        # Проверка, что text_obj является объектом AutoCAD
+        if isinstance(text_obj, str):
+            raise RuntimeError(f"AddText вернул строку вместо объекта: {text_obj}")
+
+        text_obj.Layer = layer_name
+        text_obj.Alignment = text_alignment
+
         # Устанавливаем TextAlignmentPoint только для выравниваний, где это необходимо
         if text_alignment not in [0, 1, 2]:  # acAlignmentLeft, acAlignmentCenter, acAlignmentRight
-            text.TextAlignmentPoint = point
-        text.Rotation = text_angle
-        return text
+            text_obj.TextAlignmentPoint = point_variant
+        text_obj.Rotation = text_angle
+        return text_obj
+
     except Exception as e:
         print(f"Ошибка в at_addText: {str(e)}")
-        raise
+        return None
 
 
 if __name__ == "__main__":
     """
-    Тест построения развертки конуса
+    Тест добавления текста
     """
     cad = ATCadInit()
-    input_point = at_point_input(cad.adoc)
-    # at_cone_sheet(cad.model, input_point, 300, 100, 500, "schrift")
-    at_addText(cad.model, input_point, "text")
+    adoc, model = cad.adoc, cad.model
+    input_point = at_point_input(adoc)
+    at_addText(model, input_point, "text", text_height=60, text_alignment=0)
     cad.adoc.Regen(0)
 
 

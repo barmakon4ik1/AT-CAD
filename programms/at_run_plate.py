@@ -19,7 +19,7 @@ from locales.at_localization_class import loc
 from config.at_config import *
 from windows.at_gui_utils import show_popup
 from programms.at_base import regen, init_autocad
-from at_offset import at_offset
+from programms.at_offset import at_offset
 
 # Настройка логирования
 # Настройка логирования в консоль
@@ -72,18 +72,18 @@ def run_plate(plate_data: Dict[str, Any]) -> bool:
         insert_point = plate_data.get("insert_point")
         polyline_points = plate_data.get("polyline_points", [])
         allowance = plate_data.get("allowance")
-        if not polyline_points:
-            show_popup(loc.get("no_input_data", "Не заданы координаты точек полилинии"), popup_type="error")
-            logging.error("Не заданы точки полилинии")
-            return False
-        if not insert_point or not model:
-            show_popup(loc.get("invalid_point", "Не указана точка вставки или модель"), popup_type="error")
-            logging.error("Не указана точка вставки или модель")
-            return False
-        if allowance is None or not isinstance(allowance, (int, float)) or allowance < 0:
-            show_popup(loc.get("invalid_allowance", "Неверное значение отступа"), popup_type="error")
-            logging.error(f"Неверное значение allowance: {allowance}")
-            return False
+        # if not polyline_points:
+        #     show_popup(loc.get("no_input_data", "Не заданы координаты точек полилинии"), popup_type="error")
+        #     logging.error("Не заданы точки полилинии")
+        #     return False
+        # if not insert_point or not model:
+        #     show_popup(loc.get("invalid_point", "Не указана точка вставки или модель"), popup_type="error")
+        #     logging.error("Не указана точка вставки или модель")
+        #     return False
+        # if allowance is None or not isinstance(allowance, (int, float)) or allowance < 0:
+        #     show_popup(loc.get("invalid_allowance", "Неверное значение отступа"), popup_type="error")
+        #     logging.error(f"Неверное значение allowance: {allowance}")
+        #     return False
 
         # Преобразование точек в плоский список для add_LWpolyline
         flat_points = []
@@ -133,26 +133,14 @@ def run_plate(plate_data: Dict[str, Any]) -> bool:
         max_y = max(y for x, y in polyline_points)
 
         # Координаты текста
-        point_text = APoint(insert_point[0], max_y + 60)
+        point_text = [insert_point[0], max_y + 60, 0]
 
         # Добавление текста
         text = f'{thickness} mm {material}, {weight} kg, Ch. {melt_no}'
         at_addText(model, point_text, text, layer_name="AM_5", text_height=60, text_angle=0, text_alignment=0)
 
         # Создание внутренней полилинии
-        try:
-            offset_polylines = at_offset(polyline, allowance, adoc, model)
-            if offset_polylines:
-                print(f"[{sys._getframe().f_code.co_name}] Внутренняя полилиния создана, количество объектов: {len(offset_polylines)}")
-            else:
-                print(f"[{sys._getframe().f_code.co_name}] Не удалось создать смещённую полилинию")
-                show_popup(loc.get("offset_error", "Не удалось создать смещённую полилинию"), popup_type="error")
-                return False
-
-        except Exception as e:
-            print(f"[{sys._getframe().f_code.co_name}] Ошибка при создании смещённой полилинии: {e}")
-            show_popup(loc.get("offset_error", f"Ошибка при создании смещённой полилинии: {e}"), popup_type="error")
-            return False
+        at_offset(polyline, allowance, adoc, model)
 
         # Регенерация чертежа
         regen(adoc)
@@ -171,14 +159,15 @@ if __name__ == '__main__':
         'insert_point': APoint(0, 0, 0.00),
         'point_list': [[3000, 1500]],
         'material': '1.4301',
-        'thickness': 0.0,
+        'thickness': 4.0,
         'melt_no': '',
         'allowance': 10.0,
         'polyline_points': [
             (0, 0),
             (3000, 0),
             (3000, 1500),
-            (0, 1500),
-            (0, 0)]
+            (1500, 1500),
+            (1500, 750),
+            (0, 750)]
     }
     run_plate(input_data)

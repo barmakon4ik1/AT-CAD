@@ -1,76 +1,73 @@
 """
 Файл: programms/at_offset.py
 """
-import sys
+import win32com.client
 import pythoncom
-from pyautocad import APoint
-from programms.at_construction import add_LWpolyline
+from typing import List, Any
+from config.at_cad_init import ATCadInit
+from programms.at_construction import add_LWpolyline, at_addText
+from programms.at_create_layer import at_create_layer
 
-def at_offset(polyline, allowance, adoc=None, model=None):
+
+def at_offset(polyline: Any, offset_distance: float, doc: Any, model: Any) -> List[Any]:
     """
-    Создаёт внутреннюю полилинию путём масштабирования внешней полилинии и смещения.
+    Создает смещенную полилинию с использованием win32com.
 
     Args:
         polyline: Объект полилинии (AcadLWPolyline).
-        allowance: Расстояние смещения (положительное, в единицах чертежа).
-        adoc: Объект ActiveDocument AutoCAD (не используется).
-        model: Объект ModelSpace (для создания полилинии).
+        offset_distance: Расстояние смещения (float).
+        doc: ActiveDocument AutoCAD.
+        model: ModelSpace AutoCAD.
 
     Returns:
-        Список объектов полилиний или None в случае ошибки.
+        Список смещенных полилиний или None в случае ошибки.
     """
     try:
-        pythoncom.CoInitialize()
-        print(f"[{sys._getframe().f_code.co_name}] Шаг 1: Начало создания внутренней полилинии")
-        print(f"[{sys._getframe().f_code.co_name}] Шаг 2: Расстояние смещения: {allowance}")
+        coords = polyline.Coordinates
+        vertices = list(zip(coords[::2], coords[1::2]))
 
-        # Получение координат полилинии
-        print(f"[{sys._getframe().f_code.co_name}] Шаг 3: Вычисление координат")
-        coordinates = polyline.Coordinates
-        polyline_points = [(coordinates[i], coordinates[i+1]) for i in range(0, len(coordinates), 2)]
-        if len(polyline_points) > 1 and polyline_points[-1] == polyline_points[0]:
-            polyline_points = polyline_points[:-1]
-        print(f"[{sys._getframe().f_code.co_name}] Шаг 3.1: Исходные точки: {polyline_points}")
-
-        # Определение размеров внешней полилинии
-        min_x = min(x for x, y in polyline_points)
-        max_x = max(x for x, y in polyline_points)
-        min_y = min(y for x, y in polyline_points)
-        max_y = max(y for x, y in polyline_points)
-        width = max_x - min_x
-        height = max_y - min_y
-        print(f"[{sys._getframe().f_code.co_name}] Шаг 3.2: Размеры внешней полилинии: ширина={width}, высота={height}")
-
-        # Коэффициенты масштабирования
-        scale_x = (width - 2 * allowance) / width if width > 0 else 1.0
-        scale_y = (height - 2 * allowance) / height if height > 0 else 1.0
-        print(f"[{sys._getframe().f_code.co_name}] Шаг 3.3: Коэффициенты масштабирования: scale_x={scale_x}, scale_y={scale_y}")
-
-        # Масштабирование относительно (0, 0)
-        scaled_points = [(x * scale_x, y * scale_y) for x, y in polyline_points]
-        print(f"[{sys._getframe().f_code.co_name}] Шаг 3.4: Масштабированные точки: {scaled_points}")
-
-        # Смещение на (10, 10)
-        offset_points = [(x + allowance, y + allowance) for x, y in scaled_points]
-        print(f"[{sys._getframe().f_code.co_name}] Шаг 4: Смещённые координаты: {offset_points}")
-
-        # Добавляем замыкающую точку
-        if offset_points and offset_points[0] != offset_points[-1]:
-            offset_points.append(offset_points[0])
-        flat_offset_points = [coord for pt in offset_points for coord in pt]
-
-        # Создание полилинии
-        offset_poly = add_LWpolyline(model, flat_offset_points, layer_name="SF-TEXT")
-        if offset_poly:
-            offset_poly.Closed = True
-            print(f"[{sys._getframe().f_code.co_name}] Шаг 5: Полилиния создана: Handle={offset_poly.Handle}, Площадь={offset_poly.Area}")
-            return [offset_poly]
-        else:
-            print(f"[{sys._getframe().f_code.co_name}] Шаг 5.1: Не удалось создать полилинию")
-            return None
+        # Смещение внутрь
+        offset_distance = -abs(float(offset_distance))
+        offset_objects = polyline.Offset(offset_distance)
+        result = list(offset_objects) if offset_objects else []
+        return result
 
     except Exception as e:
-        print(f"[{sys._getframe().f_code.co_name}] Шаг 6: Ошибка: {e}, Type: {type(e)}, Args: {e.args}")
-        return None
-    finally:
-        pythoncom.CoUninitialize()
+        pass
+
+if __name__ == "__main__":
+    try:
+        cad = ATCadInit()
+        adoc, model, original_layer = cad.adoc, cad.model, cad.original_layer
+        at_create_layer(adoc)
+
+        # Тестовые данные
+        polyline_points = [
+            (0, 0),
+            (1500, 0),
+            (1500, 1500),
+            (1000, 1500),
+            (1000, 750),
+            (0, 750)
+        ]
+        offset_distance = 10.0
+        text_content = "Test Text"
+
+        # Создание тестовой полилинии
+        flat_points = [float(coord) for point in polyline_points for coord in point]
+        polyline = add_LWpolyline(model, flat_points, "SF-TEXT")
+        coords = polyline.Coordinates
+        text_point = [coords[0], coords[5], 0]
+        # vertices = list(zip(coords[::2], coords[1::2]))
+
+        # Вызов функции at_offset
+        offset_polylines = at_offset(polyline, offset_distance, adoc, model)
+
+        # Создание тестового текста
+        text_obj = at_addText(model, text_point, text_content, "schrift", text_height=60, text_angle=0, text_alignment=0)
+
+        # Регенерация чертежа
+        adoc.Regen(1)  # acAllViewports
+
+    except Exception as e:
+        print(f"Ошибка в тестовом запуске: {e}")

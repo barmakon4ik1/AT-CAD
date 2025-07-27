@@ -3,14 +3,10 @@
 Модуль для инициализации AutoCAD через COM-интерфейс с использованием синглтона.
 Обеспечивает однократное подключение к AutoCAD и предоставляет доступ к его объектам.
 """
-
-from pyautocad import Autocad
-from config.at_config import *
-from locales.at_localization_class import loc
-import pythoncom  # Для управления COM-объектами
+import win32com.client
+import pythoncom
 import logging
-from programms.at_create_layer import at_create_layer
-
+from locales.at_localization_class import loc
 
 class ATCadInit:
     """
@@ -45,15 +41,16 @@ class ATCadInit:
 
     def _initialize(self):
         """
-        Выполняет подключение к AutoCAD и настройку объектов.
+        Выполняет подключение к AutoCAD и настройку объектов через win32com.
         Логирует ошибку в случае неудачи, но не показывает всплывающее окно.
         """
         try:
-            self.acad = Autocad(create_if_not_exists=True)  # Подключение или запуск AutoCAD
+            pythoncom.CoInitialize()  # Инициализация COM
+            self.acad = win32com.client.Dispatch("AutoCAD.Application")
+            self.acad.Visible = True
             self.adoc = self.acad.ActiveDocument
-            self.model = self.acad.model
+            self.model = self.adoc.ModelSpace
             self.original_layer = self.adoc.ActiveLayer
-            at_create_layer()
             logging.info("AutoCAD успешно инициализирован")
         except Exception as e:
             logging.error(f"Ошибка инициализации AutoCAD: {e}")
@@ -77,12 +74,10 @@ class ATCadInit:
         """
         try:
             if self.acad is not None:
-                # Сбрасываем ссылки на объекты AutoCAD
                 self.model = None
                 self.adoc = None
                 self.original_layer = None
                 self.acad = None
-                # Освобождаем COM-объект
                 pythoncom.CoUninitialize()
                 logging.info("Ресурсы AutoCAD освобождены")
         except Exception as e:
@@ -90,13 +85,12 @@ class ATCadInit:
 
     def reinitialize(self):
         """
-        Переподключается к AutoCAD, если соединение потеряно.
+        Переподключаемся к AutoCAD, если соединение потеряно.
         """
         if not self.is_initialized():
             self._initialized = False
             self._initialize()
             logging.info("AutoCAD переинициализирован")
-
 
 if __name__ == "__main__":
     """
