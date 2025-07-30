@@ -20,6 +20,7 @@ from config.at_config import *
 from windows.at_gui_utils import show_popup
 from programms.at_base import regen, init_autocad
 from programms.at_offset import at_offset
+from at_dimension import at_amautodim
 
 # Настройка логирования
 # Настройка логирования в консоль
@@ -142,6 +143,8 @@ def run_plate(plate_data: Dict[str, Any]) -> bool:
         # Создание внутренней полилинии
         at_offset(polyline, allowance, adoc, model)
 
+        at_amautodim(adoc, polyline, insert_point, ([insert_point([0]+insert_point[1] / 2), insert_point[5] + 60]))
+
         # Регенерация чертежа
         regen(adoc)
         logging.info("Полилиния, внутренняя полилиния, размеры и текст успешно созданы")
@@ -164,10 +167,10 @@ if __name__ == '__main__':
         'allowance': 10.0,
         'polyline_points': [
             (0, 0),
-            (3000, 0),
-            (3000, 1500),
+            (1500, 0),
             (1500, 1500),
-            (1500, 750),
+            (1000, 1500),
+            (1000, 750),
             (0, 750)]
     }
     run_plate(input_data)

@@ -204,6 +204,12 @@ def at_dimension(
         pythoncom.CoUninitialize()
 
 
+def at_amautodim(adoc, object, tart_point, dim_point):
+    cmd = f'"_amautodim_cli""\n""_p""\n""_b""\n""_n""\n""_n""\n""_n""\n"{object}\n"{tart_point}\n"{dim_point}\n"'
+    print(cmd)
+    adoc.SendCommand(cmd)
+
+
 def test_dimension():
     """
     Тестовый запуск функции at_dimension с запросом точек и типа размера.
@@ -298,3 +304,4 @@ def test_dimension():
 
 if __name__ == "__main__":
     test_dimension()
+
