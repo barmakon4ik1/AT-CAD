@@ -135,12 +135,12 @@ def at_dimension(
         pythoncom.CoInitialize()
 
         # Настройка стиля размеров
-        # try:
-        #     adoc.SendCommand("DIMSTYLE WIEDERHERSTELLEN AM_ISO\n")
-        #     time.sleep(0.5)
-        #     logging.debug("Стиль AM_ISO восстановлен")
-        # except Exception as e:
-        #     logging.warning(f"Не удалось восстановить стиль AM_ISO: {e}")
+        try:
+            adoc.SendCommand("DIMSTYLE WIEDERHERSTELLEN AM_ISO\n")
+            time.sleep(0.5)
+            logging.debug("Стиль AM_ISO восстановлен")
+        except Exception as e:
+            logging.warning(f"Не удалось восстановить стиль AM_ISO: {e}")
 
         dim_type = dim_type.upper()
         if dim_type in ['H', 'V', 'L']:
@@ -202,11 +202,6 @@ def at_dimension(
         return False
     finally:
         pythoncom.CoUninitialize()
-
-
-def at_amautodim(adoc, object, start_point, dim_point):
-    cmd = f'"_amautodim_cli""\n""_p""\n""_b""\n""_n""\n""_n""\n""_n""\n"{object}"\n{start_point}\n{dim_point}\n"'
-    adoc.SendCommand(cmd)
 
 
 def test_dimension():
@@ -302,19 +297,4 @@ def test_dimension():
 
 
 if __name__ == "__main__":
-    acad, adoc, model = initialize_autocad()
-    # test_dimension()
-    # Выбор пользователем (интерактивно)
-    # block_ref = adoc.Utility.GetEntity("Выбери блок:")[0]
-    # start_point = adoc.Utility.GetPoint("Укажи начальную точку: ")
-    # placement_point = adoc.Utility.GetPoint("Укажи точку простановки: ")
-    #
-    # # Имя блока
-    # block_name = block_ref.EffectiveName
-    # start = f"{start_point[0]},{start_point[1]}"
-    # place = f"{placement_point[0]},{placement_point[1]}"
-    #
-    # # Команда
-    # cmd = f'_amautodim_cli "{block_name}" {start} {place} \n'
-    # adoc.SendCommand(cmd)
-
+    test_dimension()

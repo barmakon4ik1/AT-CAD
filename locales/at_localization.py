@@ -280,6 +280,11 @@ translations = {
         "de": "Schriftstil",
         "en": "Font Style"
     },
+    "general_error": {
+        "ru": "Общая ошибка",
+        "de": "Allgemeiner Fehler",
+        "en": "General Error"
+    },
     "gradient_plus": {
         "ru": "Наклон должен быть положительным числом!",
         "de": "Die Neigung muss eine positive Zahl sein!",

@@ -1,17 +1,16 @@
 # programms/at_create_layer.py
-from pyautocad import Autocad, APoint
+from pyautocad import Autocad
+
+from config.at_cad_init import ATCadInit
 
 
-def at_create_layer():
+def at_create_layer(adoc):
     """
     Создает предопределенные слои в AutoCAD с заданными параметрами.
     Аналог функции at_create_layer из предоставленного Лисп-кода.
     """
     try:
-        # Подключение к AutoCAD
-        acad = Autocad(create_if_not_exists=True)
-        doc = acad.ActiveDocument
-        layers = doc.Layers
+        layers = adoc.Layers
 
         # Список слоев с их параметрами
         layer_data = [
@@ -27,18 +26,9 @@ def at_create_layer():
         ]
 
         for layer in layer_data:
-            # Создание нового слоя
-            new_layer = layers.Add(layer["name"])
-
-            # Установка цвета (ACI color)
-            new_layer.Color = layer["color"]
-
-            # Установка типа линии
-            try:
-                new_layer.Linetype = layer["linetype"]
-            except:
-                print(f"Тип линии {layer['linetype']} не найден для слоя {layer['name']}. Установлен CONTINUOUS.")
-                new_layer.Linetype = "CONTINUOUS"
+            new_layer = layers.Add(layer["name"]) # Создание нового слоя
+            new_layer.Color = layer["color"] # Установка цвета (ACI color)
+            new_layer.Linetype = layer["linetype"] # Установка типа линии
 
             # Установка веса линии, если указан
             if "lineweight" in layer:
@@ -49,11 +39,11 @@ def at_create_layer():
             if "plot" in layer:
                 new_layer.Plottable = layer["plot"]
 
-        print("Слои успешно созданы.")
-
     except Exception as e:
         print(f"Ошибка при создании слоев: {e}")
 
 
 if __name__ == "__main__":
-    at_create_layer()
+    cad = ATCadInit()
+    adoc, model = cad.adoc, cad.model
+    at_create_layer(adoc)
