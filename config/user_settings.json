@@ -14,6 +14,6 @@
     "BANNER_COLOR": "light blue",
     "BANNER_TEXT_COLOR": "black",
     "EXIT_BUTTON_COLOR": "dark grey",
-    "LABEL_FONT_COLOR": "#FFFFFF",
+    "LABEL_FONT_COLOR": "blue",
     "BUTTON_FONT_COLOR": "white"
 }

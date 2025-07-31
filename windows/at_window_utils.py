@@ -15,11 +15,15 @@ import logging
 import time
 from typing import Tuple, Dict, Optional, List
 import wx
-from config.at_config import get_setting, DEFAULT_SETTINGS
 from locales.at_localization_class import loc
 from programms.at_base import init_autocad
 from programms.at_input import at_point_input
 from windows.at_style import style_textctrl, style_combobox, style_radiobutton, style_staticbox, style_label
+from config.at_config import load_user_settings, DEFAULT_SETTINGS, get_setting
+from windows.at_gui_utils import show_popup
+from windows.at_status_bar import update_status_bar_point_selected
+from config.at_last_input import save_last_input
+
 
 # Настройка логирования
 logging.basicConfig(
@@ -30,6 +34,142 @@ logging.basicConfig(
 
 # Кэш для данных из JSON-файлов
 _common_data_cache = None
+
+
+class BaseContentPanel(wx.Panel):
+    """
+    Базовый класс для панелей контента: AppsContentPanel, ConeContentPanel, RingsContentPanel, PlateContentPanel, HeadContentPanel.
+    """
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.settings = load_user_settings()
+        background_color = self.settings.get("BACKGROUND_COLOR", DEFAULT_SETTINGS["BACKGROUND_COLOR"])
+        self.SetBackgroundColour(wx.Colour(background_color))
+        self.last_input_file = ""  # Для панелей ввода данных, устанавливается в дочерних классах
+        self.insert_point = None  # Для панелей с выбором точки
+        self.buttons = []  # Для панелей с кнопками
+        logging.info(f"Установлен цвет фона панели: {background_color}")
+
+    def switch_content_panel(self, content_name: str) -> None:
+        """
+        Переключает содержимое главного окна на указанную панель.
+
+        Args:
+            content_name: Имя модуля контента для переключения.
+        """
+        try:
+            main_window = wx.GetTopLevelParent(self)
+            if hasattr(main_window, "switch_content"):
+                main_window.switch_content(content_name)
+                logging.info(f"Переключение на контент: {content_name}")
+            else:
+                logging.error("Главное окно не имеет метода switch_content")
+                show_popup(loc.get("error_switch_content", "Ошибка: невозможно переключить контент"), popup_type="error")
+        except Exception as e:
+            logging.error(f"Ошибка при переключении контента: {e}")
+            show_popup(loc.get("error", f"Ошибка переключения контента: {str(e)}"), popup_type="error")
+
+    def on_ok(self, event: wx.Event, close_window: bool = False) -> None:
+        """
+        Обрабатывает нажатие кнопки OK: собирает данные, проверяет их валидность, обрабатывает данные.
+
+        Args:
+            event: Событие wxPython.
+            close_window: Если True, переключает на content_apps после успешной обработки.
+        """
+        try:
+            data = self.collect_input_data()
+            if not self.validate_input(data):
+                show_popup(loc.get("invalid_input", "Некорректные входные данные"), popup_type="error")
+                logging.error("Валидация данных не пройдена")
+                return
+            if not self.process_input(data):
+                show_popup(loc.get("process_input_failed", "Ошибка обработки данных"), popup_type="error")
+                logging.error("Обработка данных не выполнена")
+                return
+            if self.last_input_file:  # Сохраняем только для панелей с вводом данных
+                save_last_input(self.last_input_file, data)
+                logging.info(f"Данные сохранены в {self.last_input_file}: {data}")
+            if close_window:
+                self.switch_content_panel("content_apps")
+        except Exception as e:
+            show_popup(loc.get("input_error", f"Ошибка ввода: {str(e)}"), popup_type="error")
+            logging.error(f"Ошибка в on_ok: {e}")
+
+    def on_clear(self, event: wx.Event) -> None:
+        """
+        Очищает все поля ввода и сбрасывает статусную строку.
+
+        Args:
+            event: Событие wxPython.
+        """
+        try:
+            self.clear_input_fields()
+            update_status_bar_point_selected(self, None)
+            if self.last_input_file:
+                save_last_input(self.last_input_file, self.collect_input_data())
+            logging.info("Поля ввода очищены")
+        except Exception as e:
+            show_popup(loc.get("clear_error", f"Ошибка при очистке полей: {str(e)}"), popup_type="error")
+            logging.error(f"Ошибка в on_clear: {e}")
+
+    def on_cancel(self, event: wx.Event, switch_content: Optional[str] = "content_apps") -> None:
+        """
+        Переключает контент на указанную панель (по умолчанию content_apps).
+
+        Args:
+            event: Событие wxPython.
+            switch_content: Имя контента для переключения.
+        """
+        self.switch_content_panel(switch_content)
+
+    def collect_input_data(self) -> Dict:
+        """
+        Собирает данные из полей ввода панели.
+
+        Returns:
+            Dict: Словарь с данными из полей ввода.
+        """
+        logging.warning("Метод collect_input_data не переопределён")
+        return {}
+
+    def validate_input(self, data: Dict) -> bool:
+        """
+        Проверяет валидность введённых данных.
+
+        Args:
+            data: Словарь с данными из полей ввода.
+
+        Returns:
+            bool: True, если данные валидны, иначе False.
+        """
+        logging.warning("Метод validate_input не переопределён")
+        return True
+
+    def process_input(self, data: Dict) -> bool:
+        """
+        Обрабатывает собранные данные (например, выполняет расчёты или построение).
+
+        Args:
+            data: Словарь с данными из полей ввода.
+
+        Returns:
+            bool: True, если обработка успешна, иначе False.
+        """
+        logging.warning("Метод process_input не переопределён")
+        return True
+
+    def clear_input_fields(self) -> None:
+        """
+        Очищает все поля ввода панели.
+        """
+        logging.warning("Метод clear_input_fields не переопределён")
+
+    def update_ui_language(self) -> None:
+        """
+        Обновляет текст элементов интерфейса при смене языка.
+        """
+        logging.warning("Метод update_ui_language не переопределён")
 
 
 def load_common_data() -> Dict:

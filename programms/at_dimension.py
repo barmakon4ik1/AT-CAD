@@ -14,12 +14,12 @@ import logging
 import time
 
 # Настройка логирования
-logging.basicConfig(
-    level=logging.DEBUG,
-    filename="at_dimension.log",
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    force=True
-)
+# logging.basicConfig(
+#     level=logging.DEBUG,
+#     filename="at_dimension.log",
+#     format="%(asctime)s - %(levelname)s - %(message)s",
+#     force=True
+# )
 
 
 def initialize_autocad(max_attempts=3, delay=2):
@@ -204,8 +204,8 @@ def at_dimension(
         pythoncom.CoUninitialize()
 
 
-def at_amautodim(adoc, object, tart_point, dim_point):
-    cmd = f'"_amautodim_cli""\n""_p""\n""_b""\n""_n""\n""_n""\n""_n""\n"{object}\n"{tart_point}\n"{dim_point}\n"'
+def at_amautodim(adoc, object, start_point, dim_point):
+    cmd = f'"_amautodim_cli""\n""_p""\n""_b""\n""_n""\n""_n""\n""_n""\n"{object}\n"{start_point}\n"{dim_point}\n"'
     print(cmd)
     adoc.SendCommand(cmd)
 

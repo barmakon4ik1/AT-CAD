@@ -1,4 +1,3 @@
-# windows/content_rings.py
 """
 Модуль для создания панели для ввода параметров колец.
 """
@@ -14,8 +13,9 @@ from config.at_cad_init import ATCadInit
 from config.at_config import *
 from locales.at_localization_class import loc
 from windows.at_window_utils import (
-    CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel, create_standard_buttons, adjust_button_widths,
-    update_status_bar_point_selected
+    CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel,
+    create_standard_buttons, adjust_button_widths, update_status_bar_point_selected,
+    BaseContentPanel, load_user_settings
 )
 from programms.at_ringe import main as run_rings
 
@@ -37,10 +37,9 @@ def create_window(parent: wx.Window) -> wx.Panel:
     Returns:
         wx.Panel: Панель с интерфейсом для ввода параметров колец.
     """
-    logging.debug("Создание панели RingsContentPanel")
     try:
         panel = RingsContentPanel(parent)
-        logging.info("Панель RingsContentPanel успешно создана")
+        logging.info("Панель RingsContentPanel создана")
         return panel
     except Exception as e:
         logging.error(f"Ошибка создания RingsContentPanel: {e}")
@@ -48,7 +47,7 @@ def create_window(parent: wx.Window) -> wx.Panel:
         return None
 
 
-class RingsContentPanel(wx.Panel):
+class RingsContentPanel(BaseContentPanel):
     """
     Панель для ввода параметров колец.
     """
@@ -60,15 +59,14 @@ class RingsContentPanel(wx.Panel):
         Args:
             parent: Родительский wx.Window (content_panel).
         """
-        logging.debug("Инициализация RingsContentPanel")
         super().__init__(parent)
-        self.settings = load_user_settings()  # Загружаем настройки
-        background_color = self.settings.get("BACKGROUND_COLOR", DEFAULT_SETTINGS["BACKGROUND_COLOR"])
-        self.SetBackgroundColour(background_color)
+        self.settings = load_user_settings()
+        self.SetBackgroundColour(self.settings.get("BACKGROUND_COLOR", DEFAULT_SETTINGS["BACKGROUND_COLOR"]))
         self.parent = parent
-        self.labels = {}  # Для хранения текстовых меток
-        self.static_boxes = {}  # Для хранения StaticBox
-        self.insert_point = None  # Точка вставки
+        self.labels = {}
+        self.static_boxes = {}
+        self.buttons = []
+        self.insert_point = None
         self.update_status_bar_no_point()
         self.setup_ui()
         self.order_input.SetFocus()
@@ -77,141 +75,125 @@ class RingsContentPanel(wx.Panel):
         """
         Обновляет статусную строку, если точка не выбрана.
         """
-        update_status_bar_point_selected(self, None)
-        logging.debug("Статусная строка обновлена: точка не выбрана")
+        self.update_status_bar_point_selected(None)
 
-    def update_status_bar_point_selected(self):
+    def update_status_bar_point_selected(self, point):
         """
         Обновляет статусную строку с координатами выбранной точки.
+
+        Args:
+            point: Координаты точки вставки (APoint или None).
         """
-        update_status_bar_point_selected(self, self.insert_point)
-        logging.debug(f"Статусная строка обновлена: точка {self.insert_point}")
+        update_status_bar_point_selected(self, point)
+        logging.debug(f"Статусная строка обновлена: точка {point}")
 
     def setup_ui(self) -> None:
         """
         Настраивает элементы интерфейса, создавая компоновку с левой (изображение, кнопки)
         и правой (поля ввода) частями.
         """
-        logging.debug("Настройка UI для RingsContentPanel")
-        try:
-            if self.GetSizer():
-                self.GetSizer().Clear(True)
-                self.SetSizer(None)  # Очистка текущего sizer'а
-            self.labels.clear()
-            self.static_boxes.clear()
+        if self.GetSizer():
+            self.GetSizer().Clear(True)
+        self.labels.clear()
+        self.static_boxes.clear()
+        self.buttons.clear()
 
-            main_sizer = wx.BoxSizer(wx.HORIZONTAL)
-            self.left_sizer = wx.BoxSizer(wx.VERTICAL)
+        main_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.left_sizer = wx.BoxSizer(wx.VERTICAL)
 
-            # Проверка существования изображения (необязательно)
-            image_path = os.path.abspath(RING_IMAGE_PATH)
-            if not os.path.exists(image_path):
-                logging.warning(f"Файл изображения колец '{image_path}' не найден, продолжаем без изображения")
+        # Проверка изображения
+        image_path = os.path.abspath(RING_IMAGE_PATH)
+        if not os.path.exists(image_path):
+            logging.warning(f"Файл изображения колец '{image_path}' не найден")
 
-            # Изображение колец
-            self.canvas = CanvasPanel(self, image_file=image_path, size=(600, 400))
-            self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
+        # Изображение колец
+        self.canvas = CanvasPanel(self, image_file=image_path, size=(600, 400))
+        self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
 
-            # Кнопки
-            button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-            self.buttons = create_standard_buttons(self, self.on_ok, self.on_cancel, self.on_clear)
-            for button in self.buttons:
-                button_sizer.Add(button, 0, wx.RIGHT, 5)
-            adjust_button_widths(self.buttons)
-            self.left_sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT | wx.ALL, 10)
+        # Кнопки
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.buttons = create_standard_buttons(self, self.on_ok, self.on_cancel, self.on_clear)
+        for button in self.buttons:
+            button_sizer.Add(button, 0, wx.RIGHT, 5)
+        adjust_button_widths(self.buttons)
+        self.left_sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT | wx.ALL, 10)
 
-            # Правая часть: поля ввода
-            self.right_sizer = wx.BoxSizer(wx.VERTICAL)
-            font = get_standard_font()
+        # Правая часть: поля ввода
+        self.right_sizer = wx.BoxSizer(wx.VERTICAL)
+        font = get_standard_font()
 
-            # Группа "Основные данные"
-            main_data_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, loc.get("main_data_label", "Основные данные"))
-            main_data_box = main_data_sizer.GetStaticBox()
-            main_data_box.SetFont(font)
-            self.static_boxes["main_data"] = main_data_box
+        # Группа "Основные данные"
+        main_data_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, loc.get("main_data_label", "Основные данные"))
+        main_data_box = main_data_sizer.GetStaticBox()
+        main_data_box.SetFont(font)
+        self.static_boxes["main_data"] = main_data_box
 
-            # Номер заказа
-            order_sizer = wx.BoxSizer(wx.HORIZONTAL)
-            order_label = wx.StaticText(main_data_box, label=loc.get("order_label", "К-№"))
-            order_label.SetFont(font)
-            self.labels["order"] = order_label
-            self.order_input = wx.TextCtrl(main_data_box, value="", size=INPUT_FIELD_SIZE)
-            self.order_input.SetFont(font)
-            order_sizer.AddStretchSpacer()
-            order_sizer.Add(order_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-            order_sizer.Add(self.order_input, 0, wx.RIGHT, 10)
-            main_data_sizer.Add(order_sizer, 0, wx.ALL | wx.EXPAND, 5)
+        # Номер заказа
+        order_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        order_label = wx.StaticText(main_data_box, label=loc.get("order_label", "К-№"))
+        order_label.SetFont(font)
+        self.labels["order"] = order_label
+        self.order_input = wx.TextCtrl(main_data_box, value="", size=INPUT_FIELD_SIZE)
+        self.order_input.SetFont(font)
+        order_sizer.AddStretchSpacer()
+        order_sizer.Add(order_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        order_sizer.Add(self.order_input, 0, wx.RIGHT, 10)
+        main_data_sizer.Add(order_sizer, 0, wx.ALL | wx.EXPAND, 5)
 
-            self.right_sizer.Add(main_data_sizer, 0, wx.EXPAND | wx.ALL, 10)
+        self.right_sizer.Add(main_data_sizer, 0, wx.EXPAND | wx.ALL, 10)
 
-            # Группа "Диаметры"
-            diameters_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, loc.get("diameter_label", "Диаметры"))
-            diameters_box = diameters_sizer.GetStaticBox()
-            diameters_box.SetFont(font)
-            self.static_boxes["diameters"] = diameters_box
+        # Группа "Диаметры"
+        diameters_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, loc.get("diameter_label", "Диаметры"))
+        diameters_box = diameters_sizer.GetStaticBox()
+        diameters_box.SetFont(font)
+        self.static_boxes["diameters"] = diameters_box
 
-            # Диаметры (многострочный ввод)
-            diameters_input_sizer = wx.BoxSizer(wx.HORIZONTAL)
-            diameters_label = wx.StaticText(diameters_box, label=loc.get("diameters_label", "Диаметры (через запятую)"))
-            diameters_label.SetFont(font)
-            self.labels["diameters"] = diameters_label
-            self.diameters_input = wx.TextCtrl(diameters_box, value="", style=wx.TE_MULTILINE, size=(INPUT_FIELD_SIZE[0], 100))
-            self.diameters_input.SetFont(font)
-            diameters_input_sizer.AddStretchSpacer()
-            diameters_input_sizer.Add(diameters_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-            diameters_input_sizer.Add(self.diameters_input, 0, wx.ALL, 5)
-            diameters_sizer.Add(diameters_input_sizer, 0, wx.ALL | wx.EXPAND, 5)
+        # Диаметры (многострочный ввод)
+        diameters_input_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        diameters_label = wx.StaticText(diameters_box, label=loc.get("diameters_label", "Диаметры (через запятую)"))
+        diameters_label.SetFont(font)
+        self.labels["diameters"] = diameters_label
+        self.diameters_input = wx.TextCtrl(diameters_box, value="", style=wx.TE_MULTILINE, size=(INPUT_FIELD_SIZE[0], 100))
+        self.diameters_input.SetFont(font)
+        diameters_input_sizer.AddStretchSpacer()
+        diameters_input_sizer.Add(diameters_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        diameters_input_sizer.Add(self.diameters_input, 0, wx.ALL, 5)
+        diameters_sizer.Add(diameters_input_sizer, 0, wx.ALL | wx.EXPAND, 5)
 
-            self.right_sizer.Add(diameters_sizer, 0, wx.EXPAND | wx.ALL, 10)
+        self.right_sizer.Add(diameters_sizer, 0, wx.EXPAND | wx.ALL, 10)
 
-            main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
-            main_sizer.Add(self.right_sizer, 0, wx.ALL | wx.EXPAND, 10)
-            self.SetSizer(main_sizer)
-            apply_styles_to_panel(self)
-            self.Layout()
-            logging.info("Интерфейс панели RingsContentPanel успешно настроен")
-
-            # Устанавливаем фокус на order_input
-            self.order_input.SetFocus()
-
-        except Exception as e:
-            logging.error(f"Ошибка настройки UI для RingsContentPanel: {e}")
-            show_popup(loc.get("error", f"Ошибка настройки интерфейса: {str(e)}"), popup_type="error")
-            raise
+        main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
+        main_sizer.Add(self.right_sizer, 0, wx.ALL | wx.EXPAND, 10)
+        self.SetSizer(main_sizer)
+        apply_styles_to_panel(self)
+        self.Layout()
+        logging.info("Интерфейс RingsContentPanel настроен")
 
     def update_ui_language(self):
         """
         Обновляет текст меток и групп при смене языка.
         """
-        logging.debug("Обновление языка UI для RingsContentPanel")
-        try:
-            self.static_boxes["main_data"].SetLabel(loc.get("main_data_label", "Основные данные"))
-            self.static_boxes["diameters"].SetLabel(loc.get("diameter_label", "Диаметры"))
-            self.labels["order"].SetLabel(loc.get("order_label", "К-№"))
-            self.labels["diameters"].SetLabel(loc.get("diameters_label", "Диаметры (через запятую)"))
+        self.static_boxes["main_data"].SetLabel(loc.get("main_data_label", "Основные данные"))
+        self.static_boxes["diameters"].SetLabel(loc.get("diameter_label", "Диаметры"))
+        self.labels["order"].SetLabel(loc.get("order_label", "К-№"))
+        self.labels["diameters"].SetLabel(loc.get("diameters_label", "Диаметры (через запятую)"))
 
-            # Обновление текста кнопок
-            self.buttons[0].SetLabel(loc.get("ok_button", "ОК"))
-            self.buttons[1].SetLabel(loc.get("clear_button", "Очистить"))
-            self.buttons[2].SetLabel(loc.get("cancel_button", "Отмена"))
-            adjust_button_widths(self.buttons)
+        for i, key in enumerate(["ok_button", "clear_button", "cancel_button"]):
+            self.buttons[i].SetLabel(loc.get(key, ["ОК", "Очистить", "Отмена"][i]))
+        adjust_button_widths(self.buttons)
 
-            self.update_status_bar_no_point()
-            self.Layout()
-            logging.info("Язык UI успешно обновлён")
-        except Exception as e:
-            logging.error(f"Ошибка обновления языка UI: {e}")
-            show_popup(loc.get("error", f"Ошибка обновления языка: {str(e)}"), popup_type="error")
+        self.update_status_bar_no_point()
+        self.Layout()
+        logging.info("Язык UI обновлён")
 
-    def get_input_data(self) -> Optional[Dict]:
+    def collect_input_data(self) -> Optional[Dict]:
         """
-        Возвращает введённые данные в виде словаря.
+        Собирает данные из полей ввода.
 
         Returns:
             dict: Словарь с данными (work_number, diameters, insert_point) или None при ошибке.
         """
         try:
-            # Парсинг диаметров
             diameters_text = self.diameters_input.GetValue().strip()
             diameters = {}
             if diameters_text:
@@ -232,21 +214,42 @@ class RingsContentPanel(wx.Panel):
                 "insert_point": self.insert_point
             }
         except Exception as e:
-            logging.error(f"Ошибка получения данных из RingsContentPanel: {e}")
+            logging.error(f"Ошибка получения данных: {e}")
             return None
 
-    def on_ok(self, event: wx.Event) -> None:
+    def validate_input(self, data: Dict) -> bool:
         """
-        Проверяет данные, запрашивает точку вставки в AutoCAD и вызывает run_rings для построения колец.
-        Очищает поля и оставляет окно для нового ввода.
+        Проверяет валидность введённых данных.
 
         Args:
-            event: Событие нажатия кнопки.
+            data: Словарь с данными из полей ввода.
+
+        Returns:
+            bool: True, если данные валидны, иначе False.
         """
-        logging.debug("Обработка нажатия кнопки OK в RingsContentPanel")
         try:
-            # Минимизируем окно для выбора точки
-            main_window = self.GetTopLevelParent()
+            if not data or not data["diameters"]:
+                show_popup(loc.get("no_data_error", "Необходимо ввести хотя бы один диаметр"), popup_type="error")
+                logging.error("Данные не введены или отсутствуют диаметры")
+                return False
+            return True
+        except Exception as e:
+            logging.error(f"Ошибка валидации данных: {e}")
+            show_popup(loc.get("error", f"Неверный формат данных: {str(e)}"), popup_type="error")
+            return False
+
+    def process_input(self, data: Dict) -> bool:
+        """
+        Обрабатывает данные для построения колец.
+
+        Args:
+            data: Словарь с данными из полей ввода.
+
+        Returns:
+            bool: True, если построение успешно, иначе False.
+        """
+        try:
+            main_window = wx.GetTopLevelParent(self)
             main_window.Iconize(True)
             from programms.at_input import at_point_input
             point = at_point_input()
@@ -257,60 +260,39 @@ class RingsContentPanel(wx.Panel):
 
             if point and hasattr(point, "x") and hasattr(point, "y"):
                 self.insert_point = point
-                self.update_status_bar_point_selected()
+                self.update_status_bar_point_selected(point)
+                data["insert_point"] = self.insert_point
                 logging.info(f"Точка вставки выбрана: x={point.x}, y={point.y}")
             else:
                 show_popup(loc.get("point_selection_error", "Ошибка выбора точки"), popup_type="error")
-                logging.error(f"Точка вставки не выбрана или некорректна: {point}")
-                self.update_status_bar_no_point()
-                return
+                logging.error(f"Точка вставки не выбрана: {point}")
+                return False
 
-            # Получаем данные
-            ring_data = self.get_input_data()
-            if not ring_data or not ring_data["diameters"]:
-                show_popup(loc.get("no_data_error", "Необходимо ввести хотя бы один диаметр"), popup_type="error")
-                logging.error("Данные не введены или отсутствуют диаметры")
-                return
-
-            logging.debug(f"Данные для колец: {ring_data}")
-
-            # Инициализация AutoCAD
             cad = ATCadInit()
             if not cad.is_initialized():
                 show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
                 logging.error("Не удалось инициализировать AutoCAD")
-                return
-            ring_data["model"] = cad.model
+                return False
 
-            # Вызов обработки колец
-            success = run_rings(ring_data=ring_data)
+            data["model"] = cad.model
+            success = run_rings(ring_data=data)
             if success:
-                cad.adoc.Regen(0)  # Обновление активного видового экрана
+                cad.adoc.Regen(0)
                 logging.info("Кольца успешно построены")
-                # Очищаем поля
-                self.order_input.SetValue("")
-                self.diameters_input.SetValue("")
-                if hasattr(self, "insert_point"):
-                    del self.insert_point
-                self.update_status_bar_no_point()
-                self.order_input.SetFocus()
+                self.clear_input_fields()
             else:
-                show_popup(loc.get("ring_build_failed", "Построение колец отменено или завершилось с ошибкой"), popup_type="error")
+                show_popup(loc.get("ring_build_failed", "Ошибка построения колец"), popup_type="error")
                 logging.error("Ошибка построения колец")
-
+            return success
         except Exception as e:
-            logging.error(f"Ошибка в on_ok: {e}")
             show_popup(loc.get("ring_build_error", f"Ошибка построения колец: {str(e)}"), popup_type="error")
-            self.update_status_bar_no_point()
+            logging.error(f"Ошибка в process_input: {e}")
+            return False
 
-    def on_clear(self, event: wx.Event) -> None:
+    def clear_input_fields(self) -> None:
         """
         Очищает все поля ввода и сбрасывает точку вставки.
-
-        Args:
-            event: Событие нажатия кнопки.
         """
-        logging.debug("Обработка нажатия кнопки Очистить в RingsContentPanel")
         self.order_input.SetValue("")
         self.diameters_input.SetValue("")
         if hasattr(self, "insert_point"):
@@ -319,22 +301,51 @@ class RingsContentPanel(wx.Panel):
         self.order_input.SetFocus()
         logging.info("Поля ввода очищены")
 
-    def on_cancel(self, event: wx.Event) -> None:
-        """
-        Переключает контент на начальную страницу (content_apps) при нажатии кнопки "Отмена".
 
-        Args:
-            event: Событие нажатия кнопки.
-        """
-        logging.debug("Обработка нажатия кнопки Отмена в RingsContentPanel")
-        try:
-            main_window = wx.GetTopLevelParent(self)
-            if hasattr(main_window, "switch_content"):
-                main_window.switch_content("content_apps")
-                logging.info("Переключение на content_apps по нажатию кнопки 'Отмена'")
+if __name__ == "__main__":
+    """
+    Тестовый вызов окна для проверки интерфейса и построения колец.
+    """
+    app = wx.App(False)
+    frame = wx.Frame(None, title="Тест RingsContentPanel", size=(800, 600))
+    panel = RingsContentPanel(frame)
+
+    # Установка тестовых данных
+    panel.order_input.SetValue("TestOrder")
+    panel.diameters_input.SetValue("100, 200, 300")
+
+    # Тест выбора точки и построения
+    try:
+        cad = ATCadInit()
+        if not cad.is_initialized():
+            logging.error("Не удалось инициализировать AutoCAD")
+            print("Ошибка: Не удалось инициализировать AutoCAD")
+        else:
+            adoc, model = cad.adoc, cad.model
+            print(f"AutoCAD Version: {adoc.Application.Version}")
+            print(f"Active Document: {adoc.Name}")
+
+            test_point = APoint(0.0, 0.0)
+            panel.insert_point = test_point
+            panel.update_status_bar_point_selected(test_point)
+            print(f"Тест с фиксированной точкой: {test_point}")
+
+            data = {
+                "model": model,
+                "input_point": test_point,
+                "work_number": "TestOrder",
+                "diameters": {"1": 100.0, "2": 200.0, "3": 300.0}
+            }
+            success = run_rings(ring_data=data)
+            if success:
+                print("Кольца построены успешно")
+                adoc.Regen(0)
             else:
-                logging.error("Главное окно не имеет метода switch_content")
-                show_popup(loc.get("error_switch_content", "Ошибка: невозможно переключить контент"), popup_type="error")
-        except Exception as e:
-            logging.error(f"Ошибка при переключении на content_apps: {e}")
-            show_popup(loc.get("error", f"Ошибка переключения контента: {str(e)}"), popup_type="error")
+                print("Ошибка построения колец")
+
+    except Exception as e:
+        print(f"Ошибка в тестовом запуске: {e}")
+        logging.error(f"Ошибка в тестовом запуске: {e}")
+
+    frame.Show()
+    app.MainLoop()

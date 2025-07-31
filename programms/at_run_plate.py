@@ -20,7 +20,7 @@ from config.at_config import *
 from windows.at_gui_utils import show_popup
 from programms.at_base import regen, init_autocad
 from programms.at_offset import at_offset
-from at_dimension import at_amautodim
+from programms.at_dimension import at_amautodim
 
 # Настройка логирования
 # Настройка логирования в консоль
@@ -143,7 +143,7 @@ def run_plate(plate_data: Dict[str, Any]) -> bool:
         # Создание внутренней полилинии
         at_offset(polyline, allowance, adoc, model)
 
-        at_amautodim(adoc, polyline, insert_point, ([insert_point([0]+insert_point[1] / 2), insert_point[5] + 60]))
+        # at_amautodim(adoc, polyline, insert_point, APoint([insert_point([0]+insert_point[1] / 2), insert_point[5] + 60]))
 
         # Регенерация чертежа
         regen(adoc)

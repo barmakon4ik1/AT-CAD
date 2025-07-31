@@ -1,12 +1,13 @@
+# windows/content_apps.py
 """
 Модуль для создания панели со списком доступных программ.
 Отображает текстовые ссылки на программы в один столбец.
 """
-
 import wx
 import logging
-from config.at_config import *
-from windows.at_window_utils import *
+from config.at_config import load_user_settings, DEFAULT_SETTINGS
+from windows.at_gui_utils import show_popup
+from windows.at_window_utils import BaseContentPanel, get_link_font
 from locales.at_localization_class import loc
 from windows.at_run_dialog_window import load_content
 
@@ -31,7 +32,7 @@ def create_window(parent: wx.Window) -> wx.Panel:
     return AppsContentPanel(parent)
 
 
-class AppsContentPanel(wx.Panel):
+class AppsContentPanel(BaseContentPanel):
     """
     Панель для отображения списка программ в виде текстовых ссылок.
     """
@@ -43,10 +44,6 @@ class AppsContentPanel(wx.Panel):
             parent: Родительский wx.Window.
         """
         super().__init__(parent)
-        self.settings = load_user_settings()  # Загружаем настройки
-        background_color = self.settings.get("BACKGROUND_COLOR", DEFAULT_SETTINGS["BACKGROUND_COLOR"])
-        self.SetBackgroundColour(wx.Colour(background_color))
-        self.parent = parent
         self.links = []  # Список ссылок для последующего обновления
         self.setup_ui()
 
@@ -149,17 +146,4 @@ class AppsContentPanel(wx.Panel):
         if not isinstance(content_name, str):
             logging.warning(f"Нестроковый content_name в on_link_click: {content_name}, преобразование в строку")
             content_name = str(content_name)
-
-        logging.debug(f"Клик по ссылке: {content_name}")
-        try:
-            main_window = wx.GetTopLevelParent(self)
-            if hasattr(main_window, "switch_content"):
-                main_window.switch_content(content_name)
-                logging.info(f"Переключение на контент: {content_name}")
-            else:
-                logging.error("Главное окно не имеет метода switch_content")
-                show_popup("Ошибка: невозможно переключить контент", popup_type="error")
-        except Exception as e:
-            logging.error(f"Ошибка при переключении контента: {e}")
-            show_popup(f"Ошибка переключения контента: {str(e)}", popup_type="error")
-
+        self.switch_content_panel(content_name)
