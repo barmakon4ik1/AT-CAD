@@ -495,29 +495,53 @@ class CanvasPanel(wx.Panel):
         Args:
             event (wx.Event): Событие отрисовки (wx.EVT_PAINT).
         """
-        dc = wx.PaintDC(self)
+        dc = wx.BufferedPaintDC(self)
         dc.SetBackground(wx.WHITE_BRUSH)
         dc.Clear()
         width, height = self.GetSize()
-        if self.image and self.image.IsOk():
-            if not self.scaled_bitmap or self.scaled_bitmap.GetSize() != (width, height):
-                img_width, img_height = self.image.GetWidth(), self.image.GetHeight()
-                scale = min(width / img_width, height / img_height)
-                new_width = int(img_width * scale)
-                new_height = int(img_height * scale)
-                scaled_image = self.image.Scale(new_width, new_height, wx.IMAGE_QUALITY_HIGH)
-                self.scaled_bitmap = wx.Bitmap(scaled_image)
-            x = (width - self.scaled_bitmap.GetWidth()) // 2
-            y = (height - self.scaled_bitmap.GetHeight()) // 2
-            dc.DrawBitmap(self.scaled_bitmap, x, y)
-        else:
+
+        if width <= 0 or height <= 0:
+            logging.warning(f"Недопустимые размеры панели: {width}x{height}")
             dc.SetTextForeground(wx.BLACK)
-            # Запасной текст, так как ключ "image_not_found" отсутствует в translations
+            dc.DrawText(loc.get("invalid_size", "Недопустимый размер панели"), width // 2 - 50, height // 2)
+            return
+
+        if not self.image or not self.image.IsOk():
+            logging.warning("Изображение недоступно или некорректно")
+            dc.SetTextForeground(wx.BLACK)
             error_text = loc.get("image_not_found", "Изображение не найдено")
             if error_text == "image_not_found":
                 logging.warning(
                     "Перевод для ключа 'image_not_found' не найден в translations, использовано значение: Изображение не найдено")
             dc.DrawText(error_text, width // 2 - 50, height // 2)
+            return
+
+        img_width, img_height = self.image.GetWidth(), self.image.GetHeight()
+        if img_width <= 0 or img_height <= 0:
+            logging.error(f"Недопустимые размеры изображения: {img_width}x{img_height}")
+            dc.SetTextForeground(wx.BLACK)
+            dc.DrawText(loc.get("image_not_found", "Изображение не найдено"), width // 2 - 50, height // 2)
+            return
+
+        scale = min(width / img_width, height / img_height)
+        new_width = int(img_width * scale)
+        new_height = int(img_height * scale)
+
+        if new_width > 0 and new_height > 0:
+            try:
+                scaled_image = self.image.Scale(new_width, new_height, wx.IMAGE_QUALITY_HIGH)
+                self.scaled_bitmap = wx.Bitmap(scaled_image)
+                x = (width - self.scaled_bitmap.GetWidth()) // 2
+                y = (height - self.scaled_bitmap.GetHeight()) // 2
+                dc.DrawBitmap(self.scaled_bitmap, x, y)
+            except Exception as e:
+                logging.error(f"Ошибка масштабирования изображения: {e}")
+                dc.SetTextForeground(wx.BLACK)
+                dc.DrawText(loc.get("image_error", "Ошибка изображения"), width // 2 - 50, height // 2)
+        else:
+            logging.error(f"Недопустимые размеры для масштабирования: {new_width}x{new_height}")
+            dc.SetTextForeground(wx.BLACK)
+            dc.DrawText(loc.get("image_error", "Ошибка изображения"), width // 2 - 50, height // 2)
 
     def on_resize(self, event: wx.Event) -> None:
         """

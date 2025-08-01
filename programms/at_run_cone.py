@@ -32,7 +32,7 @@ def run_application(data: Dict[str, Any]) -> bool:
                 return False
 
         model = data["model"]
-        input_point = data["input_point"]
+        input_point = APoint(data["input_point"])
 
         # Создание слоёв
         for layer in ["LASER-TEXT", "schrift", "TEXT"]:

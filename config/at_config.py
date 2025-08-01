@@ -36,7 +36,7 @@ ICON_PATH: str = os.path.join(IMAGES_DIR, "AT-CAD_8.png")
 RING_IMAGE_PATH: str = os.path.join(IMAGES_DIR, "ring_image.png")
 HEAD_IMAGE_PATH: str = os.path.join(IMAGES_DIR, "head_image.png")
 PLATE_IMAGE_PATH: str = os.path.join(IMAGES_DIR, "plate_image.png")
-CONE_IMAGE_PATH: str = os.path.join(IMAGES_DIR, "cone.png")
+CONE_IMAGE_PATH: str = os.path.join(IMAGES_DIR, "cone_image.png")
 DONE_ICON_PATH: str = os.path.join(IMAGES_DIR, "done-icon.png")
 
 # Путь к файлу с последними введёнными данными для конуса

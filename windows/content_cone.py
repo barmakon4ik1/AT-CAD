@@ -1,16 +1,18 @@
 """
 Файл: windows/content_cone.py
 Описание:
-Модуль для создания панели для ввода параметров развертки конуса.
-Обеспечивает интерфейс для ввода данных конуса, расчёты и вызов построения развертки.
-Локализация осуществляется через loc.get с использованием словаря translations.
-Настройки (шрифты, цвета) читаются из user_settings.json через get_setting.
+Модуль для создания панели ввода параметров развертки конуса.
+Обеспечивает интерфейс для ввода данных конуса с валидацией, вызовом функции выбора точки
+и возвратом словаря с данными в main_window.last_input. Локализация через loc.get, настройки из user_settings.json.
+Сохраняет указанные данные в last_input.json для использования в качестве начальных значений.
+Изображение конуса отображается с помощью CanvasPanel слева, кнопки под изображением, поля ввода справа.
 """
 
 import logging
 import math
 import os
-from typing import Optional, Dict, List
+import json
+from typing import Optional, Dict
 
 import wx
 
@@ -23,7 +25,6 @@ from windows.at_window_utils import (
     create_standard_buttons, adjust_button_widths, update_status_bar_point_selected,
     BaseContentPanel, load_common_data
 )
-from programms.at_run_cone import run_application
 from config.at_last_input import save_last_input
 
 # Настройка логирования
@@ -51,7 +52,7 @@ def create_window(parent: wx.Window) -> wx.Panel:
     except Exception as e:
         logging.error(f"Ошибка создания ConeContentPanel: {e}")
         show_popup(loc.get("error", f"Ошибка создания панели конуса: {str(e)}"), popup_type="error")
-        return None
+        return wx.Panel(parent)
 
 
 class ConeContentPanel(BaseContentPanel):
@@ -78,7 +79,9 @@ class ConeContentPanel(BaseContentPanel):
         self.Bind(wx.EVT_TIMER, self.on_debounce_timeout, self._debounce_timer)
         self.update_status_bar_no_point()
         self.setup_ui()
+        self.load_last_input()
         self.order_input.SetFocus()
+        logging.info("ConeContentPanel инициализирована")
 
     def update_status_bar_no_point(self):
         """
@@ -114,10 +117,17 @@ class ConeContentPanel(BaseContentPanel):
         image_path = os.path.abspath(CONE_IMAGE_PATH)
         if not os.path.exists(image_path):
             logging.warning(f"Файл изображения конуса '{image_path}' не найден")
+            image_path = None  # Устанавливаем None, чтобы CanvasPanel обработал отсутствие изображения
 
         # Изображение конуса
-        self.canvas = CanvasPanel(self, image_file=image_path, size=(600, 400))
-        self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
+        try:
+            self.canvas = CanvasPanel(self, image_file=image_path, size=(600, 400))
+            self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
+        except Exception as e:
+            logging.error(f"Ошибка создания CanvasPanel: {e}")
+            show_popup(loc.get("error", f"Ошибка загрузки изображения: {str(e)}"), popup_type="error")
+            self.canvas = wx.Panel(self, size=(600, 400))
+            self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
 
         # Кнопки
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -135,7 +145,8 @@ class ConeContentPanel(BaseContentPanel):
         common_data = load_common_data()
         material_options = [mat["name"] for mat in common_data.get("material", []) if mat["name"]]
         thickness_options = common_data.get("thicknesses", [])
-        default_thickness = "4" if "4" in thickness_options or "4.0" in thickness_options else thickness_options[0] if thickness_options else ""
+        default_thickness = "4" if "4" in thickness_options or "4.0" in thickness_options else thickness_options[
+            0] if thickness_options else ""
 
         # Группа "Основные данные"
         main_data_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, loc.get("main_data_label", "Основные данные"))
@@ -146,8 +157,6 @@ class ConeContentPanel(BaseContentPanel):
         # Номер заказа и детали
         order_sizer = wx.BoxSizer(wx.HORIZONTAL)
         order_label = wx.StaticText(main_data_box, label=loc.get("order_label", "К-№"))
-        if order_label.GetLabel() == "order_label":
-            logging.warning(f"Перевод для ключа 'order_label' не найден, использовано значение: К-№")
         order_label.SetFont(font)
         self.labels["order"] = order_label
         self.order_input = wx.TextCtrl(main_data_box, value="", size=INPUT_FIELD_SIZE)
@@ -165,7 +174,9 @@ class ConeContentPanel(BaseContentPanel):
         material_label = wx.StaticText(main_data_box, label=loc.get("material_label", "Материал"))
         material_label.SetFont(font)
         self.labels["material"] = material_label
-        self.material_combo = wx.ComboBox(main_data_box, choices=material_options, value=material_options[0] if material_options else "", style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
+        self.material_combo = wx.ComboBox(main_data_box, choices=material_options,
+                                          value=material_options[0] if material_options else "", style=wx.CB_DROPDOWN,
+                                          size=INPUT_FIELD_SIZE)
         self.material_combo.SetFont(font)
         material_sizer.AddStretchSpacer()
         material_sizer.Add(material_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
@@ -177,7 +188,8 @@ class ConeContentPanel(BaseContentPanel):
         thickness_label = wx.StaticText(main_data_box, label=loc.get("thickness_label", "Толщина"))
         thickness_label.SetFont(font)
         self.labels["thickness"] = thickness_label
-        self.thickness_combo = wx.ComboBox(main_data_box, choices=thickness_options, value=default_thickness, style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
+        self.thickness_combo = wx.ComboBox(main_data_box, choices=thickness_options, value=default_thickness,
+                                           style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
         self.thickness_combo.SetFont(font)
         thickness_sizer.AddStretchSpacer()
         thickness_sizer.Add(thickness_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
@@ -304,7 +316,8 @@ class ConeContentPanel(BaseContentPanel):
         allowance_label = wx.StaticText(self, label=loc.get("weld_allowance_label", "Припуск на сварку, мм"))
         allowance_label.SetFont(font)
         self.labels["allowance"] = allowance_label
-        self.allowance_combo = wx.ComboBox(self, choices=[str(i) for i in range(11)], value="3", style=wx.CB_READONLY, size=INPUT_FIELD_SIZE)
+        self.allowance_combo = wx.ComboBox(self, choices=[str(i) for i in range(11)], value="3", style=wx.CB_READONLY,
+                                           size=INPUT_FIELD_SIZE)
         self.allowance_combo.SetFont(font)
         allowance_sizer.AddStretchSpacer()
         allowance_sizer.Add(allowance_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
@@ -317,6 +330,26 @@ class ConeContentPanel(BaseContentPanel):
         apply_styles_to_panel(self)
         self.Layout()
         logging.info("Интерфейс ConeContentPanel настроен")
+
+    def load_last_input(self) -> None:
+        """
+        Загружает последние введённые данные из last_input.json.
+        """
+        try:
+            file_path = self.last_input_file
+            if os.path.exists(file_path):
+                with open(file_path, "r", encoding='utf-8') as f:
+                    last_input = json.load(f)
+                self.order_input.SetValue(last_input.get("order_number", ""))
+                self.material_combo.SetValue(last_input.get("material", self.material_combo.GetValue()))
+                self.thickness_combo.SetValue(str(last_input.get("thickness", self.thickness_combo.GetValue())))
+                self.allowance_combo.SetValue(str(last_input.get("weld_allowance", "3")))
+                logging.info(f"Последние данные загружены из {file_path}")
+            else:
+                logging.info(f"Файл {file_path} не найден, используются значения по умолчанию")
+        except Exception as e:
+            logging.error(f"Ошибка загрузки {file_path}: {e}")
+            show_popup(loc.get("error", f"Ошибка загрузки данных: {str(e)}"), popup_type="error")
 
     def update_ui_language(self):
         """
@@ -345,16 +378,7 @@ class ConeContentPanel(BaseContentPanel):
             self.buttons[i].SetLabel(loc.get(key, ["ОК", "Очистить", "Отмена"][i]))
         adjust_button_widths(self.buttons)
 
-        common_data = load_common_data()
-        material_options = [mat["name"] for mat in common_data.get("material", []) if mat["name"]]
-        thickness_options = common_data.get("thicknesses", [])
-        default_thickness = "4" if "4" in thickness_options or "4.0" in thickness_options else thickness_options[0] if thickness_options else ""
-        self.material_combo.SetItems(material_options)
-        self.material_combo.SetValue(material_options[0] if material_options else "")
-        self.thickness_combo.SetItems(thickness_options)
-        self.thickness_combo.SetValue(default_thickness)
-
-        self.update_status_bar_no_point()
+        self.canvas.Refresh()
         self.Layout()
         self.Refresh()
         self.Update()
@@ -419,42 +443,48 @@ class ConeContentPanel(BaseContentPanel):
                 try:
                     height = float(height_str)
                     if height <= 0:
-                        show_popup(loc.get("error_height_positive", "Высота должна быть положительной"), popup_type="error")
+                        show_popup(loc.get("error_height_positive", "Высота должна быть положительной"),
+                                   popup_type="error")
                         return
                     steigung = at_steigung(height, D, d)
                     angle = math.degrees(math.atan2(abs(D - d) / 2, height)) * 2
                     self.steigung_input.SetValue(f"{steigung:.2f}" if steigung is not None else "")
                     self.angle_input.SetValue(f"{angle:.2f}" if angle is not None else "")
                 except ValueError:
-                    show_popup(loc.get("invalid_number_format_error", "Неверный формат числа для высоты"), popup_type="error")
+                    show_popup(loc.get("invalid_number_format_error", "Неверный формат числа для высоты"),
+                               popup_type="error")
             elif steigung_str:
                 self.height_input.Enable(False)
                 self.angle_input.Enable(False)
                 try:
                     steigung = float(steigung_str)
                     if steigung <= 0:
-                        show_popup(loc.get("error_steigung_positive", "Наклон должен быть положительным"), popup_type="error")
+                        show_popup(loc.get("error_steigung_positive", "Наклон должен быть положительным"),
+                                   popup_type="error")
                         return
                     height = at_cone_height(D, d, steigung=steigung)
                     angle = math.degrees(math.atan2(abs(D - d) / 2, height)) * 2 if height else 0
                     self.height_input.SetValue(f"{height:.2f}" if height is not None else "")
                     self.angle_input.SetValue(f"{angle:.2f}" if angle is not None else "")
                 except ValueError:
-                    show_popup(loc.get("invalid_number_format_error", "Неверный формат числа для наклона"), popup_type="error")
+                    show_popup(loc.get("invalid_number_format_error", "Неверный формат числа для наклона"),
+                               popup_type="error")
             elif angle_str:
                 self.height_input.Enable(False)
                 self.steigung_input.Enable(False)
                 try:
                     angle = float(angle_str)
                     if not 0 < angle < 180:
-                        show_popup(loc.get("error_angle_range", "Угол должен быть в диапазоне 0–180°"), popup_type="error")
+                        show_popup(loc.get("error_angle_range", "Угол должен быть в диапазоне 0–180°"),
+                                   popup_type="error")
                         return
                     height = at_cone_height(D, d, angle=angle)
                     steigung = at_steigung(height, D, d)
                     self.height_input.SetValue(f"{height:.2f}" if height is not None else "")
                     self.steigung_input.SetValue(f"{steigung:.2f}" if steigung is not None else "")
                 except ValueError:
-                    show_popup(loc.get("invalid_number_format_error", "Неверный формат числа для угла"), popup_type="error")
+                    show_popup(loc.get("invalid_number_format_error", "Неверный формат числа для угла"),
+                               popup_type="error")
             else:
                 self.height_input.Enable(True)
                 self.steigung_input.Enable(True)
@@ -480,17 +510,24 @@ class ConeContentPanel(BaseContentPanel):
                 "order_number": self.order_input.GetValue().strip(),
                 "detail_number": self.detail_input.GetValue().strip(),
                 "material": self.material_combo.GetValue().strip(),
-                "thickness": float(self.thickness_combo.GetValue().replace(',', '.')) if self.thickness_combo.GetValue().strip() else None,
-                "diameter_top": float(self.d_input.GetValue().replace(',', '.')) if self.d_input.GetValue().strip() else None,
-                "diameter_base": float(self.D_input.GetValue().replace(',', '.')) if self.D_input.GetValue().strip() else None,
+                "thickness": float(self.thickness_combo.GetValue().replace(',',
+                                                                           '.')) if self.thickness_combo.GetValue().strip() else 0,
+                "diameter_top": float(
+                    self.d_input.GetValue().replace(',', '.')) if self.d_input.GetValue().strip() else 0,
+                "diameter_base": float(
+                    self.D_input.GetValue().replace(',', '.')) if self.D_input.GetValue().strip() else 0,
                 "d_type": "inner" if self.d_inner.GetValue() else "middle" if self.d_middle.GetValue() else "outer",
                 "D_type": "inner" if self.D_inner.GetValue() else "middle" if self.D_middle.GetValue() else "outer",
-                "height": float(self.height_input.GetValue().replace(',', '.')) if self.height_input.GetValue().strip() else None,
-                "steigung": float(self.steigung_input.GetValue().replace(',', '.')) if self.steigung_input.GetValue().strip() else None,
-                "angle": float(self.angle_input.GetValue().replace(',', '.')) if self.angle_input.GetValue().strip() else None,
-                "weld_allowance": float(self.allowance_combo.GetValue().replace(',', '.')) if self.allowance_combo.GetValue().strip() else 0,
+                "height": float(
+                    self.height_input.GetValue().replace(',', '.')) if self.height_input.GetValue().strip() else 0,
+                "steigung": float(
+                    self.steigung_input.GetValue().replace(',', '.')) if self.steigung_input.GetValue().strip() else 0,
+                "angle": float(
+                    self.angle_input.GetValue().replace(',', '.')) if self.angle_input.GetValue().strip() else 0,
+                "weld_allowance": float(self.allowance_combo.GetValue().replace(',',
+                                                                                '.')) if self.allowance_combo.GetValue().strip() else 0,
                 "insert_point": self.insert_point,
-                "thickness_text": f"{float(self.thickness_combo.GetValue()):.2f} {loc.get('mm', 'мм')}" if self.thickness_combo.GetValue().strip() else ""
+                "thickness_text": f"{float(self.thickness_combo.GetValue()):.2f} {loc.get('mm', 'мм')}" if self.thickness_combo.GetValue().strip() else "0.00 мм"
             }
             return data
         except ValueError as e:
@@ -509,40 +546,45 @@ class ConeContentPanel(BaseContentPanel):
             bool: True, если данные валидны, иначе False.
         """
         try:
-            if not data or any(data[k] is None for k in ["diameter_top", "diameter_base", "thickness"]):
-                show_popup(loc.get("error_diameter_required", "Требуется ввести диаметры и толщину"), popup_type="error")
+            if not data:
+                show_popup(loc.get("error_data_missing", "Необходимо ввести данные"), popup_type="error")
                 return False
 
-            if data["diameter_base"] <= 0:
-                show_popup(loc.get("error_base_diameter_positive", "Диаметр основания должен быть положительным"), popup_type="error")
+            # Проверка материала
+            if not data["material"]:
+                show_popup(loc.get("error_material_required", "Выберите материал"), popup_type="error")
+                self.material_combo.SetFocus()
                 return False
 
-            if data["diameter_top"] < 0:
-                show_popup(loc.get("error_top_diameter_non_negative", "Диаметр вершины не может быть отрицательным"), popup_type="error")
-                return False
+            # Проверка числовых значений
+            for field, label, input_ctrl in [
+                ("thickness", loc.get("thickness_label", "Толщина"), self.thickness_combo),
+                ("diameter_top", loc.get("d_label", "d, мм"), self.d_input),
+                ("diameter_base", loc.get("D_label", "D, мм"), self.D_input),
+                ("height", loc.get("height_label_mm", "H, мм"), self.height_input),
+                ("weld_allowance", loc.get("weld_allowance_label", "Припуск на сварку, мм"), self.allowance_combo)
+            ]:
+                if data[field] < 0:
+                    show_popup(loc.get(f"error_{field}_non_negative", f"{label} не может быть отрицательным"),
+                               popup_type="error")
+                    input_ctrl.SetFocus()
+                    return False
+                if field != "weld_allowance" and data[field] == 0:
+                    show_popup(loc.get(f"error_{field}_positive", f"{label} должен быть положительным"),
+                               popup_type="error")
+                    input_ctrl.SetFocus()
+                    return False
 
-            if data["weld_allowance"] < 0:
-                show_popup(loc.get("error_weld_allowance_non_negative", "Припуск на сварку не может быть отрицательным"), popup_type="error")
-                return False
-
-            if data["thickness"] <= 0:
-                show_popup(loc.get("error_thickness_positive", "Толщина должна быть положительной"), popup_type="error")
-                return False
-
-            if all(data[k] is None for k in ["height", "steigung", "angle"]):
-                show_popup(loc.get("error_height_steigung_angle_required", "Необходимо ввести высоту, наклон или угол"), popup_type="error")
-                return False
-
-            if data["height"] is not None and data["height"] <= 0:
-                show_popup(loc.get("error_height_positive", "Высота должна быть положительной"), popup_type="error")
-                return False
-
-            if data["steigung"] is not None and data["steigung"] <= 0:
-                show_popup(loc.get("error_steigung_positive", "Наклон должен быть положительным"), popup_type="error")
-                return False
-
-            if data["angle"] is not None and (data["angle"] <= 0 or data["angle"] >= 180):
+            # Проверка угла
+            if data["angle"] != 0 and (data["angle"] <= 0 or data["angle"] >= 180):
                 show_popup(loc.get("error_angle_range", "Угол должен быть в диапазоне 0–180°"), popup_type="error")
+                self.angle_input.SetFocus()
+                return False
+
+            # Проверка наклона
+            if data["steigung"] != 0 and data["steigung"] <= 0:
+                show_popup(loc.get("error_steigung_positive", "Наклон должен быть положительным"), popup_type="error")
+                self.steigung_input.SetFocus()
                 return False
 
             return True
@@ -553,89 +595,71 @@ class ConeContentPanel(BaseContentPanel):
 
     def process_input(self, data: Dict) -> bool:
         """
-        Обрабатывает данные для построения развертки конуса.
+        Обрабатывает собранные данные, запрашивает точку вставки и сохраняет данные в main_window.last_input.
 
         Args:
             data: Словарь с данными из полей ввода.
 
         Returns:
-            bool: True, если построение успешно, иначе False.
+            bool: True, если обработка успешна, иначе False.
         """
         try:
+            if not data or not self.validate_input(data):
+                logging.error("Данные отсутствуют или невалидны в process_input")
+                show_popup(loc.get("error_data_missing", "Некорректные данные"), popup_type="error")
+                return False
+
             main_window = wx.GetTopLevelParent(self)
             main_window.Iconize(True)
-            point = at_point_input()
-            main_window.Iconize(False)
-            main_window.Raise()
-            main_window.SetFocus()
-            wx.Yield()
+            try:
+                logging.info("Вызов at_point_input для выбора точки")
+                point = at_point_input()
+                logging.info(f"Получена точка: {point}")
+            except Exception as e:
+                logging.error(f"Ошибка вызова at_point_input: {e}")
+                show_popup(loc.get("point_selection_error", f"Ошибка выбора точки: {str(e)}"), popup_type="error")
+                return False
+            finally:
+                main_window.Iconize(False)
+                main_window.Raise()
+                main_window.SetFocus()
+                wx.Yield()
 
             if point and isinstance(point, (list, tuple)) and len(point) == 3:
                 self.insert_point = list(point)
                 data["insert_point"] = self.insert_point
                 self.update_status_bar_point_selected(self.insert_point)
-                logging.info(f"Точка вставки выбрана: {self.insert_point}")
+                main_window.last_input = data  # Сохраняем полный словарь в main_window
+                # Сохраняем только указанные поля в last_input.json
+                last_input_data = {
+                    "order_number": data["order_number"],
+                    "material": data["material"],
+                    "thickness": data["thickness"],
+                    "weld_allowance": data["weld_allowance"]
+                }
+                save_last_input(self.last_input_file, last_input_data)
+                logging.info(f"Точка вставки выбрана: {self.insert_point}, данные сохранены в main_window.last_input")
+                main_window.switch_content("content_apps")  # Переключение на content_apps
+                return True
             else:
+                logging.warning(f"Некорректная точка вставки: {point}")
                 show_popup(loc.get("point_selection_error", "Ошибка выбора точки"), popup_type="error")
                 return False
-
-            d = data["diameter_top"]
-            D = data["diameter_base"]
-            thickness = data["thickness"]
-            allowance = data["weld_allowance"]
-            d_type = data["d_type"]
-            D_type = data["D_type"]
-
-            if d > D:
-                d, D = D, d
-                data["diameter_top"], data["diameter_base"] = d, D
-
-            diameter_top = at_diameter(d, thickness, d_type)
-            diameter_base = at_diameter(D, thickness, D_type)
-
-            height = data["height"]
-            if height is None:
-                height = at_cone_height(D, d, steigung=data["steigung"]) if data["steigung"] is not None else at_cone_height(D, d, angle=data["angle"])
-            height += allowance
-
-            process_data = {
-                "model": None,  # Model will be set in run_application
-                "input_point": self.insert_point,
-                "diameter_base": diameter_base,
-                "diameter_top": diameter_top,
-                "height": height,
-                "layer_name": "0",
-                "order_number": data["order_number"],
-                "detail_number": data["detail_number"],
-                "material": data["material"],
-                "thickness_text": data["thickness_text"]
-            }
-
-            success = run_application(process_data)
-            if success:
-                logging.info("Развертка конуса успешно построена")
-                self.clear_input_fields()
-                save_last_input(self.last_input_file, data)
-            else:
-                show_popup(loc.get("cone_build_error", "Ошибка построения развертки конуса"), popup_type="error")
-            return success
         except Exception as e:
-            logging.error(f"Ошибка в process_input: {e}")
-            show_popup(loc.get("cone_build_error", f"Ошибка построения: {str(e)}"), popup_type="error")
+            logging.error(f"Ошибка обработки данных: {e}")
+            show_popup(loc.get("error", f"Ошибка обработки: {str(e)}"), popup_type="error")
             return False
+        finally:
+            main_window.Iconize(False)
+            main_window.Raise()
+            main_window.SetFocus()
+            wx.Yield()
 
     def clear_input_fields(self) -> None:
         """
-        Очищает все поля ввода и сбрасывает точку вставки.
+        Очищает все поля ввода, кроме загружаемых из common_data.json и last_input.json.
         """
-        common_data = load_common_data()
-        material_options = [mat["name"] for mat in common_data.get("material", []) if mat["name"]]
-        thickness_options = common_data.get("thicknesses", [])
-        default_thickness = "4" if "4" in thickness_options or "4.0" in thickness_options else thickness_options[0] if thickness_options else ""
-        self.order_input.SetValue("")
         self.detail_input.SetValue("")
-        self.material_combo.SetValue(material_options[0] if material_options else "")
-        self.thickness_combo.SetValue(default_thickness)
         self.d_input.SetValue("")
         self.D_input.SetValue("")
         self.d_inner.SetValue(True)
@@ -643,71 +667,21 @@ class ConeContentPanel(BaseContentPanel):
         self.height_input.SetValue("")
         self.steigung_input.SetValue("")
         self.angle_input.SetValue("")
-        self.allowance_combo.SetValue("3")
         self.insert_point = None
         self.update_status_bar_no_point()
+        self.height_input.Enable(True)
+        self.steigung_input.Enable(True)
+        self.angle_input.Enable(True)
         self.order_input.SetFocus()
-        logging.info("Поля ввода очищены")
+        logging.info("Поля ввода очищены, кроме данных из common_data.json и last_input.json")
+
 
 if __name__ == "__main__":
     """
-    Тестовый вызов окна для проверки интерфейса и построения развертки конуса.
+    Тестовый вызов окна для проверки интерфейса.
     """
     app = wx.App(False)
     frame = wx.Frame(None, title="Тест ConeContentPanel", size=(800, 600))
     panel = ConeContentPanel(frame)
-
-    # Установка тестовых данных
-    panel.order_input.SetValue("TestOrder")
-    panel.detail_input.SetValue("TestDetail")
-    panel.material_combo.SetValue("Сталь")
-    panel.thickness_combo.SetValue("4")
-    panel.d_input.SetValue("100")
-    panel.D_input.SetValue("500")
-    panel.d_inner.SetValue(True)
-    panel.D_inner.SetValue(True)
-    panel.height_input.SetValue("300")
-    panel.allowance_combo.SetValue("3")
-
-    # Тест выбора точки и построения
-    try:
-        from config.at_cad_init import ATCadInit
-        cad = ATCadInit()
-        if not cad.is_initialized():
-            logging.error("Не удалось инициализировать AutoCAD")
-            print("Ошибка: Не удалось инициализировать AutoCAD")
-        else:
-            adoc = cad.adoc
-            print(f"AutoCAD Version: {adoc.Application.Version}")
-            print(f"Active Document: {adoc.Name}")
-
-            test_point = [0.0, 0.0, 0.0]
-            panel.insert_point = test_point
-            panel.update_status_bar_point_selected(test_point)
-            print(f"Тест с фиксированной точкой: {test_point}")
-
-            data = {
-                "model": cad.model,
-                "input_point": test_point,
-                "diameter_base": 500.0,
-                "diameter_top": 100.0,
-                "height": 303.0,  # 300 + 3 (припуск)
-                "layer_name": "0",
-                "order_number": "TestOrder",
-                "detail_number": "TestDetail",
-                "material": "Сталь",
-                "thickness_text": "4.00 мм"
-            }
-            success = run_application(data)
-            if success:
-                print("Развертка конуса построена успешно")
-                adoc.Regen(1)
-            else:
-                print("Ошибка построения развертки")
-
-    except Exception as e:
-        print(f"Ошибка в тестовом запуске: {e}")
-        logging.error(f"Ошибка в тестовом запуске: {e}")
-
     frame.Show()
     app.MainLoop()
