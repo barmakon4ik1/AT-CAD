@@ -14,6 +14,11 @@ import pythoncom
 import array
 from typing import List, Any, Optional
 from win32com.client import VARIANT
+from typing import Union, Tuple
+import math
+from windows.at_gui_utils import show_popup
+from locales.at_localization_class import loc
+
 
 
 @handle_errors
@@ -239,7 +244,7 @@ def at_cone_sheet(model: object, input_point: APoint, diameter_base: float, diam
         return None, None
 
 
-def polar_point(point: Union[APoint, Tuple[float, float]], distance: float, alpha: float = 0) -> APoint:
+def polar_point(point: Union[APoint, Tuple[float, float]], distance: float, alpha: float = 0) -> Tuple[float, float]:
     """
     Находит точку в полярных координатах относительно начальной точки.
 
@@ -249,38 +254,83 @@ def polar_point(point: Union[APoint, Tuple[float, float]], distance: float, alph
         alpha: Угол в градусах (по умолчанию 0).
 
     Returns:
-        APoint: Новая точка в модельном пространстве.
+        Tuple[float, float]: Координаты новой точки (x, y).
 
-    Raises:
-        ValueError: Если point или length имеют некорректный формат или значения.
-        TypeError: Если point не является APoint или кортежем (x, y).
+    Notes:
+        Если входные параметры некорректны, функция показывает всплывающее окно с запросом на исправление.
+        При нажатии "Cancel" возвращается (0, 0).
+        Сообщения выводятся на языке, установленном в объекте loc.
     """
-    # Проверка входных параметров
-    if point is None:
-        raise ValueError("Параметр point не может быть None")
+    # Проверка параметра point
+    while True:
+        if point is None:
+            result = show_popup(
+                message=loc.get("invalid_point", "Точка должна быть определена. Введите корректную точку"),
+                title=loc.get("error", "Ошибка"),
+                popup_type="error",
+                buttons=[loc.get("ok_button", "OK"), loc.get("cancel", "Отмена")]
+            )
+            if result == 0:  # Cancel
+                return (0, 0)
+            point = (0, 0)  # Установка значения по умолчанию для продолжения
+            continue
 
-    if not isinstance(distance, (int, float)) or distance < 0:
-        raise ValueError(f"Длина должна быть неотрицательным числом, получено: {distance}")
+        if isinstance(point, APoint):
+            x0, y0 = point.x, point.y
+            break
+        elif isinstance(point, (tuple, list)) and len(point) == 2 and all(isinstance(coord, (int, float)) for coord in point):
+            x0, y0 = point
+            break
+        else:
+            result = show_popup(
+                message=loc.get(
+                    "invalid_points_type",
+                    f"Точка должна быть типа APoint или кортеж (x, y), получено же: {type(point)}. Пожалуйста исправьте."
+                ).format(type(point)),
+                title=loc.get("error", "Ошибка"),
+                popup_type="error",
+                buttons=[loc.get("ok_button", "OK"), loc.get("cancel", "Отмена")]
+            )
+            if result == 0:  # Cancel
+                return (0, 0)
+            point = (0, 0)  # Установка значения по умолчанию для продолжения
 
-    if not isinstance(alpha, (int, float)):
-        raise ValueError(f"Угол должен быть числом, получено: {alpha}")
+    # Проверка distance
+    while not isinstance(distance, (int, float)) or distance < 0:
+        result = show_popup(
+            message=loc.get(
+                "length_positive_error",
+                f"Расстояние должно быть положительным числом, получено: {distance}. Пожалуйста исправьте."
+            ).format(distance),
+            title=loc.get("error", "Ошибка"),
+            popup_type="error",
+            buttons=[loc.get("ok_button", "OK"), loc.get("cancel", "Отмена")]
+        )
+        if result == 0:  # Cancel
+            return (0, 0)
+        distance = 0  # Установка значения по умолчанию для продолжения
 
-    # Извлечение координат x, y
-    if isinstance(point, APoint):
-        x0, y0 = point.x, point.y
-    elif isinstance(point, (tuple, list)) and len(point) == 2 and all(
-            isinstance(coord, (int, float)) for coord in point):
-        x0, y0 = point
-    else:
-        raise TypeError(f"point должен быть APoint или кортежем (x, y), получено: {type(point)}")
+    # Проверка alpha
+    while not isinstance(alpha, (int, float)):
+        result = show_popup(
+            message=loc.get(
+                "invalid_angle",
+                f"Угол должен быть числом, получено: {alpha}. Пожалуйста исправьте."
+            ).format(alpha),
+            title=loc.get("error", "Ошибка"),
+            popup_type="error",
+            buttons=[loc.get("ok_button", "OK"), loc.get("cancel", "Отмена")]
+        )
+        if result == 0:  # Cancel
+            return (0, 0)
+        alpha = 0  # Установка значения по умолчанию для продолжения
 
     # Вычисление новой точки
     alpha_rad = math.radians(alpha)
     x1 = x0 + distance * math.cos(alpha_rad)
     y1 = y0 + distance * math.sin(alpha_rad)
 
-    return APoint(x1, y1)
-
+    return (x1, y1)
 
 def at_addText(model: object, point: List[float | int], text: str = "", layer_name: str = "schrift",
                text_height: float = 30, text_angle: float = 0, text_alignment: int = 4) -> Optional[object]:
@@ -343,11 +393,12 @@ if __name__ == "__main__":
     """
     Тест добавления текста
     """
-    cad = ATCadInit()
-    adoc, model = cad.adoc, cad.model
-    input_point = at_point_input(adoc)
-    at_addText(model, input_point, "text", text_height=60, text_alignment=0)
-    cad.adoc.Regen(0)
+    # cad = ATCadInit()
+    # adoc, model = cad.adoc, cad.model
+    # input_point = at_point_input(adoc)
+    # at_addText(model, input_point, "text", text_height=60, text_alignment=0)
+    # cad.adoc.Regen(0)
+    print(polar_point((0,0), distance=5, alpha=30))
 
 
 
