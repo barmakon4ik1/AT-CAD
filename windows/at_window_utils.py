@@ -15,6 +15,8 @@ import logging
 import time
 from typing import Tuple, Dict, Optional, List
 import wx
+from pyautocad import APoint
+
 from locales.at_localization_class import loc
 from programms.at_base import init_autocad
 from programms.at_input import at_point_input

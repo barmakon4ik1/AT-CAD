@@ -501,9 +501,9 @@ translations = {
         "en": "middle"
     },
     "missing_data": {
-        "ru": "Недостаточно данных!",
-        "de": "Unzureichende Daten!",
-        "en": "Insufficient data!"
+        "ru": "Отсутствует или None значение для ключа: {0}",
+        "de": "Fehlender oder None-Wert für Schlüssel: {0}",
+        "en": "Missing or None value for key: {0}"
     },
     "missing_height_data": {
         "ru": "Необходимо указать высоту, наклон или угол.",

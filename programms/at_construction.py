@@ -393,12 +393,14 @@ if __name__ == "__main__":
     """
     Тест добавления текста
     """
-    # cad = ATCadInit()
-    # adoc, model = cad.adoc, cad.model
-    # input_point = at_point_input(adoc)
+    cad = ATCadInit()
+    adoc, model = cad.adoc, cad.model
+    input_point = at_point_input(adoc)
     # at_addText(model, input_point, "text", text_height=60, text_alignment=0)
     # cad.adoc.Regen(0)
-    print(polar_point((0,0), distance=5, alpha=30))
+    point2 = polar_point(APoint(input_point), distance=360, alpha=30)
+    print(point2)
+    add_line(adoc, APoint(input_point), point2)
 
 
 

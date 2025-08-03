@@ -1,5 +1,4 @@
 import logging
-
 import pythoncom
 from pyautocad import APoint
 from programms.at_construction import at_cone_sheet, polar_point, at_addText
@@ -8,7 +7,6 @@ from locales.at_localization_class import loc
 from config.at_config import *
 from windows.at_gui_utils import show_popup
 from programms.at_base import ensure_layer, regen
-
 
 def run_application(data: Dict[str, Any]) -> bool:
     """
@@ -27,12 +25,20 @@ def run_application(data: Dict[str, Any]) -> bool:
                          "order_number", "detail_number", "thickness_text", "material"]
         for key in required_keys:
             if key not in data or data[key] is None:
-                show_popup(loc.get("missing_data", key), popup_type="error")
+                show_popup(loc.get("missing_data", f"Missing or None value for key: {key}"), popup_type="error")
                 logging.error(f"Отсутствует или None значение для ключа: {key}")
                 return False
 
         model = data["model"]
-        input_point = APoint(data["input_point"])
+        input_point = data["input_point"]
+
+        # Преобразование input_point в APoint, если это список
+        if isinstance(input_point, list) and len(input_point) >= 2:
+            input_point = APoint(input_point[0], input_point[1])  # Используем только x, y
+        elif not isinstance(input_point, (APoint, tuple)) or (isinstance(input_point, tuple) and len(input_point) != 2):
+            show_popup(loc.get("invalid_point", "Invalid insertion point."), popup_type="error")
+            logging.error(f"Некорректная точка вставки: {input_point}")
+            return False
 
         # Создание слоёв
         for layer in ["LASER-TEXT", "schrift", "TEXT"]:
@@ -62,7 +68,6 @@ def run_application(data: Dict[str, Any]) -> bool:
         text_point = polar_point(input_point, 300, 0)
 
         # Список текстов для добавления
-
         text_configs = [
             {
                 "point": input_point,
@@ -90,7 +95,7 @@ def run_application(data: Dict[str, Any]) -> bool:
             },  # Строка К-№
             {
                 "point": polar_point(text_point, distance=text_ab, alpha=-90),
-                "text": f"D = {data['diameter_base']} {(loc.get('mm'))}",
+                "text": f"D = {data['diameter_base']} {loc.get('mm')}",
                 "layer_name": "TEXT",
                 "text_height": text_h,
                 "text_angle": 0,
@@ -98,7 +103,7 @@ def run_application(data: Dict[str, Any]) -> bool:
             },
             {
                 "point": polar_point(text_point, distance=2 * text_ab, alpha=-90),
-                "text": f"d = {data['diameter_top']} {(loc.get('mm'))}",
+                "text": f"d = {data['diameter_top']} {loc.get('mm')}",
                 "layer_name": "TEXT",
                 "text_height": text_h,
                 "text_angle": 0,
@@ -106,7 +111,7 @@ def run_application(data: Dict[str, Any]) -> bool:
             },
             {
                 "point": polar_point(text_point, distance=3 * text_ab, alpha=-90),
-                "text": f"H = {data['height']} {(loc.get('mm'))}",
+                "text": f"H = {data['height']} {loc.get('mm')}",
                 "layer_name": "TEXT",
                 "text_height": text_h,
                 "text_angle": 0,
@@ -143,19 +148,19 @@ def run_application(data: Dict[str, Any]) -> bool:
                     text_alignment=config["text_alignment"]
                 )
             except Exception as e:
-                show_popup(f"Ошибка при добавлении текста {i + 1} ({config['text']}): {str(e)}", popup_type="error")
+                show_popup(loc.get("text_error_details", f"Error adding text {i + 1} ({config['text']}): {str(e)}").format(i + 1, config['text'], str(e)), popup_type="error")
                 logging.error(f"Ошибка добавления текста {i + 1}: {e}")
                 return False
         regen(model)
         logging.info("Развертка конуса успешно построена")
         return True
     except Exception as e:
-        show_popup(loc.get("build_error", str(e)), popup_type="error")
+        show_popup(loc.get("build_error", f"Build error: {str(e)}").format(str(e)), popup_type="error")
         logging.error(f"Ошибка в run_application: {e}")
         return False
     finally:
         try:
             pythoncom.CoUninitialize()
         except Exception as e:
-            show_popup(loc.get("com_release_error", str(e)), popup_type="error")
+            show_popup(loc.get("com_release_error", f"Error releasing COM: {str(e)}").format(str(e)), popup_type="error")
             logging.error(f"Ошибка освобождения COM: {e}")
