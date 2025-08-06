@@ -1,9 +1,4 @@
 # Зависимости Python
 
-cad-pyrx
-pyrx
-
-
-
-wxPython~=4.2.3
-pyautocad~=0.2.0
+pythonnet
+wxPython

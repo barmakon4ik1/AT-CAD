@@ -2,15 +2,12 @@
 """
 Модуль для обработки пользовательского ввода в AutoCAD.
 """
-import win32com.client
 from typing import Optional, List
-
-from pyautocad import APoint
-
 from config.at_cad_init import ATCadInit
 from locales.at_localization_class import loc
 from windows.at_gui_utils import show_popup
 from programms.at_utils import handle_errors
+
 
 @handle_errors
 def at_point_input(adoc: object = None) -> Optional[List[float]]:

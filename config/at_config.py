@@ -1,3 +1,4 @@
+# config/at_config.py
 """
 Файл: at_config.py
 Путь: config/at_config.py
@@ -10,16 +11,150 @@
 import os
 import json
 import logging
+import winreg
+from pathlib import Path
 
 # Настройка логирования
 logging.basicConfig(
-    level=logging.ERROR,
+    level=logging.DEBUG,  # DEBUG для подробной диагностики
     filename="at_cad.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
 # Базовая директория проекта
 BASE_DIR: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def find_autocad_path() -> str:
+    """
+    Находит путь к последней установленной версии AutoCAD, содержащей acmgd.dll и зависимости.
+
+    Проверяет реестр Windows и файловую систему. Возвращает путь к папке AutoCAD
+    (например, 'C:\\Program Files\\Autodesk\\AutoCAD 2026'), если найдены все DLL.
+
+    Returns:
+        str: Путь к папке AutoCAD или пустая строка, если не найдено.
+    """
+    required_dlls = ["acmgd.dll", "acdbmgd.dll", "accore.dll"]
+    logging.debug("Searching for AutoCAD path...")
+    try:
+        # Попытка найти AutoCAD через реестр Windows
+        reg_path = r"SOFTWARE\Autodesk\AutoCAD"
+        try:
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path) as key:
+                i = 0
+                versions = []
+                while True:
+                    try:
+                        version = winreg.EnumKey(key, i)
+                        versions.append(version)
+                        i += 1
+                    except WindowsError:
+                        break
+
+                versions.sort(reverse=True)
+                for version in versions:
+                    logging.debug(f"Checking AutoCAD version: {version}")
+                    with winreg.OpenKey(key, version) as version_key:
+                        j = 0
+                        while True:
+                            try:
+                                product = winreg.EnumKey(version_key, j)
+                                with winreg.OpenKey(version_key, product) as product_key:
+                                    try:
+                                        install_path, _ = winreg.QueryValueEx(product_key, "ProductInstallDir")
+                                        # Проверяем наличие всех необходимых DLL
+                                        if all(os.path.exists(os.path.join(install_path, dll)) for dll in required_dlls):
+                                            logging.debug(f"Found AutoCAD path with all DLLs: {install_path}")
+                                            return install_path
+                                    except WindowsError:
+                                        pass
+                                j += 1
+                            except WindowsError:
+                                break
+        except WindowsError:
+            logging.debug("AutoCAD not found in registry.")
+
+        # Проверка стандартной папки Program Files
+        program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+        autodesk_dir = os.path.join(program_files, "Autodesk")
+        if os.path.exists(autodesk_dir):
+            autocad_dirs = [d for d in os.listdir(autodesk_dir) if d.startswith("AutoCAD")]
+            autocad_dirs.sort(reverse=True)
+            for dir_name in autocad_dirs:
+                full_path = os.path.join(autodesk_dir, dir_name)
+                if all(os.path.exists(os.path.join(full_path, dll)) for dll in required_dlls):
+                    logging.debug(f"Found AutoCAD path with all DLLs: {full_path}")
+                    return full_path
+
+        logging.error("AutoCAD installation path with required DLLs not found.")
+        return ""
+    except Exception as e:
+        logging.error(f"Error finding AutoCAD path: {e}")
+        return ""
+
+def find_objectarx_path() -> str:
+    """
+    Находит путь к ObjectARX SDK, если он содержит acmgd.dll и зависимости.
+
+    Проверяет стандартные папки и реестр. Возвращает путь к папке SDK
+    (например, 'E:\\objectarx2026'), если найдены все DLL.
+
+    Returns:
+        str: Путь к папке ObjectARX SDK или пустая строка, если не найдено.
+    """
+    required_dlls = ["acmgd.dll", "acdbmgd.dll", "accore.dll"]
+    logging.debug("Searching for ObjectARX SDK path...")
+    try:
+        # Проверка реестра
+        reg_path = r"SOFTWARE\Autodesk\ObjectARX"
+        try:
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path) as key:
+                i = 0
+                versions = []
+                while True:
+                    try:
+                        version = winreg.EnumKey(key, i)
+                        versions.append(version)
+                        i += 1
+                    except WindowsError:
+                        break
+
+                versions.sort(reverse=True)
+                for version in versions:
+                    logging.debug(f"Checking ObjectARX version: {version}")
+                    with winreg.OpenKey(key, version) as version_key:
+                        try:
+                            sdk_path, _ = winreg.QueryValueEx(version_key, "Location")
+                            if all(os.path.exists(os.path.join(sdk_path, dll)) for dll in required_dlls):
+                                logging.debug(f"Found ObjectARX SDK path with all DLLs: {sdk_path}")
+                                return sdk_path
+                        except WindowsError:
+                            pass
+        except WindowsError:
+            logging.debug("ObjectARX SDK not found in registry.")
+
+        # Проверка стандартных папок
+        drives = [f"{chr(d)}:\\" for d in range(67, 91) if os.path.exists(f"{chr(d)}:\\")]
+        for drive in drives:
+            possible_dirs = [
+                os.path.join(drive, "objectarx2026"),
+                os.path.join(drive, "ObjectARX 2026"),
+                os.path.join(drive, "Autodesk", "ObjectARX 2026"),
+            ]
+            for sdk_dir in possible_dirs:
+                if all(os.path.exists(os.path.join(sdk_dir, dll)) for dll in required_dlls):
+                    logging.debug(f"Found ObjectARX SDK path with all DLLs: {sdk_dir}")
+                    return sdk_dir
+
+        logging.error("ObjectARX SDK path with required DLLs not found.")
+        return ""
+    except Exception as e:
+        logging.error(f"Error finding ObjectARX SDK path: {e}")
+        return ""
+
+# Путь к AutoCAD или ObjectARX SDK (приоритет AutoCAD)
+ACAD_PATH: str = find_autocad_path() or find_objectarx_path()
+logging.debug(f"Final ACAD_PATH: {ACAD_PATH}")
 
 # Путь к папке с ресурсами
 IMAGES_DIR: str = "images"
@@ -124,7 +259,6 @@ def load_user_settings() -> dict:
         if os.path.exists(USER_CONFIG_PATH):
             with open(USER_CONFIG_PATH, 'r', encoding='utf-8') as f:
                 user_settings = json.load(f)
-                # Проверяем, что все ключи из DEFAULT_SETTINGS присутствуют
                 for key in DEFAULT_SETTINGS:
                     if key not in user_settings:
                         user_settings[key] = DEFAULT_SETTINGS[key]
@@ -150,7 +284,6 @@ def save_user_settings(settings: dict) -> None:
     """
     global _cached_settings
     try:
-        # Проверяем, что все ключи из DEFAULT_SETTINGS присутствуют
         for key in DEFAULT_SETTINGS:
             if key not in settings:
                 settings[key] = DEFAULT_SETTINGS[key]
