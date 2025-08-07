@@ -1,68 +1,20 @@
+# programms/at_base.py
 """
 Файл: at_base.py
-Путь: programms\at_base.py
+Путь: programms/at_base.py
 
 Описание:
 Модуль для базовых операций с AutoCAD через COM-интерфейс.
-Предоставляет функции для инициализации AutoCAD, управления слоями
-и обновления видового экрана. Использует локализацию из at_localization_class.py
-и настройки из user_settings.json через get_setting.
+Предоставляет функции для управления слоями и обновления видового экрана.
 """
+
 from contextlib import contextmanager
-from locales.at_localization_class import loc
 from config.at_cad_init import ATCadInit
+from locales.at_localization_class import loc
 from windows.at_gui_utils import show_popup
-from functools import wraps
-from pythoncom import CoInitialize, CoUninitialize
-from typing import Optional, Tuple
-
-_cad_instance = None  # Глобальный экземпляр AutoCAD
 
 
-def handle_errors(func):
-    """
-    Декоратор для обработки ошибок в функциях.
-
-    Args:
-        func: Функция для декорирования.
-
-    Returns:
-        wrapper: Обёрнутая функция с обработкой ошибок.
-    """
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except Exception:
-            return None
-
-    return wrapper
-
-
-@handle_errors
-def init_autocad() -> Optional[Tuple[object, object, object]]:
-    """
-    Инициализирует AutoCAD и возвращает его объекты.
-
-    Returns:
-        Optional[Tuple[object, object, object]]: Кортеж из объектов AutoCAD
-        (документ, модельное пространство, исходный слой) или None при ошибке.
-    """
-    global _cad_instance
-    if _cad_instance is not None and _cad_instance.is_initialized():
-        return _cad_instance.adoc, _cad_instance.model, _cad_instance.original_layer
-    CoInitialize()
-    _cad_instance = ATCadInit()
-    if not _cad_instance.is_initialized():
-        show_popup(loc.get('cad_init_error'), popup_type="error")
-        CoUninitialize()
-        return None
-    return _cad_instance.adoc, _cad_instance.model, _cad_instance.original_layer
-
-
-@handle_errors
-def regen(adoc: object) -> Optional[object]:
+def regen(adoc: object) -> bool:
     """
     Обновляет видовой экран AutoCAD.
 
@@ -70,46 +22,16 @@ def regen(adoc: object) -> Optional[object]:
         adoc: Объект документа AutoCAD.
 
     Returns:
-        Optional[object]: Объект документа AutoCAD или None при ошибке.
+        bool: True, если обновление выполнено, False при ошибке.
     """
-    adoc.Regen(0)
-    return adoc
+    try:
+        adoc.Regen(0)
+        return True
+    except Exception:
+        return False
 
 
-@handle_errors
-def set_layer(adoc: object, layer_name: str) -> Optional[object]:
-    """
-    Устанавливает активный слой в AutoCAD.
-
-    Args:
-        adoc: Объект документа AutoCAD.
-        layer_name: Имя слоя для установки.
-
-    Returns:
-        Optional[object]: Объект документа AutoCAD или None при ошибке.
-    """
-    adoc.ActiveLayer = adoc.Layers.Item(layer_name)
-    return adoc
-
-
-@handle_errors
-def restore_layer(adoc: object, original_layer: object) -> Optional[object]:
-    """
-    Восстанавливает исходный активный слой.
-
-    Args:
-        adoc: Объект документа AutoCAD.
-        original_layer: Исходный слой для восстановления.
-
-    Returns:
-        Optional[object]: Объект документа AutoCAD или None при ошибке.
-    """
-    adoc.ActiveLayer = original_layer
-    return adoc
-
-
-@handle_errors
-def ensure_layer(adoc: object, layer_name: str) -> Optional[object]:
+def ensure_layer(adoc: object, layer_name: str) -> bool:
     """
     Проверяет наличие слоя и создает его, если он отсутствует.
 
@@ -118,11 +40,64 @@ def ensure_layer(adoc: object, layer_name: str) -> Optional[object]:
         layer_name: Имя слоя для проверки/создания.
 
     Returns:
-        Optional[object]: Объект слоя AutoCAD или None при ошибке.
+        bool: True, если слой существует или создан, False при ошибке.
     """
-    if layer_name not in [layer.Name for layer in adoc.Layers]:
-        adoc.Layers.Add(layer_name)
-    return adoc.Layers.Item(layer_name)
+    try:
+        if layer_name not in [layer.Name for layer in adoc.Layers]:
+            adoc.Layers.Add(layer_name)
+        return True
+    except Exception:
+        return False
+
+
+def set_layer(adoc: object, layer_name: str) -> bool:
+    """
+    Устанавливает активный слой в AutoCAD.
+
+    Args:
+        adoc: Объект документа AutoCAD.
+        layer_name: Имя слоя для установки.
+
+    Returns:
+        bool: True, если слой установлен, False при ошибке.
+    """
+    try:
+        if layer_name not in [layer.Name for layer in adoc.Layers]:
+            ensure_layer(adoc, layer_name)
+        adoc.ActiveLayer = adoc.Layers.Item(layer_name)
+        show_popup(
+            loc.get("layer_set", "Active layer '{}' set.").format(layer_name),
+            popup_type="info"
+        )
+        return True
+    except Exception:
+        return False
+
+
+def restore_layer(adoc: object, original_layer: object) -> bool:
+    """
+    Восстанавливает исходный активный слой.
+
+    Args:
+        adoc: Объект документа AutoCAD.
+        original_layer: Исходный слой для восстановления.
+
+    Returns:
+        bool: True, если слой восстановлен, False при ошибке.
+    """
+    try:
+        adoc.ActiveLayer = original_layer
+        show_popup(
+            loc.get("layer_restored", "Original layer '{}' restored.").format(original_layer.Name),
+            popup_type="info"
+        )
+        return True
+    except Exception:
+        show_popup(
+            loc.get("layer_restore_error", "Error restoring original layer: {}").format(str(Exception)),
+            popup_type="error"
+        )
+        return False
 
 
 @contextmanager
@@ -141,5 +116,26 @@ def layer_context(adoc: object, layer_name: str):
     try:
         set_layer(adoc, layer_name)
         yield
+    except Exception as e:
+        show_popup(
+            loc.get("layer_context_error", "Error in layer context '{}': {}").format(layer_name, str(e)),
+            popup_type="error"
+        )
+        raise
     finally:
         restore_layer(adoc, original_layer)
+
+
+if __name__ == "__main__":
+    """
+    Тестирование базовых операций при прямом запуске модуля.
+    """
+    cad = ATCadInit()
+    if cad.original_layer is None:
+        show_popup(
+            loc.get("cad_init_error_short", "AutoCAD initialization error."),
+            popup_type="error"
+        )
+    else:
+        print(
+            f'{loc.get("current_layer_label", "Current layer")}: {cad.original_layer.Name}, {loc.get("color_label", "color")}: {cad.original_layer.Color}')

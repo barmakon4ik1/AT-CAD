@@ -170,6 +170,16 @@ translations = {
         "de": "Gegen den Uhrzeigersinn",
         "en": "Counterclockwise"
     },
+    "current_layer_label": {
+        "ru": "Текущий слой",
+        "de": "Aktive Ebene",
+        "en": "Current layer"
+    },
+    "color_label": {
+        "ru": "цвет",
+        "de": "Farbe",
+        "en": "color"
+    },
     "diameter": {
         "ru": "Диаметр",
         "de": "Durchmesser",
