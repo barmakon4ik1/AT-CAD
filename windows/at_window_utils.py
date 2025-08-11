@@ -18,7 +18,6 @@ import wx
 from pyautocad import APoint
 
 from locales.at_localization_class import loc
-from programms.at_base import init_autocad
 from programms.at_input import at_point_input
 from windows.at_style import style_textctrl, style_combobox, style_radiobutton, style_staticbox, style_label
 from config.at_config import load_user_settings, DEFAULT_SETTINGS, get_setting

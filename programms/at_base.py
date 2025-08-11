@@ -137,5 +137,8 @@ if __name__ == "__main__":
             popup_type="error"
         )
     else:
-        print(
-            f'{loc.get("current_layer_label", "Current layer")}: {cad.original_layer.Name}, {loc.get("color_label", "color")}: {cad.original_layer.Color}')
+        show_popup(
+            f'{loc.get("current_layer_label", "Current layer")}: {cad.original_layer.Name}, \n'
+            f'{loc.get("color_label", "color")}: {cad.original_layer.Color}',
+            popup_type="info"
+        )

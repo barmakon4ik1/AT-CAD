@@ -595,10 +595,15 @@ translations = {
         "de": "Punkt ausgewählt: x={}, y={}",
         "en": "Point selected: x={}, y={}"
     },
+    "point_selection_cancelled": {
+        "ru": "Выбор точки отменён.",
+        "de": "Punktauswahl abgebrochen.",
+        "en": "Point selection cancelled."
+    },
     "point_selection_error": {
-        "ru": "Ошибка при выборе точки: {}",
-        "de": "Fehler bei der Punktauswahl: {}",
-        "en": "Error selecting point: {}"
+        "ru": "Ошибка выбора точки: {}. Пожалуйста, повторите ввод или отмените.",
+        "de": "Fehler bei der Punktauswahl: {}. Bitte wiederholen Sie die Eingabe oder brechen Sie ab.",
+        "en": "Point selection error: {}. Please retry or cancel."
     },
     "polyline_points": {
         "ru": "Координаты полилинии: {}",

@@ -21,7 +21,7 @@ def handle_errors(func):
 
 def finder(x, r, accuracy):
     '''
-    Представление числа x, округленного до знака accuracy через простую дробь из числе в диапазоне от 1 до r
+    Представление числа x, округленного до знака accuracy через простую дробь из числа в диапазоне от 1 до r
     '''
     a = int(x)
     b = 1
@@ -40,5 +40,6 @@ def finder(x, r, accuracy):
 if __name__ == '__main__':
     finder(round(math.pi, 6), 10000, 6)
     finder(round(math.sqrt(2), 2), 1000, 4)
+    finder(0.6667, 10000, 4)
     finder(0.3333, 10000, 4)
     finder(3.1818, 1000, 4)

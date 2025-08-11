@@ -1,103 +1,123 @@
 # programms/at_construction.py
 """
-Модуль для создания геометрических объектов в AutoCAD.
+Файл: at_construction.py
+Путь: programms/at_construction.py
+
+Описание:
+Модуль для создания геометрических объектов в AutoCAD через COM-интерфейс.
+Переданный слой должен быть установлен как активный в системе.
 """
-import array
 
-from pyautocad import APoint, Autocad
-
-from programms.at_base import *
-from programms.at_geometry import *
-from programms.at_input import at_point_input
-import win32com.client
-import pythoncom
-import array
-from typing import List, Any, Optional
-from win32com.client import VARIANT
-from typing import Union, Tuple
+from typing import Optional, Any, List, Tuple
 import math
+import array
+import pythoncom
+from win32com.client import VARIANT
+
+from programms.at_base import regen
+from programms.at_geometry import add_rectangle_points
+from programms.at_input import at_point_input
 from windows.at_gui_utils import show_popup
+from config.at_config import DEFAULT_TEXT_LAYER
 from locales.at_localization_class import loc
 
 
-
-@handle_errors
-def add_circle(model: object, center: APoint, radius: float, layer_name: str = "0") -> Optional[object]:
+def add_circle(model: Any, center: List[float], radius: float, layer_name: str = "0") -> Optional[Any]:
     """
-    Создает окружность в модельном пространстве.
-    """
-    circle = model.AddCircle(center, radius)
-    circle.Layer = layer_name
-    return circle
+    Создаёт окружность в модельном пространстве.
 
+    Args:
+        model: Объект модельного пространства AutoCAD (ModelSpace).
+        center: Центр окружности в формате [x, y, z].
+        radius: Радиус окружности.
+        layer_name: Название слоя (по умолчанию "0", должен быть активным).
 
-@handle_errors
-def add_line(model: object, point1: APoint, point2: APoint, layer_name: str = "0") -> Optional[object]:
-    """
-    Создает линию в модельном пространстве.
-    """
-    line = model.AddLine(point1, point2)
-    line.Layer = layer_name
-    return line
-
-
-@handle_errors
-# def add_LWpolyline(model: object, points_list: List[float], layer_name: str = "0") -> Optional[object]:
-#     """
-#     Создает легковесную полилинию в модельном пространстве.
-#     """
-#     if not isinstance(points_list, (list, tuple)) or len(points_list) % 2 != 0:
-#         raise ValueError("Invalid points list")
-#     flat_points = [float(coord) for coord in points_list]
-#     points_double = array.array("d", flat_points)
-#     adoc = model.Document
-#     ensure_layer(adoc, layer_name)
-#     layer = adoc.Layers.Item(layer_name)
-#     if layer.Lock:
-#         layer.Lock = False
-#     polyline = model.AddLightWeightPolyline(points_double)
-#     polyline.Closed = True
-#     polyline.Layer = layer_name
-#     return polyline
-def add_LWpolyline(model: Any, points_list: List[float], layer_name: str = "0") -> Any:
-    """
-        Создает легковесную полилинию в модельном пространстве.
+    Returns:
+        Optional[Any]: Объект окружности или None в случае ошибки.
     """
     try:
-        if not isinstance(points_list, (list, tuple)) or len(points_list) % 2 != 0:
-            raise ValueError("Invalid points list")
+        center_array = [float(coord) for coord in center]
+        center_variant = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, center_array)
+        circle = model.AddCircle(center_variant, radius)
+        circle.Layer = layer_name
+        return circle
+    except:
+        return None
+
+
+def add_line(model: Any, point1: List[float], point2: List[float], layer_name: str = "0") -> Optional[Any]:
+    """
+    Создаёт линию в модельном пространстве.
+
+    Args:
+        model: Объект модельного пространства AutoCAD (ModelSpace).
+        point1: Начальная точка линии в формате [x, y, z].
+        point2: Конечная точка линии в формате [x, y, z].
+        layer_name: Название слоя (по умолчанию "0", должен быть активным).
+
+    Returns:
+        Optional[Any]: Объект линии или None в случае ошибки.
+    """
+    try:
+        point1_variant = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, point1)
+        point2_variant = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, point2)
+        line = model.AddLine(point1_variant, point2_variant)
+        line.Layer = layer_name
+        return line
+    except:
+        return None
+
+
+def add_LWpolyline(model: Any, points_list: List[float], layer_name: str = "0") -> Optional[Any]:
+    """
+    Создаёт легковесную полилинию в модельном пространстве.
+
+    Args:
+        model: Объект модельного пространства AutoCAD (ModelSpace).
+        points_list: Список координат [x1, y1, x2, y2, ...].
+        layer_name: Название слоя (по умолчанию "0", должен быть активным).
+
+    Returns:
+        Optional[Any]: Объект полилинии или None в случае ошибки.
+    """
+    try:
         flat_points = [float(coord) for coord in points_list]
-
-        adoc = model.Document
-        layer = adoc.Layers.Item(layer_name)
-        if layer.Lock:
-            layer.Lock = False
-
         arr = array.array('d', flat_points)
         variant_array = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, arr)
         polyline = model.AddLightWeightPolyline(variant_array)
         polyline.Closed = True
         polyline.Layer = layer_name
-
         return polyline
-    except Exception as e:
-        print(f"Ошибка в add_LWpolyline: {e}")
+    except:
         return None
 
-@handle_errors
-def add_rectangle(model: object, point: APoint, width: float, height: float, layer_name: str = "0",
-                 point_direction: str = "left_bottom") -> Optional[object]:
+
+def add_rectangle(model: Any, point: List[float], width: float, height: float, layer_name: str = "0",
+                  point_direction: str = "left_bottom") -> Optional[Any]:
     """
-    Создает прямоугольник в модельном пространстве.
+    Создаёт прямоугольник в модельном пространстве.
+
+    Args:
+        model: Объект модельного пространства AutoCAD (ModelSpace).
+        point: Начальная точка в формате [x, y, z].
+        width: Ширина прямоугольника.
+        height: Высота прямоугольника.
+        layer_name: Название слоя (по умолчанию "0", должен быть активным).
+        point_direction: Направление начальной точки (по умолчанию "left_bottom").
+
+    Returns:
+        Optional[Any]: Объект полилинии (прямоугольник) или None в случае ошибки.
     """
-    from at_geometry import add_rectangle_points
-    points_list = add_rectangle_points(point, width, height, point_direction)
-    return add_LWpolyline(model, points_list, layer_name)
+    try:
+        points_list = add_rectangle_points(point, width, height, point_direction)
+        return add_LWpolyline(model, points_list, layer_name)
+    except:
+        return None
 
 
 def at_diameter(diameter: float, thickness: float, flag: str = "outer") -> float:
     """
-    Вычисляет средний диаметр с учетом толщины.
+    Вычисляет средний диаметр с учётом толщины.
 
     Args:
         diameter: Диаметр (внешний, внутренний или средний).
@@ -105,117 +125,140 @@ def at_diameter(diameter: float, thickness: float, flag: str = "outer") -> float
         flag: Тип диаметра ("inner", "middle", "outer").
 
     Returns:
-        Средний диаметр.
+        float: Средний диаметр.
 
     Raises:
         ValueError: Если входные данные некорректны.
     """
-    if thickness < 0:
-        raise ValueError("Толщина материала не может быть отрицательной.")
-    if diameter < 0:
-        raise ValueError("Диаметр не может быть отрицательным.")
-    if flag == "middle":
-        return float(diameter)
-    elif flag == "outer":
-        if diameter < thickness:
-            raise ValueError("Внешний диаметр не может быть меньше толщины.")
-        return float(diameter - thickness)
-    elif flag == "inner":
-        return float(diameter + thickness)
-    raise ValueError(loc.get('dia_error', "Неверный тип диаметра."))
+    try:
+        if thickness < 0:
+            raise ValueError("Толщина материала не может быть отрицательной.")
+        if diameter < 0:
+            raise ValueError("Диаметр не может быть отрицательным.")
+        if flag == "middle":
+            return float(diameter)
+        elif flag == "outer":
+            if diameter < thickness:
+                raise ValueError("Внешний диаметр не может быть меньше толщины.")
+            return float(diameter - thickness)
+        elif flag == "inner":
+            return float(diameter + thickness)
+        raise ValueError(loc.get("dia_error", "Неверный тип диаметра."))
+    except Exception as e:
+        show_popup(
+            loc.get("diameter_error_details", f"Ошибка при вычислении диаметра: {str(e)}"),
+            popup_type="error"
+        )
+        return 0.0
 
 
-@handle_errors
 def at_steigung(height: float, diameter_base: float, diameter_top: float = 0) -> Optional[float]:
     """
     Вычисляет наклон конуса.
+
+    Args:
+        height: Высота конуса.
+        diameter_base: Диаметр основания.
+        diameter_top: Диаметр вершины (по умолчанию 0).
+
+    Returns:
+        Optional[float]: Наклон конуса или None в случае ошибки.
     """
-    if not all(isinstance(x, (int, float)) for x in [height, diameter_base, diameter_top]):
-        show_popup(loc.get('invalid_number'), popup_type="error")
-        return None
-    if diameter_base <= 0 or diameter_top < 0 or height <= 0:
-        show_popup(loc.get('diameter_base_positive') if diameter_base <= 0 else
-                   loc.get('diameter_top_non_negative') if diameter_top < 0 else
-                   loc.get('height_positive'), popup_type="error")
-        return None
-    if diameter_top > diameter_base:
-        diameter_top, diameter_base = diameter_base, diameter_top
     try:
+        if not all(isinstance(x, (int, float)) for x in [height, diameter_base, diameter_top]):
+            raise ValueError("All inputs must be numbers")
+        if diameter_base <= 0 or diameter_top < 0 or height <= 0:
+            raise ValueError(
+                loc.get("diameter_base_positive",
+                        "Диаметр основания должен быть положительным.") if diameter_base <= 0 else
+                loc.get("diameter_top_non_negative",
+                        "Диаметр вершины не может быть отрицательным.") if diameter_top < 0 else
+                loc.get("height_positive", "Высота должна быть положительной.")
+            )
+        if diameter_top > diameter_base:
+            diameter_top, diameter_base = diameter_base, diameter_top
         steigung = (diameter_base - diameter_top) / height
-        return steigung if not (math.isinf(steigung) or math.isnan(steigung)) else None
-    except Exception:
-        show_popup(loc.get('invalid_result'), popup_type="error")
+        if math.isinf(steigung) or math.isnan(steigung):
+            raise ValueError("Invalid steigung result")
+        return steigung
+    except Exception as e:
+        show_popup(
+            loc.get("steigung_error_details", f"Ошибка при вычислении наклона: {str(e)}"),
+            popup_type="error"
+        )
         return None
 
 
-@handle_errors
 def at_cone_height(diameter_base: float, diameter_top: float = 0, steigung: Optional[float] = None,
                    angle: Optional[float] = None) -> Optional[float]:
     """
     Вычисляет высоту конуса по заданным параметрам.
+
+    Args:
+        diameter_base: Диаметр основания.
+        diameter_top: Диаметр вершины (по умолчанию 0).
+        steigung: Наклон конуса (опционально).
+        angle: Угол наклона в градусах (опционально).
+
+    Returns:
+        Optional[float]: Высота конуса или None в случае ошибки.
     """
-    if not all(isinstance(x, (int, float)) for x in [diameter_base, diameter_top]):
-        show_popup(loc.get('invalid_number'), popup_type="error")
-        return None
-    if diameter_base <= 0 or diameter_top < 0:
-        show_popup(loc.get('diameter_base_positive') if diameter_base <= 0 else
-                   loc.get('diameter_top_non_negative'), popup_type="error")
-        return None
-    if diameter_top > diameter_base:
-        diameter_top, diameter_base = diameter_base, diameter_top
-    if steigung is None and angle is None:
-        show_popup(loc.get('missing_data'), popup_type="error")
-        return None
-    if steigung is not None and angle is not None:
-        show_popup(loc.get('both_parameters_error'), popup_type="error")
-        return None
-    if steigung is not None:
-        if not isinstance(steigung, (int, float)) or steigung <= 0:
-            show_popup(loc.get('invalid_gradient') if not isinstance(steigung, (int, float)) else
-                       loc.get('gradient_positive'), popup_type="error")
-            return None
-        return (diameter_base - diameter_top) / steigung
-    if not isinstance(angle, (int, float)) or angle <= 0 or angle >= 180:
-        show_popup(loc.get('invalid_angle') if not isinstance(angle, (int, float)) else
-                   loc.get('angle_range_error'), popup_type="error")
-        return None
     try:
+        if diameter_top > diameter_base:
+            diameter_top, diameter_base = diameter_base, diameter_top
+        if steigung is None and angle is None:
+            raise ValueError(loc.get("missing_data", "Необходимо указать наклон или угол."))
+        if steigung is not None and angle is not None:
+            raise ValueError(loc.get("both_parameters_error", "Нельзя указывать одновременно наклон и угол."))
+        if steigung is not None:
+            if not isinstance(steigung, (int, float)) or steigung <= 0:
+                raise ValueError(
+                    loc.get("invalid_gradient", "Наклон должен быть числом.") if not isinstance(steigung,
+                                                                                                (int, float)) else
+                    loc.get("gradient_positive", "Наклон должен быть положительным.")
+                )
+            return (diameter_base - diameter_top) / steigung
+        if not isinstance(angle, (int, float)) or angle <= 0 or angle >= 180:
+            raise ValueError(
+                loc.get("invalid_angle", "Угол должен быть числом.") if not isinstance(angle, (int, float)) else
+                loc.get("angle_range_error", "Угол должен быть в диапазоне (0, 180).")
+            )
         return (diameter_base - diameter_top) / (2 * math.tan(math.radians(angle) / 2))
-    except Exception:
-        show_popup(loc.get('math_error'), popup_type="error")
+    except Exception as e:
+        show_popup(
+            loc.get("cone_height_error_details", f"Ошибка при вычислении высоты конуса: {str(e)}"),
+            popup_type="error"
+        )
         return None
 
 
-@handle_errors
-def at_cone_sheet(model: object, input_point: APoint, diameter_base: float, diameter_top: float = 0,
-                  height: float = 0, layer_name: str = "0") -> Optional[Tuple[object, APoint]]:
+def at_cone_sheet(model: Any, input_point: List[float], diameter_base: float, diameter_top: float = 0,
+                  height: float = 0, layer_name: str = "0") -> Optional[Tuple[Any, List[float]]]:
     """
-    Создает развертку конуса в модельном пространстве.
+    Создаёт развертку конуса в модельном пространстве.
+
+    Args:
+        model: Объект модельного пространства AutoCAD (ModelSpace).
+        input_point: Точка вставки в формате [x, y, z].
+        diameter_base: Диаметр основания.
+        diameter_top: Диаметр вершины (по умолчанию 0).
+        height: Высота конуса.
+        layer_name: Название слоя (по умолчанию "0", должен быть активным).
+
+    Returns:
+        Optional[Tuple[Any, List[float]]]: Объект полилинии и точка вставки или (None, None) в случае ошибки.
     """
-    if not all(isinstance(x, (int, float)) for x in [diameter_base, diameter_top, height]):
-        show_popup(loc.get('invalid_number'), popup_type="error")
-        return None, None
-    if not isinstance(input_point, (APoint, list, tuple)) or len(input_point) < 2:
-        show_popup(loc.get('invalid_point'), popup_type="error")
-        return None, None
-    if diameter_base <= 0 or diameter_top < 0 or height <= 0:
-        show_popup(loc.get('diameter_base_positive') if diameter_base <= 0 else
-                   loc.get('diameter_top_non_negative') if diameter_top < 0 else
-                   loc.get('height_positive'), popup_type="error")
-        return None, None
-    if diameter_top > diameter_base:
-        diameter_base, diameter_top = diameter_top, diameter_base
     try:
+        if diameter_top > diameter_base:
+            diameter_base, diameter_top = diameter_top, diameter_base
         k = 0.5 * math.sqrt(1 + height ** 2 * 4 / ((diameter_base - diameter_top) ** 2))
         R1 = diameter_base * k
         R2 = diameter_top * k
         theta = math.pi * diameter_base / R1
         if math.isinf(theta) or math.isnan(theta):
-            show_popup(loc.get('invalid_result'), popup_type="error")
-            return None, None
+            raise ValueError("Invalid theta result")
         if R1 <= 0 or R2 < 0 or math.isinf(R1) or math.isinf(R2) or math.isnan(R1) or math.isnan(R2):
-            show_popup(loc.get('invalid_geometry'), popup_type="error")
-            return None, None
+            raise ValueError("Invalid geometry parameters")
         half_theta = theta / 2
         sin_half_theta = math.sin(half_theta)
         cos_half_theta = math.cos(half_theta)
@@ -223,33 +266,36 @@ def at_cone_sheet(model: object, input_point: APoint, diameter_base: float, diam
         drs2 = R2 * sin_half_theta
         drc1 = R1 * cos_half_theta
         drc2 = R2 * cos_half_theta
-        center = (input_point[0], input_point[1] - (R1 - (R1 - R2) * 0.5))
-        p1 = APoint(center[0] + drs2, center[1] + drc2)
-        p2 = APoint(center[0] + drs1, center[1] + drc1)
-        p3 = APoint(center[0] - drs1, center[1] + drc1)
-        p4 = APoint(center[0] - drs2, center[1] + drc2)
+        center = [input_point[0], input_point[1] - (R1 - (R1 - R2) * 0.5), 0]
+        p1 = [center[0] + drs2, center[1] + drc2]
+        p2 = [center[0] + drs1, center[1] + drc1]
+        p3 = [center[0] - drs1, center[1] + drc1]
+        p4 = [center[0] - drs2, center[1] + drc2]
         bulge = math.tan(0.25 * theta)
         if math.isinf(bulge) or math.isnan(bulge):
-            show_popup(loc.get('invalid_bulge'), popup_type="error")
-            return None, None
+            raise ValueError("Invalid bulge result")
         points_list = [p1[0], p1[1], p2[0], p2[1], p3[0], p3[1], p4[0], p4[1]]
-        adoc = model.Document
-        ensure_layer(adoc, layer_name)
         polyline = add_LWpolyline(model, points_list, layer_name)
-        polyline.SetBulge(1, bulge)
-        polyline.SetBulge(3, -bulge)
+        if polyline:
+            polyline.SetBulge(1, bulge)
+            polyline.SetBulge(3, -bulge)
         return polyline, input_point
-    except Exception:
-        show_popup(loc.get('cone_sheet_error', ''), popup_type="error")
+    except Exception as e:
+        if hasattr(e, 'hresult') and e.hresult == -2147417848:
+            return None, None
+        show_popup(
+            loc.get("cone_sheet_error_details", f"Ошибка при создании развертки конуса: {str(e)}"),
+            popup_type="error"
+        )
         return None, None
 
 
-def polar_point(point: Union[APoint, Tuple[float, float]], distance: float, alpha: float = 0) -> Tuple[float, float]:
+def polar_point(point: List[float], distance: float, alpha: float = 0) -> list[float | int] | None:
     """
     Находит точку в полярных координатах относительно начальной точки.
 
     Args:
-        point: Начальная точка (объект APoint или кортеж (x, y)).
+        point: Начальная точка в формате [x, y] или [x, y, z].
         distance: Расстояние от начальной точки.
         alpha: Угол в градусах (по умолчанию 0).
 
@@ -257,154 +303,87 @@ def polar_point(point: Union[APoint, Tuple[float, float]], distance: float, alph
         Tuple[float, float]: Координаты новой точки (x, y).
 
     Notes:
-        Если входные параметры некорректны, функция показывает всплывающее окно с запросом на исправление.
-        При нажатии "Cancel" возвращается (0, 0).
-        Сообщения выводятся на языке, установленном в объекте loc.
-    """
-    # Проверка параметра point
-    while True:
-        if point is None:
-            result = show_popup(
-                message=loc.get("invalid_point", "Точка должна быть определена. Введите корректную точку"),
-                title=loc.get("error", "Ошибка"),
-                popup_type="error",
-                buttons=[loc.get("ok_button", "OK"), loc.get("cancel", "Отмена")]
-            )
-            if result == 0:  # Cancel
-                return (0, 0)
-            point = (0, 0)  # Установка значения по умолчанию для продолжения
-            continue
-
-        if isinstance(point, APoint):
-            x0, y0 = point.x, point.y
-            break
-        elif isinstance(point, (tuple, list)) and len(point) == 2 and all(isinstance(coord, (int, float)) for coord in point):
-            x0, y0 = point
-            break
-        else:
-            result = show_popup(
-                message=loc.get(
-                    "invalid_points_type",
-                    f"Точка должна быть типа APoint или кортеж (x, y), получено же: {type(point)}. Пожалуйста исправьте."
-                ).format(type(point)),
-                title=loc.get("error", "Ошибка"),
-                popup_type="error",
-                buttons=[loc.get("ok_button", "OK"), loc.get("cancel", "Отмена")]
-            )
-            if result == 0:  # Cancel
-                return (0, 0)
-            point = (0, 0)  # Установка значения по умолчанию для продолжения
-
-    # Проверка distance
-    while not isinstance(distance, (int, float)) or distance < 0:
-        result = show_popup(
-            message=loc.get(
-                "length_positive_error",
-                f"Расстояние должно быть положительным числом, получено: {distance}. Пожалуйста исправьте."
-            ).format(distance),
-            title=loc.get("error", "Ошибка"),
-            popup_type="error",
-            buttons=[loc.get("ok_button", "OK"), loc.get("cancel", "Отмена")]
-        )
-        if result == 0:  # Cancel
-            return (0, 0)
-        distance = 0  # Установка значения по умолчанию для продолжения
-
-    # Проверка alpha
-    while not isinstance(alpha, (int, float)):
-        result = show_popup(
-            message=loc.get(
-                "invalid_angle",
-                f"Угол должен быть числом, получено: {alpha}. Пожалуйста исправьте."
-            ).format(alpha),
-            title=loc.get("error", "Ошибка"),
-            popup_type="error",
-            buttons=[loc.get("ok_button", "OK"), loc.get("cancel", "Отмена")]
-        )
-        if result == 0:  # Cancel
-            return (0, 0)
-        alpha = 0  # Установка значения по умолчанию для продолжения
-
-    # Вычисление новой точки
-    alpha_rad = math.radians(alpha)
-    x1 = x0 + distance * math.cos(alpha_rad)
-    y1 = y0 + distance * math.sin(alpha_rad)
-
-    return (x1, y1)
-
-def at_addText(model: object, point: List[float | int], text: str = "", layer_name: str = "schrift",
-               text_height: float = 30, text_angle: float = 0, text_alignment: int = 4) -> Optional[object]:
-    """
-    Создает текст в модельном пространстве в указанной точке.
-    Параметры выравнивания:
-        0: acAlignmentLeft
-        1: acAlignmentCenter
-        2: acAlignmentRight
-        3: acAlignmentAligned
-        4: acAlignmentMiddle
-        5: acAlignmentFit
-        6: acAlignmentTopLeft
-        7: acAlignmentTopCenter
-        8: acAlignmentTopRight
-        9: acAlignmentMiddleLeft
-        10: acAlignmentMiddleCenter
-        11: acAlignmentMiddleRight
-        12: acAlignmentBottomLeft
-        13: acAlignmentBottomCenter
-        14: acAlignmentBottomRight
+        Если входные параметры некорректны, возвращается None.
     """
     try:
-        # Проверка point
-        if not isinstance(point, (list, tuple)) or len(point) != 3:
-            raise ValueError("Point must be a list or tuple with 3 coordinates [x, y, z]")
+        x0, y0 = float(point[0]), float(point[1])
+        alpha_rad = math.radians(alpha)
+        x1 = x0 + distance * math.cos(alpha_rad)
+        y1 = y0 + distance * math.sin(alpha_rad)
+        return [x1, y1, 0]
+    except:
+        return None
+
+
+def at_addText(model: Any, point: List[float], text: str = "", layer_name: str = DEFAULT_TEXT_LAYER,
+               text_height: float = 30, text_angle: float = 0, text_alignment: int = 4) -> Optional[Any]:
+    """
+    Создаёт текст в модельном пространстве.
+
+    Args:
+        model: Объект модельного пространства AutoCAD (ModelSpace).
+        point: Точка вставки текста в формате [x, y, z].
+        text: Строка текста.
+        layer_name: Название слоя (по умолчанию DEFAULT_TEXT_LAYER, должен быть активным).
+        text_height: Высота текста (по умолчанию 30).
+        text_angle: Угол поворота текста в радианах (по умолчанию 0).
+        text_alignment: Выравнивание текста (по умолчанию 4, acAlignmentMiddle).
+
+    Returns:
+        Optional[Any]: Объект текста или None в случае ошибки.
+
+    Notes:
+        Значения выравнивания:
+        0: acAlignmentLeft, 1: acAlignmentCenter, 2: acAlignmentRight,
+        3: acAlignmentAligned, 4: acAlignmentMiddle, 5: acAlignmentFit,
+        6: acAlignmentTopLeft, 7: acAlignmentTopCenter, 8: acAlignmentTopRight,
+        9: acAlignmentMiddleLeft, 10: acAlignmentMiddleCenter, 11: acAlignmentMiddleRight,
+        12: acAlignmentBottomLeft, 13: acAlignmentBottomCenter, 14: acAlignmentBottomRight.
+    """
+    try:
         point_array = [float(coord) for coord in point]
-        print(f"at_addText: point_array: {point_array}, text: {text}, layer: {layer_name}")
-
-        # Проверка слоя
-        adoc = model.Document
-        layer = adoc.Layers.Item(layer_name)
-        if layer.Lock:
-            print(f"Слой {layer_name} заблокирован, разблокировка...")
-            layer.Lock = False
-
-        # Создание текста
-        point_variant = win32com.client.VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, point_array)
+        point_variant = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, point_array)
         text_obj = model.AddText(text, point_variant, text_height)
-
-        # Проверка, что text_obj является объектом AutoCAD
-        if isinstance(text_obj, str):
-            raise RuntimeError(f"AddText вернул строку вместо объекта: {text_obj}")
-
         text_obj.Layer = layer_name
         text_obj.Alignment = text_alignment
-
-        # Устанавливаем TextAlignmentPoint только для выравниваний, где это необходимо
-        if text_alignment not in [0, 1, 2]:  # acAlignmentLeft, acAlignmentCenter, acAlignmentRight
+        if text_alignment not in [0, 1, 2]:
             text_obj.TextAlignmentPoint = point_variant
         text_obj.Rotation = text_angle
         return text_obj
-
-    except Exception as e:
-        print(f"Ошибка в at_addText: {str(e)}")
+    except:
         return None
 
 
 if __name__ == "__main__":
     """
-    Тест добавления текста
+    Тестирование создания текста, окружности, линий, полилинии и прямоугольника с использованием точки из at_input.
     """
+    from config.at_cad_init import ATCadInit
+
     cad = ATCadInit()
-    adoc, model = cad.adoc, cad.model
-    input_point = at_point_input(adoc)
-    # at_addText(model, input_point, "text", text_height=60, text_alignment=0)
-    # cad.adoc.Regen(0)
-    point2 = polar_point(APoint(input_point), distance=360, alpha=30)
-    print(point2)
-    add_line(adoc, APoint(input_point), point2)
 
+    # Точки
+    input_point = at_point_input(cad.adoc)
+    point2 = polar_point(input_point, distance=400, alpha=90)
+    point3 = polar_point(input_point, distance=400, alpha=60)
+    point4 = polar_point(input_point, distance=400, alpha=120)
 
+    # Создание текста
+    text_obj = at_addText(cad.model, input_point, "Тестовый текст")
 
+    # Создание окружности
+    radius = 200
+    circle_obj = add_circle(cad.model, input_point, radius, layer_name="SF-ARE")
 
+    # Создание линии
+    line_obj = add_line(cad.model, input_point, point2, layer_name="AM_7")
 
+    # Создание полилинии (треугольник)
+    polyline_points = [input_point[0], input_point[1], point3[0], point3[1], point4[0], point4[1]]
+    polyline_obj = add_LWpolyline(cad.model, polyline_points, layer_name="LASER-TEXT")
 
+    # Создание прямоугольника
+    width, height = 300, 200
+    rectangle_obj = add_rectangle(cad.model, input_point, width, height, layer_name="SF-TEXT")
 
+    regen(cad.adoc)
