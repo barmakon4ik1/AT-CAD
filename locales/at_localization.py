@@ -180,6 +180,11 @@ translations = {
         "de": "Farbe",
         "en": "color"
     },
+    'create_layer_error': {
+        "ru": "Ошибка создания слоя",
+        "de": "Fehler beim Erstellen des Layers",
+        "en": "Layer creation error"
+    },
     "diameter": {
         "ru": "Диаметр",
         "de": "Durchmesser",

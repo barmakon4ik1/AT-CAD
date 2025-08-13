@@ -101,17 +101,6 @@ def add_LWpolyline(model: Any, points: Union[VARIANT, List[VARIANT]], layer_name
         else:
             raise TypeError("Точки должны быть типа либо VARIANT, либо list или объектом VARIANT")
 
-        # Проверяем, что массив содержит парное количество координат (x, y)
-        # points_array = points_variant.value
-        # if len(points_array) % 2 != 0:
-        #     raise ValueError("Points array must contain an even number of coordinates (x, y pairs)")
-        # if len(points_array) < 4:
-        #     raise ValueError("At least two points (four coordinates) are required for a polyline")
-
-        # Проверяем, что все координаты валидны
-        # if any(c is None or not isinstance(c, (int, float)) for c in points_array):
-        #     raise ValueError(f"Invalid coordinates in points array: {points_array}")
-
         # Создаём полилинию
         polyline = model.AddLightWeightPolyline(points_variant)
         polyline.Closed = closed
