@@ -105,6 +105,12 @@ DEFAULT_CIRCLE_LAYER: str = "0"
 HEADS_LAYER: str = "0"
 DEFAULT_TEXT_LAYER: str = "schrift"
 
+# Установки для размеров
+DEFAULT_DIM_LAYER = "AM_5"
+DEFAULT_DIM_STYLE = "AM_ISO"
+DEFAULT_DIM_OFFSET = 60.0
+DEFAULT_DIM_SCALE = 10.0
+
 # Текстовые параметры для черчения
 TEXT_HEIGHT_BIG: int = 60
 TEXT_HEIGHT_SMALL: int = 30

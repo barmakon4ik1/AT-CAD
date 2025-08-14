@@ -1,307 +1,367 @@
-# programms/at_dimension.py
 """
-Модуль для простановки размеров в AutoCAD с использованием win32com.
-Создаёт линейные размеры через ENTMAKE с DXF-списком, диаметрические и радиальные — через SendCommand.
-Использует стиль AM_ISO и слой AM_5.
+Файл: add_dimension.py
+Описание: Добавление размеров в AutoCAD через COM API.
+Поддерживаются: линейные (H/V/L), радиусные (R), диаметральные (D) и угловые (A) размеры.
 """
-
-import win32com.client
-import pythoncom
-from programms.at_input import at_point_input
-from locales.at_localization_class import loc
-from windows.at_gui_utils import show_popup
-import logging
 import time
 
-# Настройка логирования
-# logging.basicConfig(
-#     level=logging.DEBUG,
-#     filename="at_dimension.log",
-#     format="%(asctime)s - %(levelname)s - %(message)s",
-#     force=True
-# )
+from config import at_config as cfg
+from config.at_cad_init import ATCadInit
+from programms.at_com_utils import safe_utility_call
+from locales.at_localization_class import loc
+from programms.at_input import at_point_input
+from windows.at_gui_utils import show_popup
+import pythoncom
+from win32com.client import Dispatch
 
 
-def initialize_autocad(max_attempts=3, delay=2):
+def add_dimension(
+    adoc,
+    dim_type: str = None,
+    start_point: list = None,
+    end_point: list = None,
+    second_point_for_angle: list = None,
+    dim_layer: str = None,
+    dim_style: str = None,
+    scale_factor: float = None,
+    dim_offset: float = None
+):
     """
-    Инициализирует AutoCAD с повторными попытками.
-
-    Args:
-        max_attempts (int): Максимальное количество попыток подключения.
-        delay (int): Задержка между попытками в секундах.
-
-    Returns:
-        tuple: (acad, adoc, model) или (None, None, None) в случае неудачи.
+    Добавляет размер в AutoCAD с безопасным запросом типа и точек у пользователя.
+    Параметры:
+        adoc: COM объект ActiveDocument AutoCAD
+        model: ModelSpace документа
+        dim_type: Тип размера ('H','V','L','R','D','A')
+        start_point: первая точка
+        end_point: вторая точка
+        second_point_for_angle: для угловых размеров третья точка
+        dim_layer: слой размера
+        dim_style: стиль размера
+        scale_factor: масштаб размера
+        dim_offset: смещение линии размера
+    Если параметры не заданы, используются значения по умолчанию и запрос у пользователя.
     """
-    attempt = 0
-    while attempt < max_attempts:
-        try:
-            pythoncom.CoInitialize()
-            logging.debug("Инициализация COM выполнена")
-            try:
-                acad = win32com.client.GetActiveObject("AutoCAD.Application")
-                logging.debug("Подключение к существующему AutoCAD успешно")
-            except:
-                logging.debug("AutoCAD не найден, запуск нового экземпляра")
-                acad = win32com.client.Dispatch("AutoCAD.Application")
-                acad.Visible = True
-                time.sleep(delay)
-            adoc = acad.ActiveDocument
-            model = adoc.ModelSpace
-            logging.info("AutoCAD успешно инициализирован")
-            return acad, adoc, model
-        except Exception as e:
-            logging.error(f"Попытка {attempt + 1} инициализации AutoCAD не удалась: {e}")
-            attempt += 1
-            time.sleep(delay)
-        finally:
-            pythoncom.CoUninitialize()
-    logging.error("Не удалось инициализировать AutoCAD после всех попыток")
-    return None, None, None
-
-
-def create_dxf_dimension(dim_type: str, start_point: tuple, end_point: tuple, dim_point: tuple, layer: str = "AM_5"):
-    """
-    Формирует DXF-список для линейного размера (H, V, L).
-
-    Args:
-        dim_type (str): Тип размера ('H', 'V', 'L').
-        start_point (tuple): Начальная точка (x, y, z).
-        end_point (tuple): Конечная точка (x, y, z).
-        dim_point (tuple): Точка размерной линии (x, y, z).
-        layer (str): Слой размера.
-
-    Returns:
-        str: LISP-строка для ENTMAKE.
-    """
-    dim_type = dim_type.upper()
-    # Корректировка координат
-    start_x, start_y, start_z = float(start_point[0]), float(start_point[1]), float(start_point[2])
-    end_x, end_y, end_z = float(end_point[0]), float(end_point[1]), float(end_point[2])
-    dim_x, dim_y, dim_z = float(dim_point[0]), float(dim_point[1]), float(dim_point[2])
-
-    if dim_type == 'H':
-        end_y = start_y  # Фиксируем y для горизонтального
-    elif dim_type == 'V':
-        end_x = start_x  # Фиксируем x для вертикального
-
-    # DXF-список с обязательными кодами
-    dxf_list = [
-        "(0 . \"DIMENSION\")",
-        "(100 . \"AcDbEntity\")",
-        "(100 . \"AcDbDimension\")",
-        f"(10 {dim_x} {dim_y} {dim_z})",  # Точка размерной линии
-        f"(11 {dim_x} {dim_y} {dim_z})",  # Точка текста (совпадает с 10)
-        f"(13 {start_x} {start_y} {start_z})",  # Первая выносная точка
-        f"(14 {end_x} {end_y} {end_z})",  # Вторая выносная точка
-        "(70 . 32)",  # Тип: AlignedDimension
-        "(100 . \"AcDbAlignedDimension\")"
-    ]
-
-    # Формирование LISP-строки
-    lisp_str = f"(entmake '({' '.join(dxf_list)}))"
-    logging.debug(f"Сформирован DXF: {lisp_str}")
-    return lisp_str
-
-
-def at_dimension(
-        dim_type: str,
-        start_point: tuple,
-        end_point: tuple,
-        dim_point: tuple,
-        layer: str = "AM_5"
-) -> bool:
-    """
-    Создает размер в AutoCAD через ENTMAKE для линейных размеров и SendCommand для D/R.
-
-    Args:
-        layer: Слой для размеров (по умолчанию "AM_5").
-        dim_type (str): Тип размера ('L', 'H', 'V', 'D', 'R').
-        start_point (tuple): Начальная точка размера (x, y, z).
-        end_point (tuple): Конечная точка размера (x, y, z).
-        dim_point (tuple): Точка размерной линии (x, y, z).
-
-    Returns:
-        bool: True, если размер создан, False в случае ошибки.
-    """
-    # Инициализация AutoCAD
-    acad, adoc, model = initialize_autocad()
-    if not adoc or not model:
-        show_popup(loc.get('cad_init_error', 'Ошибка инициализации AutoCAD'), popup_type="error")
-        logging.error("Не удалось инициализировать AutoCAD")
-        return False
-
+    # --- Значения по умолчанию ---
+    dim_layer = dim_layer or cfg.DEFAULT_DIM_LAYER
+    dim_style = dim_style or cfg.DEFAULT_DIM_STYLE
+    model = cad.model
+    # Проверяем и преобразуем scale_factor
     try:
-        pythoncom.CoInitialize()
-
-        # Настройка стиля размеров
-        try:
-            adoc.SendCommand("DIMSTYLE WIEDERHERSTELLEN AM_ISO\n")
-            time.sleep(0.5)
-            logging.debug("Стиль AM_ISO восстановлен")
-        except Exception as e:
-            logging.warning(f"Не удалось восстановить стиль AM_ISO: {e}")
-
-        dim_type = dim_type.upper()
-        if dim_type in ['H', 'V', 'L']:
-            # Линейный размер через ENTMAKE
-            lisp_command = create_dxf_dimension(dim_type, start_point, end_point, dim_point, layer)
-            try:
-                adoc.SendCommand(lisp_command + "\n")
-                time.sleep(1.5)
-                # Проверка результата
-                adoc.SendCommand("(princ (entlast))\n")
-                time.sleep(0.5)
-                adoc.SendCommand("REGEN\n")
-                time.sleep(0.5)
-                logging.info(f"Размер типа '{dim_type}' создан через ENTMAKE")
-            except Exception as e:
-                logging.error(f"Ошибка при выполнении ENTMAKE: {e}")
-                show_popup(loc.get('dim_creation_error', f"Ошибка при создании размера: {str(e)}"), popup_type="error")
-                return False
-        else:
-            # Диаметрические и радиальные размеры через SendCommand
-            start_point_list = [float(start_point[0]), float(start_point[1]), float(start_point[2])]
-            end_point_list = [float(end_point[0]), float(end_point[1]), float(end_point[2])]
-            dim_point_list = [float(dim_point[0]), float(dim_point[1]), float(dim_point[2])]
-            try:
-                if dim_type == 'D':
-                    command = (
-                        f"DIMDIAMETER "
-                        f"{start_point_list[0]},{start_point_list[1]} "
-                        f"{end_point_list[0]},{end_point_list[1]} "
-                        f"{dim_point_list[0]},{dim_point_list[1]}\n"
-                    )
-                    logging.debug(f"Отправка команды: {command}")
-                    adoc.SendCommand(command)
-                    time.sleep(1.5)
-                elif dim_type == 'R':
-                    command = (
-                        f"DIMRADIUS "
-                        f"{start_point_list[0]},{start_point_list[1]} "
-                        f"{dim_point_list[0]},{dim_point_list[1]}\n"
-                    )
-                    logging.debug(f"Отправка команды: {command}")
-                    adoc.SendCommand(command)
-                    time.sleep(1.5)
-                else:
-                    show_popup(loc.get('invalid_dim_type', 'Недопустимый тип размера'), popup_type="error")
-                    logging.error(f"Недопустимый тип размера: {dim_type}")
-                    return False
-                adoc.SendCommand("REGEN\n")
-                time.sleep(0.5)
-                logging.info(f"Размер типа '{dim_type}' создан через SendCommand")
-            except Exception as e:
-                logging.error(f"Ошибка при выполнении SendCommand: {e}")
-                show_popup.error(f"Ошибка при создании размера: {str(e)}")
-                return False
-
-    except Exception as e:
-        logging.error(f"Общая ошибка: {str(e)}")
-        show_popup(loc.get('dim_error', f"Ошибка при создании размера: {str(e)}"), popup_type="error")
-        return False
-    finally:
-        pythoncom.CoUninitialize()
-
-
-def at_amautodim(adoc, object, start_point, dim_point):
-    cmd = f'"_amautodim_cli""\n""_p""\n""_b""\n""_n""\n""_n""\n""_n""\n"{object}\n"{start_point}\n"{dim_point}\n"'
-    print(cmd)
-    adoc.SendCommand(cmd)
-
-
-def test_dimension():
-    """
-    Тестовый запуск функции at_dimension с запросом точек и типа размера.
-    """
-    acad, adoc, model = initialize_autocad()
-    if not adoc or not model:
-        show_popup(loc.get('cad_init_error', 'Ошибка инициализации AutoCAD'), popup_type="error")
-        logging.error("Не удалось инициализировать AutoCAD в тестовом режиме")
+        scale_factor = float(scale_factor if scale_factor is not None else cfg.DEFAULT_DIM_SCALE)
+    except (ValueError, TypeError) as e:
+        show_popup(
+            loc.get("invalid_value", "Неверное значение scale_factor: {}").format(scale_factor or cfg.DEFAULT_DIM_SCALE),
+            popup_type="error"
+        )
+        return
+    # Проверяем и преобразуем dim_offset
+    try:
+        dim_offset = float(dim_offset if dim_offset is not None else cfg.DEFAULT_DIM_OFFSET)
+    except (ValueError, TypeError) as e:
+        show_popup(
+            loc.get("invalid_value", "Неверное значение dim_offset: {}").format(dim_offset or cfg.DEFAULT_DIM_OFFSET),
+            popup_type="error"
+        )
         return
 
-    try:
-        pythoncom.CoInitialize()
-
-        # Запрос типа размера
-        dim_types = ['L', 'H', 'V', 'D', 'R']
-        adoc.Utility.Prompt(f"Выберите тип размера ({', '.join(dim_types)}): ")
-        dim_type = adoc.Utility.GetString(1).strip().upper()
-        if dim_type not in dim_types:
-            show_popup(loc.get('invalid_dim_type', 'Недопустимый тип размера'), popup_type="error")
-            logging.error(f"Недопустимый тип размера: {dim_type}")
+    # --- Запрос типа размера, если не задан ---
+    if dim_type is None:
+        raw = adoc.Utility.GetString(True, "Введите тип размера (H/V/L/R/D/A): ")
+        if raw is None or not str(raw).strip():
+            show_popup(
+                loc.get("input_error", "Ошибка ввода типа размера или пустой ввод"),
+                popup_type="error"
+            )
+            return
+        dim_type = str(raw).strip().upper()  # Приводим к строке и верхнему регистру
+        if dim_type not in ("H", "V", "L", "R", "D", "A"):
             return
 
-        # Запрос точек с учетом типа размера
-        if dim_type in ['L', 'H', 'V']:
-            adoc.Utility.Prompt("Выберите начальную точку размера:\n")
-            start_point = at_point_input(adoc)
-            if not start_point:
-                logging.error("Не выбрана начальная точка размера")
-                return
+    # --- Запрос первой точки, если не задана ---
+    if start_point is None:
+        start_point = at_point_input(adoc, as_variant=True)
 
-            adoc.Utility.Prompt("Выберите конечную точку размера:\n")
-            end_point = at_point_input(adoc)
-            if not end_point:
-                logging.error("Не выбрана конечная точка размера")
-                return
+    # --- Запрос остальных точек в зависимости от типа ---
+    if dim_type in ("H", "V", "L"):
+        if end_point is None:
+            end_point = at_point_input(adoc, as_variant=True)
 
-            adoc.Utility.Prompt("Выберите точку размещения размерной линии:\n")
-            dim_point = at_point_input(adoc)
-            if not dim_point:
-                logging.error("Не выбрана точка размещения размерной линии")
-                return
-        elif dim_type == 'D':
-            adoc.Utility.Prompt("Выберите первую точку на окружности/дуге:\n")
-            start_point = at_point_input(adoc)
-            if not start_point:
-                logging.error("Не выбрана первая точка для диаметра")
-                return
+    elif dim_type == "R":
+        if end_point is None:
+            end_point = at_point_input(adoc, as_variant=True)
 
-            adoc.Utility.Prompt("Выберите противоположную точку на окружности/дуге:\n")
-            end_point = at_point_input(adoc)
-            if not end_point:
-                logging.error("Не выбрана противоположная точка для диаметра")
-                return
+    elif dim_type == "D":
+        if end_point is None:
+            end_point = at_point_input(adoc, as_variant=True)
 
-            adoc.Utility.Prompt("Выберите точку размещения размерной линии:\n")
-            dim_point = at_point_input(adoc)
-            if not dim_point:
-                logging.error("Не выбрана точка размещения размерной линии для диаметра")
-                return
-        elif dim_type == 'R':
-            adoc.Utility.Prompt("Выберите центр окружности/дуги:\n")
-            start_point = at_point_input(adoc)
-            if not start_point:
-                logging.error("Не выбран центр для радиального размера")
-                return
+    elif dim_type == "A":
+        if second_point_for_angle is None:
+            second_point_for_angle = at_point_input(adoc, as_variant=True)
 
-            adoc.Utility.Prompt("Выберите точку на окружности/дуге:\n")
-            dim_point = at_point_input(adoc)
-            if not dim_point:
-                logging.error("Не выбрана точка на окружности/дуге для радиального размера")
-                return
+        if end_point is None:
+            end_point = at_point_input(adoc, as_variant=True)
 
-            end_point = dim_point
+    # --- Создание размера ---
+    dim_ent = None
+    if dim_type in ("H", "V"):
+        angle = 0 if dim_type == "H" else 90  # 0 для H/L, 90 для V
+        dim_ent = model.AddDimRotated(start_point, end_point, angle, None)
+    elif dim_type == "L":
+        dim_ent = model.AddDimRotated(start_point, end_point, None, None)
+    elif dim_type == "R":
+        dim_ent = model.AddDimRadial(start_point, end_point)
+    elif dim_type == "D":
+        dim_ent = model.AddDimDiametric(start_point, end_point, 0)
+    elif dim_type == "A":
+        dim_ent = model.AddDimAngular(start_point, second_point_for_angle, end_point, None)
 
-        # Преобразование точек в кортежи (x, y, z)
-        start_point = (start_point[0], start_point[1], 0)
-        end_point = (end_point[0], end_point[1], 0)
-        dim_point = (dim_point[0], dim_point[1], 0)
+    # --- Применяем параметры ---
+    dim_ent.ScaleFactor = scale_factor
+    dim_ent.Layer = dim_layer
+    dim_ent.StyleName = dim_style
+    if hasattr(dim_ent, "DimLineOffset"):
+        dim_ent.DimLineOffset = dim_offset
 
-        # Вызов функции простановки размера
-        if at_dimension(dim_type, start_point, end_point, dim_point):
-            show_popup(loc.get('dim_success', 'Размер успешно создан с масштабом 10'), popup_type="success")
-        else:
-            show_popup(loc.get('dim_creation_error', 'Ошибка при создании размера'), popup_type="error")
+    adoc.Regen()  # Обновляем чертеж
 
-    except Exception as e:
-        logging.error(f"Ошибка в тестовом режиме: {e}")
-        show_popup(loc.get('test_error', f"Ошибка в тестовом режиме: {str(e)}"), popup_type="error")
-    finally:
-        pythoncom.CoUninitialize()
+    return dim_ent
 
+
+# --- Точка входа ---
+if __name__ == "__main__":
+
+    cad = ATCadInit()
+    add_dimension(cad.adoc)
+
+
+"""
+Рабочий вариант с sendcommand
+# programms/at_dimension.py
+
+Постановка размеров H/V/L/D/R/A в AutoCAD (Mechanical 2026) из Python.
+Масштаб применяется только к созданному размеру (не глобально).
+
+Типы размеров:
+    H — горизонтальный (DIMROTATED 0)
+    V — вертикальный   (DIMROTATED 90)
+    L — линейный       (DIMLINEAR)
+    D — диаметр        (DIMDIAMETER)
+    R — радиус         (DIMRADIUS)
+    A — угол           (DIMANGULAR)
+
+
+from __future__ import annotations
+import time
+from typing import Optional
+
+from config.at_cad_init import ATCadInit
+from programms.at_input import at_point_input
+from locales.at_localization_class import loc
+from programms.at_base import regen
+from config.at_config import DEFAULT_DIM_STYLE, DEFAULT_DIM_SCALE, DEFAULT_DIM_LAYER, DEFAULT_DIM_OFFSET
+
+
+# ---------- Вспомогательные функции ----------
+
+def _fmt_xy(pt) -> str:
+Формат 'x,y' с точкой как десятичным разделителем.
+    return f"{float(pt[0]):.8f},{float(pt[1]):.8f}"
+
+
+def _set_active_layer_and_style(adoc, layer_name: str, dimstyle_name: str) -> None:
+Активируем слой и стиль размеров.
+    try:
+        adoc.ActiveLayer = adoc.Layers.Item(layer_name)
+    except Exception:
+        # слой гарантированно есть, так что ошибок быть не должно
+        pass
+    try:
+        adoc.ActiveDimStyle = adoc.DimStyles.Item(dimstyle_name)
+    except Exception:
+        pass
+
+
+def _ucs_world(adoc) -> None:
+Привязка к WCS для предсказуемого смещения размерных линий.
+    adoc.SendCommand("._UCS _W\n")
+    time.sleep(0.05)
+
+
+def _wait_new_entity(ms, count_before: int, timeout: float = 5.0) -> bool:
+Ждем появления нового объекта в ModelSpace после SendCommand.
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        try:
+            if ms.Count > count_before:
+                return True
+        except Exception:
+            pass
+        time.sleep(0.05)
+    return False
+
+
+def _is_dimension(ent) -> bool:
+Эвристика для определения объекта как размера.
+    name = ""
+    try:
+        name = getattr(ent, "ObjectName", "") or getattr(ent, "EntityName", "")
+    except Exception:
+        name = ""
+    if isinstance(name, str) and ("Dim" in name or "DIM" in name):
+        return True
+    # запасной признак — наличие типичных свойств размера
+    for prop in ("DimScale", "ScaleFactor", "TextPosition"):
+        try:
+            getattr(ent, prop)
+            return True
+        except Exception:
+            continue
+    return False
+
+
+def _find_last_dimension(ms, count_before: int) -> Optional[object]:
+    Находим последний созданный размер после count_before.
+    try:
+        i = ms.Count - 1
+        low = max(count_before, 0)
+        steps = 0
+        while i >= low and steps < 20:
+            try:
+                ent = ms.Item(i)
+                if _is_dimension(ent):
+                    return ent
+            except Exception:
+                pass
+            i -= 1
+            steps += 1
+    except Exception:
+        pass
+    return None
+
+
+def _apply_per_entity_scale(dim_ent, scale: float) -> bool:
+
+    Применяем масштаб только к созданному размеру.
+    Используем DimScale / ScaleFactor, если доступно.
+
+    for prop in ("DimScale", "ScaleFactor"):
+        try:
+            setattr(dim_ent, prop, float(scale))
+            try:
+                dim_ent.Update()
+            except Exception:
+                pass
+            return True
+        except Exception:
+            continue
+    return False
+
+
+# ---------- Основная функция ----------
+
+def add_dimension(adoc, model, dim_type: str, start_point, end_point, offset: float = DEFAULT_DIM_OFFSET,
+                  per_entity_scale: float = DEFAULT_DIM_SCALE) -> bool:
+
+    Ставит размер в AutoCAD по типу:
+        H — горизонтальный
+        V — вертикальный
+        L — линейный
+        D — диаметр
+        R — радиус
+        A — угол
+    Масштаб применяется только к созданному размеру.
+
+    Args:
+        dim_type: 'H'|'V'|'L'|'D'|'R'|'A'
+        start_point: [x,y,z]
+        end_point:   [x,y,z]
+        offset:      смещение размерной линии
+        per_entity_scale: масштаб для нового размера
+
+    _ucs_world(adoc)
+    _set_active_layer_and_style(adoc, DEFAULT_DIM_LAYER, DEFAULT_DIM_STYLE)
+
+    x1, y1 = float(start_point[0]), float(start_point[1])
+    x2, y2 = float(end_point[0]), float(end_point[1])
+
+    dim_type = (dim_type or "").upper().strip()
+
+    # Вычисление точки размещения размерной линии
+    if dim_type == "H":
+        pd = ((x1 + x2) / 2.0, y1 + float(offset))
+        cmd = f"_.DIMROTATED 0 {_fmt_xy((x1, y1))} {_fmt_xy((x2, y2))} {_fmt_xy(pd)}\n"
+    elif dim_type == "V":
+        pd = (max(x1, x2) + float(offset), (y1 + y2) / 2.0)
+        cmd = f"_.DIMROTATED 90 {_fmt_xy((x1, y1))} {_fmt_xy((x2, y2))} {_fmt_xy(pd)}\n"
+    elif dim_type == "L":
+        # Линейный размер параллельно линии с смещением offset
+        import math
+        dx, dy = x2 - x1, y2 - y1
+        angle = math.degrees(math.atan2(dy, dx))
+        length = math.hypot(dx, dy)
+        # нормаль к линии (перпендикуляр)
+        nx, ny = -dy / length, dx / length
+        pd = ((x1 + x2) / 2 + nx * offset, (y1 + y2) / 2 + ny * offset)
+        cmd = f"_.DIMROTATED {angle} {_fmt_xy((x1, y1))} {_fmt_xy((x2, y2))} {_fmt_xy(pd)}\n"
+    elif dim_type == "D":
+        cmd = f"_.DIMDIAMETER {_fmt_xy((x1, y1))} {_fmt_xy((x2, y2))}\n"
+    elif dim_type == "R":
+        cmd = f"_.DIMRADIUS {_fmt_xy((x1, y1))} {_fmt_xy((x2, y2))}\n"
+    elif dim_type == "A":
+        # угол между точками, pd = средняя точка между p1 и p2
+        pd = ((x1 + x2) / 2.0, (y1 + y2) / 2.0)
+        cmd = f"_.DIMANGULAR {_fmt_xy((x1, y1))} {_fmt_xy((x2, y2))} {_fmt_xy(pd)}\n"
+    else:
+        adoc.Utility.Prompt("Прервано пользователем.\n")
+        raise SystemExit(0)
+
+    count_before = model.Count
+    adoc.SendCommand(cmd)
+
+    # Ждём появления новой сущности
+    if not _wait_new_entity(model, count_before, timeout=5.0):
+        regen(adoc)
+        return False
+
+    # Находим только что созданный размер
+    dim_ent = _find_last_dimension(model, count_before)
+    if dim_ent is None:
+        regen(adoc)
+        return False
+
+    # Применяем масштаб ТОЛЬКО к этому размеру
+    _apply_per_entity_scale(dim_ent, per_entity_scale)
+
+    regen(adoc)
+    return True
+
+
+# ---------- Тестовый запуск ----------
 
 if __name__ == "__main__":
-    test_dimension()
+    cad = ATCadInit()
+    if not cad.is_initialized():
+        raise SystemExit
 
+    adoc = cad.adoc
+
+    # ---------- Запрос типа размера ----------
+    adoc.Utility.Prompt("Введите тип размера (H/V/L/D/R/A), другой символ для выхода:\n")
+    dim_type = adoc.Utility.GetString(True)  # только AutoCAD prompt, без консоли
+    dim_type = dim_type.upper().strip()
+    if dim_type not in ("H", "V", "L", "D", "R", "A"):
+        raise SystemExit
+
+    adoc.Utility.Prompt("Выберите первую точку:\n")
+    p1 = at_point_input(adoc, as_variant=False)
+    if not p1:
+        raise SystemExit
+
+    adoc.Utility.Prompt("Выберите вторую точку:\n")
+    p2 = at_point_input(adoc, as_variant=False)
+    if not p2:
+        raise SystemExit
+
+    ok = add_dimension(dim_type, p1, p2, offset=DEFAULT_DIM_OFFSET, per_entity_scale=DEFAULT_DIM_SCALE)
+
+"""

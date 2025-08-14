@@ -7,13 +7,13 @@
     "BANNER_FONT_SIZE": 24,
     "LABEL_FONT_SIZE": 24,
     "LABEL_FONT_NAME": "Times New Roman",
-    "LABEL_FONT_TYPE": "italic",
+    "LABEL_FONT_TYPE": "normal",
     "LABEL_FONT_WEIGHT": "bold",
     "BACKGROUND_COLOR": "#508050",
     "FOREGROUND_COLOR": "white",
     "BANNER_COLOR": "light blue",
     "BANNER_TEXT_COLOR": "black",
     "EXIT_BUTTON_COLOR": "dark grey",
-    "LABEL_FONT_COLOR": "blue",
+    "LABEL_FONT_COLOR": "#FFFFFF",
     "BUTTON_FONT_COLOR": "white"
 }
