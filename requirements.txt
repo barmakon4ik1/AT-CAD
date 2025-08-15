@@ -2,3 +2,4 @@
 
 pythonnet
 wxPython
+pywin32

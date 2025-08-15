@@ -175,6 +175,11 @@ translations = {
         "de": "Gegen den Uhrzeigersinn",
         "en": "Counterclockwise"
     },
+    "create_textstyle_error": {
+        "ru": "Ошибка создания текстового стиля",
+        "de": "Fehler beim Erstellen vom Textstil",
+        "en": "Create textstyle error"
+    },
     "current_layer_label": {
         "ru": "Текущий слой",
         "de": "Aktive Ebene",
@@ -804,6 +809,11 @@ translations = {
         "ru": "Ошибка при добавлении текста: {}",
         "de": "Fehler beim Hinzufügen von Text: {}",
         "en": "Error adding text: {}"
+    },
+    "text_font_error": {
+        "ru": "Ошибка стиля текста",
+        "de": "Fehler beim Textstil",
+        "en": "Text font error"
     },
     "text_layer_error": {
         "ru": "Не удалось добавить текст на слой '{}'.",

@@ -4,15 +4,45 @@
 Путь: config/at_cad_init.py
 
 Описание:
-Модуль для инициализации AutoCAD через COM (win32com). Проверяет подключение к AutoCAD,
-автоматически создаёт предопределённые слои и предоставляет синглтон для доступа к приложению.
+Модуль для инициализации AutoCAD через COM (win32com).
+Проверяет подключение к AutoCAD, автоматически создаёт предопределённые слои
+и устанавливает TTF-шрифт для текущего стиля текста.
+Реализует синглтон для однократной инициализации.
 """
 
+import math
 import win32com.client
-from locales.at_localization_class import loc
+from locales.at_translations import loc
 from windows.at_gui_utils import show_popup
 from config.at_config import LAYER_DATA
 
+# Локальный словарь переводов для модуля at_cad_init
+TRANSLATIONS = {
+    # Ошибка инициализации AutoCAD
+    "cad_init_error_short": {
+        "ru": "Ошибка инициализации AutoCAD.",
+        "de": "Fehler bei der Initialisierung von AutoCAD.",
+        "en": "AutoCAD initialization error."
+    },
+    # Ошибка создания предопределённых слоёв
+    "create_layer_error": {
+        "ru": "Не удалось создать предопределённые слои.",
+        "de": "Fehler beim Erstellen vordefinierter Layer.",
+        "en": "Failed to create predefined layers."
+    },
+    # Ошибка установки шрифта для текстового стиля
+    "text_style_error": {
+        "ru": "Ошибка установки шрифта: {0}",
+        "de": "Fehler beim Setzen der Schriftart: {0}",
+        "en": "Error setting font: {0}"
+    },
+    # Успешная инициализация AutoCAD (для тестового запуска)
+    "cad_init_success": {
+        "ru": "AutoCAD успешно инициализирован.",
+        "de": "AutoCAD erfolgreich initialisiert.",
+        "en": "AutoCAD successfully initialized."
+    }
+}
 
 class ATCadInit:
     """
@@ -22,45 +52,60 @@ class ATCadInit:
     _instance = None
 
     def __new__(cls):
-        """
-        Гарантирует создание только одного экземпляра класса.
-
-        Returns:
-            ATCadInit: Единственный экземпляр класса.
-        """
         if cls._instance is None:
             cls._instance = super(ATCadInit, cls).__new__(cls)
             cls._instance._initialize()
         return cls._instance
 
+    def __init__(self):
+        """
+        Регистрирует локальные переводы модуля в глобальном обработчике локализации.
+        """
+        loc.register_translations(TRANSLATIONS)
+
+    def _msg(self, key: str, default_ru: str, *args) -> str:
+        """
+        Получает строку из словаря перевода или возвращает русский текст по умолчанию.
+        Поддерживает форматирование строк с аргументами.
+
+        Аргументы:
+            key (str): Ключ перевода.
+            default_ru (str): Русский текст по умолчанию.
+            *args: Аргументы для форматирования строки.
+
+        Возвращает:
+            str: Переведённая строка или текст по умолчанию.
+        """
+        return loc.get(key, default_ru, *args)
+
     def _initialize(self):
         """
-        Выполняет подключение к AutoCAD через COM и создаёт предопределённые слои.
-
-        Attributes:
-            acad: Экземпляр приложения AutoCAD (Application).
-            adoc: Активный документ AutoCAD (Document).
-            model: Модельное пространство AutoCAD (ModelSpace).
-            original_layer: Исходный активный слой.
-
-        Notes:
-            В случае ошибки инициализации показывает всплывающее окно с сообщением.
-            Создаёт слои из LAYER_DATA после инициализации документа.
+        Выполняет подключение к AutoCAD через COM, создаёт предопределённые слои
+        и настраивает шрифт текущего стиля текста.
         """
         try:
             self.acad = win32com.client.Dispatch("AutoCAD.Application")
             self.acad.Visible = True
             self.adoc = self.acad.ActiveDocument
             if self.adoc is None:
-                raise Exception(loc.get("cad_init_error_short", "AutoCAD initialization error."))
+                raise Exception(self._msg("cad_init_error_short", "Ошибка инициализации AutoCAD."))
             self.model = self.adoc.ModelSpace
             self.original_layer = self.adoc.ActiveLayer
-            # Создание предопределённых слоёв
+            # Установка масштаба линий
+            self.adoc.SetVariable("LTSCALE", 10)
+            self.adoc.SetVariable("MSLTSCALE", 1)
+            self.adoc.SetVariable("PSLTSCALE", 1)
+            self.adoc.SetVariable("CANNOSCALE", "1:10")
+            self.adoc.SetVariable("DIMSCALE", 10)
+
             if not self._create_layers():
-                raise Exception(loc.get("create_layer_error", "Failed to create predefined layers."))
+                raise Exception(self._msg("create_layer_error", "Не удалось создать предопределённые слои."))
+
+            self._set_current_text_font()
+
         except Exception as e:
             show_popup(
-                loc.get("cad_init_error_short", f"AutoCAD initialization error: {str(e)}"),
+                self._msg("cad_init_error_short", f"Ошибка инициализации AutoCAD: {0}", str(e)),
                 popup_type="error"
             )
             self.acad = None
@@ -72,8 +117,8 @@ class ATCadInit:
         """
         Проверяет, успешно ли инициализирован AutoCAD.
 
-        Returns:
-            bool: True, если AutoCAD готов к работе, иначе False.
+        Возвращает:
+            bool: True, если AutoCAD инициализирован, иначе False.
         """
         return self.acad is not None and self.adoc is not None and self.model is not None
 
@@ -81,8 +126,8 @@ class ATCadInit:
         """
         Создает предопределенные слои в AutoCAD с заданными параметрами.
 
-        Returns:
-            bool: True, если слои созданы, False при ошибке.
+        Возвращает:
+            bool: True, если слои успешно созданы, иначе False.
         """
         try:
             layers = self.adoc.Layers
@@ -96,31 +141,51 @@ class ATCadInit:
                         new_layer.Lineweight = int(layer["lineweight"] * 100)
                     if "plot" in layer:
                         new_layer.Plottable = layer["plot"]
-                    show_popup(
-                        loc.get("layer_created", "Layer '{}' created.").format(layer_name),
-                        popup_type="info"
-                    )
             return True
         except Exception as e:
             show_popup(
-                loc.get("create_layer_error", f"Error creating layers: {str(e)}"),
+                self._msg("create_layer_error", f"Ошибка при создании слоёв: {0}", str(e)),
+                popup_type="error"
+            )
+            return False
+
+    def _set_current_text_font(self) -> bool:
+        """
+        Устанавливает для текущего стиля текста TTF-шрифт ISOCPEUR и курсив.
+        Работает через коллекцию TextStyles, что поддерживается в AutoCAD Mechanical DE.
+
+        Возвращает:
+            bool: True, если шрифт успешно установлен, иначе False.
+        """
+        try:
+            font_name = "ISOCPEUR"  # имя шрифта (TTF)
+            current_style_name = self.adoc.ActiveTextStyle.Name
+            style = self.adoc.TextStyles.Item(current_style_name)
+
+            try:
+                # Предпочтительный способ для TTF
+                style.SetFont(font_name, False, True, 0, 0)
+            except Exception as e:
+                raise Exception(self._msg("text_style_error", f"Не удалось применить SetFont: {0}", str(e)))
+
+            return True
+        except Exception as e:
+            show_popup(
+                self._msg("text_style_error", f"Ошибка установки шрифта: {0}", str(e)),
                 popup_type="error"
             )
             return False
 
 
 if __name__ == "__main__":
-    """
-    Тестирование инициализации AutoCAD при прямом запуске модуля.
-    """
     cad = ATCadInit()
     if not cad.is_initialized():
         show_popup(
-            loc.get("cad_init_error_short", "AutoCAD initialization error."),
+            cad._msg("cad_init_error_short", "Ошибка инициализации AutoCAD."),
             popup_type="error"
         )
     else:
         show_popup(
-            loc.get("cad_init_success", "AutoCAD initialized successfully."),
+            cad._msg("cad_init_success", "AutoCAD успешно инициализирован."),
             popup_type="success"
         )
