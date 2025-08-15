@@ -20,6 +20,7 @@ import pythoncom
 from win32com.client import VARIANT
 
 from programms.at_base import regen
+from programms.at_dimension import add_dimension
 from programms.at_geometry import add_rectangle_points
 from programms.at_input import at_point_input
 from windows.at_gui_utils import show_popup
@@ -194,7 +195,7 @@ if __name__ == "__main__":
     cad = ATCadInit()
 
     # Запрашиваем точку у пользователя (at_point_input уже возвращает готовый VARIANT)
-    input_point = at_point_input(cad.adoc)
+    input_point = at_point_input(cad.adoc, prompt="Укажите центр окружности")
 
     if input_point:
         # Вычисляем дополнительные точки с помощью полярных координат
@@ -217,6 +218,8 @@ if __name__ == "__main__":
 
         # Создание прямоугольника
         add_rectangle(cad.model, input_point, 300, 200, layer_name="SF-TEXT")
+        end_point = polar_point(input_point, distance=380, alpha=math.tan(200 / 300))
+        add_dimension(cad.adoc, "H", input_point, end_point)
 
         # Обновляем экран
         regen(cad.adoc)

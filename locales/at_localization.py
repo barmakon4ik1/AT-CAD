@@ -125,6 +125,11 @@ translations = {
         "de": "Zurück",
         "en": "Return"
     },
+    "center_point_label": {
+        "ru": "центральную точку",
+        "de": "den Mittelpunkt",
+        "en": "the center point"
+    },
     "circle_error": {
         "ru": "Ошибка при построении окружностей.",
         "de": "Fehler beim Erstellen von Kreisen.",
@@ -250,6 +255,11 @@ translations = {
         "de": "Welcher Durchmesser wurde angegeben?",
         "en": "Which diameter was specified?"
     },
+    "dimension_line_point_label": {
+        "ru": "точку размерной линии",
+        "de": "den Punkt der Maßlinie",
+        "en": "the dimension line point"
+    },
     "dimensions_label": {
         "ru": "Размеры",
         "de": "Abmessungen",
@@ -264,6 +274,11 @@ translations = {
         "ru": "Ошибка в '{}': {}",
         "de": "Fehler in '{}': {}",
         "en": "Error in '{}': {}"
+    },
+    "first_point_label": {
+        "ru": "первую точку",
+        "de": "den ersten Punkt",
+        "en": "the first point"
     },
     "fittings_placeholder_label": {
         "ru": "Параметры штуцеров и отводов (будет реализовано позже)",
@@ -715,10 +730,20 @@ translations = {
         "de": "Fehler: Nahtwinkel muss zwischen 0 und 360 Grad liegen",
         "en": "Error: Seam angle must be between 0 and 360 degrees"
     },
+    "second_point_label": {
+        "ru": "вторую точку",
+        "de": "den zweiten Punkt",
+        "en": "the second point"
+    },
     "select_point_button": {
         "ru": "Выбрать точку",
         "de": "Punkt auswählen",
         "en": "Select point"
+    },
+    "select_point_template": {
+        "ru": "Укажите {point_type}: ",
+        "de": "{point_type} auswählen: ",
+        "en": "Select {point_type}: "
     },
     "settings_reset": {
         "ru": "Настройки сброшены",

@@ -14,7 +14,7 @@ from locales.at_localization_class import loc
 from programms.at_com_utils import safe_utility_call
 
 
-def at_point_input(adoc: object = None, as_variant: bool = True) -> Optional[Union[List[float], VARIANT]]:
+def at_point_input(adoc: object = None, as_variant: bool = True, prompt: str = None) -> Optional[Union[List[float], VARIANT]]:
     """
     Запрашивает у пользователя выбор точки в AutoCAD с повторным вводом при ошибке.
 
@@ -41,7 +41,9 @@ def at_point_input(adoc: object = None, as_variant: bool = True) -> Optional[Uni
         adoc = cad.adoc
 
     # Печатаем приглашение, затем безопасно запрашиваем точку.
-    adoc.Utility.Prompt(loc.get("prompt_select_point", "Выберите точку: ") + "\n")
+    if prompt is None:
+        prompt = loc.get("prompt_select_point", "Выберите точку: ") + "\n"
+    adoc.Utility.Prompt(prompt)
 
     # ВАЖНО: передаём ЛЯМБДА-ВЫЗОВ, а не метод как объект.
     # Так мы всегда вызываем метод правильно, и анализаторы не ругаются, что "ожидался возвращаемый объект".
@@ -54,9 +56,11 @@ if __name__ == "__main__":
     """
     cad = ATCadInit()
     # Пример теста с возвратом VARIANT
-    input_point_variant = at_point_input(cad.adoc, as_variant=True)
+    prompt1 = "Введите точку для вариантной точки"
+    input_point_variant = at_point_input(cad.adoc, as_variant=True, prompt=prompt1)
     print("VARIANT:", input_point_variant)
 
     # Пример теста с возвратом обычного списка
-    input_point_list = at_point_input(cad.adoc, as_variant=False)
+    prompt2 = "А это для точки с возвратом списка координат"
+    input_point_list = at_point_input(cad.adoc, as_variant=False, prompt=prompt2)
     print("List:", input_point_list)
