@@ -89,6 +89,7 @@ DEFAULT_SETTINGS: dict = {
 # Предопределённые слои для AutoCAD
 LAYER_DATA: list[dict] = [
     {"name": "0", "color": 7, "linetype": "CONTINUOUS", "lineweight": 0.25},
+    {"name": "AM_0", "color": 7, "linetype": "CONTINUOUS", "lineweight": 1},
     {"name": "SF-ARE", "color": 233, "linetype": "PHANTOM2", "plot": False},
     {"name": "AM_5", "color": 110, "linetype": "CONTINUOUS", "lineweight": 0.05},
     {"name": "LASER-TEXT", "color": 2, "linetype": "CONTINUOUS"},
@@ -102,7 +103,7 @@ LAYER_DATA: list[dict] = [
 # Слои по умолчанию для объектов AutoCAD
 RECTANGLE_LAYER: str = "0"
 DEFAULT_CIRCLE_LAYER: str = "0"
-HEADS_LAYER: str = "0"
+HEADS_LAYER: str = "AM_0"
 DEFAULT_TEXT_LAYER: str = "schrift"
 
 # Установки для размеров
@@ -112,9 +113,13 @@ DEFAULT_DIM_OFFSET = 60.0
 DEFAULT_DIM_SCALE = 10.0
 
 # Текстовые параметры для черчения
+TEXT_FONT: str = "ISOCPEUR"
+TEXT_BOLD: bool = False
+TEXT_ITAL: bool = True
 TEXT_HEIGHT_BIG: int = 60
 TEXT_HEIGHT_SMALL: int = 30
 TEXT_DISTANCE: int = 80
+
 CHECK_MARK: str = "✅"
 ERROR_MARK: str = "⚠️"
 
