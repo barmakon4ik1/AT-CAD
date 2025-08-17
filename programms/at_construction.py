@@ -21,7 +21,7 @@ from win32com.client import VARIANT
 
 from programms.at_base import regen
 from programms.at_dimension import add_dimension
-from programms.at_geometry import add_rectangle_points
+from programms.at_geometry import add_rectangle_points, offset_point
 from programms.at_input import at_point_input
 from windows.at_gui_utils import show_popup
 from config.at_config import DEFAULT_TEXT_LAYER
@@ -204,10 +204,10 @@ if __name__ == "__main__":
         point4 = polar_point(input_point, distance=400, alpha=120)
 
         # Создание текста
-        at_addText(cad.model, input_point, "Тестовый текст")
+        at_addText(cad.model, polar_point(input_point, distance=500, alpha=90), "Тестовый текст")
 
         # Создание окружности
-        add_circle(cad.model, input_point, 200, layer_name="SF-ARE")
+        add_circle(cad.model, input_point, 200, layer_name="AM_0")
 
         # Создание линии
         add_line(cad.model, input_point, point2, layer_name="AM_7")
@@ -217,8 +217,9 @@ if __name__ == "__main__":
         add_LWpolyline(cad.model, polyline_points, layer_name="LASER-TEXT")
 
         # Создание прямоугольника
-        add_rectangle(cad.model, input_point, 300, 200, layer_name="SF-TEXT")
-        end_point = polar_point(input_point, distance=380, alpha=math.tan(200 / 300))
+        width, height = 500, 300
+        add_rectangle(cad.model, input_point, width, height, layer_name="SF-TEXT")
+        end_point = offset_point(input_point, width, height)
         add_dimension(cad.adoc, "H", input_point, end_point)
 
         # Обновляем экран
