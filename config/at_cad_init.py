@@ -35,9 +35,9 @@ TRANSLATIONS = {
         "de": "AutoCAD erfolgreich initialisiert."
     },
     "cad_not_ready": {
-        "ru": "AutoCAD не готов к работе. Пожалуйста сначала запустите AutoCAD и выберите рабочее пространство.",
-        "en": "AutoCAD is not ready. Please start AutoCAD first and select a workspace.",
-        "de": "AutoCAD ist nicht bereit. Bitte starten Sie zuerst AutoCAD und wählen Sie einen Arbeitsbereich aus."
+        "ru": "AutoCAD не готов к работе. Пожалуйста сначала запустите AutoCAD и подготовьте рабочее пространство.",
+        "en": "AutoCAD is not ready. Please start AutoCAD first and prepare a workspace.",
+        "de": "AutoCAD ist nicht bereit. Bitte starten Sie zuerst AutoCAD und bereiten Sie Ihren Arbeitsbereich vor."
     },
     "create_layer_error": {
         "ru": "Ошибка при создании слоёв: {0}",

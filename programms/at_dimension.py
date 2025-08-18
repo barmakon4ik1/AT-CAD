@@ -211,4 +211,5 @@ def add_dimension(
 
 if __name__ == "__main__":
     cad = ATCadInit()
-    add_dimension(cad.adoc)
+    if cad.is_initialized():
+        add_dimension(cad.adoc)
