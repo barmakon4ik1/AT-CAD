@@ -3,8 +3,10 @@
 Модуль для построения днища в AutoCAD.
 Создает внутреннюю и внешнюю полилинии днища на основе заданных параметров.
 """
-
+from programms.at_base import layer_context, ensure_layer
 from programms.at_construction import *
+from programms.at_geometry import at_bulge
+from programms.at_utils import handle_errors
 
 try:
     from at_config import HEADS_LAYER
@@ -90,7 +92,7 @@ def at_add_head(D: float, s: float, R: float, r: float, h1: float, insert_point:
 
     # Инициализация AutoCAD, если adoc не передан
     if adoc is None:
-        cad_objects = init_autocad()
+        cad_objects = ATCadInit()
         if cad_objects is None:
             show_popup(loc.get('cad_init_error'), popup_type="error")
             return None

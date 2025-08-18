@@ -6,22 +6,47 @@
 и поддерживает динамическую смену языка.
 """
 
+import os
+import json
 import logging
+
 
 class Localization:
     """
     Класс для управления локализацией приложения AT-CAD.
     Работает с локальными словарями переводов в каждом модуле.
     """
-    def __init__(self, language: str = "ru"):
+    def __init__(self, language: str = None):
         """
-        Инициализирует локализацию с указанным языком.
+        Инициализирует локализацию. Язык берётся из config/user_language.json,
+        если файл доступен. Приоритет: аргумент > json > "ru".
         """
         self.supported_languages = ["ru", "en", "de"]
-        self._translations = {}  # Сначала создаём словарь!
+        self._translations = {}
+
+        # Значение по умолчанию
         self.language = "ru"
-        logging.info(f"Инициализация Localization с language={language}")
-        self.set_language(language)
+
+        # Путь к файлу языка
+        config_path = os.path.join(os.path.dirname(__file__), "..", "config", "user_language.json")
+        config_path = os.path.abspath(config_path)
+
+        # Загружаем язык из JSON, если есть
+        if os.path.isfile(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, dict) and "language" in data:
+                    file_lang = data["language"]
+                    logging.info(f"Загружен язык из user_language.json: {file_lang}")
+                    if language is None:  # приоритет у аргумента
+                        language = file_lang
+            except Exception as e:
+                logging.error(f"Ошибка чтения user_language.json: {e}")
+
+        # Устанавливаем язык (аргумент > json > fallback "ru")
+        logging.info(f"Инициализация Localization с language={language or 'ru'}")
+        self.set_language(language or "ru")
 
     def set_language(self, language: str) -> None:
         """
@@ -58,7 +83,6 @@ class Localization:
             logging.warning(f"Нестроковое значение default: {default}, преобразование в строку")
             default = str(default)
 
-        # Берём перевод или default
         translation = self._translations.get(key, {}).get(self.language, default)
 
         if translation == default:
@@ -74,5 +98,31 @@ class Localization:
             logging.error(f"Ошибка форматирования строки '{translation}': {e}")
             return translation
 
+
 # Глобальный экземпляр локализации
 loc = Localization()
+
+if __name__ == "__main__":
+    import pprint
+
+    print("=== Тестирование модуля Localization ===")
+
+    # Создаём экземпляр
+    localization = Localization()
+
+    # Вывод текущего языка
+    print(f"Текущий язык (после чтения user_language.json): {localization.language}")
+
+    # Если словарь JSON читается корректно — покажем содержимое
+    config_path = os.path.join(os.path.dirname(__file__), "..", "config", "user_language.json")
+    config_path = os.path.abspath(config_path)
+    if os.path.isfile(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            print("Содержимое user_language.json:")
+            pprint.pprint(data)
+        except Exception as e:
+            print(f"Ошибка чтения user_language.json: {e}")
+    else:
+        print("Файл user_language.json не найден")
