@@ -3,6 +3,9 @@
 Модуль для построения днища в AutoCAD.
 Создает внутреннюю и внешнюю полилинии днища на основе заданных параметров.
 """
+import math
+from typing import Tuple
+
 from programms.at_base import layer_context, ensure_layer
 from programms.at_construction import *
 from programms.at_geometry import at_bulge
@@ -31,14 +34,14 @@ def create_polyline(model: object, points: List[Tuple[float, float]],
         object: Объект полилинии или None при ошибке.
     """
     points_list = [coord for point in points for coord in point]
-    poly = add_LWpolyline(model, points_list, layer_name)
+    poly = add_polyline(model, points_list, layer_name)
     for idx, (start, end, center) in bulge_data:
         poly.SetBulge(idx, at_bulge(start, end, center))
     return poly
 
 
 @handle_errors
-def at_add_head(D: float, s: float, R: float, r: float, h1: float, insert_point: Optional[APoint] = None,
+def at_add_head(D: float, s: float, R: float, r: float, h1: float, insert_point: Optional[VARIANT] = None,
                 layer: str = HEADS_LAYER, adoc: Optional[object] = None) -> Optional[dict]:
     """
     Строит днище в AutoCAD, создавая внутреннюю и внешнюю полилинии.

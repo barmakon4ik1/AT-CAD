@@ -1,176 +1,221 @@
 # programms/at_run_plate.py
 """
-Модуль для построения листа для лазерной резки в AutoCAD с использованием pyautocad.
-Создает внешнюю и внутреннюю замкнутые полилинии, проставляет размеры и добавляет текст.
+Модуль для построения листа для лазерной резки в AutoCAD с использованием Win32com (COM).
+
+Создаёт внешнюю и внутреннюю замкнутые полилинии, проставляет размеры и добавляет текст.
+Совместим с функциями построения из programms.at_construction (add_polyline, add_text).
+
+Правила размеров (список вершин против часовой):
+- Базовые 4 точки: 0 (ЛЛ), 1 (ПН), 2 (ПВ), 3 (ЛВ).
+- Если точек >4: далее 4-5-6-7 (последняя) и замыкание на 0.
+
+Порядок размеров:
+Горизонтальные: (1,0), если >4 то (3,2), если ≥6 то (5,2).
+Вертикальные:   (2,1), если >4 то (0,5), если ≥8 то (0,7).
+
+Меньший размер — меньший offset.
 """
 
+from typing import Dict, Any, List, Tuple
 import logging
-import math
 import sys
-import time
 
 import pythoncom
-from pyautocad import APoint
-from programms.at_calculation import at_plate_weight, at_density
-from programms.at_construction import add_LWpolyline, at_addText, polar_point
-from programms.at_dimension import at_dimension
-from typing import Dict, Any, List
-from locales.at_localization_class import loc
-from config.at_config import *
-from windows.at_gui_utils import show_popup
-from programms.at_base import regen, init_autocad
-from programms.at_offset import at_offset
-from programms.at_dimension import at_amautodim
+import win32com.client  # COM
 
-# Настройка логирования
-# Настройка логирования в консоль
+from config.at_cad_init import ATCadInit
+from programms.at_calculation import at_plate_weight, at_density
+from programms.at_construction import add_polyline, add_text
+from programms.at_dimension import add_dimension
+from programms.at_base import regen
+from programms.at_offset import at_offset
+from programms.at_geometry import ensure_point_variant
+from windows.at_gui_utils import show_popup
+from config.at_config import (
+    DEFAULT_DIM_OFFSET,  # базовый отступ для размеров
+    TEXT_HEIGHT_BIG
+)
+from locales.at_translations import loc
+
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout)  # Вывод в консоль
-    ]
+    handlers=[logging.StreamHandler(sys.stdout)]
 )
 
 
-def run_plate(plate_data: Dict[str, Any]) -> bool:
+def _points_to_variant_list(points_xy: List[Tuple[float, float]]) -> List:
+    """[(x,y), ...] -> список VARIANT-точек [x,y,z] для add_polyline()."""
+    return [ensure_point_variant([float(x), float(y), 0.0]) for x, y in points_xy]
+
+
+def _build_dimension_pairs(points_xy: List[Tuple[float, float]]):
     """
-    Выполняет построение листа для лазерной резки в AutoCAD.
-
-    Создает внешнюю замкнутую полилинию и внутреннюю с использованием метода Offset,
-    проставляет размеры (для 4 уникальных точек: только 0-1, 1-2; для >4 уникальных точек:
-    дополнительные горизонтальные 2-3, 2-5, 2-7, 2-9 и вертикальные 0-9, 0-7, 0-5, 0-3,
-    строго горизонтальные/вертикальные, измеряющие проекции по X/Y) и добавляет текст.
-
-    Args:
-        plate_data: Словарь с параметрами листа:
-            - insert_point: Точка вставки (APoint или список/кортеж [x, y]).
-            - polyline_points: Список точек полилинии [(x0, y0), (x1, y1), ..., (x0, y0)].
-            - material: Материал листа.
-            - thickness: Толщина листа.
-            - melt_no: Номер плавки.
-            - allowance: Отступ для внутренней полилинии.
-
-    Returns:
-        bool: True, если выполнено успешно, False в случае ошибки.
+    Формирует пары для размеров по заданным правилам.
+    Возвращает два списка: pairs_h, pairs_v, где каждая пара — индексы вершин (i, j).
     """
+    n = len(points_xy)
+    pairs_h: List[Tuple[int, int]] = []
+    pairs_v: List[Tuple[int, int]] = []
+
+    if n >= 2:
+        pairs_h.append((1, 0))  # базовый H
+    if n >= 3:
+        pairs_v.append((2, 1))  # базовый V
+    if n > 4:
+        # дополнительные при >4
+        if n >= 4:
+            pairs_h.append((3, 2))
+        if n >= 6:
+            pairs_h.append((5, 2))
+            pairs_v.append((0, 5))
+        if n >= 8:
+            pairs_v.append((0, 7))
+
+    # фильтр на валидные индексы
+    pairs_h = [(i, j) for (i, j) in pairs_h if i < n and j < n]
+    pairs_v = [(i, j) for (i, j) in pairs_v if i < n and j < n]
+    return pairs_h, pairs_v
+
+
+def _dim_length(points_xy: List[Tuple[float, float]], pair: Tuple[int, int], orient: str) -> float:
+    """Длина размера для сортировки (H — по Δx, V — по Δy)."""
+    (i, j) = pair
+    (x1, y1), (x2, y2) = points_xy[i], points_xy[j]
+    if orient == "H":
+        return abs(x2 - x1)
+    return abs(y2 - y1)
+
+
+def _apply_dimensions_with_offsets(
+    adoc,
+    points_xy: List[Tuple[float, float]],
+    pairs_h: List[Tuple[int, int]],
+    pairs_v: List[Tuple[int, int]],
+    thickness: float
+) -> float:
+    """
+    Ставит размеры с возрастающими offset внутри каждой группы (H и V)
+    так, чтобы более короткие имели меньший offset.
+    Возвращает Y максимальной горизонтальной размерной линии (для расчёта высоты текста).
+    """
+    # базовый и шаг (можно при желании сделать параметрами)
+    base = DEFAULT_DIM_OFFSET + max(0.0, float(thickness)) * 2.0
+    step = max(60.0, float(thickness) * 5.0)  # разнос между линиями
+
+    max_y_line = max(y for _, y in points_xy)  # на случай отсутствия H-замеров
+
+    # Горизонтальные: сортируем по длине по возрастанию (короче — ближе)
+    pairs_h_sorted = sorted(pairs_h, key=lambda pr: _dim_length(points_xy, pr, "H"))
+    for rank, (i, j) in enumerate(pairs_h_sorted):
+        p1 = ensure_point_variant([points_xy[i][0], points_xy[i][1], 0.0])
+        p2 = ensure_point_variant([points_xy[j][0], points_xy[j][1], 0.0])
+        offset = base + rank * step
+        add_dimension(adoc, "H", p1, p2, offset=offset)
+        # горизонтальная размерная линия идёт выше верхней из точек пары
+        y_line = max(points_xy[i][1], points_xy[j][1]) + offset
+        if y_line > max_y_line:
+            max_y_line = y_line
+
+    # Вертикальные: сортируем по длине по возрастанию (короче — ближе)
+    pairs_v_sorted = sorted(pairs_v, key=lambda pr: _dim_length(points_xy, pr, "V"))
+    for rank, (i, j) in enumerate(pairs_v_sorted):
+        p1 = ensure_point_variant([points_xy[i][0], points_xy[i][1], 0.0])
+        p2 = ensure_point_variant([points_xy[j][0], points_xy[j][1], 0.0])
+        offset = base + rank * step
+        add_dimension(adoc, "V", p1, p2, offset=offset)
+        # вертикальная размерная линия уходит вправо; по Y она ограничена самими точками
+        # (на высоту текста это не влияет), но на всякий держим максимум по Y точек
+        # уже учтён max_y_line выше.
+
+    return max_y_line
+
+
+def run_plate(adoc: Any, plate_data: Dict[str, Any]) -> bool:
+    """
+    Построение листа: внешняя и внутренняя полилинии, размеры и текст.
+    """
+    pythoncom.CoInitialize()
     try:
-        # Инициализация AutoCAD
-        cad_objects = init_autocad()
-        if cad_objects is None:
-            show_popup(loc.get("cad_init_error_short", "Ошибка инициализации AutoCAD"), popup_type="error")
-            logging.error("Не удалось инициализировать AutoCAD")
-            return False
-        adoc, model, original_layer = cad_objects
+        model = adoc.ModelSpace
 
-        # Проверка входных данных
-        if not plate_data:
-            show_popup(loc.get("no_data_error", "Данные не введены"), popup_type="error")
-            logging.error("Данные не предоставлены")
-            return False
+        insert_point = plate_data.get("insert_point", (0.0, 0.0))
+        polyline_points: List[Tuple[float, float]] = plate_data.get("polyline_points", [])
+        allowance = float(plate_data.get("allowance", 0.0))
 
-        # Извлечение данных из plate_data
-        insert_point = plate_data.get("insert_point")
-        polyline_points = plate_data.get("polyline_points", [])
-        allowance = plate_data.get("allowance")
-        # if not polyline_points:
-        #     show_popup(loc.get("no_input_data", "Не заданы координаты точек полилинии"), popup_type="error")
-        #     logging.error("Не заданы точки полилинии")
-        #     return False
-        # if not insert_point or not model:
-        #     show_popup(loc.get("invalid_point", "Не указана точка вставки или модель"), popup_type="error")
-        #     logging.error("Не указана точка вставки или модель")
-        #     return False
-        # if allowance is None or not isinstance(allowance, (int, float)) or allowance < 0:
-        #     show_popup(loc.get("invalid_allowance", "Неверное значение отступа"), popup_type="error")
-        #     logging.error(f"Неверное значение allowance: {allowance}")
-        #     return False
+        # --- внешняя полилиния ---
+        points_variant_list = _points_to_variant_list(polyline_points)
+        poly = add_polyline(model, points_variant_list, layer_name="SF-TEXT", closed=True)
 
-        # Преобразование точек в плоский список для add_LWpolyline
-        flat_points = []
-        for x, y in polyline_points:
-            if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
-                show_popup(loc.get("invalid_point_format", "Неверный формат точки"), popup_type="error")
-                logging.error(f"Неверный формат точки: ({x}, {y})")
-                return False
-            flat_points.extend([x, y])
+        # --- площадь для массы ---
+        area = float(poly.Area)
 
-        # Построение внешней замкнутой полилинии
-        polyline = add_LWpolyline(model, flat_points, layer_name="SF-TEXT")
-        if polyline is None:
-            show_popup(loc.get("polyline_creation_error", "Ошибка создания полилинии"), popup_type="error")
-            logging.error("Не удалось создать внешнюю полилинию")
-            return False
+        # --- свойства материала ---
+        material = plate_data.get("material", "")
+        thickness = float(plate_data.get("thickness", 0.0))
+        melt_no = plate_data.get("melt_no", "")
 
-        try:
-            # Установка замкнутости внешней полилинии
-            if not polyline.Closed:
-                polyline.Closed = True
-            # Вычисление площади внешней полилинии
-            area = polyline.Area
-            logging.info(f"Площадь внешней полилинии: {area}")
-            # Проверка, что allowance не слишком большой
-            min_dimension = min(
-                max(x for x, y in polyline_points) - min(x for x, y in polyline_points),
-                max(y for x, y in polyline_points) - min(y for x, y in polyline_points)
-            )
-            if allowance > min_dimension / 2:
-                show_popup(loc.get("invalid_allowance", "Слишком большой отступ для данной полилинии"), popup_type="error")
-                logging.error(f"Слишком большой allowance: {allowance}, минимальный размер: {min_dimension}")
-                return False
-        except Exception as e:
-            show_popup(loc.get("area_calculation_error", "Ошибка расчета площади"), popup_type="error")
-            logging.error(f"Ошибка при вычислении площади: {e}")
-            return False
-
-        # Формирование сопроводительного текста
-        material = plate_data.get("material")
         density = at_density(material)
-        thickness = plate_data.get("thickness")
-        melt_no = plate_data.get("melt_no")
         weight = at_plate_weight(thickness, density, area)
 
-        # Находим максимальную Y-координату для размещения текста
-        max_y = max(y for x, y in polyline_points)
+        # --- пары размеров по правилам ---
+        pairs_h, pairs_v = _build_dimension_pairs(polyline_points)
 
-        # Координаты текста
-        point_text = [insert_point[0], max_y + 60, 0]
+        # --- постановка размеров с корректной иерархией offset ---
+        max_y_dim_line = _apply_dimensions_with_offsets(adoc, polyline_points, pairs_h, pairs_v, thickness)
 
-        # Добавление текста
-        text = f'{thickness} mm {material}, {weight} kg, Ch. {melt_no}'
-        at_addText(model, point_text, text, layer_name="AM_5", text_height=60, text_angle=0, text_alignment=0)
+        # --- текст над самым верхним размером + 60 мм ---
+        text_point = (insert_point[0], max_y_dim_line + 60.0, 0.0)
+        text_str = f"{thickness:g} mm {material}, {weight:g} kg, Ch. {melt_no}"
+        add_text(model, point=text_point, text=text_str, layer_name="AM_5",
+                 text_height=TEXT_HEIGHT_BIG, text_angle=0, text_alignment=0)
 
-        # Создание внутренней полилинии
-        at_offset(polyline, allowance, adoc, model)
+        # --- внутренний контур ---
+        at_offset(poly, allowance, adoc, model)
 
-        # at_amautodim(adoc, polyline, insert_point, APoint([insert_point([0]+insert_point[1] / 2), insert_point[5] + 60]))
-
-        # Регенерация чертежа
         regen(adoc)
-        logging.info("Полилиния, внутренняя полилиния, размеры и текст успешно созданы")
+        logging.info("Полилиния, размеры и текст успешно созданы")
         return True
 
     except Exception as e:
-        show_popup(loc.get("general_error", f"Ошибка: {str(e)}"), popup_type="error")
-        logging.error(f"Ошибка в run_plate (programms/at_run_plate.py): {e}")
+        show_popup(f"Ошибка: {str(e)}", popup_type="error")
+        logging.error(f"Ошибка в run_plate: {e}")
         return False
+    finally:
+        try:
+            pythoncom.CoUninitialize()
+        except Exception:
+            pass
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
+
+    cad = ATCadInit()
+    if not cad.is_initialized():
+        sys.exit(0)
+
+    adoc = cad.adoc
+
+    # Пример: 8 точек (0..7), против часовой
     input_data = {
-        'insert_point': APoint(0, 0, 0.00),
-        'point_list': [[3000, 1500]],
-        'material': '1.4301',
-        'thickness': 4.0,
-        'melt_no': '',
-        'allowance': 10.0,
-        'polyline_points': [
-            (0, 0),
-            (1500, 0),
-            (1500, 1500),
-            (1000, 1500),
-            (1000, 750),
-            (0, 750)]
+        "insert_point": (0, 0),
+        "polyline_points": [
+            (0, 0),     # 0: ЛЛ
+            (3000, 0),  # 1: ПН
+            (3000, 1500),  # 2: ПВ
+            (2000, 1500),  # 3: ЛВ наружного участка
+            (2000, 1000),  # 4
+            (1000, 1000),  # 5
+            (1000, 500),   # 6
+            (0, 500)       # 7
+        ],
+        "material": "1.4301",
+        "thickness": 4.0,
+        "melt_no": "123456-789",
+        "allowance": 10.0
     }
-    run_plate(input_data)
+
+    ok = run_plate(adoc, input_data)
+    logging.info("Готово" if ok else "Выполнено с ошибками")
