@@ -13,6 +13,8 @@
 import os
 import time
 import logging
+from typing import Optional
+
 import pythoncom
 import win32com.client
 
@@ -40,9 +42,9 @@ TRANSLATIONS = {
         "de": "AutoCAD ist nicht bereit. Bitte starten Sie zuerst AutoCAD und bereiten Sie Ihren Arbeitsbereich vor."
     },
     "create_layer_error": {
-        "ru": "Ошибка при создании слоёв: {0}",
-        "en": "Error creating layers: {0}",
-        "de": "Fehler beim Erstellen von Layern: {0}"
+        "ru": "Ошибка при создании слоёв: {error}",
+        "en": "Error creating layers: {error}",
+        "de": "Fehler beim Erstellen von Layern: {error}"
     },
     "layer_already_exists": {
         "ru": "Слой уже существует: {0}",
@@ -55,9 +57,9 @@ TRANSLATIONS = {
         "de": "Layer erstellt: {0}"
     },
     "text_style_error": {
-        "ru": "Ошибка установки шрифта: {0}",
-        "en": "Error setting text font: {0}",
-        "de": "Fehler beim Setzen der Schriftart: {0}"
+        "ru": "Ошибка установки шрифта: {error}",
+        "en": "Error setting text font: {error}",
+        "de": "Fehler beim Setzen der Schriftart: {error}"
     }
 }
 # Регистрируем переводы сразу при загрузке модуля (до любых вызовов loc.get)
@@ -77,6 +79,8 @@ logging.basicConfig(
     encoding="utf-8"
 )
 
+CAD_READY_TIMEOUT = 20
+CAD_READY_INTERVAL = 0.5
 
 class ATCadInit:
     """
@@ -94,7 +98,7 @@ class ATCadInit:
     # -----------------------------
     # Вспомогательные методы
     # -----------------------------
-    def wait_for_autocad_ready(self, timeout: int = 20, interval: float = 0.5) -> bool:
+    def wait_for_autocad_ready(self, timeout: int = CAD_READY_TIMEOUT, interval: float = CAD_READY_INTERVAL) -> bool:
         """
         Ожидает готовность AutoCAD (доступность ActiveDocument и его ModelSpace).
 
@@ -127,26 +131,25 @@ class ATCadInit:
         """
         try:
             layers = self.adoc.Layers
-            existing = {l.Name for l in layers}
             for layer in LAYER_DATA:
                 name = layer["name"]
-                if name in existing:
+                try:
+                    layers.Item(name)  # Проверяем, существует ли слой
                     logging.info(loc.get("layer_already_exists").format(name))
                     continue
-
-                new_layer = layers.Add(name)
-                new_layer.Color = layer["color"]
-                new_layer.Linetype = layer["linetype"]
-                if "lineweight" in layer:
-                    new_layer.Lineweight = int(layer["lineweight"] * 100)
-                if "plot" in layer:
-                    new_layer.Plottable = layer["plot"]
-                logging.info(loc.get("layer_created").format(name))
+                except:
+                    new_layer = layers.Add(name)
+                    new_layer.Color = layer["color"]
+                    new_layer.Linetype = layer["linetype"]
+                    if "lineweight" in layer:
+                        new_layer.Lineweight = int(layer["lineweight"] * 100)
+                    if "plot" in layer:
+                        new_layer.Plottable = layer["plot"]
+                    logging.info(loc.get("layer_created").format(name))
             return True
-
         except Exception as e:
-            logging.error(f"Create layers failed: {e}")
-            show_popup(loc.get("create_layer_error").format(str(e)), popup_type="error")
+            logging.error(f"Ошибка создания слоя: {e}")
+            show_popup(loc.get("create_layer_error").format(error=str(e)), popup_type="error")
             return False
 
     def _set_text_style(self, font_name: str, bold: bool = False, italic: bool = False) -> None:
@@ -167,10 +170,15 @@ class ATCadInit:
             style = self.adoc.ActiveTextStyle
             # SetFont(Typeface, Bold, Italic, CharSet, PitchAndFamily)
             style.SetFont(font_name, bool(bold), bool(italic), 0, 0)
-            logging.info(f"Text style set: {font_name}, bold={bold}, italic={italic}")
+            logging.info(f"Установка стиля текста: {font_name}, bold={bold}, italic={italic}")
         except Exception as e:
-            logging.error(f"Set text style failed: {e}")
-            show_popup(loc.get("text_style_error").format(str(e)), popup_type="error")
+            logging.error(f"Установка стиля текста не удалась: {e}")
+            show_popup(loc.get("text_style_error").format(error=str(e)), popup_type="error")
+
+    def restore_original_layer(self):
+        if self.original_layer and self.adoc:
+            self.adoc.ActiveLayer = self.original_layer
+            logging.info(f"Восстановлен первоначальный слой: {self.original_layer.Name}")
 
     # -----------------------------
     # Основная инициализация
@@ -184,9 +192,10 @@ class ATCadInit:
             # Пробуем подключиться к существующему процессу AutoCAD
             try:
                 self.acad = win32com.client.GetActiveObject("AutoCAD.Application")
+                logging.info(f"AutoCAD версия: {self.acad.Version}")
             except Exception:
                 show_popup(loc.get("cad_not_ready"), popup_type="error")
-                logging.info("AutoCAD is not running. Please start AutoCAD first.")
+                logging.info("Автокад не запущен. Сначала запустите Автокад.")
                 self.acad = None
                 self.adoc = None
                 self.model = None
@@ -194,9 +203,9 @@ class ATCadInit:
                 return
 
             # Проверяем готовность объектной модели
-            if not self.wait_for_autocad_ready(timeout=10, interval=0.5):
+            if not self.wait_for_autocad_ready():
                 show_popup(loc.get("cad_not_ready"), popup_type="error")
-                logging.warning("AutoCAD not ready (ActiveDocument/ModelSpace unavailable).")
+                logging.warning("Автокад не готов. Объектная модель недоступна.")
                 self.acad = None
                 self.adoc = None
                 self.model = None
@@ -217,10 +226,10 @@ class ATCadInit:
             # Устанавливаем активным слой "0"
             self.adoc.ActiveLayer = self.adoc.Layers.Item("0")
 
-            logging.info("AutoCAD initialized successfully")
+            logging.info("Автокад инициализирован успешно")
 
         except Exception as e:
-            logging.error(f"Initialization failed: {e}")
+            logging.error(f"Инициализация провалилась: {e}")
             show_popup(loc.get("cad_init_error_short") + f" {e}", popup_type="error")
             self.acad = None
             self.adoc = None
@@ -233,6 +242,24 @@ class ATCadInit:
     def is_initialized(self) -> bool:
         """Проверяет, успешно ли инициализирован AutoCAD."""
         return self.acad is not None and self.adoc is not None and self.model is not None
+
+    # -----------------------------
+    # Публичный API
+    # -----------------------------
+    @property
+    def application(self) -> Optional[win32com.client.Dispatch]:
+        """Возвращает объект AutoCAD Application, если инициализирован."""
+        return self.acad if self.is_initialized() else None
+
+    @property
+    def document(self) -> Optional[win32com.client.Dispatch]:
+        """Возвращает объект ActiveDocument, если инициализирован."""
+        return self.adoc if self.is_initialized() else None
+
+    @property
+    def model_space(self) -> Optional[win32com.client.Dispatch]:
+        """Возвращает объект ModelSpace, если инициализирован."""
+        return self.model if self.is_initialized() else None
 
 
 if __name__ == "__main__":

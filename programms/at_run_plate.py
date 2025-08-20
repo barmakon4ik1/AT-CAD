@@ -196,7 +196,7 @@ if __name__ == '__main__':
     if not cad.is_initialized():
         sys.exit(0)
 
-    adoc = cad.adoc
+    adoc = cad.document
 
     # Пример: 8 точек (0..7), против часовой
     input_data = {
@@ -211,8 +211,8 @@ if __name__ == '__main__':
             (1000, 500),   # 6
             (0, 500)       # 7
         ],
-        "material": "1.4301",
-        "thickness": 4.0,
+        "material": "3.7035",
+        "thickness": 3.0,
         "melt_no": "123456-789",
         "allowance": 10.0
     }

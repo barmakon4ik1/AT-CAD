@@ -276,8 +276,8 @@ if __name__ == "__main__":
         logging.info("AutoCAD initialized successfully")
         loc.register_translations(TRANSLATIONS)
 
-        adoc = cad.adoc
-        model = cad.model
+        adoc = cad.document
+        model = cad.model_space
 
         # Запрашиваем точку у пользователя (at_point_input уже возвращает готовый VARIANT)
         input_point = at_point_input(adoc, prompt="Укажите центр окружности")

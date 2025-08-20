@@ -38,14 +38,12 @@ class Localization:
                     data = json.load(f)
                 if isinstance(data, dict) and "language" in data:
                     file_lang = data["language"]
-                    logging.info(f"Загружен язык из user_language.json: {file_lang}")
                     if language is None:  # приоритет у аргумента
                         language = file_lang
             except Exception as e:
-                logging.error(f"Ошибка чтения user_language.json: {e}")
+                logging.critical(f"Ошибка чтения user_language.json: {e}")
 
         # Устанавливаем язык (аргумент > json > fallback "ru")
-        logging.info(f"Инициализация Localization с language={language or 'ru'}")
         self.set_language(language or "ru")
 
     def set_language(self, language: str) -> None:
@@ -53,12 +51,11 @@ class Localization:
         Устанавливает новый язык локализации.
         """
         if not isinstance(language, str):
-            logging.error(f"Попытка установить нестроковый язык: {language}, тип: {type(language)}, остаётся: {self.language}")
+            logging.critical(f"Попытка установить нестроковый язык: {language}, тип: {type(language)}")
             return
         if language not in self.supported_languages:
-            logging.warning(f"Недопустимый язык: {language}, остаётся: {self.language}")
+            # Если язык не поддерживается — молча остаёмся на текущем
             return
-        logging.info(f"Смена языка на: {language}")
         self.language = language
 
     def register_translations(self, translations: dict) -> None:
@@ -66,36 +63,30 @@ class Localization:
         Регистрирует словарь переводов из модуля.
         """
         if not isinstance(translations, dict):
-            logging.error(f"Передан некорректный словарь переводов: {type(translations)}")
+            logging.critical(f"Передан некорректный словарь переводов: {type(translations)}")
             return
         self._translations.update(translations)
-        logging.debug(f"Зарегистрированы переводы: {list(translations.keys())}")
 
     def get(self, key: str, default: str = "Translation missing", *args) -> str:
         """
         Возвращает перевод строки по ключу для текущего языка.
         """
         if not isinstance(key, str):
-            logging.warning(f"Получен нестроковый ключ: {key}, возвращается значение по умолчанию")
             return default.format(*args) if args else default
 
         if not isinstance(default, str):
-            logging.warning(f"Нестроковое значение default: {default}, преобразование в строку")
             default = str(default)
 
         translation = self._translations.get(key, {}).get(self.language, default)
 
-        if translation == default:
-            logging.warning(f"Перевод для ключа '{key}' и языка '{self.language}' отсутствует")
-
         if not isinstance(translation, str):
-            logging.warning(f"Нестроковый перевод для ключа '{key}' и языка '{self.language}': {translation}, возвращается default")
+            logging.critical(f"Нестроковый перевод для ключа '{key}' и языка '{self.language}': {translation}")
             return default.format(*args) if args else default
 
         try:
             return translation.format(*args) if args else translation
         except Exception as e:
-            logging.error(f"Ошибка форматирования строки '{translation}': {e}")
+            logging.critical(f"Ошибка форматирования строки '{translation}': {e}")
             return translation
 
 
