@@ -4,69 +4,61 @@
 Путь: config/at_config.py
 
 Описание:
-Конфигурационный файл для проекта AT-CAD. Содержит пути к ресурсам, настройки по умолчанию
-и функции для загрузки/сохранения пользовательских настроек из user_settings.json.
+Конфигурационный файл для проекта AT-CAD. Содержит:
+- Пути к ресурсам проекта (иконки, конфиги, изображения)
+- Настройки интерфейса и слоёв AutoCAD
+- Функции для загрузки/сохранения пользовательских настроек
 """
 
-import os
 import json
 from pathlib import Path
+import wx
 
-# Базовая директория проекта
-BASE_DIR: str = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# --- Базовые пути ---
+BASE_DIR: Path = Path(__file__).resolve().parent.parent
+IMAGES_DIR: Path = BASE_DIR / "images"
+RESOURCE_DIR: Path = BASE_DIR / "config"
 
-# Путь к папке с ресурсами
-IMAGES_DIR: str = "images"
-RESOURCE_DIR: str = "config"
+# --- Пути к конфигам пользователя ---
+USER_CONFIG_PATH: Path = RESOURCE_DIR / "user_settings.json"
+USER_LANGUAGE_PATH: Path = RESOURCE_DIR / "user_language.json"
+LAST_CONE_INPUT_FILE: Path = RESOURCE_DIR / "last_input.json"
 
-# Путь к файлу пользовательских настроек
-USER_CONFIG_PATH: str = os.path.join(RESOURCE_DIR, "user_settings.json")
-USER_LANGUAGE_PATH: str = os.path.join(RESOURCE_DIR, "user_language.json")
+# --- Иконки приложения ---
+ICON_PATH: Path = IMAGES_DIR / "AT-CAD_8.png"
 
-# Путь к иконке приложения
-ICON_PATH: str = os.path.join(IMAGES_DIR, "AT-CAD_8.png")
+# --- Пути к изображениям объектов ---
+RING_IMAGE_PATH: Path = IMAGES_DIR / "ring_image.png"
+HEAD_IMAGE_PATH: Path = IMAGES_DIR / "head_image.png"
+PLATE_IMAGE_PATH: Path = IMAGES_DIR / "plate_image.png"
+CONE_IMAGE_PATH: Path = IMAGES_DIR / "cone_image.png"
+DONE_ICON_PATH: Path = IMAGES_DIR / "done-icon.png"
 
-# Пути к изображениям для различных объектов
-RING_IMAGE_PATH: str = os.path.join(IMAGES_DIR, "ring_image.png")
-HEAD_IMAGE_PATH: str = os.path.join(IMAGES_DIR, "head_image.png")
-PLATE_IMAGE_PATH: str = os.path.join(IMAGES_DIR, "plate_image.png")
-CONE_IMAGE_PATH: str = os.path.join(IMAGES_DIR, "cone_image.png")
-DONE_ICON_PATH: str = os.path.join(IMAGES_DIR, "done-icon.png")
-
-# Путь к файлу с последними введёнными данными для конуса
-LAST_CONE_INPUT_FILE: str = os.path.join(RESOURCE_DIR, "last_input.json")
-
-# Иконки для языков
-LANGUAGE_ICONS: dict = {
-    "ru": os.path.join(IMAGES_DIR, "ru.png"),
-    "de": os.path.join(IMAGES_DIR, "de.png"),
-    "en": os.path.join(IMAGES_DIR, "en.png"),
+# --- Иконки языков ---
+LANGUAGE_ICONS: dict[str, Path] = {
+    "ru": IMAGES_DIR / "ru.png",
+    "de": IMAGES_DIR / "de.png",
+    "en": IMAGES_DIR / "en.png",
 }
 
-# Иконки для пунктов меню
-MENU_ICONS: dict = {
-    "exit": os.path.join(IMAGES_DIR, "exit_icon.png"),
-    "about": os.path.join(IMAGES_DIR, "about_icon.png"),
-    "settings": os.path.join(IMAGES_DIR, "settings_icon.png"),
-    "lang_ru": os.path.join(IMAGES_DIR, "lang_ru_icon.png"),
-    "lang_de": os.path.join(IMAGES_DIR, "lang_de_icon.png"),
-    "lang_en": os.path.join(IMAGES_DIR, "lang_en_icon.png"),
+# --- Иконки меню ---
+MENU_ICONS: dict[str, Path] = {
+    "exit": IMAGES_DIR / "exit_icon.png",
+    "about": IMAGES_DIR / "about_icon.png",
+    "settings": IMAGES_DIR / "settings_icon.png",
+    "lang_ru": IMAGES_DIR / "lang_ru_icon.png",
+    "lang_de": IMAGES_DIR / "lang_de_icon.png",
+    "lang_en": IMAGES_DIR / "lang_en_icon.png",
 }
 
-# Размер полей ввода и выпадающих списков
+# --- Параметры интерфейса ---
 INPUT_FIELD_SIZE: tuple[int, int] = (200, -1)
-
-# Высота баннера в пикселях
 BANNER_HIGH: int = 100
-
-# Размер логотипа в баннере
 LOGO_SIZE: tuple[int, int] = (BANNER_HIGH - 10, BANNER_HIGH - 10)
-
-# Размер главного окна приложения
 WINDOW_SIZE: tuple[int, int] = (1280, 980)
 
-# Словарь настроек по умолчанию
-DEFAULT_SETTINGS: dict = {
+# --- Настройки по умолчанию ---
+DEFAULT_SETTINGS: dict[str, object] = {
     "FONT_NAME": "Times New Roman",
     "FONT_TYPE": "normal",
     "FONT_SIZE": 16,
@@ -86,8 +78,8 @@ DEFAULT_SETTINGS: dict = {
     "BUTTON_FONT_COLOR": "white",
 }
 
-# Предопределённые слои для AutoCAD
-LAYER_DATA: list[dict] = [
+# --- Предопределённые слои AutoCAD ---
+LAYER_DATA: list[dict[str, object]] = [
     {"name": "0", "color": 7, "linetype": "CONTINUOUS", "lineweight": 0.25},
     {"name": "AM_0", "color": 7, "linetype": "CONTINUOUS", "lineweight": 1},
     {"name": "SF-ARE", "color": 233, "linetype": "PHANTOM2", "plot": False},
@@ -97,22 +89,22 @@ LAYER_DATA: list[dict] = [
     {"name": "SF-RAHMEN", "color": 140, "linetype": "CONTINUOUS"},
     {"name": "SF-TEXT", "color": 82, "linetype": "CONTINUOUS"},
     {"name": "TEXT", "color": 2, "linetype": "CONTINUOUS"},
-    {"name": "AM_7", "color": 4, "linetype": "AM_ISO08W050", "lineweight": 0.05}
+    {"name": "AM_7", "color": 4, "linetype": "AM_ISO08W050", "lineweight": 0.05},
 ]
 
-# Слои по умолчанию для объектов AutoCAD
+# --- Слои по умолчанию для объектов AutoCAD ---
 RECTANGLE_LAYER: str = "0"
 DEFAULT_CIRCLE_LAYER: str = "0"
 HEADS_LAYER: str = "AM_0"
 DEFAULT_TEXT_LAYER: str = "schrift"
 
-# Установки для размеров
-DEFAULT_DIM_LAYER = "AM_5"
-DEFAULT_DIM_STYLE = "AM_ISO"
-DEFAULT_DIM_OFFSET = 60.0
-DEFAULT_DIM_SCALE = 10.0
+# --- Настройки размеров ---
+DEFAULT_DIM_LAYER: str = "AM_5"
+DEFAULT_DIM_STYLE: str = "AM_ISO"
+DEFAULT_DIM_OFFSET: float = 60.0
+DEFAULT_DIM_SCALE: float = 10.0
 
-# Текстовые параметры для черчения
+# --- Текстовые параметры ---
 TEXT_FONT: str = "ISOCPEUR"
 TEXT_BOLD: bool = False
 TEXT_ITAL: bool = True
@@ -120,69 +112,131 @@ TEXT_HEIGHT_BIG: int = 60
 TEXT_HEIGHT_SMALL: int = 30
 TEXT_DISTANCE: int = 80
 
+# --- Символы статусов ---
 CHECK_MARK: str = "✅"
 ERROR_MARK: str = "⚠️"
 
-# Кэш для пользовательских настроек
-_cached_settings = None
+# --- Кэш настроек пользователя ---
+_cached_settings: dict[str, object] | None = None
 
 
-def load_user_settings() -> dict:
+def load_user_settings() -> dict[str, object]:
     """
-    Загружает пользовательские настройки из файла user_settings.json.
-    Если файл не существует или содержит ошибки, возвращает настройки по умолчанию.
-
-    Returns:
-        dict: Словарь с пользовательскими настройками.
+    Загружает пользовательские настройки из USER_CONFIG_PATH.
+    Если файл отсутствует или повреждён — возвращает DEFAULT_SETTINGS.
     """
     global _cached_settings
     if _cached_settings is not None:
         return _cached_settings
+
     try:
-        if os.path.exists(USER_CONFIG_PATH):
-            with open(USER_CONFIG_PATH, 'r', encoding='utf-8') as f:
+        if USER_CONFIG_PATH.exists():
+            with USER_CONFIG_PATH.open('r', encoding='utf-8') as f:
                 user_settings = json.load(f)
-                for key in DEFAULT_SETTINGS:
-                    if key not in user_settings:
-                        user_settings[key] = DEFAULT_SETTINGS[key]
-                _cached_settings = user_settings
-                return user_settings
+            for key in DEFAULT_SETTINGS:
+                user_settings.setdefault(key, DEFAULT_SETTINGS[key])
+            _cached_settings = user_settings
         else:
             _cached_settings = DEFAULT_SETTINGS.copy()
-            return _cached_settings
     except Exception:
         _cached_settings = DEFAULT_SETTINGS.copy()
-        return _cached_settings
+
+    return _cached_settings
 
 
-def save_user_settings(settings: dict) -> None:
+def save_user_settings(settings: dict[str, object]) -> None:
     """
-    Сохраняет настройки в файл user_settings.json.
-
-    Args:
-        settings (dict): Словарь с настройками.
+    Сохраняет настройки в USER_CONFIG_PATH.
+    Автоматически дополняет недостающие ключи из DEFAULT_SETTINGS.
     """
     global _cached_settings
     try:
         for key in DEFAULT_SETTINGS:
-            if key not in settings:
-                settings[key] = DEFAULT_SETTINGS[key]
-        with open(USER_CONFIG_PATH, 'w', encoding='utf-8') as f:
+            settings.setdefault(key, DEFAULT_SETTINGS[key])
+        with USER_CONFIG_PATH.open('w', encoding='utf-8') as f:
             json.dump(settings, f, indent=4, ensure_ascii=False)
         _cached_settings = settings.copy()
     except Exception:
         pass
 
 
-def get_setting(key: str) -> any:
+def get_setting(key: str):
     """
-    Возвращает значение настройки по ключу из user_settings.json.
-
-    Args:
-        key (str): Ключ настройки (например, "FONT_NAME").
-
-    Returns:
-        Значение настройки или значение по умолчанию из DEFAULT_SETTINGS.
+    Возвращает значение настройки по ключу из USER_CONFIG_PATH.
+    Если ключ отсутствует — возвращает значение из DEFAULT_SETTINGS.
     """
     settings = load_user_settings()
     return settings.get(key, DEFAULT_SETTINGS.get(key))
+
+
+def show_config_window():
+    """Открывает окно со списком всех путей и настроек (с подсветкой отсутствующих файлов)."""
+
+    class ConfigFrame(wx.Frame):
+        def __init__(self):
+            total_items = 3 + len(LANGUAGE_ICONS) + len(MENU_ICONS) + len(load_user_settings()) + 3
+            height = min(800, 100 + total_items * 25)
+            wx.Frame.__init__(self, None, title="Конфигурация AT-CAD", size=(800, height))
+
+            panel = wx.Panel(self)
+            self.list_ctrl = wx.ListCtrl(panel, style=wx.LC_REPORT | wx.BORDER_SUNKEN)
+            self.list_ctrl.InsertColumn(0, "Название", width=220)
+            self.list_ctrl.InsertColumn(1, "Путь / Значение", width=480)
+            self.list_ctrl.InsertColumn(2, "Статус", width=80)
+
+            btn_refresh = wx.Button(panel, label="Обновить")
+            btn_close = wx.Button(panel, label="Закрыть")
+            btn_refresh.Bind(wx.EVT_BUTTON, self.on_refresh)
+            btn_close.Bind(wx.EVT_BUTTON, lambda evt: self.Close())
+
+            sizer = wx.BoxSizer(wx.VERTICAL)
+            sizer.Add(self.list_ctrl, 1, wx.EXPAND | wx.ALL, 10)
+
+            btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            btn_sizer.AddStretchSpacer()
+            btn_sizer.Add(btn_refresh, 0, wx.ALL, 5)
+            btn_sizer.Add(btn_close, 0, wx.ALL, 5)
+
+            sizer.Add(btn_sizer, 0, wx.EXPAND | wx.RIGHT, 10)
+            panel.SetSizer(sizer)
+
+            self.populate()
+
+        def populate(self):
+            self.list_ctrl.DeleteAllItems()
+
+            def add_item(name: str, value: str, exists: bool = True):
+                index = self.list_ctrl.InsertItem(self.list_ctrl.GetItemCount(), name)
+                self.list_ctrl.SetItem(index, 1, str(value))
+                self.list_ctrl.SetItem(index, 2, "✅" if exists else "⚠️")
+                # Подсветка отсутствующих файлов красным
+                if not exists:
+                    self.list_ctrl.SetItemBackgroundColour(index, wx.Colour(255, 200, 200))
+
+            add_item("BASE_DIR", BASE_DIR, BASE_DIR.exists())
+            add_item("ICON_PATH", ICON_PATH, ICON_PATH.exists())
+            add_item("USER_CONFIG_PATH", USER_CONFIG_PATH, USER_CONFIG_PATH.exists())
+
+            self.list_ctrl.InsertItem(self.list_ctrl.GetItemCount(), "--- Иконки языков ---")
+            for lang, path in LANGUAGE_ICONS.items():
+                add_item(f"  {lang}", path, path.exists())
+
+            self.list_ctrl.InsertItem(self.list_ctrl.GetItemCount(), "--- Иконки меню ---")
+            for name, path in MENU_ICONS.items():
+                add_item(f"  {name}", path, path.exists())
+
+            self.list_ctrl.InsertItem(self.list_ctrl.GetItemCount(), "--- Настройки ---")
+            for key, value in load_user_settings().items():
+                add_item(f"  {key}", value, True)
+
+        def on_refresh(self, event):
+            self.populate()
+
+    app = wx.App(False)
+    frame = ConfigFrame()
+    frame.Show()
+    app.MainLoop()
+
+
+if __name__ == "__main__":
+    show_config_window()

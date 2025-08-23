@@ -23,7 +23,8 @@ from config.at_config import (
     save_user_settings,
     USER_LANGUAGE_PATH,
 )
-from locales.at_localization_class import loc, Localization
+from locales.at_translations import loc
+# from locales.at_localization_class import loc, Localization
 from windows.at_window_utils import load_last_position, save_last_position, get_button_font, fit_text_to_height
 from windows.at_gui_utils import show_popup
 from config.at_cad_init import ATCadInit
@@ -40,6 +41,73 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
+# -----------------------------
+# Локальные переводы модуля
+# -----------------------------
+TRANSLATIONS = {
+    "about_text": {
+        "de": "Die Software AT-CAD ermöglicht die Berechnung und Erstellung von Abwicklungen dünnwandiger Metallteile in der AutoCAD-Umgebung",
+        "en": "The AT-CAD software enables the calculation and creation of sheet metal developments directly within the AutoCAD environment",
+        "ru": "Программа AT-CAD позволяет рассчитывать развертки изделий из тонкостенного металла и строить их в среде AutoCAD"
+    },
+    "button_exit": {
+        "ru": "&Выйти",
+        "de": "&Beenden",
+        "en": "&Exit"
+    },
+    "copyright": {
+        "ru": "Дизайн и разработка: А.Тутубалин © 2025",
+        "de": "Design und Entwicklung: A.Tutubalin © 2025",
+        "en": "Design and development: A.Tutubalin © 2025"
+    },
+    "lang_de": {
+        "ru": "Немецкий",
+        "de": "Deutsch",
+        "en": "German"
+    },
+    "lang_en": {
+        "ru": "Английский",
+        "de": "Englisch",
+        "en": "English"
+    },
+    "lang_ru": {
+        "ru": "Русский",
+        "de": "Russisch",
+        "en": "Russian"
+    },
+    "language_menu": {
+        "ru": "&Язык",
+        "de": "&Sprache",
+        "en": "&Language"
+    },
+    "menu_about": {
+        "ru": "&О программе",
+        "de": "&Über das Programm",
+        "en": "&About the program"
+    },
+    "menu_file": {
+        "ru": "&Файл",
+        "de": "&Datei",
+        "en": "&File"
+    },
+    "menu_help": {
+        "ru": "&Справка",
+        "de": "&Hilfe",
+        "en": "&Help"
+    },
+    "program_title": {
+        "ru": "Система автоматизации построения разверток",
+        "de": "Automatisiertes Profisystem für Metallabwicklung",
+        "en": "Metal Unfold Pro System"
+    },
+    "settings_title": {
+        "ru": "Настройки",
+        "de": "Einstellungen",
+        "en": "Settings"
+    }
+}
+# Регистрируем переводы сразу при загрузке модуля (до любых вызовов loc.get)
+loc.register_translations(TRANSLATIONS)
 
 class ATMainWindow(wx.Frame):
     """
@@ -457,7 +525,7 @@ class ATMainWindow(wx.Frame):
         status_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         # Строка статуса
-        self.status_text = wx.StaticText(status_panel, label=loc.get("status_ready", "Готово"))
+        self.status_text = wx.StaticText(status_panel, label="AT-CAD")
         font = wx.Font(
             self.settings.get("FONT_SIZE", DEFAULT_SETTINGS["FONT_SIZE"]),
             wx.FONTFAMILY_DEFAULT,
