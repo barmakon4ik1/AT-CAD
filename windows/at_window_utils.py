@@ -15,8 +15,8 @@ import logging
 import time
 from typing import Tuple, Dict, Optional, List
 import wx
-from pyautocad import APoint
 
+from config.at_cad_init import ATCadInit
 from locales.at_localization_class import loc
 from programms.at_input import at_point_input
 from windows.at_style import style_textctrl, style_combobox, style_radiobutton, style_staticbox, style_label
@@ -613,18 +613,11 @@ class BaseInputWindow(wx.Frame):
         else:
             self.Centre()
 
-        try:
-            init_result = init_autocad()
-            if not init_result:
-                show_popup(loc.get("cad_init_error_short", "Ошибка инициализации AutoCAD"), popup_type="error")
-                logging.error("Не удалось инициализировать AutoCAD")
-                self.Destroy()
-                return
-            self.adoc, self.model, _ = init_result
-        except Exception as e:
-            show_popup(loc.get("cad_init_error_short", "Ошибка инициализации AutoCAD"), popup_type="error")
-            logging.error(f"Ошибка инициализации AutoCAD: {e}")
-            self.Destroy()
+
+        init_result = ATCadInit()
+        adoc = init_result.document
+        model = init_result.model_space
+
 
     def on_cancel(self, event: wx.Event) -> None:
         """

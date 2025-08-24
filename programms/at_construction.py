@@ -215,12 +215,15 @@ def add_rectangle(model: Any, point: Union[List[float], VARIANT],
         return None
 
 
-def add_text(model: Any, point: Union[List[float], VARIANT],
+def add_text(
+               model: Any,
+               point: Union[List[float], VARIANT],
                text: str = "",
                layer_name: str = DEFAULT_TEXT_LAYER,
                text_height: float = 30,
                text_angle: float = 0,
-               text_alignment: int = 4) -> Optional[Any]:
+               text_alignment: int = 4
+            ) -> Optional[Any]:
     """
     Создаёт текст в модельном пространстве.
 

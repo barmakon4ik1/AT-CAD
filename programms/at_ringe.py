@@ -11,9 +11,8 @@ from pyautocad import APoint
 from config.at_cad_init import ATCadInit
 from config.at_config import DEFAULT_CIRCLE_LAYER, DEFAULT_TEXT_LAYER
 from locales.at_localization_class import loc
-from programms.at_construction import add_circle
-from programms.at_text_input import ATTextInput
-from programms.at_base import layer_context, init_autocad, regen
+from programms.at_construction import add_circle, add_text
+from programms.at_base import layer_context, regen
 from windows.at_gui_utils import show_popup
 
 # Настройка логирования
@@ -36,12 +35,9 @@ def main(ring_data: dict = None) -> bool:
     """
     logging.debug("Запуск функции main в at_ringe")
     # Инициализация AutoCAD
-    cad_objects = init_autocad()
-    if cad_objects is None:
-        show_popup(loc.get("cad_init_error_short", "Ошибка инициализации AutoCAD"), popup_type="error")
-        logging.error("Не удалось инициализировать AutoCAD")
-        return None
-    adoc, model, original_layer = cad_objects
+    cad = ATCadInit()
+    adoc = cad.document
+    model = cad.model_space
 
     # Проверка данных
     if not ring_data:
@@ -67,10 +63,7 @@ def main(ring_data: dict = None) -> bool:
         with layer_context(adoc, DEFAULT_CIRCLE_LAYER):
             for diameter_value in diameters.values():
                 add_circle(model, APoint(center[0], center[1]), diameter_value / 2.0, DEFAULT_CIRCLE_LAYER)
-                logging.info(f"Построена окружность с диаметром {diameter_value} мм")
-    except Exception as e:
-        show_popup(loc.get("circle_error"), popup_type="error")
-        logging.error(f"Ошибка построения окружностей: {e}")
+    except:
         return None
 
     # Добавление текста
@@ -84,28 +77,14 @@ def main(ring_data: dict = None) -> bool:
             p1 = APoint(center[0], center[1] + y_offset)
             p2 = APoint(center[0], center[1] - y_offset)
 
-            # Добавление текста с использованием ATTextInput
-            text1 = ATTextInput(p1, work_number, "LASER-TEXT", 7)
-            text2 = ATTextInput(p2, work_number, "schrift", 30)
-            if not text1.at_text_input() or not text2.at_text_input():
-                show_popup(loc.get("text_error"), popup_type="error")
-                logging.error("Ошибка добавления текста")
-                return None
-            logging.info(f"Текст '{work_number}' добавлен на слои 'LASER-TEXT' и 'schrift'")
-        except Exception as e:
-            show_popup(loc.get("text_error"), popup_type="error")
-            logging.error(f"Ошибка добавления текста: {e}")
+            # Добавление текста с использованием add_text
+            add_text(model, p1, text=work_number, layer_name="LASER-TEXT", text_height=7)
+            add_text(model, p2, text=work_number, layer_name="schrift", text_height=30)
+        except:
             return None
 
     # Обновляем вид
-    try:
-        regen(adoc)
-        logging.info("Вид успешно обновлён")
-    except Exception as e:
-        show_popup(loc.get("regen_error"), popup_type="error")
-        logging.error(f"Ошибка обновления вида: {e}")
-        return None
-
+    regen(adoc)
     return True  # Успешное выполнение
 
 
@@ -113,7 +92,6 @@ if __name__ == "__main__":
     """
     Точка входа в приложение. Для тестирования напрямую (не рекомендуется).
     """
-    logging.debug("Запуск at_ringe как основного модуля")
     try:
         pythoncom.CoInitialize()  # Инициализация COM один раз
         # Для тестирования можно передать тестовые данные
@@ -125,12 +103,10 @@ if __name__ == "__main__":
         }
         main(test_data)
     except Exception as e:
-        show_popup(loc.get("error_in_main", str(e)), popup_type="error")
-        logging.error(f"Ошибка в главном цикле: {e}")
+        print(f"Ошибка в главном цикле: {e}")
     finally:
         try:
             pythoncom.CoUninitialize()  # Освобождение COM в конце
-            logging.debug("COM успешно освобождён")
         except Exception as e:
             show_popup(loc.get("com_release_error", str(e)), popup_type="error")
-            logging.error(f"Ошибка освобождения COM: {e}")
+

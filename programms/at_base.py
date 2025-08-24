@@ -65,10 +65,6 @@ def set_layer(adoc: object, layer_name: str) -> bool:
         if layer_name not in [layer.Name for layer in adoc.Layers]:
             ensure_layer(adoc, layer_name)
         adoc.ActiveLayer = adoc.Layers.Item(layer_name)
-        show_popup(
-            loc.get("layer_set", "Active layer '{}' set.").format(layer_name),
-            popup_type="info"
-        )
         return True
     except Exception:
         return False
@@ -87,10 +83,6 @@ def restore_layer(adoc: object, original_layer: object) -> bool:
     """
     try:
         adoc.ActiveLayer = original_layer
-        show_popup(
-            loc.get("layer_restored", "Original layer '{}' restored.").format(original_layer.Name),
-            popup_type="info"
-        )
         return True
     except Exception:
         show_popup(
@@ -121,7 +113,6 @@ def layer_context(adoc: object, layer_name: str):
             loc.get("layer_context_error", "Error in layer context '{}': {}").format(layer_name, str(e)),
             popup_type="error"
         )
-        raise
     finally:
         restore_layer(adoc, original_layer)
 
