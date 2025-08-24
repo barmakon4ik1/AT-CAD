@@ -4,24 +4,20 @@ windows/content_rings.py
 Работает с AutoCAD через win32com.client.
 """
 
-import sys
+import logging
 from typing import Optional, Dict
 
 import wx
-import win32com.client  # оставлен для явности работы через COM
+import win32com.client
 
-from config.at_cad_init import ATCadInit
 from config.at_config import *
 from locales.at_translations import loc
-from programms.at_base import regen
-from programms.at_com_utils import safe_utility_call
+from programms.at_input import at_point_input
 from windows.at_window_utils import (
     CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel,
     create_standard_buttons, adjust_button_widths, update_status_bar_point_selected,
-    BaseContentPanel, load_user_settings
+    BaseContentPanel, BaseInputWindow, load_user_settings
 )
-from programms.at_ringe import main as run_rings
-
 
 # -----------------------------
 # Локальные переводы модуля
@@ -52,24 +48,37 @@ TRANSLATIONS = {
         "en": "Point selection error: {}. Please retry or cancel.",
     },
     "prompt_select_point": {"ru": "Укажите точку: ", "de": "Punkt auswählen: ", "en": "Select point: "},
-    "ring_build_failed": {
-        "ru": "Построение колец отменено или завершилось с ошибкой",
-        "de": "Ringbau abgebrochen oder fehlerhaft",
-        "en": "Ring construction cancelled or failed",
-    },
+    "point_selected": {
+        "ru": "Точка выбрана: x={0}, y={1}",
+        "en": "Point selected: x={0}, y={1}",
+        "de": "Punkt ausgewählt: x={0}, y={1}"
+    }
 }
 # Регистрируем переводы сразу при загрузке модуля
 loc.register_translations(TRANSLATIONS)
+
+# Настройка логирования (только критические ошибки)
+logging.basicConfig(
+    level=logging.ERROR,
+    filename="at_cad.log",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
 
 def create_window(parent: wx.Window) -> wx.Panel:
     """
     Создаёт панель контента для ввода параметров колец.
+
+    Args:
+        parent: Родительский wx.Window (например, content_panel).
+
+    Returns:
+        wx.Panel: Панель RingsContentPanel или None при ошибке.
     """
     try:
         return RingsContentPanel(parent)
     except Exception as e:
-        print(f"CRITICAL: Ошибка создания RingsContentPanel: {e}", file=sys.stderr)
+        logging.error(f"Ошибка создания RingsContentPanel: {e}")
         return None
 
 
@@ -84,6 +93,7 @@ class RingsContentPanel(BaseContentPanel):
 
         Args:
             parent: Родительский wx.Window (content_panel).
+            on_submit_callback: Функция обратного вызова для обработки данных (опционально).
         """
         super().__init__(parent)
         self.settings = load_user_settings()
@@ -93,20 +103,10 @@ class RingsContentPanel(BaseContentPanel):
         self.labels: Dict[str, wx.StaticText] = {}
         self.static_boxes: Dict[str, wx.StaticBox] = {}
         self.buttons: list[wx.Button] = []
-        self.input_point = None  # единый стиль имени точки
+        self.input_point = None  # Единый стиль имени точки
         self._build_ui()
         self.order_input.SetFocus()
 
-    # --- Статусная строка
-    def update_status_bar_point_selected(self, point):
-        """Обновляет статусную строку координат выбранной точки."""
-        update_status_bar_point_selected(self, point)
-
-    def _status_clear(self):
-        """Сбрасывает статусную строку (точка не выбрана)."""
-        self.update_status_bar_point_selected(None)
-
-    # --- UI
     def _build_ui(self) -> None:
         """
         Создаёт компоновку: слева изображение и кнопки, справа поля ввода.
@@ -184,6 +184,10 @@ class RingsContentPanel(BaseContentPanel):
         self.Layout()
         self._status_clear()
 
+    def _status_clear(self):
+        """Сбрасывает статусную строку (точка не выбрана)."""
+        update_status_bar_point_selected(self, None)
+
     def update_ui_language(self):
         """
         Обновляет текст меток и групп при смене языка.
@@ -193,95 +197,122 @@ class RingsContentPanel(BaseContentPanel):
         self.labels["order"].SetLabel(loc.get("order_label", "К-№"))
         self.labels["diameters"].SetLabel(loc.get("diameters_label", "Диаметры (через запятую)"))
         for i, key in enumerate(["ok_button", "clear_button", "cancel_button"]):
-            self.buttons[i].SetLabel(loc.get(key, ["ОК", "Очистить", "Отмена"][i]))
+            self.buttons[i].SetLabel(loc.get(key, ["ОК", "Очистить", "Возврат"][i]))
         adjust_button_widths(self.buttons)
         self._status_clear()
         self.Layout()
 
-    # --- Сбор данных минимума (валидация переносим в профильные модули)
     def collect_input_data(self) -> Optional[Dict]:
         """
         Собирает данные из полей ввода.
-        Возвращает словарь для programms.at_ringe: work_number, diameters, input_point.
+        Возвращает словарь с данными: work_number, diameters, input_point.
+
+        Returns:
+            Optional[Dict]: Словарь с данными или None при ошибке.
         """
         try:
             diameters_text = self.diameters_input.GetValue().strip()
             diameters: Dict[str, float] = {}
             if diameters_text:
                 for i, value in enumerate(diameters_text.split(",")):
-                    # только парсинг в float, без дополнительных проверок
                     val = float(value.strip().replace(",", "."))
                     diameters[str(i + 1)] = val
 
             return {
                 "work_number": self.order_input.GetValue().strip(),
                 "diameters": diameters,
-                "input_point": self.input_point,  # единое имя ключа
+                "input_point": self.input_point
             }
         except Exception as e:
-            # критично для дальнейшей работы — дать знать
-            print(f"CRITICAL: Ошибка получения данных: {e}", file=sys.stderr)
+            logging.error(f"Ошибка получения данных: {e}")
             show_popup(loc.get("error", f"Ошибка: {e}"), popup_type="error")
             return None
 
     def validate_input(self, data: Dict) -> bool:
         """
-        Минимальная проверка UI-уровня: хотя бы один диаметр.
-        Вся прочая валидация выполняется в соответствующих модулях.
+        Минимальная проверка UI-уровня: наличие хотя бы одного диаметра и точки.
+
+        Args:
+            data: Словарь с данными ввода.
+
+        Returns:
+            bool: True, если данные валидны, иначе False.
         """
         if not data or not data.get("diameters"):
             show_popup(loc.get("no_data_error", "Необходимо ввести хотя бы один размер"), popup_type="error")
             return False
+        if not data.get("input_point"):
+            show_popup(loc.get("point_selection_error", "Ошибка выбора точки").format("None"), popup_type="error")
+            return False
         return True
 
-    def process_input(self, data: Dict) -> bool:
+    def on_ok(self, event: wx.Event, close_window: bool = False) -> None:
         """
-        Передаёт данные модулю построения колец и обновляет чертёж.
+        Обрабатывает нажатие кнопки OK: запрашивает точку, собирает данные, проверяет и передаёт их через callback.
+
+        Args:
+            event: Событие wxPython.
+            close_window: Если True, переключает на content_apps после успешной обработки.
         """
         try:
-            # Выбор точки через твой механизм (обёртка может работать с COM)
+            # Запрос точки через AutoCAD
             main_window = wx.GetTopLevelParent(self)
             main_window.Iconize(True)
-            from programms.at_input import at_point_input
-            point = at_point_input()
+            self.input_point = at_point_input(as_variant=False)  # Возвращаем список [x, y, z]
             main_window.Iconize(False)
             main_window.Raise()
             main_window.SetFocus()
             wx.Yield()
 
-            if not point:
-                show_popup(loc.get("point_selection_error", "Ошибка выбора точки").format("None"), popup_type="error")
-                return False
+            # Собираем данные
+            data = self.collect_input_data()
+            if not data:
+                return
 
-            self.input_point = point
-            self.update_status_bar_point_selected(point)
-            data["input_point"] = self.input_point  # унификация ключа
+            # Проверяем данные (включая точку)
+            if not self.validate_input(data):
+                return
 
-            # Инициализация CAD и запуск построения
-            cad = ATCadInit()
-            data["model"] = getattr(cad, "model_space", getattr(cad, "model", None))
+            # Вызываем callback, если он есть
+            if self.on_submit_callback:
+                self.on_submit_callback(data)
 
-            success = run_rings(ring_data=data)
-            if success:
-                # корректный regen активного документа
-                regen(getattr(cad, "document", getattr(cad, "adoc", None)))
-                self.clear_input_fields()
-            else:
-                show_popup(loc.get("ring_build_failed", "Ошибка построения колец"), popup_type="error")
-            return bool(success)
+            # Переключаем на content_apps, если нужно
+            if close_window:
+                self.switch_content_panel("content_apps")
 
         except Exception as e:
-            print(f"CRITICAL: Ошибка построения колец: {e}", file=sys.stderr)
-            show_popup(loc.get("error", f"Ошибка построения: {e}"), popup_type="error")
-            return False
+            logging.error(f"Ошибка при обработке ввода: {e}")
+            show_popup(loc.get("error", f"Ошибка: {e}"), popup_type="error")
+
+    def on_clear(self, event: wx.Event) -> None:
+        """
+        Очищает поля ввода и сбрасывает статусную строку.
+
+        Args:
+            event: Событие wxPython.
+        """
+        self.clear_input_fields()
 
     def clear_input_fields(self) -> None:
-        """Очищает поля ввода и сбрасывает выбранную точку."""
+        """
+        Очищает поля ввода и сбрасывает выбранную точку.
+        """
         self.order_input.SetValue("")
         self.diameters_input.SetValue("")
         self.input_point = None
         self._status_clear()
         self.order_input.SetFocus()
+
+    def on_cancel(self, event: wx.Event, switch_content: Optional[str] = "content_apps") -> None:
+        """
+        Переключает контент на указанную панель (по умолчанию content_apps).
+
+        Args:
+            event: Событие wxPython.
+            switch_content: Имя контента для переключения.
+        """
+        self.switch_content_panel(switch_content)
 
 
 # -----------------------------
@@ -289,13 +320,20 @@ class RingsContentPanel(BaseContentPanel):
 # -----------------------------
 if __name__ == "__main__":
     def on_submit(data: Dict):
-        """Вывод полученных данных после закрытия окна."""
+        """Выводит полученные данные в консоль для проверки."""
         print("Полученные данные:")
         for k, v in data.items():
             print(f"{k}: {v}")
 
     app = wx.App(False)
-    frame = wx.Frame(None, title="Тест ввода колец", size=(900, 600))
-    RingsContentPanel(frame, on_submit_callback=on_submit)
+    frame = BaseInputWindow(
+        title_key="test_rings_window",
+        last_input_file=str(LAST_CONE_INPUT_FILE),
+        window_size=(900, 600)
+    )
+    panel = RingsContentPanel(frame.panel, on_submit_callback=on_submit)
+    main_sizer = wx.BoxSizer(wx.VERTICAL)
+    main_sizer.Add(panel, 1, wx.EXPAND)
+    frame.panel.SetSizer(main_sizer)
     frame.Show()
     app.MainLoop()
