@@ -1,26 +1,55 @@
-# programms/at_ringe.py
 """
+programms/at_ringe.py
 Модуль для построения колец в AutoCAD на основе данных из диалогового окна.
-
 Создаёт окружности с заданными диаметрами и добавляет текстовые метки с номером работы.
 """
 
-import pythoncom
-import logging
-from pyautocad import APoint
+from win32com.client import VARIANT
 from config.at_cad_init import ATCadInit
-from config.at_config import DEFAULT_CIRCLE_LAYER, DEFAULT_TEXT_LAYER
-from locales.at_localization_class import loc
+from config.at_config import DEFAULT_CIRCLE_LAYER
+from locales.at_translations import loc
 from programms.at_construction import add_circle, add_text
 from programms.at_base import layer_context, regen
+from programms.at_geometry import ensure_point_variant
 from windows.at_gui_utils import show_popup
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.ERROR,
-    filename="at_cad.log",
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
+# -----------------------------
+# Локальные переводы модуля
+# -----------------------------
+TRANSLATIONS = {
+    "no_data_error": {
+        "ru": "Данные не введены",
+        "de": "Keine Daten eingegeben",
+        "en": "No data provided"
+    },
+    "no_diameters": {
+        "ru": "Не указаны диаметры",
+        "de": "Keine Durchmesser angegeben",
+        "en": "No diameters specified"
+    },
+    "no_center": {
+        "ru": "Не указана центральная точка или модель",
+        "de": "Kein Mittelpunkt oder Modell angegeben",
+        "en": "No center point or model specified"
+    },
+    "build_success": {
+        "ru": "Кольца успешно построены",
+        "de": "Ringe erfolgreich erstellt",
+        "en": "Rings successfully built"
+    },
+    "build_error": {
+        "ru": "Ошибка построения колец: {}",
+        "de": "Fehler beim Erstellen der Ringe: {}",
+        "en": "Error building rings: {}"
+    },
+    "point_conversion_error": {
+        "ru": "Ошибка преобразования точки: {}",
+        "de": "Fehler bei der Punktkonvertierung: {}",
+        "en": "Point conversion error: {}"
+    }
+}
+# Регистрируем переводы сразу при загрузке модуля
+loc.register_translations(TRANSLATIONS)
 
 
 def main(ring_data: dict = None) -> bool:
@@ -28,12 +57,11 @@ def main(ring_data: dict = None) -> bool:
     Основная функция для построения колец в AutoCAD.
 
     Args:
-        ring_data: Словарь с данными колец (work_number, diameters, insert_point, model).
+        ring_data: Словарь с данными колец (work_number, diameters, input_point).
 
     Returns:
         bool: True при успешном выполнении, None при прерывании (отмена) или ошибке.
     """
-    logging.debug("Запуск функции main в at_ringe")
     # Инициализация AutoCAD
     cad = ATCadInit()
     adoc = cad.document
@@ -42,28 +70,40 @@ def main(ring_data: dict = None) -> bool:
     # Проверка данных
     if not ring_data:
         show_popup(loc.get("no_data_error", "Данные не введены"), popup_type="error")
-        logging.error("Данные не предоставлены")
         return None
 
     # Извлекаем данные
     work_number = ring_data.get("work_number", "")
     diameters = ring_data.get("diameters", {})
-    center = ring_data.get("insert_point")
+    center = ring_data.get("input_point")  # Изменено с insert_point на input_point
     if not diameters:
-        show_popup(loc.get("no_diameters"), popup_type="error")
-        logging.error("Не указаны диаметры")
+        show_popup(loc.get("no_diameters", "Не указаны диаметры"), popup_type="error")
         return None
     if not center or not model:
-        show_popup(loc.get("no_center"), popup_type="error")
-        logging.error("Не указана центральная точка или модель")
+        show_popup(loc.get("no_center", "Не указана центральная точка или модель"), popup_type="error")
+        return None
+
+    # Преобразуем центр в VARIANT
+    try:
+        center_variant = ensure_point_variant(center)
+    except Exception as e:
+        show_popup(
+            loc.get("point_conversion_error", "Ошибка преобразования точки: {}").format(str(e)),
+            popup_type="error"
+        )
         return None
 
     # Построение окружностей
     try:
         with layer_context(adoc, DEFAULT_CIRCLE_LAYER):
             for diameter_value in diameters.values():
-                add_circle(model, APoint(center[0], center[1]), diameter_value / 2.0, DEFAULT_CIRCLE_LAYER)
-    except:
+                if not isinstance(diameter_value, (int, float)) or diameter_value <= 0:
+                    show_popup(loc.get("no_diameters", "Не указаны диаметры"), popup_type="error")
+                    return None
+                radius = diameter_value / 2.0
+                add_circle(model, center_variant, radius, DEFAULT_CIRCLE_LAYER)
+    except Exception as e:
+        show_popup(loc.get("build_error", "Ошибка построения колец: {}").format(str(e)), popup_type="error")
         return None
 
     # Добавление текста
@@ -74,18 +114,21 @@ def main(ring_data: dict = None) -> bool:
             max_radius = sorted_radii[0]
             second_radius = sorted_radii[1] if len(sorted_radii) > 1 else 0
             y_offset = max_radius - (max_radius - second_radius) * 0.5
-            p1 = APoint(center[0], center[1] + y_offset)
-            p2 = APoint(center[0], center[1] - y_offset)
+            p1 = [center[0], center[1] + y_offset, 0]
+            p2 = [center[0], center[1] - y_offset, 0]
+            p1_variant = ensure_point_variant(p1)
+            p2_variant = ensure_point_variant(p2)
 
-            # Добавление текста с использованием add_text
-            add_text(model, p1, text=work_number, layer_name="LASER-TEXT", text_height=7)
-            add_text(model, p2, text=work_number, layer_name="schrift", text_height=30)
-        except:
+            # Добавление текста с использованием add_text из at_construction.py
+            add_text(model, p1_variant, text=work_number, layer_name="LASER-TEXT", text_height=7)
+            add_text(model, p2_variant, text=work_number, layer_name="schrift", text_height=30)
+        except Exception as e:
+            show_popup(loc.get("build_error", "Ошибка построения колец: {}").format(str(e)), popup_type="error")
             return None
 
     # Обновляем вид
     regen(adoc)
-    return True  # Успешное выполнение
+    return True
 
 
 if __name__ == "__main__":
@@ -93,20 +136,12 @@ if __name__ == "__main__":
     Точка входа в приложение. Для тестирования напрямую (не рекомендуется).
     """
     try:
-        pythoncom.CoInitialize()  # Инициализация COM один раз
         # Для тестирования можно передать тестовые данные
         test_data = {
             "work_number": "TEST123",
             "diameters": {"1": 100, "2": 200},
-            "insert_point": (0, 0),
-            "model": None  # Требуется инициализация AutoCAD
+            "input_point": [0, 0, 0]  # Изменено с insert_point на input_point
         }
         main(test_data)
     except Exception as e:
-        print(f"Ошибка в главном цикле: {e}")
-    finally:
-        try:
-            pythoncom.CoUninitialize()  # Освобождение COM в конце
-        except Exception as e:
-            show_popup(loc.get("com_release_error", str(e)), popup_type="error")
-
+        show_popup(loc.get("build_error", "Ошибка построения колец: {}").format(str(e)), popup_type="error")

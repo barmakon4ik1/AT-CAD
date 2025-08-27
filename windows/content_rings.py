@@ -4,12 +4,9 @@ windows/content_rings.py
 Работает с AutoCAD через win32com.client.
 """
 
-import logging
 from typing import Optional, Dict
-
 import wx
 import win32com.client
-
 from config.at_config import *
 from locales.at_translations import loc
 from programms.at_input import at_point_input
@@ -52,17 +49,15 @@ TRANSLATIONS = {
         "ru": "Точка выбрана: x={0}, y={1}",
         "en": "Point selected: x={0}, y={1}",
         "de": "Punkt ausgewählt: x={0}, y={1}"
+    },
+    "data_collected": {
+        "ru": "Данные собраны: {}",
+        "de": "Daten gesammelt: {}",
+        "en": "Data collected: {}"
     }
 }
 # Регистрируем переводы сразу при загрузке модуля
 loc.register_translations(TRANSLATIONS)
-
-# Настройка логирования (только критические ошибки)
-logging.basicConfig(
-    level=logging.ERROR,
-    filename="at_cad.log",
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
 
 
 def create_window(parent: wx.Window) -> wx.Panel:
@@ -78,7 +73,7 @@ def create_window(parent: wx.Window) -> wx.Panel:
     try:
         return RingsContentPanel(parent)
     except Exception as e:
-        logging.error(f"Ошибка создания RingsContentPanel: {e}")
+        show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
         return None
 
 
@@ -103,7 +98,7 @@ class RingsContentPanel(BaseContentPanel):
         self.labels: Dict[str, wx.StaticText] = {}
         self.static_boxes: Dict[str, wx.StaticBox] = {}
         self.buttons: list[wx.Button] = []
-        self.input_point = None  # Единый стиль имени точки
+        self.input_point = None
         self._build_ui()
         self.order_input.SetFocus()
 
@@ -218,14 +213,15 @@ class RingsContentPanel(BaseContentPanel):
                     val = float(value.strip().replace(",", "."))
                     diameters[str(i + 1)] = val
 
-            return {
+            data = {
                 "work_number": self.order_input.GetValue().strip(),
                 "diameters": diameters,
                 "input_point": self.input_point
             }
+
+            return data
         except Exception as e:
-            logging.error(f"Ошибка получения данных: {e}")
-            show_popup(loc.get("error", f"Ошибка: {e}"), popup_type="error")
+            show_popup(loc.get("error", f"Ошибка при сборе данных: {str(e)}"), popup_type="error")
             return None
 
     def validate_input(self, data: Dict) -> bool:
@@ -267,6 +263,10 @@ class RingsContentPanel(BaseContentPanel):
             # Собираем данные
             data = self.collect_input_data()
             if not data:
+                show_popup(
+                    loc.get("error", "Ошибка") + ": Данные не собраны",
+                    popup_type="error"
+                )
                 return
 
             # Проверяем данные (включая точку)
@@ -276,14 +276,18 @@ class RingsContentPanel(BaseContentPanel):
             # Вызываем callback, если он есть
             if self.on_submit_callback:
                 self.on_submit_callback(data)
+            else:
+                show_popup(
+                    loc.get("error", "Ошибка") + ": Callback не установлен",
+                    popup_type="error"
+                )
 
             # Переключаем на content_apps, если нужно
             if close_window:
                 self.switch_content_panel("content_apps")
 
         except Exception as e:
-            logging.error(f"Ошибка при обработке ввода: {e}")
-            show_popup(loc.get("error", f"Ошибка: {e}"), popup_type="error")
+            show_popup(loc.get("error", f"Ошибка при обработке ввода: {str(e)}"), popup_type="error")
 
     def on_clear(self, event: wx.Event) -> None:
         """
@@ -315,10 +319,10 @@ class RingsContentPanel(BaseContentPanel):
         self.switch_content_panel(switch_content)
 
 
-# -----------------------------
-# Тестовый запуск окна
-# -----------------------------
 if __name__ == "__main__":
+    """
+    Тестовый запуск окна.
+    """
     def on_submit(data: Dict):
         """Выводит полученные данные в консоль для проверки."""
         print("Полученные данные:")
