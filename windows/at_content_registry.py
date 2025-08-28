@@ -10,7 +10,7 @@ CONTENT_REGISTRY = {
     "cone": {
         "module": "windows.content_cone",
         "label": "at_run_cone",
-        "build_module": "programms.at_cone"
+        "build_module": "programms.at_run_cone"
     },
     "content_apps": {
         "module": "windows.content_apps",
@@ -29,6 +29,6 @@ CONTENT_REGISTRY = {
     "plate": {
         "module": "windows.content_plate",
         "label": "at_run_plate",
-        "build_module": "programms.at_plate"
+        "build_module": "programms.at_run_plate"
     }
 }

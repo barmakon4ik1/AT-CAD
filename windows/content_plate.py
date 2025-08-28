@@ -1,27 +1,129 @@
 """
-window/content_plate.py
+windows/content_plate.py
 Модуль для создания панели для ввода параметров листа.
 """
 
 import wx
-from typing import Optional, Dict, List
-from pyautocad import APoint
+from typing import Optional, Dict
+from win32com.client import VARIANT
 
+from config.at_cad_init import ATCadInit
 from config.at_config import *
-from locales.at_localization_class import loc
+from locales.at_translations import loc
 from windows.at_window_utils import (
     CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel,
     create_standard_buttons, adjust_button_widths, update_status_bar_point_selected,
     BaseContentPanel, load_user_settings, load_common_data
 )
-from programms.at_run_plate import run_plate
+from programms.at_input import at_point_input
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.ERROR,
-    filename="at_cad.log",
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
+# -----------------------------
+# Локальные переводы модуля
+# -----------------------------
+TRANSLATIONS = {
+    "error": {
+        "ru": "Ошибка",
+        "de": "Fehler",
+        "en": "Error"
+    },
+    "main_data_label": {
+        "ru": "Основные данные",
+        "de": "Hauptdaten",
+        "en": "Main Data"
+    },
+    "dimensions_label": {
+        "ru": "Размеры",
+        "de": "Abmessungen",
+        "en": "Dimensions"
+    },
+    "material_label": {
+        "ru": "Материал",
+        "de": "Material",
+        "en": "Material"
+    },
+    "thickness_label": {
+        "ru": "Толщина",
+        "de": "Dicke",
+        "en": "Thickness"
+    },
+    "melt_no_label": {
+        "ru": "Номер плавки",
+        "de": "Schmelznummer",
+        "en": "Melt Number"
+    },
+    "size_label": {
+        "ru": "Размер",
+        "de": "Größe",
+        "en": "Size"
+    },
+    "length_label": {
+        "ru": "Длина L, мм",
+        "de": "Länge L, mm",
+        "en": "Length L, mm"
+    },
+    "height_label": {
+        "ru": "Высота H, мм",
+        "de": "Höhe H, mm",
+        "en": "Height H, mm"
+    },
+    "allowance_label": {
+        "ru": "Отступ от края, мм",
+        "de": "Randabstand, mm",
+        "en": "Edge Allowance, mm"
+    },
+    "manual_input_label": {
+        "ru": "Ручной ввод",
+        "de": "Manuelle Eingabe",
+        "en": "Manual Input"
+    },
+    "ok_button": {
+        "ru": "ОК",
+        "de": "OK",
+        "en": "OK"
+    },
+    "clear_button": {
+        "ru": "Очистить",
+        "de": "Zurücksetzen",
+        "en": "Clear"
+    },
+    "cancel_button": {
+        "ru": "Возврат",
+        "de": "Zurück",
+        "en": "Return"
+    },
+    "no_data_error": {
+        "ru": "Необходимо ввести хотя бы один размер",
+        "de": "Mindestens eine Größe muss eingegeben werden",
+        "en": "At least one size must be entered"
+    },
+    "max_points_error": {
+        "ru": "Максимальное количество точек - 5",
+        "de": "Maximale Anzahl von Punkten - 5",
+        "en": "Maximum number of points - 5"
+    },
+    "size_positive_error": {
+        "ru": "Размеры должны быть положительными",
+        "de": "Größen müssen positiv sein",
+        "en": "Sizes must be positive"
+    },
+    "invalid_number_format_error": {
+        "ru": "Неверный формат числа",
+        "de": "Ungültiges Zahlenformat",
+        "en": "Invalid number format"
+    },
+    "offset_non_negative_error": {
+        "ru": "Отступ не может быть отрицательным",
+        "de": "Randabstand darf nicht negativ sein",
+        "en": "Allowance cannot be negative"
+    },
+    "point_selection_error": {
+        "ru": "Ошибка выбора точки",
+        "de": "Fehler bei der Punktauswahl",
+        "en": "Point selection error"
+    }
+}
+# Регистрируем переводы сразу при загрузке модуля
+loc.register_translations(TRANSLATIONS)
 
 
 def create_window(parent: wx.Window) -> wx.Panel:
@@ -32,15 +134,13 @@ def create_window(parent: wx.Window) -> wx.Panel:
         parent: Родительский wx.Window (content_panel из ATMainWindow).
 
     Returns:
-        wx.Panel: Панель с интерфейсом для ввода параметров листа.
+        wx.Panel: Панель с интерфейсом для ввода параметров листа или None при ошибке.
     """
     try:
         panel = PlateContentPanel(parent)
-        logging.info("Панель PlateContentPanel создана")
         return panel
     except Exception as e:
-        logging.error(f"Ошибка создания PlateContentPanel: {e}")
-        show_popup(loc.get("error", f"Ошибка создания панели листа: {str(e)}"), popup_type="error")
+        show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
         return None
 
 
@@ -49,41 +149,26 @@ class PlateContentPanel(BaseContentPanel):
     Панель для ввода параметров листа.
     """
 
-    def __init__(self, parent):
+    def __init__(self, parent, callback=None):
         """
         Инициализирует панель, создаёт элементы управления.
 
         Args:
             parent: Родительский wx.Window (content_panel).
+            callback: Функция обратного вызова для передачи данных.
         """
         super().__init__(parent)
         self.settings = load_user_settings()
         self.SetBackgroundColour(self.settings.get("BACKGROUND_COLOR", DEFAULT_SETTINGS["BACKGROUND_COLOR"]))
+        self.on_submit_callback = callback
         self.parent = parent
         self.labels = {}
         self.static_boxes = {}
         self.buttons = []
         self.size_inputs = []
         self.insert_point = None
-        self.update_status_bar_no_point()
         self.setup_ui()
         self.melt_no_input.SetFocus()
-
-    def update_status_bar_no_point(self):
-        """
-        Обновляет статусную строку, если точка не выбрана.
-        """
-        self.update_status_bar_point_selected(None)
-
-    def update_status_bar_point_selected(self, point):
-        """
-        Обновляет статусную строку с координатами выбранной точки.
-
-        Args:
-            point: Координаты точки вставки (APoint или None).
-        """
-        update_status_bar_point_selected(self, point)
-        logging.debug(f"Статусная строка обновлена: точка {point}")
 
     def setup_ui(self) -> None:
         """
@@ -101,9 +186,12 @@ class PlateContentPanel(BaseContentPanel):
         self.left_sizer = wx.BoxSizer(wx.VERTICAL)
 
         # Проверка изображения
-        image_path = os.path.abspath(PLATE_IMAGE_PATH)
-        if not os.path.exists(image_path):
-            logging.warning(f"Файл изображения листа '{image_path}' не найден")
+        image_path = str(PLATE_IMAGE_PATH)
+        if not str(image_path):
+            show_popup(
+                loc.get("error", "Ошибка") + f": Путь к изображению не указан",
+                popup_type="error"
+            )
 
         # Изображение листа
         self.canvas = CanvasPanel(self, image_file=image_path, size=(600, 400))
@@ -246,7 +334,6 @@ class PlateContentPanel(BaseContentPanel):
         self.Layout()
         self.size_combo.Bind(wx.EVT_COMBOBOX, self.on_size_combo_change)
         self.on_size_combo_change(None)
-        logging.info("Интерфейс PlateContentPanel настроен")
 
     def on_size_combo_change(self, event: wx.Event) -> None:
         """
@@ -257,7 +344,6 @@ class PlateContentPanel(BaseContentPanel):
         for l_input, h_input in self.size_inputs:
             l_input.Enable(is_manual)
             h_input.Enable(is_manual)
-        logging.debug(f"Ручной ввод {'включён' if is_manual else 'выключен'}")
 
     def update_ui_language(self):
         """
@@ -265,16 +351,17 @@ class PlateContentPanel(BaseContentPanel):
         """
         self.static_boxes["main_data"].SetLabel(loc.get("main_data_label", "Основные данные"))
         self.static_boxes["dimensions"].SetLabel(loc.get("dimensions_label", "Размеры"))
-        self.labels["melt_no"].SetLabel(loc.get("melt_no_label", "Номер плавки"))
         self.labels["material"].SetLabel(loc.get("material_label", "Материал"))
         self.labels["thickness"].SetLabel(loc.get("thickness_label", "Толщина"))
+        self.labels["melt_no"].SetLabel(loc.get("melt_no_label", "Номер плавки"))
         self.labels["size"].SetLabel(loc.get("size_label", "Размер"))
-        self.labels["allowance"].SetLabel(loc.get("allowance_label", "Отступ от края, мм"))
         self.labels["length"].SetLabel(loc.get("length_label", "Длина L, мм"))
         self.labels["height"].SetLabel(loc.get("height_label", "Высота H, мм"))
+        self.labels["allowance"].SetLabel(loc.get("allowance_label", "Отступ от края, мм"))
 
-        for i, key in enumerate(["ok_button", "clear_button", "cancel_button"]):
-            self.buttons[i].SetLabel(loc.get(key, ["ОК", "Очистить", "Отмена"][i]))
+        # Обновляем метки кнопок: ОК, Отмена, Очистить
+        for i, key in enumerate(["ok_button", "cancel_button", "clear_button"]):
+            self.buttons[i].SetLabel(loc.get(key, ["ОК", "Отмена", "Очистить"][i]))
         adjust_button_widths(self.buttons)
 
         size_options = [
@@ -294,9 +381,8 @@ class PlateContentPanel(BaseContentPanel):
         self.thickness_combo.SetItems(thickness_options)
         self.thickness_combo.SetValue(default_thickness)
 
-        self.update_status_bar_no_point()
+        update_status_bar_point_selected(self, None)
         self.Layout()
-        logging.info("Язык UI обновлён")
 
     def collect_input_data(self) -> Optional[Dict]:
         """
@@ -330,6 +416,10 @@ class PlateContentPanel(BaseContentPanel):
                             h = float(h_str)
                             point_list.append([l, h])
                         except ValueError:
+                            show_popup(
+                                loc.get("invalid_number_format_error", "Неверный формат числа"),
+                                popup_type="error"
+                            )
                             return None
 
             allowance_str = self.allowance_input.GetValue().strip().replace(',', '.')
@@ -339,6 +429,10 @@ class PlateContentPanel(BaseContentPanel):
                 allowance = float(allowance_str) if allowance_str else None
                 thickness = float(thickness_str) if thickness_str else None
             except ValueError:
+                show_popup(
+                    loc.get("invalid_number_format_error", "Неверный формат числа"),
+                    popup_type="error"
+                )
                 return None
 
             return {
@@ -350,7 +444,10 @@ class PlateContentPanel(BaseContentPanel):
                 "allowance": allowance
             }
         except Exception as e:
-            logging.error(f"Ошибка получения данных: {e}")
+            show_popup(
+                loc.get("error", "Ошибка") + f": {str(e)}",
+                popup_type="error"
+            )
             return None
 
     def validate_input(self, data: Dict) -> bool:
@@ -366,132 +463,67 @@ class PlateContentPanel(BaseContentPanel):
         try:
             if not data or not data["point_list"]:
                 show_popup(loc.get("no_data_error", "Необходимо ввести хотя бы один размер"), popup_type="error")
-                logging.error("Отсутствуют размеры")
                 return False
 
             if len(data["point_list"]) > 5:
                 show_popup(loc.get("max_points_error", "Максимальное количество точек - 5"), popup_type="error")
-                logging.error(f"Слишком много точек: {len(data['point_list'])}")
                 return False
 
             for l, h in data["point_list"]:
                 if l <= 0 or h <= 0:
                     show_popup(loc.get("size_positive_error", "Размеры должны быть положительными"), popup_type="error")
-                    logging.error(f"Недопустимые размеры: L={l}, H={h}")
                     return False
 
             if data["allowance"] is None:
                 show_popup(loc.get("invalid_number_format_error", "Неверный формат числа для отступа"), popup_type="error")
-                logging.error(f"Некорректный формат отступа: {data['allowance']}")
                 return False
             if data["allowance"] < 0:
                 show_popup(loc.get("offset_non_negative_error", "Отступ не может быть отрицательным"), popup_type="error")
-                logging.error(f"Недопустимое значение отступа: {data['allowance']}")
                 return False
 
             if data["thickness"] is None:
                 show_popup(loc.get("invalid_number_format_error", "Неверный формат числа для толщины"), popup_type="error")
-                logging.error(f"Некорректный формат толщины: {data['thickness']}")
+                return False
+
+            if not data["insert_point"]:
+                show_popup(loc.get("point_selection_error", "Ошибка выбора точки"), popup_type="error")
                 return False
 
             return True
         except Exception as e:
-            logging.error(f"Ошибка валидации данных: {e}")
-            show_popup(loc.get("error", f"Неверный формат данных: {str(e)}"), popup_type="error")
+            show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
             return False
 
-    def create_polyline_points(self, data: Dict) -> List[tuple]:
+    def on_ok(self, event: wx.Event) -> None:
         """
-        Преобразует входные данные в список точек для полилинии.
-
-        Args:
-            data: Словарь с данными, содержащий 'insert_point' (APoint) и 'point_list' (список [x, y]).
-
-        Returns:
-            List[tuple]: Список кортежей с координатами точек полилинии.
-        """
-        try:
-            insert_point = data['insert_point']
-            x0, y0 = insert_point.x, insert_point.y if insert_point else (0, 0)
-            point_list = data['point_list']
-
-            if len(point_list) > 5:
-                logging.error("Максимальное количество точек - 5")
-                return []
-
-            polyline_points = [(0, 0)]
-            if point_list:
-                x = point_list[0][0]
-                y = point_list[0][1]
-                polyline_points.append((x, 0))
-                polyline_points.append((x, y))
-                x1 = x
-                prev_y = y
-                for dx, dy in point_list[1:]:
-                    x, y = x1 - dx, dy
-                    polyline_points.extend([(x, prev_y), (x, y)])
-                    prev_y = y
-                polyline_points.append((0, y))
-            polyline_points.append((0, 0))
-            polyline_points = [(x + x0, y + y0) for x, y in polyline_points]
-            logging.debug(f"Созданы точки полилинии: {polyline_points}")
-            return polyline_points
-        except Exception as e:
-            logging.error(f"Ошибка создания точек полилинии: {e}")
-            return []
-
-    def process_input(self, data: Dict) -> bool:
-        """
-        Обрабатывает данные для построения листа.
-
-        Args:
-            data: Словарь с данными из полей ввода.
-
-        Returns:
-            bool: True, если построение успешно, иначе False.
+        Обрабатывает нажатие кнопки "ОК", запрашивает точку и вызывает callback.
         """
         try:
             main_window = wx.GetTopLevelParent(self)
             main_window.Iconize(True)
-            from programms.at_input import at_point_input
             point = at_point_input()
             main_window.Iconize(False)
             main_window.Raise()
             main_window.SetFocus()
             wx.Yield()
 
-            if point and hasattr(point, "x") and hasattr(point, "y"):
-                self.insert_point = point
-                self.update_status_bar_point_selected(point)
-                data["insert_point"] = self.insert_point
-                logging.info(f"Точка вставки выбрана: x={point.x}, y={point.y}")
-            else:
+            if not isinstance(point, VARIANT):
                 show_popup(loc.get("point_selection_error", "Ошибка выбора точки"), popup_type="error")
-                logging.error(f"Точка вставки не выбрана: {point}")
-                return False
+                return
 
-            polyline_points = self.create_polyline_points(data)
-            if not polyline_points:
-                logging.error("Не удалось создать точки полилинии")
-                return False
+            self.insert_point = point
+            update_status_bar_point_selected(self, point)
 
-            data["polyline_points"] = polyline_points
-            success = run_plate(data)
-            if success:
-                logging.info("Лист успешно построен")
-                self.clear_input_fields()
-            else:
-                show_popup(loc.get("plate_build_error", "Ошибка построения листа"), popup_type="error")
-                logging.error("Ошибка построения листа")
-            return success
+            data = self.collect_input_data()
+            if data and self.validate_input(data):
+                if self.on_submit_callback:
+                    self.on_submit_callback(data)
         except Exception as e:
-            logging.error(f"Ошибка в process_input: {e}")
-            show_popup(loc.get("plate_build_error", f"Ошибка построения листа: {str(e)}"), popup_type="error")
-            return False
+            show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
 
-    def clear_input_fields(self) -> None:
+    def on_clear(self, event: wx.Event) -> None:
         """
-        Очищает все поля ввода и сбрасывает точку вставки.
+        Обрабатывает нажатие кнопки "Очистить", сбрасывая поля ввода и точку вставки.
         """
         common_data = load_common_data()
         material_options = [mat["name"] for mat in common_data.get("material", []) if mat["name"]]
@@ -507,64 +539,54 @@ class PlateContentPanel(BaseContentPanel):
             l_input.Enable(False)
             h_input.Enable(False)
         self.allowance_input.SetValue("10")
-        if hasattr(self, "insert_point"):
-            del self.insert_point
-        self.update_status_bar_no_point()
+        self.insert_point = None
+        update_status_bar_point_selected(self, None)
         self.melt_no_input.SetFocus()
-        logging.info("Поля ввода очищены")
+
+    def on_cancel(self, event: wx.Event) -> None:
+        """
+        Обрабатывает нажатие кнопки "Отмена", закрывая панель.
+        """
+        self.GetParent().Close()
 
 
 if __name__ == "__main__":
     """
-    Тестовый вызов окна для проверки интерфейса и построения листа.
+    Тестовый вызов окна для проверки интерфейса и вывода данных, введённых пользователем.
     """
+    import comtypes
+
     app = wx.App(False)
     frame = wx.Frame(None, title="Тест PlateContentPanel", size=(800, 600))
     panel = PlateContentPanel(frame)
 
-    # Установка тестовых данных
-    panel.melt_no_input.SetValue("TestMelt")
-    panel.material_combo.SetValue("1ю4301")
-    panel.thickness_combo.SetValue("4")
-    panel.size_combo.SetValue("SF - 4000x2000")
-    panel.allowance_input.SetValue("10")
 
-    # Тест выбора точки и построения
-    try:
-        from config.at_cad_init import ATCadInit
-        cad = ATCadInit()
-        if not cad.is_initialized():
-            logging.error("Не удалось инициализировать AutoCAD")
-            print("Ошибка: Не удалось инициализировать AutoCAD")
-        else:
-            adoc = cad.adoc
-            print(f"AutoCAD Version: {adoc.Application.Version}")
-            print(f"Active Document: {adoc.Name}")
+    # Функция для вывода данных при нажатии "ОК"
+    def on_ok_test(event):
+        try:
+            # Тестовая точка для имитации ввода
+            cad = ATCadInit()
+            prompt1 = "Введите левый нижний угол листа"
+            point = at_point_input(cad.adoc, as_variant=True, prompt=prompt1)
+            panel.insert_point = point
+            update_status_bar_point_selected(panel, point)
 
-            test_point = APoint(0.0, 0.0)
-            panel.insert_point = test_point
-            panel.update_status_bar_point_selected(test_point)
-            print(f"Тест с фиксированной точкой: {test_point}")
-
-            data = {
-                "insert_point": test_point,
-                "point_list": [[4000, 2000]],
-                "material": "Steel",
-                "thickness": 4.0,
-                "melt_no": "TestMelt",
-                "allowance": 10.0,
-                "polyline_points": [(0, 0), (4000, 0), (4000, 2000), (0, 2000), (0, 0)]
-            }
-            success = run_plate(data)
-            if success:
-                print("Лист построен успешно")
-                adoc.Regen(0)
+            # Собираем данные, введённые пользователем
+            data = panel.collect_input_data()
+            if data:
+                print("Собранные данные:", data)
             else:
-                print("Ошибка построения листа")
+                print("Ошибка: данные не собраны")
+        except Exception as e:
+            print(f"Ошибка в тестовом запуске: {e}")
 
-    except Exception as e:
-        print(f"Ошибка в тестовом запуске: {e}")
-        logging.error(f"Ошибка в тестовом запуске: {e}")
 
+    # Привязываем тестовую функцию к кнопке "ОК"
+    panel.buttons[0].Bind(wx.EVT_BUTTON, on_ok_test)
+
+    sizer = wx.BoxSizer(wx.VERTICAL)
+    sizer.Add(panel, 1, wx.EXPAND)
+    frame.SetSizer(sizer)
+    frame.Layout()
     frame.Show()
     app.MainLoop()
