@@ -345,6 +345,28 @@ class PlateContentPanel(BaseContentPanel):
             l_input.Enable(is_manual)
             h_input.Enable(is_manual)
 
+    def clear_input_fields(self) -> None:
+        """
+        Очищает все поля ввода панели.
+        """
+        common_data = load_common_data()
+        material_options = [mat["name"] for mat in common_data.get("material", []) if mat["name"]]
+        thickness_options = common_data.get("thicknesses", [])
+        default_thickness = "4" if "4" in thickness_options or "4.0" in thickness_options else thickness_options[
+            0] if thickness_options else ""
+        self.melt_no_input.SetValue("")
+        self.material_combo.SetValue(material_options[0] if material_options else "")
+        self.thickness_combo.SetValue(default_thickness)
+        self.size_combo.SetValue(loc.get("manual_input_label", "Ручной ввод"))
+        for l_input, h_input in self.size_inputs:
+            l_input.SetValue("")
+            h_input.SetValue("")
+            l_input.Enable(False)
+            h_input.Enable(False)
+        self.allowance_input.SetValue("10")
+        self.insert_point = None
+        self.melt_no_input.SetFocus()
+
     def update_ui_language(self):
         """
         Обновляет текст меток и групп при смене языка.
@@ -361,7 +383,7 @@ class PlateContentPanel(BaseContentPanel):
 
         # Обновляем метки кнопок: ОК, Отмена, Очистить
         for i, key in enumerate(["ok_button", "cancel_button", "clear_button"]):
-            self.buttons[i].SetLabel(loc.get(key, ["ОК", "Отмена", "Очистить"][i]))
+            self.buttons[i].SetLabel(loc.get(key, ["ОК", "Возврат", "Очистить"][i]))
         adjust_button_widths(self.buttons)
 
         size_options = [
@@ -374,10 +396,12 @@ class PlateContentPanel(BaseContentPanel):
         ]
         current_value = self.size_combo.GetValue()
         self.size_combo.SetItems(size_options)
-        self.size_combo.SetValue(current_value if current_value in size_options else loc.get("manual_input_label", "Ручной ввод"))
+        self.size_combo.SetValue(
+            current_value if current_value in size_options else loc.get("manual_input_label", "Ручной ввод"))
 
         thickness_options = load_common_data().get("thicknesses", [])
-        default_thickness = "4" if "4" in thickness_options or "4.0" in thickness_options else thickness_options[0] if thickness_options else ""
+        default_thickness = "4" if "4" in thickness_options or "4.0" in thickness_options else thickness_options[
+            0] if thickness_options else ""
         self.thickness_combo.SetItems(thickness_options)
         self.thickness_combo.SetValue(default_thickness)
 
@@ -435,8 +459,11 @@ class PlateContentPanel(BaseContentPanel):
                 )
                 return None
 
+            # Преобразуем insert_point в список [x, z, y], если он существует
+            insert_point = self.insert_point if self.insert_point else None
+
             return {
-                "insert_point": self.insert_point,
+                "insert_point": insert_point,
                 "point_list": point_list,
                 "material": self.material_combo.GetValue(),
                 "thickness": thickness,
@@ -475,14 +502,17 @@ class PlateContentPanel(BaseContentPanel):
                     return False
 
             if data["allowance"] is None:
-                show_popup(loc.get("invalid_number_format_error", "Неверный формат числа для отступа"), popup_type="error")
+                show_popup(loc.get("invalid_number_format_error", "Неверный формат числа для отступа"),
+                           popup_type="error")
                 return False
             if data["allowance"] < 0:
-                show_popup(loc.get("offset_non_negative_error", "Отступ не может быть отрицательным"), popup_type="error")
+                show_popup(loc.get("offset_non_negative_error", "Отступ не может быть отрицательным"),
+                           popup_type="error")
                 return False
 
             if data["thickness"] is None:
-                show_popup(loc.get("invalid_number_format_error", "Неверный формат числа для толщины"), popup_type="error")
+                show_popup(loc.get("invalid_number_format_error", "Неверный формат числа для толщины"),
+                           popup_type="error")
                 return False
 
             if not data["insert_point"]:
@@ -501,17 +531,18 @@ class PlateContentPanel(BaseContentPanel):
         try:
             main_window = wx.GetTopLevelParent(self)
             main_window.Iconize(True)
-            point = at_point_input()
+            cad = ATCadInit()
+            point = at_point_input(cad.adoc, as_variant=False, prompt="Введите левый нижний угол листа")
             main_window.Iconize(False)
             main_window.Raise()
             main_window.SetFocus()
             wx.Yield()
 
-            if not isinstance(point, VARIANT):
+            if not isinstance(point, list) or len(point) != 3:
                 show_popup(loc.get("point_selection_error", "Ошибка выбора точки"), popup_type="error")
                 return
 
-            self.insert_point = point
+            self.insert_point = point  # Сохраняем точку как список [x, z, y]
             update_status_bar_point_selected(self, point)
 
             data = self.collect_input_data()
@@ -521,65 +552,35 @@ class PlateContentPanel(BaseContentPanel):
         except Exception as e:
             show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
 
-    def on_clear(self, event: wx.Event) -> None:
-        """
-        Обрабатывает нажатие кнопки "Очистить", сбрасывая поля ввода и точку вставки.
-        """
-        common_data = load_common_data()
-        material_options = [mat["name"] for mat in common_data.get("material", []) if mat["name"]]
-        thickness_options = common_data.get("thicknesses", [])
-        default_thickness = "4" if "4" in thickness_options or "4.0" in thickness_options else thickness_options[0] if thickness_options else ""
-        self.melt_no_input.SetValue("")
-        self.material_combo.SetValue(material_options[0] if material_options else "")
-        self.thickness_combo.SetValue(default_thickness)
-        self.size_combo.SetValue(loc.get("manual_input_label", "Ручной ввод"))
-        for l_input, h_input in self.size_inputs:
-            l_input.SetValue("")
-            h_input.SetValue("")
-            l_input.Enable(False)
-            h_input.Enable(False)
-        self.allowance_input.SetValue("10")
-        self.insert_point = None
-        update_status_bar_point_selected(self, None)
-        self.melt_no_input.SetFocus()
-
-    def on_cancel(self, event: wx.Event) -> None:
-        """
-        Обрабатывает нажатие кнопки "Отмена", закрывая панель.
-        """
-        self.GetParent().Close()
-
 
 if __name__ == "__main__":
     """
     Тестовый вызов окна для проверки интерфейса и вывода данных, введённых пользователем.
     """
-    import comtypes
+    from programms.at_run_plate import main
 
     app = wx.App(False)
     frame = wx.Frame(None, title="Тест PlateContentPanel", size=(800, 600))
     panel = PlateContentPanel(frame)
-
 
     # Функция для вывода данных при нажатии "ОК"
     def on_ok_test(event):
         try:
             # Тестовая точка для имитации ввода
             cad = ATCadInit()
-            prompt1 = "Введите левый нижний угол листа"
-            point = at_point_input(cad.adoc, as_variant=True, prompt=prompt1)
-            panel.insert_point = point
+            point = at_point_input(cad.adoc, as_variant=False, prompt="Введите левый нижний угол листа")
+            panel.insert_point = point  # Сохраняем точку как список [x, z, y]
             update_status_bar_point_selected(panel, point)
 
             # Собираем данные, введённые пользователем
             data = panel.collect_input_data()
             if data:
                 print("Собранные данные:", data)
+                main(data)
             else:
                 print("Ошибка: данные не собраны")
         except Exception as e:
             print(f"Ошибка в тестовом запуске: {e}")
-
 
     # Привязываем тестовую функцию к кнопке "ОК"
     panel.buttons[0].Bind(wx.EVT_BUTTON, on_ok_test)
@@ -590,3 +591,5 @@ if __name__ == "__main__":
     frame.Layout()
     frame.Show()
     app.MainLoop()
+
+

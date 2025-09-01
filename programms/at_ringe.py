@@ -75,7 +75,7 @@ def main(ring_data: dict = None) -> bool:
     # Извлекаем данные
     work_number = ring_data.get("work_number", "")
     diameters = ring_data.get("diameters", {})
-    center = ring_data.get("input_point")  # Изменено с insert_point на input_point
+    center = ring_data.get("input_point")
     if not diameters:
         show_popup(loc.get("no_diameters", "Не указаны диаметры"), popup_type="error")
         return None

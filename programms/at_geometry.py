@@ -200,7 +200,8 @@ def add_rectangle_points(point: APoint, width: float, height: float, point_direc
 
 def polar_point(base_point: Union[List[float], Tuple[float, ...], VARIANT],
                 distance: float,
-                alpha: float) -> VARIANT:
+                alpha: float,
+                as_variant=True) -> list | VARIANT:
     """
     Вычисляет координаты точки, расположенной на заданном расстоянии и под углом от базовой точки,
     и возвращает готовый COM VARIANT для AutoCAD.
@@ -209,13 +210,14 @@ def polar_point(base_point: Union[List[float], Tuple[float, ...], VARIANT],
         base_point: Базовая точка (список, кортеж или готовый VARIANT).
         distance: Расстояние до новой точки.
         alpha: Угол в градусах (0° = по оси X, 90° = по оси Y).
-
+        as_variant: True или False
     Returns:
         VARIANT: COM-массив double [x, y, z], готовый для передачи в AutoCAD API.
 
     Примечания:
         - Угол alpha интерпретируется в градусах, внутри функции переводится в радианы.
         - Если base_point содержит менее трёх координат, недостающие будут заполнены нулями.
+
     """
     # Если base_point — VARIANT, извлекаем значения через .value
     bp_list = list(base_point.value) if isinstance(base_point, VARIANT) else list(base_point)
@@ -233,11 +235,15 @@ def polar_point(base_point: Union[List[float], Tuple[float, ...], VARIANT],
     new_z = bp_list[2]
 
     # Возвращаем готовый COM VARIANT
-    return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [new_x, new_y, new_z])
+    if as_variant:
+        return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [new_x, new_y, new_z])
+    else:
+        return [new_x, new_y, new_z]
 
 def offset_point(input_point: Union[List[float], Tuple[float, ...], VARIANT],
                 offset_x: float,
-                offset_y: float) -> VARIANT:
+                offset_y: float,
+                as_variant=True) -> list | VARIANT:
     """
     Вычисляет координаты точки, смещенной от исходной на заданные значения по осям X и Y,
     с фиксированной координатой Z=0, и возвращает готовый COM VARIANT для AutoCAD.
@@ -246,7 +252,7 @@ def offset_point(input_point: Union[List[float], Tuple[float, ...], VARIANT],
         input_point: Исходная точка (список, кортеж или готовый VARIANT).
         offset_x: Смещение по оси X.
         offset_y: Смещение по оси Y.
-
+        as_variant: True или False
     Returns:
         VARIANT: COM-массив double [x, y, z], готовый для передачи в AutoCAD API.
 
@@ -267,4 +273,7 @@ def offset_point(input_point: Union[List[float], Tuple[float, ...], VARIANT],
     new_z = 0.0
 
     # Возвращаем готовый COM VARIANT
-    return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [new_x, new_y, new_z])
+    if as_variant:
+        return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [new_x, new_y, new_z])
+    else:
+        return [new_x, new_y, new_z]
