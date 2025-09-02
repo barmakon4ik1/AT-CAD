@@ -15,12 +15,41 @@
 """
 
 import math
-from typing import Optional, List, Tuple, Union
+from typing import Optional, List, Tuple, Union, Dict
 from pyautocad import APoint
 from programms.at_utils import handle_errors
 from win32com.client import VARIANT
 import pythoncom
+from locales.at_translations import loc
+from windows.at_gui_utils import show_popup
 
+# -----------------------------
+# Локальные переводы модуля
+# -----------------------------
+TRANSLATIONS = {
+    "error": {
+        "ru": "Ошибка",
+        "de": "Fehler",
+        "en": "Error"
+    },
+    "max_points_error": {
+        "ru": "Максимальное количество точек - 5",
+        "de": "Maximale Punktzahl - 5",
+        "en": "Maximum number of points - 5"
+    },
+    "no_data_error": {
+        "ru": "Данные не введены",
+        "de": "Keine Daten eingegeben",
+        "en": "No data provided"
+    },
+    "to_small_points": {
+        "ru": "Мало точек",
+        "de": "Zu wenig Punkten",
+        "en": "To small points"
+    }
+}
+# Регистрируем переводы сразу при загрузке модуля
+loc.register_translations(TRANSLATIONS)
 
 def ensure_point_variant(point: Union[List[float], Tuple[float, ...], VARIANT]) -> VARIANT:
     """
@@ -198,82 +227,152 @@ def add_rectangle_points(point: APoint, width: float, height: float, point_direc
         return None
 
 
-def polar_point(base_point: Union[List[float], Tuple[float, ...], VARIANT],
-                distance: float,
-                alpha: float,
-                as_variant=True) -> list | VARIANT:
-    """
-    Вычисляет координаты точки, расположенной на заданном расстоянии и под углом от базовой точки,
-    и возвращает готовый COM VARIANT для AutoCAD.
-
-    Args:
-        base_point: Базовая точка (список, кортеж или готовый VARIANT).
-        distance: Расстояние до новой точки.
-        alpha: Угол в градусах (0° = по оси X, 90° = по оси Y).
-        as_variant: True или False
-    Returns:
-        VARIANT: COM-массив double [x, y, z], готовый для передачи в AutoCAD API.
-
-    Примечания:
-        - Угол alpha интерпретируется в градусах, внутри функции переводится в радианы.
-        - Если base_point содержит менее трёх координат, недостающие будут заполнены нулями.
-
-    """
-    # Если base_point — VARIANT, извлекаем значения через .value
-    bp_list = list(base_point.value) if isinstance(base_point, VARIANT) else list(base_point)
-
-    # Дополняем координаты до [x, y, z]
-    while len(bp_list) < 3:
-        bp_list.append(0.0)
-
-    # Переводим угол в радианы
-    rad = math.radians(alpha)
-
-    # Вычисляем новые координаты
-    new_x = bp_list[0] + distance * math.cos(rad)
-    new_y = bp_list[1] + distance * math.sin(rad)
-    new_z = bp_list[2]
-
-    # Возвращаем готовый COM VARIANT
-    if as_variant:
-        return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [new_x, new_y, new_z])
-    else:
-        return [new_x, new_y, new_z]
-
 def offset_point(input_point: Union[List[float], Tuple[float, ...], VARIANT],
                 offset_x: float,
                 offset_y: float,
-                as_variant=True) -> list | VARIANT:
+                as_variant: bool = True) -> Union[List[float], VARIANT]:
     """
     Вычисляет координаты точки, смещенной от исходной на заданные значения по осям X и Y,
-    с фиксированной координатой Z=0, и возвращает готовый COM VARIANT для AutoCAD.
+    с фиксированной координатой Z=0, и возвращает готовый COM VARIANT для AutoCAD или список [x, y].
 
     Args:
         input_point: Исходная точка (список, кортеж или готовый VARIANT).
         offset_x: Смещение по оси X.
         offset_y: Смещение по оси Y.
-        as_variant: True или False
-    Returns:
-        VARIANT: COM-массив double [x, y, z], готовый для передачи в AutoCAD API.
+        as_variant: Если True, возвращает VARIANT [x, y, 0]; если False, возвращает [x, y].
 
-    Примечания:
-        - Если input_point содержит менее трёх координат, недостающие будут заполнены нулями.
-        - Координата Z новой точки всегда равна 0.
+    Returns:
+        Union[List[float], VARIANT]: Список [x, y] или COM-массив double [x, y, 0].
     """
     # Если input_point — VARIANT, извлекаем значения через .value
     point_list = list(input_point.value) if isinstance(input_point, VARIANT) else list(input_point)
 
-    # Дополняем координаты до [x, y, z]
-    while len(point_list) < 3:
-        point_list.append(0.0)
+    # Используем только x, y (игнорируем z, если есть)
+    x, y = point_list[0], point_list[1] if len(point_list) > 1 else point_list[0]
 
     # Вычисляем новые координаты
-    new_x = point_list[0] + offset_x
-    new_y = point_list[1] + offset_y
-    new_z = 0.0
+    new_x = x + offset_x
+    new_y = y + offset_y
 
-    # Возвращаем готовый COM VARIANT
+    # Возвращаем результат
     if as_variant:
-        return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [new_x, new_y, new_z])
-    else:
-        return [new_x, new_y, new_z]
+        return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [new_x, new_y, 0.0])
+    return [new_x, new_y]
+
+def polar_point(base_point: Union[List[float], Tuple[float, ...], VARIANT],
+                distance: float,
+                alpha: float,
+                as_variant: bool = True) -> Union[List[float], VARIANT]:
+    """
+    Вычисляет координаты точки, расположенной на заданном расстоянии и под углом от базовой точки,
+    и возвращает готовый COM VARIANT для AutoCAD или список [x, y].
+
+    Args:
+        base_point: Базовая точка (список, кортеж или готовый VARIANT).
+        distance: Расстояние до новой точки.
+        alpha: Угол в градусах (0° = по оси X, 90° = по оси Y).
+        as_variant: Если True, возвращает VARIANT [x, y, 0]; если False, возвращает [x, y].
+
+    Returns:
+        Union[List[float], VARIANT]: Список [x, y] или COM-массив double [x, y, 0].
+    """
+    # Если base_point — VARIANT, извлекаем значения через .value
+    bp_list = list(base_point.value) if isinstance(base_point, VARIANT) else list(base_point)
+
+    # Используем только x, y (игнорируем z, если есть)
+    x, y = bp_list[0], bp_list[1] if len(bp_list) > 1 else bp_list[0]
+
+    # Переводим угол в радианы
+    rad = math.radians(alpha)
+
+    # Вычисляем новые координаты
+    new_x = x + distance * math.cos(rad)
+    new_y = y + distance * math.sin(rad)
+
+    # Возвращаем результат
+    if as_variant:
+        return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [new_x, new_y, 0.0])
+    return [new_x, new_y]
+
+def build_polyline_list(plate_data: Dict) -> Optional[List[List[float]]]:
+    """
+    Создаёт список точек для полилинии на основе данных листа.
+
+    Args:
+        plate_data: Словарь с данными (insert_point, point_list, material, thickness, melt_no, allowance).
+
+    Returns:
+        List[List[float]]: Список точек в формате [[x1, y1], [x2, y2], ...] или None при ошибке.
+    """
+    try:
+        # Инициализация списка полилинии
+        polyline_list = []
+
+        # Извлекаем данные
+        insert_point = plate_data.get("insert_point")
+        point_list = plate_data.get("point_list")
+
+        # Проверка наличия точек
+        if not point_list:
+            show_popup(loc.get("to_small_points", "Мало точек"), popup_type="error")
+            return None
+
+        # Начальная точка (p0) из insert_point
+        if not isinstance(insert_point, (list, tuple)) or len(insert_point) < 2:
+            show_popup(loc.get("invalid_point_format", "Точка вставки должна быть [x, y, 0]"), popup_type="error")
+            return None
+        p0x, p0y = map(float, insert_point[:2])  # Берём только x, y
+        p0 = [p0x, p0y]
+        polyline_list.append(p0)
+
+        # Первая пара размеров (обязательная)
+        l, h = point_list[0][0], point_list[0][1]
+        p1 = offset_point(p0, l, 0, as_variant=False)  # Двигаемся вправо на l
+        p2 = polar_point(p1, h, 90, as_variant=False)  # Двигаемся вверх на h
+        polyline_list.append(p1)
+        polyline_list.append(p2)
+
+        # Обработка дополнительных пар размеров
+        prev_h = h  # Высота предыдущей пары
+        for i in range(1, len(point_list)):
+            if i >= 5:  # Ограничение на максимум 5 пар точек
+                show_popup(loc.get("max_points_error", "Максимальное количество точек - 5"), popup_type="error")
+                return None
+            l_i, h_i = point_list[i][0], point_list[i][1]
+            # Точка на уровне prev_h
+            p_next = offset_point(p0, l - l_i, prev_h, as_variant=False)
+            polyline_list.append(p_next)
+            # Точка на уровне h_i
+            p_next = offset_point(p0, l - l_i, h_i, as_variant=False)
+            polyline_list.append(p_next)
+            prev_h = h_i  # Обновляем prev_h для следующей итерации
+
+        # Закрытие полилинии: возвращаемся к точке на уровне h_i от p0
+        if len(point_list) > 1:
+            last_h = point_list[-1][1]  # Высота последней пары
+            p_close = polar_point(p0, last_h, 90, as_variant=False)
+            polyline_list.append(p_close)
+        else:
+            p_close = polar_point(p0, h, 90, as_variant=False)
+            polyline_list.append(p_close)
+
+        return polyline_list
+
+    except Exception as e:
+        show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
+        return None
+
+def convert_to_variant_points(polyline_list: List[List[float]]) -> List:
+    """
+    Преобразует список точек [[x, y], ...] в список VARIANT для AutoCAD.
+
+    Args:
+        polyline_list: Список точек в формате [[x1, y1], [x2, y2], ...].
+
+    Returns:
+        List: Список точек в формате VARIANT.
+    """
+    if polyline_list is None:
+        print("Error: polyline_list is None")  # Отладка
+        return []
+    return [ensure_point_variant([x, y, 0.0]) for x, y in polyline_list]

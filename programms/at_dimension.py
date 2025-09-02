@@ -85,30 +85,68 @@ def _xyz_from_variant(p: Union[VARIANT, list, tuple]) -> list[float]:
 
 def _dim_mid_offset(dim_type: str, point1: VARIANT, point2: VARIANT, offset: float) -> VARIANT:
     """
-    Вычисляет среднюю точку между point1 и point2 и смещает её на расстояние offset
-    по нормали к отрезку p1->p2.
+    Вычисляет точку для размерной линии, смещённую на offset. Для V смещение влево от минимальной x,
+    если point1 нижняя, или вправо от максимальной x, если point1 верхняя.
+
+    Args:
+        dim_type: Тип размера ("H" - горизонтальный, "V" - вертикальный, "L" - линейный).
+        point1: Первая точка (VARIANT, [x, y, 0]).
+        point2: Вторая точка (VARIANT, [x, y, 0]).
+        offset: Расстояние смещения.
+
+    Returns:
+        VARIANT: Смещённая точка в формате [x, y, 0].
     """
+    # Преобразуем VARIANT в списки [x, y, z]
     p1 = _xyz_from_variant(point1)
     p2 = _xyz_from_variant(point2)
 
-    # Средняя точка
-    mid = [(p1[0] + p2[0]) / 2.0, (p1[1] + p2[1]) / 2.0, 0.0]
+    # Средняя y-координата
+    mid_y = (p1[1] + p2[1]) / 2.0
 
     # Вектор p1->p2 (XY)
     vx, vy = p2[0] - p1[0], p2[1] - p1[1]
 
-    # Нормаль (XY) для H/V/L
-    if dim_type in ("H", "V", "L"):
+    # Инициализация результирующей точки
+    result = [0.0, mid_y, 0.0]
+
+    # Определяем нормаль и смещение
+    nx, ny = 0.0, 0.0
+    if dim_type == "H":
+        # Для горизонтального размера: ближайшая точка с большей y
+        base_point = p2 if p2[1] > p1[1] else p1
+        # Нормаль перпендикулярна линии p1->p2
         nx, ny = -vy, vx
         nlen = math.hypot(nx, ny)
         if nlen > 0:
             nx /= nlen
             ny /= nlen
-            mid[0] += nx * offset
-            mid[1] += ny * offset
+            # Смещение от base_point
+            result[0] = base_point[0] + nx * offset
+            result[1] = base_point[1] + ny * offset
+    elif dim_type == "V":
+        # Для вертикального размера: направление зависит от y point1
+        if p1[1] < p2[1]:  # point1 нижняя
+            # Выбираем точку с минимальной x
+            base_point = p1 if p1[0] <= p2[0] else p2
+            result[0] = base_point[0] - offset  # Влево
+        else:  # point1 верхняя или y равны
+            # Выбираем точку с максимальной x
+            base_point = p1 if p1[0] >= p2[0] else p2
+            result[0] = base_point[0] + offset  # Вправо
+        result[1] = mid_y  # Средняя y
+    elif dim_type == "L":
+        # Для линейного размера: смещение от середины
+        result[0] = (p1[0] + p2[0]) / 2.0
+        nx, ny = -vy, vx
+        nlen = math.hypot(nx, ny)
+        if nlen > 0:
+            nx /= nlen
+            ny /= nlen
+            result[0] += nx * offset
+            result[1] += ny * offset
 
-    return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, mid)
-
+    return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, result)
 
 def _safe_leader_len(leader_len: Optional[float]) -> float:
     """
