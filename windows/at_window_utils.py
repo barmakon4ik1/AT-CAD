@@ -259,6 +259,7 @@ def load_common_data() -> Dict:
             dimensions = data.get("dimensions", {})
             _common_data_cache["material"] = dimensions.get("material", [])
             _common_data_cache["thicknesses"] = dimensions.get("thicknesses", [])
+            _common_data_cache["diameters"] = dimensions.get("diameters", [])
     except (FileNotFoundError, json.JSONDecodeError) as e:
         logging.error(f"Ошибка загрузки {common_data_path}: {e}")
 

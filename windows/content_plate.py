@@ -553,6 +553,7 @@ class PlateContentPanel(BaseContentPanel):
             show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
 
 
+
 if __name__ == "__main__":
     """
     Тестовый вызов окна для проверки интерфейса и вывода данных, введённых пользователем.

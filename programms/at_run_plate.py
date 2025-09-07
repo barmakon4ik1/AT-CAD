@@ -39,8 +39,6 @@ loc.register_translations(TRANSLATIONS)
 
 from typing import Dict, List, Optional
 from windows.at_window_utils import show_popup
-from locales.at_translations import loc
-
 
 
 def main(plate_data: dict = None) -> bool:
@@ -108,51 +106,6 @@ def main(plate_data: dict = None) -> bool:
     add_dimension(adoc, "V", p2, p1, offset=DEFAULT_DIM_OFFSET)
 
     default_offset = 60 # Базовое смещение для размеров
-
-    # text_offset = 60
-    # if len(polyline_list) > 2:
-    #     offset = DEFAULT_DIM_OFFSET
-    #     text_offset += offset
-    #     p3 = ensure_point_variant(polyline_list[3])
-    #     add_dimension(adoc, "H", p3, p2, offset=offset)
-    #     if len(polyline_list) > 4:
-    #         offset = 2 * DEFAULT_DIM_OFFSET
-    #         text_offset += offset
-    #         p5 = ensure_point_variant(polyline_list[5])
-    #         add_dimension(adoc, "H", p5, p2, offset=offset)
-    #         if len(polyline_list) > 6:
-    #             offset = 3 * DEFAULT_DIM_OFFSET
-    #             text_offset += offset
-    #             p7 = ensure_point_variant(polyline_list[7])
-    #             add_dimension(adoc, "H", p7, p2, offset=offset)
-    #             if len(polyline_list) > 8:
-    #                 offset = 4 * DEFAULT_DIM_OFFSET
-    #                 text_offset += offset
-    #                 p9 = ensure_point_variant(polyline_list[9])
-    #                 add_dimension(adoc, "H", p9, p2, offset=offset)
-    #
-    # offset = DEFAULT_DIM_OFFSET
-    # if len(polyline_list) > 10:
-    #     p11 = ensure_point_variant(polyline_list[11])
-    #     add_dimension(adoc, "V", p0, p11, offset=offset)
-    #     offset += DEFAULT_DIM_OFFSET
-    #
-    # if len(polyline_list) > 8:
-    #     p9 = ensure_point_variant(polyline_list[9])
-    #     add_dimension(adoc, "V", p0, p9, offset=offset)
-    #     offset += DEFAULT_DIM_OFFSET
-    #
-    # if len(polyline_list) > 6:
-    #     p7 = ensure_point_variant(polyline_list[7])
-    #     add_dimension(adoc, "V", p0, p7, offset=offset)
-    #     offset += DEFAULT_DIM_OFFSET
-    #
-    # if len(polyline_list) > 4:
-    #     p5 = ensure_point_variant(polyline_list[5])
-    #     add_dimension(adoc, "V", p0, p5, offset=offset)
-
-
-    # текст h + 60 мм
 
     # Список индексов для горизонтальных размеров (p3, p5, p7, p9)
     h_indices = [4, 6, 8, 10]
