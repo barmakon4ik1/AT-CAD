@@ -31,6 +31,9 @@ from config.at_cad_init import ATCadInit
 from windows.at_run_dialog_window import load_content, at_load_content
 from windows.at_content_registry import CONTENT_REGISTRY
 
+# Определяем кастомное событие для смены языка
+wxEVT_LANGUAGE_CHANGE = wx.PyEventBinder(wx.NewEventType())
+
 # Устанавливаем текущую рабочую директорию в корень проекта
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -587,6 +590,10 @@ class ATMainWindow(wx.Frame):
         loc.set_language(new_lang)
         self.update_language_icon(new_lang)
         self.update_ui(self.settings)
+        # Отправляем событие смены языка
+        language_event = wx.CommandEvent(wxEVT_LANGUAGE_CHANGE.evtType[0])
+        language_event.SetString(new_lang)
+        wx.PostEvent(self.content_panel, language_event)
         logging.info(f"Смена языка через меню на: {new_lang}")
 
     def on_change_language(self, event) -> None:
@@ -595,7 +602,8 @@ class ATMainWindow(wx.Frame):
         """
         current_langs = ["ru", "en", "de"]
         if not isinstance(loc.language, str):
-            logging.error(f"loc.language не строка в on_change_language: {loc.language}, установка языка по умолчанию: ru")
+            logging.error(
+                f"loc.language не строка в on_change_language: {loc.language}, установка языка по умолчанию: ru")
             loc.language = "ru"
         current_index = current_langs.index(loc.language) if loc.language in current_langs else 0
         new_index = (current_index + 1) % len(current_langs)
@@ -603,6 +611,10 @@ class ATMainWindow(wx.Frame):
         loc.set_language(new_lang)
         self.update_language_icon(new_lang)
         self.update_ui(self.settings)
+        # Отправляем событие смены языка
+        language_event = wx.CommandEvent(wxEVT_LANGUAGE_CHANGE.evtType[0])
+        language_event.SetString(new_lang)
+        wx.PostEvent(self.content_panel, language_event)
         logging.info(f"Смена языка через значок на: {new_lang}")
 
     def update_language_icon(self, new_lang: str) -> None:

@@ -24,7 +24,7 @@ CONTENT_REGISTRY = {
     "head": {
         "module": "windows.content_head",
         "label": "at_run_heads",
-        "build_module": "programms.at_head"
+        "build_module": "programms.at_addhead"
     },
     "plate": {
         "module": "windows.content_plate",

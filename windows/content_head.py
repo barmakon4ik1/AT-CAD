@@ -18,7 +18,6 @@ from windows.at_window_utils import (
     BaseContentPanel, load_user_settings, load_common_data
 )
 from programms.at_input import at_point_input
-from programms.at_addhead import at_add_head
 
 # Настройка логирования только для критических ошибок
 logging.basicConfig(

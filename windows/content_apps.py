@@ -3,10 +3,10 @@ windows/content_apps.py
 Модуль для создания панели со списком доступных программ.
 Отображает текстовые ссылки на программы в один столбец.
 """
+import logging
 
 import wx
 import importlib
-from config.at_config import load_user_settings, DEFAULT_SETTINGS
 from windows.at_window_utils import BaseContentPanel, get_link_font
 from windows.at_run_dialog_window import at_load_content, load_content
 from locales.at_translations import loc
@@ -34,6 +34,16 @@ TRANSLATIONS = {
 # Регистрируем переводы сразу при загрузке модуля
 loc.register_translations(TRANSLATIONS)
 
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    filename="at_cad.log",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+
+# Определяем кастомное событие для смены языка
+wxEVT_LANGUAGE_CHANGE = wx.PyEventBinder(wx.NewEventType())
 
 def create_window(parent: wx.Window) -> wx.Panel:
     """
@@ -64,6 +74,31 @@ class AppsContentPanel(BaseContentPanel):
         self.links = []  # Список ссылок для последующего обновления
         self.current_panel = None  # Для сохранения текущей панели
         self.setup_ui()
+        # Подписка на событие смены языка на уровне панели и родителя
+        self.Bind(wxEVT_LANGUAGE_CHANGE, self.on_language_change)
+        self.GetParent().Bind(wxEVT_LANGUAGE_CHANGE, self.on_language_change)
+        logging.info("AppsContentPanel: Подписка на wxEVT_LANGUAGE_CHANGE выполнена для панели и родителя")
+
+    def on_language_change(self, event):
+        """
+        Обрабатывает событие смены языка, обновляя интерфейс.
+
+        Args:
+            event: Событие wx.CommandEvent.
+        """
+        new_lang = event.GetString()
+        logging.info(f"AppsContentPanel: Получено событие смены языка на {new_lang}")
+        self.update_ui_language()
+        # Если открыта другая панель, пытаемся обновить её язык
+        if self.current_panel and hasattr(self.current_panel, 'update_ui_language'):
+            try:
+                self.current_panel.update_ui_language()
+                logging.info(f"AppsContentPanel: Обновлён язык дочерней панели {self.current_panel.__class__.__name__}")
+            except Exception as e:
+                logging.error(
+                    f"AppsContentPanel: Ошибка при обновлении языка дочерней панели {self.current_panel.__class__.__name__}: {e}")
+        self.Layout()
+        self.Refresh()
 
     def setup_ui(self):
         """
@@ -106,11 +141,13 @@ class AppsContentPanel(BaseContentPanel):
         main_sizer.Add(link_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 10)
         self.SetSizer(main_sizer)
         self.Layout()
+        logging.info("AppsContentPanel: UI настроен")
 
     def update_ui_language(self):
         """
         Обновляет текст ссылок при смене языка.
         """
+        logging.info(f"AppsContentPanel: Обновление языка, текущий язык: {loc.language}")
         programs = load_content("get_content_menu", self) or []
         for i, (content_name, label_key) in enumerate(programs):
             if not isinstance(content_name, str):
@@ -124,6 +161,7 @@ class AppsContentPanel(BaseContentPanel):
                 self.links[i].SetLabel(new_label)
                 self.links[i].SetFont(get_link_font())
                 self.links[i].SetForegroundColour(wx.Colour(self.settings["LABEL_FONT_COLOR"]))
+                logging.info(f"AppsContentPanel: Обновлена метка {i}: {new_label}")
         self.Layout()
 
     def on_link_click(self, content_name: str):
@@ -133,7 +171,6 @@ class AppsContentPanel(BaseContentPanel):
         Args:
             content_name: Имя модуля контента для загрузки (например, 'rings').
         """
-        from windows.at_content_registry import CONTENT_REGISTRY
         # Очищаем текущую панель
         parent = self.GetParent()
         sizer = parent.GetSizer()
@@ -148,6 +185,7 @@ class AppsContentPanel(BaseContentPanel):
             panel = at_load_content(content_name, parent)
 
         if not panel:
+            logging.error(f"AppsContentPanel: Не удалось загрузить контент {content_name}")
             # Возвращаем начальную панель, если загрузка не удалась
             sizer.Add(create_window(parent), 1, wx.EXPAND)
             parent.Layout()
@@ -158,21 +196,24 @@ class AppsContentPanel(BaseContentPanel):
         # Добавляем панель в sizer
         sizer.Add(self.current_panel, 1, wx.EXPAND)
         parent.Layout()
+        logging.info(f"AppsContentPanel: Загружен контент {content_name}")
 
         # Устанавливаем callback для получения данных
         def on_submit(data):
             from windows.at_content_registry import CONTENT_REGISTRY
             if not data:
+                logging.warning("AppsContentPanel: Пустые данные от on_submit")
                 return
 
             content_info = CONTENT_REGISTRY.get(content_name)
             if not content_info or "build_module" not in content_info:
+                logging.error(f"AppsContentPanel: Некорректный CONTENT_REGISTRY для {content_name}")
                 return
 
             build_module = importlib.import_module(content_info["build_module"])
             build_func = getattr(build_module, "main")
             success = build_func(data)
-            if success:
+            if success and content_name != "cone":  # Не переключаем панель для конуса
                 # Возвращаем начальную панель
                 sizer = parent.GetSizer()
                 if sizer:

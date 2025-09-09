@@ -3,9 +3,19 @@
 Описание:
 Модуль для создания панели ввода параметров развертки конуса.
 Обеспечивает интерфейс для ввода данных конуса с валидацией, вызовом функции выбора точки
-и возвратом словаря с данными в main_window.last_input. Локализация через loc.get, настройки из user_settings.json.
-Сохраняет указанные данные в last_input.json для использования в качестве начальных значений.
-Изображение конуса отображается с помощью CanvasPanel слева, кнопки под изображением, поля ввода справа.
+и возвратом словаря с данными через callback. Локализация через словарь TRANSLATIONS,
+регистрируемый в loc. Настройки из user_settings.json. Сохраняет указанные данные
+(order_number, material, thickness, weld_allowance) в last_cone_input.json для использования
+в качестве начальных значений. Изображение конуса отображается с помощью CanvasPanel слева,
+кнопки под изображением, поля ввода справа. Поддерживает автоматический пересчёт параметров
+высоты, наклона и угла с использованием debounce.
+
+Особенности:
+- Выход из окна конуса происходит только по кнопке "Возврат" (переключение на content_apps).
+- При нажатии "ОК" данные передаются через callback, после чего очищаются поля, не сохраняемые
+  в last_cone_input.json, и окно остаётся открытым.
+- Исправлена ошибка "wrapped C/C++ object of type TextCtrl has been deleted" путём проверки
+  состояния окна перед очисткой полей и отложенного вызова clear_input_fields.
 """
 
 import logging
@@ -15,21 +25,186 @@ import json
 from typing import Optional, Dict
 
 import wx
+from win32com.client import VARIANT
 
+from config.at_cad_init import ATCadInit
 from config.at_config import *
+from config.at_last_input import save_last_input
+from locales.at_translations import loc
 from programms.at_construction import at_diameter, at_cone_height, at_steigung
 from programms.at_input import at_point_input
-from locales.at_localization_class import loc
 from windows.at_window_utils import (
     CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel,
     create_standard_buttons, adjust_button_widths, update_status_bar_point_selected,
-    BaseContentPanel, load_common_data
+    BaseContentPanel, load_user_settings, load_common_data
 )
-from config.at_last_input import save_last_input
+
+# -----------------------------
+# Локальные переводы модуля
+# -----------------------------
+TRANSLATIONS = {
+    "error": {
+        "ru": "Ошибка",
+        "de": "Fehler",
+        "en": "Error"
+    },
+    "main_data_label": {
+        "ru": "Основные данные",
+        "de": "Hauptdaten",
+        "en": "Main Data"
+    },
+    "diameter_label": {
+        "ru": "Диаметры",
+        "de": "Durchmesser",
+        "en": "Diameters"
+    },
+    "height_label": {
+        "ru": "Высота",
+        "de": "Höhe",
+        "en": "Height"
+    },
+    "order_label": {
+        "ru": "К-№",
+        "de": "Auftragsnummer",
+        "en": "Order No."
+    },
+    "material_label": {
+        "ru": "Материал",
+        "de": "Material",
+        "en": "Material"
+    },
+    "thickness_label": {
+        "ru": "Толщина",
+        "de": "Dicke",
+        "en": "Thickness"
+    },
+    "d_label": {
+        "ru": "d, мм",
+        "de": "d, mm",
+        "en": "d, mm"
+    },
+    "D_label": {
+        "ru": "D, мм",
+        "de": "D, mm",
+        "en": "D, mm"
+    },
+    "inner_label": {
+        "ru": "Внутренний",
+        "de": "Innen",
+        "en": "Inner"
+    },
+    "middle_label": {
+        "ru": "Средний",
+        "de": "Mittel",
+        "en": "Middle"
+    },
+    "outer_label": {
+        "ru": "Внешний",
+        "de": "Außen",
+        "en": "Outer"
+    },
+    "height_label_mm": {
+        "ru": "H, мм",
+        "de": "H, mm",
+        "en": "H, mm"
+    },
+    "steigung_label": {
+        "ru": "Наклон",
+        "de": "Neigung",
+        "en": "Slope"
+    },
+    "angle_label": {
+        "ru": "α°",
+        "de": "α°",
+        "en": "α°"
+    },
+    "weld_allowance_label": {
+        "ru": "Припуск на сварку, мм",
+        "de": "Schweißnahtzugabe, mm",
+        "en": "Weld Allowance, mm"
+    },
+    "ok_button": {
+        "ru": "ОК",
+        "de": "OK",
+        "en": "OK"
+    },
+    "clear_button": {
+        "ru": "Очистить",
+        "de": "Zurücksetzen",
+        "en": "Clear"
+    },
+    "cancel_button": {
+        "ru": "Возврат",
+        "de": "Zurück",
+        "en": "Return"
+    },
+    "no_data_error": {
+        "ru": "Необходимо заполнить все обязательные поля",
+        "de": "Alle Pflichtfelder müssen ausgefüllt werden",
+        "en": "All mandatory fields must be filled"
+    },
+    "invalid_number_format_error": {
+        "ru": "Неверный формат числа",
+        "de": "Ungültiges Zahlenformat",
+        "en": "Invalid number format"
+    },
+    "diameter_positive_error": {
+        "ru": "Диаметры должны быть положительными",
+        "de": "Durchmesser müssen positiv sein",
+        "en": "Diameters must be positive"
+    },
+    "thickness_positive_error": {
+        "ru": "Толщина должна быть положительной",
+        "de": "Dicke muss positiv sein",
+        "en": "Thickness must be positive"
+    },
+    "height_positive_error": {
+        "ru": "Высота должна быть положительной",
+        "de": "Höhe muss positiv sein",
+        "en": "Height must be positive"
+    },
+    "weld_allowance_non_negative_error": {
+        "ru": "Припуск на сварку не может быть отрицательным",
+        "de": "Schweißnahtzugabe darf nicht negativ sein",
+        "en": "Weld allowance cannot be negative"
+    },
+    "angle_range_error": {
+        "ru": "Угол должен быть в диапазоне 0–180°",
+        "de": "Winkel muss im Bereich 0–180° liegen",
+        "en": "Angle must be in the range 0–180°"
+    },
+    "steigung_positive_error": {
+        "ru": "Наклон должен быть положительным",
+        "de": "Neigung muss positiv sein",
+        "en": "Slope must be positive"
+    },
+    "point_selection_error": {
+        "ru": "Ошибка выбора точки",
+        "de": "Fehler bei der Punktauswahl",
+        "en": "Point selection error"
+    },
+    "cad_init_error": {
+        "ru": "Ошибка инициализации AutoCAD",
+        "de": "Fehler bei der Initialisierung von AutoCAD",
+        "en": "AutoCAD initialization error"
+    },
+    "diameter_adjusted_negative_error": {
+        "ru": "Скорректированный диаметр не может быть отрицательным",
+        "de": "Der angepasste Durchmesser darf nicht negativ sein",
+        "en": "Adjusted diameter cannot be negative"
+    },
+    "window_destroyed_error": {
+        "ru": "Окно было закрыто во время обработки",
+        "de": "Das Fenster wurde während der Verarbeitung geschlossen",
+        "en": "The window was closed during processing"
+    }
+}
+# Регистрируем переводы сразу при загрузке модуля
+loc.register_translations(TRANSLATIONS)
 
 # Настройка логирования
 logging.basicConfig(
-    level=logging.ERROR,
+    level=logging.INFO,  # Изменено на INFO для более подробной отладки
     filename="at_cad.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
@@ -43,7 +218,7 @@ def create_window(parent: wx.Window) -> wx.Panel:
         parent: Родительский wx.Window (content_panel из ATMainWindow).
 
     Returns:
-        wx.Panel: Панель с интерфейсом для ввода параметров конуса.
+        wx.Panel: Панель с интерфейсом для ввода параметров конуса или None при ошибке.
     """
     try:
         panel = ConeContentPanel(parent)
@@ -51,8 +226,8 @@ def create_window(parent: wx.Window) -> wx.Panel:
         return panel
     except Exception as e:
         logging.error(f"Ошибка создания ConeContentPanel: {e}")
-        show_popup(loc.get("error", f"Ошибка создания панели конуса: {str(e)}"), popup_type="error")
-        return wx.Panel(parent)
+        show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
+        return None
 
 
 class ConeContentPanel(BaseContentPanel):
@@ -60,15 +235,17 @@ class ConeContentPanel(BaseContentPanel):
     Панель для ввода параметров развертки конуса.
     """
 
-    def __init__(self, parent):
+    def __init__(self, parent, callback=None):
         """
         Инициализирует панель, создаёт элементы управления.
 
         Args:
             parent: Родительский wx.Window (content_panel).
+            callback: Функция обратного вызова для передачи данных.
         """
         super().__init__(parent)
-        self.last_input_file = os.path.join(RESOURCE_DIR, "last_cone_input.json")
+        self.last_input_file = str(LAST_CONE_INPUT_FILE)
+        self.on_submit_callback = callback
         self.parent = parent
         self.labels = {}
         self.static_boxes = {}
@@ -77,27 +254,10 @@ class ConeContentPanel(BaseContentPanel):
         self._updating = False
         self._debounce_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.on_debounce_timeout, self._debounce_timer)
-        self.update_status_bar_no_point()
         self.setup_ui()
         self.load_last_input()
         self.order_input.SetFocus()
         logging.info("ConeContentPanel инициализирована")
-
-    def update_status_bar_no_point(self):
-        """
-        Обновляет статусную строку, если точка не выбрана.
-        """
-        self.update_status_bar_point_selected(None)
-
-    def update_status_bar_point_selected(self, point):
-        """
-        Обновляет статусную строку с координатами выбранной точки.
-
-        Args:
-            point: Координаты точки вставки ([x, y, z]) или None.
-        """
-        update_status_bar_point_selected(self, point)
-        logging.debug(f"Статусная строка обновлена: точка {point}")
 
     def setup_ui(self) -> None:
         """
@@ -114,20 +274,16 @@ class ConeContentPanel(BaseContentPanel):
         self.left_sizer = wx.BoxSizer(wx.VERTICAL)
 
         # Проверка изображения
-        image_path = os.path.abspath(CONE_IMAGE_PATH)
-        if not os.path.exists(image_path):
-            logging.warning(f"Файл изображения конуса '{image_path}' не найден")
-            image_path = None  # Устанавливаем None, чтобы CanvasPanel обработал отсутствие изображения
+        image_path = str(CONE_IMAGE_PATH)
+        if not image_path:
+            show_popup(
+                loc.get("error", "Ошибка") + f": Путь к изображению не указан",
+                popup_type="error"
+            )
 
         # Изображение конуса
-        try:
-            self.canvas = CanvasPanel(self, image_file=image_path, size=(600, 400))
-            self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
-        except Exception as e:
-            logging.error(f"Ошибка создания CanvasPanel: {e}")
-            show_popup(loc.get("error", f"Ошибка загрузки изображения: {str(e)}"), popup_type="error")
-            self.canvas = wx.Panel(self, size=(600, 400))
-            self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
+        self.canvas = CanvasPanel(self, image_file=image_path, size=(600, 400))
+        self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
 
         # Кнопки
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -175,8 +331,8 @@ class ConeContentPanel(BaseContentPanel):
         material_label.SetFont(font)
         self.labels["material"] = material_label
         self.material_combo = wx.ComboBox(main_data_box, choices=material_options,
-                                          value=material_options[0] if material_options else "", style=wx.CB_DROPDOWN,
-                                          size=INPUT_FIELD_SIZE)
+                                         value=material_options[0] if material_options else "", style=wx.CB_DROPDOWN,
+                                         size=INPUT_FIELD_SIZE)
         self.material_combo.SetFont(font)
         material_sizer.AddStretchSpacer()
         material_sizer.Add(material_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
@@ -189,7 +345,7 @@ class ConeContentPanel(BaseContentPanel):
         thickness_label.SetFont(font)
         self.labels["thickness"] = thickness_label
         self.thickness_combo = wx.ComboBox(main_data_box, choices=thickness_options, value=default_thickness,
-                                           style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
+                                          style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
         self.thickness_combo.SetFont(font)
         thickness_sizer.AddStretchSpacer()
         thickness_sizer.Add(thickness_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
@@ -199,7 +355,7 @@ class ConeContentPanel(BaseContentPanel):
         self.right_sizer.Add(main_data_sizer, 0, wx.EXPAND | wx.ALL, 10)
 
         # Группа "Диаметры"
-        diameter_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, loc.get("diameter", "Диаметры"))
+        diameter_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, loc.get("diameter_label", "Диаметры"))
         diameter_box = diameter_sizer.GetStaticBox()
         diameter_box.SetFont(font)
         self.static_boxes["diameter"] = diameter_box
@@ -317,7 +473,7 @@ class ConeContentPanel(BaseContentPanel):
         allowance_label.SetFont(font)
         self.labels["allowance"] = allowance_label
         self.allowance_combo = wx.ComboBox(self, choices=[str(i) for i in range(11)], value="3", style=wx.CB_READONLY,
-                                           size=INPUT_FIELD_SIZE)
+                                          size=INPUT_FIELD_SIZE)
         self.allowance_combo.SetFont(font)
         allowance_sizer.AddStretchSpacer()
         allowance_sizer.Add(allowance_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
@@ -333,56 +489,110 @@ class ConeContentPanel(BaseContentPanel):
 
     def load_last_input(self) -> None:
         """
-        Загружает последние введённые данные из last_input.json.
+        Загружает последние введённые данные из last_cone_input.json.
         """
         try:
-            file_path = self.last_input_file
-            if os.path.exists(file_path):
-                with open(file_path, "r", encoding='utf-8') as f:
+            if os.path.exists(self.last_input_file):
+                with open(self.last_input_file, "r", encoding='utf-8') as f:
                     last_input = json.load(f)
-                self.order_input.SetValue(last_input.get("order_number", ""))
-                self.material_combo.SetValue(last_input.get("material", self.material_combo.GetValue()))
-                self.thickness_combo.SetValue(str(last_input.get("thickness", self.thickness_combo.GetValue())))
-                self.allowance_combo.SetValue(str(last_input.get("weld_allowance", "3")))
-                logging.info(f"Последние данные загружены из {file_path}")
+                if not self.order_input.IsBeingDeleted():
+                    self.order_input.SetValue(last_input.get("order_number", ""))
+                if not self.material_combo.IsBeingDeleted():
+                    self.material_combo.SetValue(last_input.get("material", self.material_combo.GetValue()))
+                if not self.thickness_combo.IsBeingDeleted():
+                    self.thickness_combo.SetValue(str(last_input.get("thickness", self.thickness_combo.GetValue())))
+                if not self.allowance_combo.IsBeingDeleted():
+                    self.allowance_combo.SetValue(str(last_input.get("weld_allowance", "3")))
+                logging.info(f"Последние данные загружены из {self.last_input_file}")
             else:
-                logging.info(f"Файл {file_path} не найден, используются значения по умолчанию")
+                logging.info(f"Файл {self.last_input_file} не найден, используются значения по умолчанию")
         except Exception as e:
-            logging.error(f"Ошибка загрузки {file_path}: {e}")
-            show_popup(loc.get("error", f"Ошибка загрузки данных: {str(e)}"), popup_type="error")
+            logging.error(f"Ошибка загрузки {self.last_input_file}: {e}")
+            show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
 
-    def update_ui_language(self):
+    def clear_input_fields(self) -> None:
+        """
+        Очищает поля ввода, не сохраняемые в last_cone_input.json.
+        Проверяет, что элементы не были уничтожены перед очисткой.
+        """
+        try:
+            if self.IsBeingDeleted():
+                logging.warning("Попытка очистки полей в уничтожаемом окне")
+                logging.getLogger().handlers[0].flush()
+                return
+            if not self.detail_input.IsBeingDeleted():
+                self.detail_input.SetValue("")
+            if not self.d_input.IsBeingDeleted():
+                self.d_input.SetValue("")
+            if not self.D_input.IsBeingDeleted():
+                self.D_input.SetValue("")
+            if not self.d_inner.IsBeingDeleted():
+                self.d_inner.SetValue(True)
+            if not self.D_inner.IsBeingDeleted():
+                self.D_inner.SetValue(True)
+            if not self.height_input.IsBeingDeleted():
+                self.height_input.SetValue("")
+            if not self.steigung_input.IsBeingDeleted():
+                self.steigung_input.SetValue("")
+            if not self.angle_input.IsBeingDeleted():
+                self.angle_input.SetValue("")
+            self.insert_point = None
+            update_status_bar_point_selected(self, None)
+            if not self.height_input.IsBeingDeleted():
+                self.height_input.Enable(True)
+            if not self.steigung_input.IsBeingDeleted():
+                self.steigung_input.Enable(True)
+            if not self.angle_input.IsBeingDeleted():
+                self.angle_input.Enable(True)
+            if not self.order_input.IsBeingDeleted():
+                self.order_input.SetFocus()
+            logging.info(
+                "Очищены поля: detail_number, diameter_top, diameter_base, height, steigung, angle, insert_point, d_type, D_type")
+            logging.getLogger().handlers[0].flush()
+        except Exception as e:
+            logging.error(f"Ошибка при очистке полей: {e}")
+            show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
+            logging.getLogger().handlers[0].flush()
+
+    def update_ui_language(self) -> None:
         """
         Обновляет текст меток и групп при смене языка.
+        Проверяет, что элементы не уничтожены.
         """
-        self.static_boxes["main_data"].SetLabel(loc.get("main_data_label", "Основные данные"))
-        self.static_boxes["diameter"].SetLabel(loc.get("diameter", "Диаметры"))
-        self.static_boxes["height"].SetLabel(loc.get("height_label", "Высота"))
-        self.labels["order"].SetLabel(loc.get("order_label", "К-№"))
-        self.labels["material"].SetLabel(loc.get("material_label", "Материал"))
-        self.labels["thickness"].SetLabel(loc.get("thickness_label", "Толщина"))
-        self.labels["d"].SetLabel(loc.get("d_label", "d, мм"))
-        self.labels["D"].SetLabel(loc.get("D_label", "D, мм"))
-        self.labels["d_inner"].SetLabel(loc.get("inner_label", "Внутренний"))
-        self.labels["d_middle"].SetLabel(loc.get("middle_label", "Средний"))
-        self.labels["d_outer"].SetLabel(loc.get("outer_label", "Внешний"))
-        self.labels["D_inner"].SetLabel(loc.get("inner_label", "Внутренний"))
-        self.labels["D_middle"].SetLabel(loc.get("middle_label", "Средний"))
-        self.labels["D_outer"].SetLabel(loc.get("outer_label", "Внешний"))
-        self.labels["height"].SetLabel(loc.get("height_label_mm", "H, мм"))
-        self.labels["steigung"].SetLabel(loc.get("steigung_label", "Наклон"))
-        self.labels["angle"].SetLabel(loc.get("angle_label", "α°"))
-        self.labels["allowance"].SetLabel(loc.get("weld_allowance_label", "Припуск на сварку, мм"))
+        try:
+            if self.IsBeingDeleted():
+                logging.warning("Попытка обновления языка в уничтожаемом окне")
+                return
+            self.static_boxes["main_data"].SetLabel(loc.get("main_data_label", "Основные данные"))
+            self.static_boxes["diameter"].SetLabel(loc.get("diameter_label", "Диаметры"))
+            self.static_boxes["height"].SetLabel(loc.get("height_label", "Высота"))
+            self.labels["order"].SetLabel(loc.get("order_label", "К-№"))
+            self.labels["material"].SetLabel(loc.get("material_label", "Материал"))
+            self.labels["thickness"].SetLabel(loc.get("thickness_label", "Толщина"))
+            self.labels["d"].SetLabel(loc.get("d_label", "d, мм"))
+            self.labels["D"].SetLabel(loc.get("D_label", "D, мм"))
+            self.labels["d_inner"].SetLabel(loc.get("inner_label", "Внутренний"))
+            self.labels["d_middle"].SetLabel(loc.get("middle_label", "Средний"))
+            self.labels["d_outer"].SetLabel(loc.get("outer_label", "Внешний"))
+            self.labels["D_inner"].SetLabel(loc.get("inner_label", "Внутренний"))
+            self.labels["D_middle"].SetLabel(loc.get("middle_label", "Средний"))
+            self.labels["D_outer"].SetLabel(loc.get("outer_label", "Внешний"))
+            self.labels["height"].SetLabel(loc.get("height_label_mm", "H, мм"))
+            self.labels["steigung"].SetLabel(loc.get("steigung_label", "Наклон"))
+            self.labels["angle"].SetLabel(loc.get("angle_label", "α°"))
+            self.labels["allowance"].SetLabel(loc.get("weld_allowance_label", "Припуск на сварку, мм"))
 
-        for i, key in enumerate(["ok_button", "clear_button", "cancel_button"]):
-            self.buttons[i].SetLabel(loc.get(key, ["ОК", "Очистить", "Отмена"][i]))
-        adjust_button_widths(self.buttons)
+            for i, key in enumerate(["ok_button", "clear_button", "cancel_button"]):
+                if not self.buttons[i].IsBeingDeleted():
+                    self.buttons[i].SetLabel(loc.get(key, ["ОК", "Очистить", "Возврат"][i]))
+            adjust_button_widths(self.buttons)
 
-        self.canvas.Refresh()
-        self.Layout()
-        self.Refresh()
-        self.Update()
-        logging.info("Язык UI обновлён")
+            update_status_bar_point_selected(self, self.insert_point)
+            self.Layout()
+            logging.info("Язык UI обновлён")
+        except Exception as e:
+            logging.error(f"Ошибка при обновлении языка UI: {e}")
+            show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
 
     def on_height_text(self, event: wx.Event) -> None:
         """
@@ -424,7 +634,7 @@ class ConeContentPanel(BaseContentPanel):
         Args:
             event: Событие wxPython.
         """
-        if self._updating:
+        if self._updating or self.IsBeingDeleted():
             return
         self._updating = True
         try:
@@ -443,7 +653,7 @@ class ConeContentPanel(BaseContentPanel):
                 try:
                     height = float(height_str)
                     if height <= 0:
-                        show_popup(loc.get("error_height_positive", "Высота должна быть положительной"),
+                        show_popup(loc.get("height_positive_error", "Высота должна быть положительной"),
                                    popup_type="error")
                         return
                     steigung = at_steigung(height, D, d)
@@ -459,7 +669,7 @@ class ConeContentPanel(BaseContentPanel):
                 try:
                     steigung = float(steigung_str)
                     if steigung <= 0:
-                        show_popup(loc.get("error_steigung_positive", "Наклон должен быть положительным"),
+                        show_popup(loc.get("steigung_positive_error", "Наклон должен быть положительным"),
                                    popup_type="error")
                         return
                     height = at_cone_height(D, d, steigung=steigung)
@@ -475,7 +685,7 @@ class ConeContentPanel(BaseContentPanel):
                 try:
                     angle = float(angle_str)
                     if not 0 < angle < 180:
-                        show_popup(loc.get("error_angle_range", "Угол должен быть в диапазоне 0–180°"),
+                        show_popup(loc.get("angle_range_error", "Угол должен быть в диапазоне 0–180°"),
                                    popup_type="error")
                         return
                     height = at_cone_height(D, d, angle=angle)
@@ -494,45 +704,81 @@ class ConeContentPanel(BaseContentPanel):
                 self.angle_input.SetValue("")
         except Exception as e:
             logging.error(f"Ошибка в расчётах параметров конуса: {e}")
-            show_popup(loc.get("error", f"Ошибка расчёта: {str(e)}"), popup_type="error")
+            show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
         finally:
             self._updating = False
 
     def collect_input_data(self) -> Optional[Dict]:
         """
-        Собирает данные из полей ввода.
+        Собирает данные из полей ввода, корректируя диаметры и высоту.
+
+        Диаметры:
+        - Если диаметр равен 0, заменяется на значение толщины.
+        - Если тип диаметра 'outer', вычитается толщина.
+        - Если тип диаметра 'inner', прибавляется толщина.
+        - Если тип диаметра 'middle', диаметр остаётся без изменений.
+        Высота:
+        - К высоте прибавляется припуск на сварку.
 
         Returns:
-            Optional[Dict]: Словарь с данными или None при ошибке.
+            Optional[Dict]: Словарь с данными (order_number, detail_number, material, thickness, diameter_top,
+            diameter_base, d_type, D_type, height, steigung, angle, weld_allowance, insert_point, thickness_text)
+            или None при ошибке.
         """
         try:
             data = {
                 "order_number": self.order_input.GetValue().strip(),
                 "detail_number": self.detail_input.GetValue().strip(),
                 "material": self.material_combo.GetValue().strip(),
-                "thickness": float(self.thickness_combo.GetValue().replace(',',
-                                                                           '.')) if self.thickness_combo.GetValue().strip() else 0,
-                "diameter_top": float(
-                    self.d_input.GetValue().replace(',', '.')) if self.d_input.GetValue().strip() else 0,
-                "diameter_base": float(
-                    self.D_input.GetValue().replace(',', '.')) if self.D_input.GetValue().strip() else 0,
+                "thickness": float(self.thickness_combo.GetValue().replace(',', '.')) if self.thickness_combo.GetValue().strip() else None,
+                "diameter_top": float(self.d_input.GetValue().replace(',', '.')) if self.d_input.GetValue().strip() else 0,
+                "diameter_base": float(self.D_input.GetValue().replace(',', '.')) if self.D_input.GetValue().strip() else 0,
                 "d_type": "inner" if self.d_inner.GetValue() else "middle" if self.d_middle.GetValue() else "outer",
                 "D_type": "inner" if self.D_inner.GetValue() else "middle" if self.D_middle.GetValue() else "outer",
-                "height": float(
-                    self.height_input.GetValue().replace(',', '.')) if self.height_input.GetValue().strip() else 0,
-                "steigung": float(
-                    self.steigung_input.GetValue().replace(',', '.')) if self.steigung_input.GetValue().strip() else 0,
-                "angle": float(
-                    self.angle_input.GetValue().replace(',', '.')) if self.angle_input.GetValue().strip() else 0,
-                "weld_allowance": float(self.allowance_combo.GetValue().replace(',',
-                                                                                '.')) if self.allowance_combo.GetValue().strip() else 0,
+                "height": float(self.height_input.GetValue().replace(',', '.')) if self.height_input.GetValue().strip() else None,
+                "steigung": float(self.steigung_input.GetValue().replace(',', '.')) if self.steigung_input.GetValue().strip() else None,
+                "angle": float(self.angle_input.GetValue().replace(',', '.')) if self.angle_input.GetValue().strip() else None,
+                "weld_allowance": float(self.allowance_combo.GetValue().replace(',', '.')) if self.allowance_combo.GetValue().strip() else None,
                 "insert_point": self.insert_point,
-                "thickness_text": f"{float(self.thickness_combo.GetValue()):.2f} {loc.get('mm', 'мм')}" if self.thickness_combo.GetValue().strip() else "0.00 мм"
+                "thickness_text": f"{float(self.thickness_combo.GetValue()):.2f} {loc.get('mm', 'мм')}" if self.thickness_combo.GetValue().strip() else None
             }
+
+            # Проверка на наличие всех обязательных полей
+            if any(data[key] is None for key in ["thickness", "diameter_top", "diameter_base", "height", "weld_allowance"]):
+                show_popup(loc.get("no_data_error", "Необходимо заполнить все обязательные поля"), popup_type="error")
+                return None
+
+            # Замена нулевых диаметров на толщину
+            if data["diameter_top"] == 0:
+                data["diameter_top"] = data["thickness"]
+            if data["diameter_base"] == 0:
+                data["diameter_base"] = data["thickness"]
+
+            # Корректировка диаметров с использованием at_diameter
+            try:
+                data["diameter_top"] = at_diameter(data["diameter_top"], data["thickness"], data["d_type"])
+                data["diameter_base"] = at_diameter(data["diameter_base"], data["thickness"], data["D_type"])
+            except ValueError as e:
+                logging.error(f"Ошибка корректировки диаметров: {str(e)}")
+                show_popup(str(e), popup_type="error")
+                return None
+
+            # Проверка скорректированных диаметров
+            if data["diameter_top"] <= 0 or data["diameter_base"] <= 0:
+                show_popup(loc.get("diameter_adjusted_negative_error", "Скорректированный диаметр не может быть отрицательным"), popup_type="error")
+                return None
+
+            # Корректировка высоты с учётом припуска на сварку
+            data["height"] += data["weld_allowance"]
+
             return data
         except ValueError as e:
             logging.error(f"Ошибка получения данных: {e}")
             show_popup(loc.get("invalid_number_format_error", "Неверный формат числа"), popup_type="error")
+            return None
+        except Exception as e:
+            logging.error(f"Ошибка в collect_input_data: {e}")
+            show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
             return None
 
     def validate_input(self, data: Dict) -> bool:
@@ -540,97 +786,116 @@ class ConeContentPanel(BaseContentPanel):
         Проверяет валидность введённых данных.
 
         Args:
-            data: Словарь с данными из полей ввода.
+            data: Словарь с данными из полей ввода (после корректировки).
 
         Returns:
             bool: True, если данные валидны, иначе False.
         """
         try:
-            if not data:
-                show_popup(loc.get("error_data_missing", "Необходимо ввести данные"), popup_type="error")
+            if not data or any(data[key] is None for key in ["thickness", "diameter_top", "diameter_base", "height"]):
+                show_popup(loc.get("no_data_error", "Необходимо заполнить все обязательные поля"), popup_type="error")
                 return False
 
-            # Проверка материала
-            if not data["material"]:
-                show_popup(loc.get("error_material_required", "Выберите материал"), popup_type="error")
-                self.material_combo.SetFocus()
+            if data["thickness"] <= 0:
+                show_popup(loc.get("thickness_positive_error", "Толщина должна быть положительной"), popup_type="error")
+                self.thickness_combo.SetFocus()
                 return False
 
-            # Проверка числовых значений
-            for field, label, input_ctrl in [
-                ("thickness", loc.get("thickness_label", "Толщина"), self.thickness_combo),
-                ("diameter_top", loc.get("d_label", "d, мм"), self.d_input),
-                ("diameter_base", loc.get("D_label", "D, мм"), self.D_input),
-                ("height", loc.get("height_label_mm", "H, мм"), self.height_input),
-                ("weld_allowance", loc.get("weld_allowance_label", "Припуск на сварку, мм"), self.allowance_combo)
-            ]:
-                if data[field] < 0:
-                    show_popup(loc.get(f"error_{field}_non_negative", f"{label} не может быть отрицательным"),
-                               popup_type="error")
-                    input_ctrl.SetFocus()
-                    return False
-                if field != "weld_allowance" and data[field] == 0:
-                    show_popup(loc.get(f"error_{field}_positive", f"{label} должен быть положительным"),
-                               popup_type="error")
-                    input_ctrl.SetFocus()
-                    return False
+            if data["diameter_top"] <= 0 or data["diameter_base"] <= 0:
+                show_popup(loc.get("diameter_positive_error", "Диаметры должны быть положительными"), popup_type="error")
+                self.d_input.SetFocus() if data["diameter_top"] <= 0 else self.D_input.SetFocus()
+                return False
 
-            # Проверка угла
-            if data["angle"] != 0 and (data["angle"] <= 0 or data["angle"] >= 180):
-                show_popup(loc.get("error_angle_range", "Угол должен быть в диапазоне 0–180°"), popup_type="error")
+            if data["height"] <= 0:
+                show_popup(loc.get("height_positive_error", "Высота должна быть положительной"), popup_type="error")
+                self.height_input.SetFocus()
+                return False
+
+            if data["weld_allowance"] < 0:
+                show_popup(loc.get("weld_allowance_non_negative_error", "Припуск на сварку не может быть отрицательным"), popup_type="error")
+                self.allowance_combo.SetFocus()
+                return False
+
+            if data["angle"] is not None and (data["angle"] <= 0 or data["angle"] >= 180):
+                show_popup(loc.get("angle_range_error", "Угол должен быть в диапазоне 0–180°"), popup_type="error")
                 self.angle_input.SetFocus()
                 return False
 
-            # Проверка наклона
-            if data["steigung"] != 0 and data["steigung"] <= 0:
-                show_popup(loc.get("error_steigung_positive", "Наклон должен быть положительным"), popup_type="error")
+            if data["steigung"] is not None and data["steigung"] <= 0:
+                show_popup(loc.get("steigung_positive_error", "Наклон должен быть положительным"), popup_type="error")
                 self.steigung_input.SetFocus()
+                return False
+
+            if not data["insert_point"]:
+                show_popup(loc.get("point_selection_error", "Ошибка выбора точки"), popup_type="error")
                 return False
 
             return True
         except Exception as e:
             logging.error(f"Ошибка валидации данных: {e}")
-            show_popup(loc.get("error", f"Ошибка валидации: {str(e)}"), popup_type="error")
+            show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
             return False
 
-    def process_input(self, data: Dict) -> bool:
+    def on_ok(self, event: wx.Event) -> None:
         """
-        Обрабатывает собранные данные, запрашивает точку вставки и сохраняет данные в main_window.last_input.
+        Обрабатывает нажатие кнопки "ОК", запрашивает точку, передаёт данные через callback
+        и очищает поля, не сохраняемые в last_cone_input.json, если окно не уничтожено.
 
         Args:
-            data: Словарь с данными из полей ввода.
-
-        Returns:
-            bool: True, если обработка успешна, иначе False.
+            event: Событие нажатия кнопки "ОК".
         """
         try:
-            if not data or not self.validate_input(data):
-                logging.error("Данные отсутствуют или невалидны в process_input")
-                show_popup(loc.get("error_data_missing", "Некорректные данные"), popup_type="error")
-                return False
+            if self.IsBeingDeleted():
+                logging.warning("Попытка обработки ОК в уничтожаемом окне")
+                show_popup(loc.get("window_destroyed_error", "Окно было закрыто во время обработки"),
+                           popup_type="error")
+                logging.getLogger().handlers[0].flush()  # Принудительная запись лога
+                return
 
             main_window = wx.GetTopLevelParent(self)
             main_window.Iconize(True)
-            try:
-                logging.info("Вызов at_point_input для выбора точки")
-                point = at_point_input()
-                logging.info(f"Получена точка: {point}")
-            except Exception as e:
-                logging.error(f"Ошибка вызова at_point_input: {e}")
-                show_popup(loc.get("point_selection_error", f"Ошибка выбора точки: {str(e)}"), popup_type="error")
-                return False
-            finally:
+            cad = ATCadInit()
+
+            if cad.adoc is None:
+                logging.error("Не удалось инициализировать AutoCAD")
+                show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
                 main_window.Iconize(False)
                 main_window.Raise()
                 main_window.SetFocus()
-                wx.Yield()
+                logging.getLogger().handlers[0].flush()
+                return
 
-            if point and isinstance(point, (list, tuple)) and len(point) == 3:
-                self.insert_point = list(point)
-                data["insert_point"] = self.insert_point
-                self.update_status_bar_point_selected(self.insert_point)
-                main_window.last_input = data  # Сохраняем полный словарь в main_window
-                # Сохраняем только указанные поля в last_input.json
+            point = None
+            try:
+                point = at_point_input(cad.adoc, as_variant=False,
+                                       prompt=loc.get("point_prompt", "Введите точку вставки конуса"))
+                if point is None or not (isinstance(point, list) and len(point) == 3):
+                    logging.error("Ошибка выбора точки")
+                    show_popup(loc.get("point_selection_error", "Ошибка выбора точки"), popup_type="error")
+                    main_window.Iconize(False)
+                    main_window.Raise()
+                    main_window.SetFocus()
+                    logging.getLogger().handlers[0].flush()
+                    return
+            except Exception as e:
+                logging.error(f"Ошибка при выборе точки: {e}")
+                show_popup(loc.get("point_selection_error", "Ошибка выбора точки") + f": {str(e)}", popup_type="error")
+                main_window.Iconize(False)
+                main_window.Raise()
+                main_window.SetFocus()
+                logging.getLogger().handlers[0].flush()
+                return
+
+            main_window.Iconize(False)
+            main_window.Raise()
+            main_window.SetFocus()
+
+            self.insert_point = point
+            update_status_bar_point_selected(self, point)
+
+            data = self.collect_input_data()
+            if data and self.validate_input(data):
+                # Сохраняем указанные поля в last_cone_input.json
                 last_input_data = {
                     "order_number": data["order_number"],
                     "material": data["material"],
@@ -638,50 +903,138 @@ class ConeContentPanel(BaseContentPanel):
                     "weld_allowance": data["weld_allowance"]
                 }
                 save_last_input(self.last_input_file, last_input_data)
-                logging.info(f"Точка вставки выбрана: {self.insert_point}, данные сохранены в main_window.last_input")
-                main_window.switch_content("content_apps")  # Переключение на content_apps
-                return True
-            else:
-                logging.warning(f"Некорректная точка вставки: {point}")
-                show_popup(loc.get("point_selection_error", "Ошибка выбора точки"), popup_type="error")
-                return False
-        except Exception as e:
-            logging.error(f"Ошибка обработки данных: {e}")
-            show_popup(loc.get("error", f"Ошибка обработки: {str(e)}"), popup_type="error")
-            return False
-        finally:
-            main_window.Iconize(False)
-            main_window.Raise()
-            main_window.SetFocus()
-            wx.Yield()
+                logging.info(f"Данные сохранены в {self.last_input_file}: {last_input_data}")
+                logging.getLogger().handlers[0].flush()
 
-    def clear_input_fields(self) -> None:
+                # Проверяем, что окно всё ещё существует перед вызовом callback
+                if self.IsBeingDeleted():
+                    logging.warning("Окно уничтожено перед вызовом on_submit_callback")
+                    show_popup(loc.get("window_destroyed_error", "Окно было закрыто во время обработки"),
+                               popup_type="error")
+                    logging.getLogger().handlers[0].flush()
+                    return
+
+                # Вызываем callback в безопасном контексте
+                if self.on_submit_callback:
+                    logging.info("Перед вызовом on_submit_callback")
+                    try:
+                        wx.CallAfter(self.on_submit_callback, data)  # Отложенный вызов callback
+                        logging.info("on_submit_callback вызван отложенно")
+                    except Exception as e:
+                        logging.error(f"Ошибка при вызове on_submit_callback: {e}")
+                        show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
+                        logging.getLogger().handlers[0].flush()
+                        return
+
+                # Отложенная очистка полей
+                if not self.IsBeingDeleted():
+                    wx.CallAfter(self.clear_input_fields)
+                    logging.info("Окно конуса остаётся открытым, несохранённые поля будут очищены отложенно")
+                else:
+                    logging.warning("Окно уничтожено перед очисткой полей")
+                logging.getLogger().handlers[0].flush()
+            else:
+                logging.info("Данные не прошли валидацию, очистка полей не выполняется")
+                logging.getLogger().handlers[0].flush()
+        except Exception as e:
+            logging.error(f"Ошибка в on_ok: {e}")
+            show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
+            logging.getLogger().handlers[0].flush()
+        finally:
+            if not main_window.IsBeingDeleted():
+                main_window.Iconize(False)
+                main_window.Raise()
+                main_window.SetFocus()
+            logging.getLogger().handlers[0].flush()
+
+    def on_clear(self, event: wx.Event) -> None:
         """
-        Очищает все поля ввода, кроме загружаемых из common_data.json и last_input.json.
+        Очищает поля ввода, не сохраняемые в last_cone_input.json.
+
+        Args:
+            event: Событие нажатия кнопки.
         """
-        self.detail_input.SetValue("")
-        self.d_input.SetValue("")
-        self.D_input.SetValue("")
-        self.d_inner.SetValue(True)
-        self.D_inner.SetValue(True)
-        self.height_input.SetValue("")
-        self.steigung_input.SetValue("")
-        self.angle_input.SetValue("")
-        self.insert_point = None
-        self.update_status_bar_no_point()
-        self.height_input.Enable(True)
-        self.steigung_input.Enable(True)
-        self.angle_input.Enable(True)
-        self.order_input.SetFocus()
-        logging.info("Поля ввода очищены, кроме данных из common_data.json и last_input.json")
+        try:
+            self.clear_input_fields()
+            logging.info("Поля ввода очищены")
+        except Exception as e:
+            logging.error(f"Ошибка при очистке полей: {e}")
+            show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
+
+    def on_cancel(self, event: wx.Event, switch_content: Optional[str] = "content_apps") -> None:
+        """
+        Переключает контент на указанную панель (по умолчанию content_apps).
+
+        Args:
+            event: Событие нажатия кнопки.
+            switch_content: Имя контента для переключения.
+        """
+        try:
+            self.switch_content_panel(switch_content)
+            logging.info(f"Переключение на панель {switch_content}")
+        except Exception as e:
+            logging.error(f"Ошибка при отмене: {e}")
+            show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
 
 
 if __name__ == "__main__":
     """
-    Тестовый вызов окна для проверки интерфейса.
+    Тестовый вызов окна для проверки интерфейса и поведения кнопок.
     """
     app = wx.App(False)
     frame = wx.Frame(None, title="Тест ConeContentPanel", size=(800, 600))
     panel = ConeContentPanel(frame)
+
+    def on_ok_test(data):
+        """
+        Тестовая функция для обработки callback.
+        Симулирует обработку данных и проверяет состояние окна.
+        """
+        try:
+            print("Собранные данные:", data)
+            logging.info("Тестовый callback вызван с данными")
+            # Симулируем задержку, как в реальной отрисовке
+            wx.MilliSleep(100)
+            if panel.IsBeingDeleted():
+                logging.warning("Окно уничтожено в тестовом callback")
+            else:
+                logging.info("Окно всё ещё существует после тестового callback")
+        except Exception as e:
+            print(f"Ошибка в тестовом callback: {e}")
+            logging.error(f"Ошибка в тестовом callback: {e}")
+
+    def on_ok_event(event):
+        """
+        Тестовая функция для обработки нажатия "ОК".
+        Проверяет, что данные передаются, поля очищаются, а окно остаётся открытым.
+        """
+        try:
+            panel.on_submit_callback = on_ok_test
+            panel.on_ok(event)
+            if not panel.IsBeingDeleted():
+                print("Поля после нажатия ОК:")
+                print(f"detail_number: {panel.detail_input.GetValue()}")
+                print(f"diameter_top: {panel.d_input.GetValue()}")
+                print(f"diameter_base: {panel.D_input.GetValue()}")
+                print(f"height: {panel.height_input.GetValue()}")
+                print(f"steigung: {panel.steigung_input.GetValue()}")
+                print(f"angle: {panel.angle_input.GetValue()}")
+                print(f"insert_point: {panel.insert_point}")
+                print(f"d_type: {'inner' if panel.d_inner.GetValue() else 'middle' if panel.d_middle.GetValue() else 'outer'}")
+                print(f"D_type: {'inner' if panel.D_inner.GetValue() else 'middle' if panel.D_middle.GetValue() else 'outer'}")
+                print("Окно должно остаться открытым")
+            else:
+                print("Окно уничтожено после нажатия ОК")
+                logging.warning("Окно уничтожено в тестовом режиме")
+        except Exception as e:
+            print(f"Ошибка в тестовом запуске: {e}")
+            logging.error(f"Ошибка в тестовом запуске: {e}")
+
+    panel.buttons[0].Bind(wx.EVT_BUTTON, on_ok_event)
+
+    sizer = wx.BoxSizer(wx.VERTICAL)
+    sizer.Add(panel, 1, wx.EXPAND)
+    frame.SetSizer(sizer)
+    frame.Layout()
     frame.Show()
     app.MainLoop()
