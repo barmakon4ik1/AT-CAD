@@ -36,7 +36,7 @@ from programms.at_input import at_point_input
 from windows.at_window_utils import (
     CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel,
     create_standard_buttons, adjust_button_widths, update_status_bar_point_selected,
-    BaseContentPanel, load_user_settings, load_common_data
+    BaseContentPanel, load_user_settings, load_common_data, parse_float
 )
 
 # -----------------------------
@@ -730,17 +730,18 @@ class ConeContentPanel(BaseContentPanel):
                 "order_number": self.order_input.GetValue().strip(),
                 "detail_number": self.detail_input.GetValue().strip(),
                 "material": self.material_combo.GetValue().strip(),
-                "thickness": float(self.thickness_combo.GetValue().replace(',', '.')) if self.thickness_combo.GetValue().strip() else None,
-                "diameter_top": float(self.d_input.GetValue().replace(',', '.')) if self.d_input.GetValue().strip() else 0,
-                "diameter_base": float(self.D_input.GetValue().replace(',', '.')) if self.D_input.GetValue().strip() else 0,
+                "thickness": parse_float(self.thickness_combo.GetValue()),
+                "diameter_top": parse_float(self.d_input.GetValue()) or 0,
+                "diameter_base": parse_float(self.D_input.GetValue()) or 0,
                 "d_type": "inner" if self.d_inner.GetValue() else "middle" if self.d_middle.GetValue() else "outer",
                 "D_type": "inner" if self.D_inner.GetValue() else "middle" if self.D_middle.GetValue() else "outer",
-                "height": float(self.height_input.GetValue().replace(',', '.')) if self.height_input.GetValue().strip() else None,
-                "steigung": float(self.steigung_input.GetValue().replace(',', '.')) if self.steigung_input.GetValue().strip() else None,
-                "angle": float(self.angle_input.GetValue().replace(',', '.')) if self.angle_input.GetValue().strip() else None,
-                "weld_allowance": float(self.allowance_combo.GetValue().replace(',', '.')) if self.allowance_combo.GetValue().strip() else None,
+                "height": parse_float(self.height_input.GetValue()),
+                "steigung": parse_float(self.steigung_input.GetValue()),
+                "angle": parse_float(self.angle_input.GetValue()),
+                "weld_allowance": parse_float(self.allowance_combo.GetValue()),
                 "insert_point": self.insert_point,
-                "thickness_text": f"{float(self.thickness_combo.GetValue()):.2f} {loc.get('mm', 'мм')}" if self.thickness_combo.GetValue().strip() else None
+                "thickness_text": f"{parse_float(self.thickness_combo.GetValue()):.2f} {loc.get('mm', 'мм')}" if parse_float(
+                    self.thickness_combo.GetValue()) is not None else None
             }
 
             # Проверка на наличие всех обязательных полей

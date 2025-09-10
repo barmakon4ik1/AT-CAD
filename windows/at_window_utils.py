@@ -457,6 +457,15 @@ def fit_text_to_height(ctrl, text: str, max_width: int, max_height: int, font_na
     return min_size
 
 
+def parse_float(value: str) -> Optional[float]:
+    """Преобразует строку в число, заменяя запятую на точку."""
+    try:
+        cleaned_value = value.strip().replace(',', '.')
+        return float(cleaned_value) if cleaned_value else None
+    except ValueError:
+        return None
+
+
 class CanvasPanel(wx.Panel):
     """
     Панель для отображения изображения с поддержкой масштабирования.
