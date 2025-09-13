@@ -17,6 +17,9 @@
 import math
 from typing import Optional, List, Tuple, Union, Dict
 from pyautocad import APoint
+
+from config.at_cad_init import ATCadInit
+from programms.at_input import at_point_input
 from programms.at_utils import handle_errors
 from win32com.client import VARIANT
 import pythoncom
@@ -376,3 +379,50 @@ def convert_to_variant_points(polyline_list: List[List[float]]) -> List:
         print("Error: polyline_list is None")  # Отладка
         return []
     return [ensure_point_variant([x, y, 0.0]) for x, y in polyline_list]
+
+
+def get_unwrapped_points(D, L, A_deg, clockwise=False):
+    """
+    Возвращает список (угол, x, y) вдоль развертки цилиндра.
+
+    D  - диаметр цилиндра
+    L  - высота цилиндра (не используется, но для совместимости)
+    A_deg - угол разреза в градусах
+    clockwise - направление обхода:
+                False = против часовой стрелки (по умолчанию)
+                True  = по часовой стрелке
+    """
+    unwrapped_length = math.pi * D
+    deg_to_len = lambda angle: (angle % 360) / 360 * unwrapped_length
+    y = 0  # Все точки на нижней линии развёртки
+
+    # Базовые углы
+    base_angles = [0, 90, 180, 270, 360]
+
+    # Нормализуем A
+    A = A_deg % 360
+
+    # Выбор правил в зависимости от направления
+    distance = (lambda a1, a2: (a1 - a2) % 360) if not clockwise else (lambda a1, a2: (a2 - a1) % 360)
+    shift    = (lambda ang: (A - ang) % 360)    if not clockwise else (lambda ang: (ang - A) % 360)
+
+    # Определить набор углов
+    marked_angles = sorted(set(base_angles + [A]), key=lambda ang: distance(A, ang))
+
+    # Замкнуть на A
+    if marked_angles[0] != A:
+        marked_angles = [A] + marked_angles
+    if marked_angles[-1] != A:
+        marked_angles.append(A)
+
+    # Преобразовать углы в координаты
+    points = []
+    for ang in marked_angles:
+        x = deg_to_len(shift(ang))
+        points.append((ang % 360, x, y))
+
+    return points
+
+
+
+
