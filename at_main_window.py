@@ -9,6 +9,7 @@
 
 import wx
 import os
+import sys
 import logging
 import json
 from config.at_config import (
@@ -24,25 +25,24 @@ from config.at_config import (
     USER_LANGUAGE_PATH,
 )
 from locales.at_translations import loc
-# from locales.at_localization_class import loc, Localization
-from windows.at_window_utils import load_last_position, save_last_position, get_button_font, fit_text_to_height
+from windows.at_window_utils import load_last_position, save_last_position, get_button_font, fit_text_to_height, LANGUAGE_CHANGE_EVT_TYPE, LANGUAGE_CHANGE_EVT
 from windows.at_gui_utils import show_popup
-from config.at_cad_init import ATCadInit
 from windows.at_run_dialog_window import load_content, at_load_content
 from windows.at_content_registry import CONTENT_REGISTRY
-
-# Определяем кастомное событие для смены языка
-wxEVT_LANGUAGE_CHANGE = wx.PyEventBinder(wx.NewEventType())
 
 # Устанавливаем текущую рабочую директорию в корень проекта
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.ERROR,  # Основной уровень для ошибок
-    filename="at_cad.log",
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
+# Настройка логирования в консоль
+# print("Инициализация логирования в at_main_window.py")  # Временный print для проверки
+# logging.getLogger().handlers = []  # Очищаем существующие обработчики
+# logging.getLogger().setLevel(logging.INFO)
+# handler = logging.StreamHandler(sys.stdout)
+# handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+# logging.getLogger().addHandler(handler)
+#
+# # Проверяем sys.stdout
+# print(f"sys.stdout: {sys.stdout}")
 
 # -----------------------------
 # Локальные переводы модуля
@@ -285,44 +285,112 @@ class ATMainWindow(wx.Frame):
             content_name (str): Имя контента для отображения.
         """
         if not isinstance(content_name, str):
-            logging.warning(f"Нестроковый content_name: {content_name}, преобразование в строку")
+            # logging.warning(f"Нестроковый content_name: {content_name}, преобразование в строку")
             content_name = str(content_name)
 
-        logging.info(
-            f"Переключение на контент: {content_name}, текущий контент: {self.current_content.__class__.__name__ if self.current_content else None}")
+        # logging.info(
+        #     f"Переключение на контент: {content_name}, текущий контент: {self.current_content.__class__.__name__ if self.current_content else None}")
 
-        # Очищаем content_sizer полностью
+        # Очищаем текущий контент
         if self.current_content:
             self.current_content.Destroy()
             self.current_content = None
-        self.content_sizer.Clear(True)  # Полная очистка сайзера
+        self.content_sizer.Clear(True)
 
         try:
             new_content = at_load_content(content_name, self.content_panel)
             if new_content and isinstance(new_content, wx.Window):
                 self.current_content = new_content
+                self.current_content.content_name = content_name
                 self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
-                if hasattr(self.current_content, 'update_ui_language'):
-                    self.current_content.update_ui_language()
-                    logging.info(f"Обновлён язык для контента: {content_name}")
-                else:
-                    logging.warning(f"Контент {content_name} не имеет метода update_ui_language")
+                if hasattr(new_content, 'update_ui_language'):
+                    new_content.update_ui_language()
+                    # logging.info(f"Обновлён язык для контента: {content_name}")
             else:
                 error_msg = f"Ошибка загрузки {content_name}"
-                logging.error(f"Некорректный контент возвращён для {content_name}")
+                # logging.error(error_msg)
                 self.current_content = wx.StaticText(self.content_panel, label=error_msg)
+                self.current_content.content_name = content_name
                 self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
         except Exception as e:
             error_msg = f"Ошибка загрузки {content_name}: {str(e)}"
-            logging.error(f"Ошибка переключения на контент {content_name}: {e}")
+            # logging.error(error_msg)
             self.current_content = wx.StaticText(self.content_panel, label=error_msg)
+            self.current_content.content_name = content_name
             self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
 
         self.content_panel.Layout()
         self.content_panel.Refresh()
         self.content_panel.Update()
         self.update_ui(self.settings)
-        logging.info(f"Контент переключён на {content_name}, интерфейс обновлён")
+        # logging.info(f"Контент переключён на {content_name}")
+
+    def on_language_change(self, new_lang: str) -> None:
+        """
+        Обрабатывает смену языка через меню.
+        """
+        if not isinstance(new_lang, str):
+            # logging.info(f"Нестроковый new_lang: {new_lang}, игнорируется")
+            return
+        loc.set_language(new_lang)
+        # logging.info(f"Установлен язык: {new_lang}")
+        self.update_language_icon(new_lang)
+        self.update_ui(self.settings)
+
+        # Попробуем обновить язык текущей панели, если она существует
+        current_content_name = getattr(self.current_content, 'content_name', None) if self.current_content else None
+        if self.current_content and hasattr(self.current_content, 'update_ui_language') and current_content_name:
+            try:
+                if not self.current_content.IsBeingDeleted():
+                    self.current_content.update_ui_language()
+                    # logging.info(f"Язык текущего контента обновлён: {current_content_name}")
+            except Exception as e:
+                # logging.error(f"Ошибка при обновлении языка текущего контента: {e}")
+                show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
+
+        # Пересоздаём панель для полного обновления
+        if current_content_name:
+            # logging.info(f"Пересоздание контента: {current_content_name} с языком {new_lang}")
+            self.switch_content(current_content_name)
+        else:
+            # logging.warning("Текущий контент не определён, обновление только UI главного окна")
+            pass
+
+    def on_change_language(self, event) -> None:
+        """
+        Обрабатывает смену языка через иконку флага.
+        """
+        current_langs = ["ru", "en", "de"]
+        if not isinstance(loc.language, str):
+            # logging.error(f"loc.language не строка: {loc.language}, установка по умолчанию: ru")
+            loc.language = "ru"
+        current_index = current_langs.index(loc.language) if loc.language in current_langs else 0
+        new_index = (current_index + 1) % len(current_langs)
+        new_lang = current_langs[new_index]
+
+        loc.set_language(new_lang)
+        # logging.info(f"Установлен язык: {new_lang}")
+        self.update_language_icon(new_lang)
+        self.update_ui(self.settings)
+
+        # Попробуем обновить язык текущей панели, если она существует
+        current_content_name = getattr(self.current_content, 'content_name', None) if self.current_content else None
+        if self.current_content and hasattr(self.current_content, 'update_ui_language') and current_content_name:
+            try:
+                if not self.current_content.IsBeingDeleted():
+                    self.current_content.update_ui_language()
+                    # logging.info(f"Язык текущего контента обновлён: {current_content_name}")
+            except Exception as e:
+                # logging.error(f"Ошибка при обновлении языка текущего контента: {e}")
+                show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
+
+        # Пересоздаём панель для полного обновления
+        if current_content_name:
+            # logging.info(f"Пересоздание контента: {current_content_name} с языком {new_lang}")
+            self.switch_content(current_content_name)
+        else:
+            # logging.warning("Текущий контент не определён, обновление только UI главного окна")
+            pass
 
     def create_banner(self) -> None:
         """
@@ -577,46 +645,6 @@ class ATMainWindow(wx.Frame):
         logging.info(
             f"Кнопка выхода создана: текст={loc.get('button_exit', 'Выход')}, размер={max_width}x30")
 
-    def on_language_change(self, new_lang: str) -> None:
-        """
-        Обрабатывает смену языка через меню.
-
-        Args:
-            new_lang (str): Новый язык (ru, en, de).
-        """
-        if not isinstance(new_lang, str):
-            logging.error(f"Нестроковый new_lang в on_language_change: {new_lang}, игнорируется")
-            return
-        loc.set_language(new_lang)
-        self.update_language_icon(new_lang)
-        self.update_ui(self.settings)
-        # Отправляем событие смены языка
-        language_event = wx.CommandEvent(wxEVT_LANGUAGE_CHANGE.evtType[0])
-        language_event.SetString(new_lang)
-        wx.PostEvent(self.content_panel, language_event)
-        logging.info(f"Смена языка через меню на: {new_lang}")
-
-    def on_change_language(self, event) -> None:
-        """
-        Обрабатывает смену языка через иконку флага.
-        """
-        current_langs = ["ru", "en", "de"]
-        if not isinstance(loc.language, str):
-            logging.error(
-                f"loc.language не строка в on_change_language: {loc.language}, установка языка по умолчанию: ru")
-            loc.language = "ru"
-        current_index = current_langs.index(loc.language) if loc.language in current_langs else 0
-        new_index = (current_index + 1) % len(current_langs)
-        new_lang = current_langs[new_index]
-        loc.set_language(new_lang)
-        self.update_language_icon(new_lang)
-        self.update_ui(self.settings)
-        # Отправляем событие смены языка
-        language_event = wx.CommandEvent(wxEVT_LANGUAGE_CHANGE.evtType[0])
-        language_event.SetString(new_lang)
-        wx.PostEvent(self.content_panel, language_event)
-        logging.info(f"Смена языка через значок на: {new_lang}")
-
     def update_language_icon(self, new_lang: str) -> None:
         """
         Обновляет иконку флага в баннере.
@@ -625,21 +653,26 @@ class ATMainWindow(wx.Frame):
             new_lang (str): Код языка (ru, en, de).
         """
         if not isinstance(new_lang, str):
-            logging.error(f"Нестроковый new_lang в update_language_icon: {new_lang}, использование языка по умолчанию: ru")
+            logging.error(
+                f"Нестроковый new_lang в update_language_icon: {new_lang}, использование языка по умолчанию: ru")
             new_lang = "ru"
+
         lang_icon_path = os.path.abspath(LANGUAGE_ICONS.get(new_lang, LANGUAGE_ICONS["ru"]))
         if os.path.exists(lang_icon_path):
             try:
                 flag_bitmap = wx.Bitmap(lang_icon_path, wx.BITMAP_TYPE_ANY)
                 if flag_bitmap.IsOk():
                     flag_bitmap = self.scale_bitmap(flag_bitmap, BANNER_HIGH - 10, BANNER_HIGH - 10)
-                    if isinstance(self.flag_button, wx.StaticBitmap):
-                        self.flag_button.SetBitmap(flag_bitmap)
-                    else:
-                        self.flag_button.Destroy()
-                        self.flag_button = wx.StaticBitmap(self.banner_panel, bitmap=flag_bitmap)
-                        self.banner_panel.GetSizer().Replace(self.flag_button, self.flag_button)
-                    self.flag_button.Bind(wx.EVT_LEFT_DOWN, self.on_change_language)
+
+                    # --- главное исправление ---
+                    old_flag = self.flag_button
+                    new_flag = wx.StaticBitmap(self.banner_panel, bitmap=flag_bitmap)
+                    new_flag.Bind(wx.EVT_LEFT_DOWN, self.on_change_language)
+                    self.banner_panel.GetSizer().Replace(old_flag, new_flag)
+                    old_flag.Destroy()
+                    self.flag_button = new_flag
+                    # ---------------------------
+
                     logging.info(f"Иконка флага обновлена: {lang_icon_path}")
                 else:
                     logging.error(f"Недопустимый формат иконки флага: {lang_icon_path}")
@@ -654,26 +687,35 @@ class ATMainWindow(wx.Frame):
         # Обновляем радиокнопки
         for lang, item in self.lang_items.items():
             item.Check(lang == new_lang)
+
         self.banner_panel.Layout()
         self.banner_panel.Refresh()
         self.banner_panel.Update()
 
     def replace_flag_button_with_text(self, new_lang: str) -> None:
         """
-        Заменяет иконку флага на текстовую метку при ошибке загрузки.
-
-        Args:
-            new_lang (str): Код языка (ru, en, de).
+        Заменяет кнопку с флагом текстовой меткой, если иконка не найдена.
         """
-        if not isinstance(new_lang, str):
-            logging.error(f"Нестроковый new_lang в replace_flag_button_with_text: {new_lang}, использование языка по умолчанию: ru")
-            new_lang = "ru"
-        if isinstance(self.flag_button, wx.StaticBitmap):
-            self.flag_button.Destroy()
-        self.flag_button = wx.StaticText(self.banner_panel, label=f"[{new_lang}]")
-        self.banner_panel.GetSizer().Replace(self.flag_button, self.flag_button)
-        self.flag_button.Bind(wx.EVT_LEFT_DOWN, self.on_change_language)
-        logging.info(f"Иконка флага заменена текстом: [{new_lang}]")
+        old_flag = self.flag_button
+        new_flag = wx.StaticText(self.banner_panel, label=new_lang.upper())
+        font = new_flag.GetFont()
+        font.SetPointSize(10)
+        font.SetWeight(wx.FONTWEIGHT_BOLD)
+        new_flag.SetFont(font)
+        new_flag.SetForegroundColour(wx.Colour(0, 0, 0))
+        new_flag.SetCursor(wx.Cursor(wx.CURSOR_HAND))
+        new_flag.Bind(wx.EVT_LEFT_DOWN, self.on_change_language)
+
+        # --- главное исправление ---
+        self.banner_panel.GetSizer().Replace(old_flag, new_flag)
+        old_flag.Destroy()
+        self.flag_button = new_flag
+        # ---------------------------
+
+        logging.info(f"Флаг заменён текстовой меткой: {new_lang.upper()}")
+
+        self.banner_panel.Layout()
+        self.banner_panel.Refresh()
 
     def update_ui(self, settings: dict) -> None:
         """

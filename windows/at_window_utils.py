@@ -21,6 +21,12 @@ from config.at_config import load_user_settings, DEFAULT_SETTINGS, get_setting, 
 from config.at_last_input import save_last_input
 
 # -----------------------------
+# Кастомные события
+# -----------------------------
+LANGUAGE_CHANGE_EVT_TYPE = wx.NewEventType()
+LANGUAGE_CHANGE_EVT = wx.PyEventBinder(LANGUAGE_CHANGE_EVT_TYPE, 1)
+
+# -----------------------------
 # Локальные переводы модуля
 # -----------------------------
 TRANSLATIONS = {

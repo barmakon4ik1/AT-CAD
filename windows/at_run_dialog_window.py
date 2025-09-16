@@ -11,84 +11,57 @@
 import wx
 import logging
 import importlib
+from typing import Union, List, Tuple  # Добавляем импорт Union, List, Tuple
 from windows.at_content_registry import CONTENT_REGISTRY
-from locales.at_localization_class import loc  # Импортируем loc для локализации
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.ERROR,  # Основной уровень логирования для ошибок
-    filename="at_cad.log",
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
+# # Настройка логирования в консоль
+# logging.basicConfig(
+#     level=logging.INFO,
+#     format="%(asctime)s - %(levelname)s - %(message)s",
+#     handlers=[logging.StreamHandler()]
+# )
 
-
-def at_load_content(content_name: str, parent: wx.Window) -> wx.Window | None:
+def load_content(content_name: str, parent: wx.Window) -> Union[List[Tuple[str, str]], wx.Window, None]:
     """
-    Загружает панель контента по имени из CONTENT_REGISTRY.
+    Загружает контент по его имени.
 
     Args:
-        content_name (str): Ключ контента в CONTENT_REGISTRY (например, 'cone', 'content_apps').
-        parent (wx.Window): Родительский wx.Window для создаваемой панели.
+        content_name: Имя контента (например, 'content_apps', 'cone' или 'get_content_menu').
+        parent: Родительский элемент (обычно content_panel).
 
     Returns:
-        wx.Window | None: Созданная панель контента или None, если загрузка не удалась.
+        Union[List[Tuple[str, str]], wx.Window, None]: Список программ для меню или панель контента.
     """
+    logging.info(f"load_content: Попытка загрузки {content_name}")
+    if content_name == "get_content_menu":
+        result = [(name, info.get("label", name)) for name, info in CONTENT_REGISTRY.items()]
+        logging.info(f"load_content: Возвращён список программ: {result}")
+        return result
+
     content_info = CONTENT_REGISTRY.get(content_name)
     if not content_info:
-        logging.error(f"Контент с ключом '{content_name}' не найден в CONTENT_REGISTRY")
+        logging.error(f"Контент {content_name} не найден в CONTENT_REGISTRY")
         return None
 
     try:
-        # Динамически импортируем модуль
-        module_path = content_info["module"]
-        module = importlib.import_module(module_path)
+        module = importlib.import_module(content_info.get("module", ""))
         create_window = getattr(module, "create_window")
-        content = create_window(parent)
-        if not isinstance(content, wx.Window):
-            logging.error(f"Некорректный контент возвращён для {content_name}: ожидался wx.Window")
-            return None
-        logging.info(f"Контент {content_name} успешно загружен из модуля {module_path}")
-        return content
+        panel = create_window(parent)
+        logging.info(f"load_content: Успешно загружен контент {content_name}, тип: {panel.__class__.__name__}")
+        return panel
     except Exception as e:
         logging.error(f"Ошибка загрузки контента {content_name}: {e}")
         return None
 
-
-def load_content(content_key: str, parent: wx.Window) -> list[tuple[str, str]] | wx.Window | None:
+def at_load_content(content_name: str, parent: wx.Window) -> wx.Window | None:
     """
-    Возвращает список пунктов меню контента с локализованными метками или загружает панель контента.
+    Вспомогательная функция для загрузки контента.
 
     Args:
-        content_key (str): Ключ контента (например, 'cone', 'content_apps') или 'get_content_menu' для получения списка меню.
-        parent (wx.Window): Родительский wx.Window для загрузки контента.
+        content_name: Имя контента.
+        parent: Родительский элемент.
 
     Returns:
-        list[tuple[str, str]] | wx.Window | None: Список кортежей (content_name, translated_label) для меню
-        или панель контента (wx.Window) при загрузке контента, или None в случае ошибки.
+        wx.Window | None: Панель контента или None при ошибке.
     """
-    if content_key == "get_content_menu":
-        # Формируем список пунктов меню с локализованными метками
-        menu_items = []
-        for name, info in CONTENT_REGISTRY.items():
-            if name != "content_apps":  # Исключаем content_apps из меню
-                label_key = info.get("label", name)  # Используем ключ локализации или имя как запасной вариант
-                # Проверяем, является ли label_key словарем, и извлекаем строку, если возможно
-                if isinstance(label_key, dict):
-                    logging.warning(f"Получен словарь вместо строки для label_key в CONTENT_REGISTRY для {name}: {label_key}")
-                    label_key = label_key.get('key', name)  # Извлекаем строковый ключ или используем имя
-                # Получаем переведённую метку, возвращаем имя, если перевод отсутствует
-                translated_label = loc.get(label_key, name)
-                # Проверяем, что translated_label — строка
-                if not isinstance(translated_label, str):
-                    logging.warning(f"Нестроковый перевод для ключа '{label_key}': {translated_label}, использование имени контента: {name}")
-                    translated_label = name
-                if translated_label == label_key:
-                    logging.warning(f"Перевод для ключа '{label_key}' не найден в translations, использовано имя контента: {name}")
-                else:
-                    logging.info(f"Локализованная метка для {name}: {translated_label}")
-                menu_items.append((name, translated_label))
-        return menu_items
-    else:
-        # Перенаправляем на at_load_content для загрузки панели
-        logging.warning(f"load_content вызван с content_key='{content_key}', перенаправление на at_load_content")
-        return at_load_content(content_key, parent)
+    return load_content(content_name, parent)
