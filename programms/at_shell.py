@@ -6,6 +6,8 @@ programms/at_shell.py
 import math
 from typing import Dict
 
+from django.template.defaultfilters import length
+
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programms.at_base import regen
@@ -76,9 +78,11 @@ def at_shell(data: Dict[str, any]) -> bool:
         length = data.get("length", 0.0)
         a_deg = data.get("angle", 0.0)
         clockwise = data.get("clockwise", False)
+        axis = data.get("axis", True)
+        axis_marks = data.get("axis_marks", 0.0)
         layer_name = data.get("layer_name", "0")
-        weld_allowance_top = data.get("weld_allowance_top", False)
-        weld_allowance_bottom = data.get("weld_allowance_bottom", False)
+        weld_allowance_top = data.get("weld_allowance_top", 0.0)
+        weld_allowance_bottom = data.get("weld_allowance_bottom", 0.0)
 
         # Проверяем insert_point
         if not isinstance(insert_point, (list, tuple)) or len(insert_point) != 3:
@@ -88,56 +92,100 @@ def at_shell(data: Dict[str, any]) -> bool:
         data["insert_point"] = insert_point  # Обновляем в data
         
         width = math.pi * diameter
+        length_full = length + weld_allowance_top + weld_allowance_bottom
        
         # Нарисовать прямоугольник развертки
-        add_rectangle(model, insert_point, width, length, layer_name=layer_name)
-    
-        # Получить точки для углов на развертке цилиндра
-        points = get_unwrapped_points(D=diameter, L=length, A_deg=a_deg, clockwise=clockwise)
-    
+        add_rectangle(model, insert_point, width, length_full, layer_name=layer_name)
+
         # Точки для размерных линий
-        end_point = offset_point(insert_point, width, length)
-        top_point = offset_point(insert_point, 0, length)
-        left_bottom = ensure_point_variant(insert_point)
+        rect_top_right = offset_point(insert_point, width, length_full)
+        rect_top_left = offset_point(insert_point, 0, length_full)
+        rect_bottom_left = ensure_point_variant(insert_point)
 
-        # Размеры
-        add_dimension(adoc, "H", top_point, end_point, offset=DEFAULT_DIM_OFFSET * 2)
-        add_dimension(adoc, "V", left_bottom, top_point, offset=DEFAULT_DIM_OFFSET)
+        # Размеры габаритные
+        add_dimension(adoc, "H", rect_top_left, rect_top_right, offset=DEFAULT_DIM_OFFSET * 2 + 20)
+        add_dimension(adoc, "V", rect_bottom_left, rect_top_left, offset=DEFAULT_DIM_OFFSET)
 
-        drawn_x = set()  # будем помнить, какие линии уже проведены
-        # Отрисовка осей
-        for angle, x, y in points:
-            # пропускаем 360°, чтобы не дублировать 0°
-            if angle == 360:
-                continue
-    
-            base_x = insert_point[0] + x
-            base_y = insert_point[1] + y
-    
-            # если по этому X линия уже нарисована – пропускаем
-            if round(base_x, 6) in drawn_x:
-                continue
-            drawn_x.add(round(base_x, 6))
-    
-            point1 = [base_x, base_y]
-            point2 = [base_x, base_y + length]
-            point_text = [base_x, base_y - 60]
-            point_text2 = [base_x + width, base_y - 60]
+        if axis:
+            drawn_x = set()  # будем помнить, какие линии уже проведены
 
-            # Форматируем угол: если целое — без дробной части, иначе с одной
-            angle_text = f"{int(angle)}°" if angle.is_integer() else f"{angle:.1f}°"
-    
-            if angle == a_deg:
-                # правая граница: только подпись (слева и справа)
-                add_text(model, point_text, angle_text, layer_name="AM_5")
-                add_text(model, point_text2, angle_text, layer_name="AM_5")
-    
-            else:
-                # остальные углы: линия + подпись
-                add_line(model, point1, point2, layer_name="AM_5")
-                add_text(model, point_text, angle_text, layer_name="AM_5")
-    
-            # print(f"Угол: {angle:.1f}°, X: {base_x:>7.2f}, Y: {base_y}")
+            # Получить точки для углов осей на развертке цилиндра
+            points = get_unwrapped_points(D=diameter, L=length, A_deg=a_deg, clockwise=clockwise)
+
+            # Массив для верхних точек осей (для размеров типа H)
+            top_axis_points = []
+
+            # заранее вычисляем X-координаты краёв рамки
+            rect_top_left_v = ensure_point_variant(rect_top_left)
+            rect_top_right_v = ensure_point_variant(rect_top_right)
+            left_edge_x = float(rect_top_left_v.value[0])
+            right_edge_x = float(rect_top_right_v.value[0])
+            edge_tol = 1e-6
+
+            # Отрисовка осей и меток в одном цикле
+            for angle, x, y in points:
+                # пропускаем 360°, чтобы не дублировать 0°
+                if angle == 360:
+                    continue
+
+                base_x = insert_point[0] + x
+                base_y = insert_point[1] + y
+
+                # если по этому X линия уже нарисована – пропускаем
+                if round(base_x, 6) in drawn_x:
+                    continue
+                drawn_x.add(round(base_x, 6))
+
+                point1 = [base_x, base_y]
+                point2 = [base_x, base_y + length_full]
+                point_text = [base_x, base_y - 60]
+                point_text2 = [base_x + width, base_y - 60]
+
+                # Форматируем угол: если целое — без дробной части, иначе с одной
+                angle_text = f"{int(angle)}°" if angle.is_integer() else f"{angle:.1f}°"
+
+                if angle == a_deg:
+                    # правая граница: только подпись (слева и справа)
+                    add_text(model, point_text, angle_text, layer_name="AM_5")
+                    add_text(model, point_text2, angle_text, layer_name="AM_5")
+                else:
+                    # остальные углы: линия + подпись
+                    add_line(model, point1, point2, layer_name="AM_5")
+                    add_text(model, point_text, angle_text, layer_name="AM_5")
+
+                    # собираем верхние точки для размеров
+                    top_axis_points.append(point2)
+
+                # --- Метки (только если задано axis_marks и это не граница прямоугольника) ---
+                if axis_marks > 0 and not (
+                        math.isclose(base_x, left_edge_x, abs_tol=edge_tol) or
+                        math.isclose(base_x, right_edge_x, abs_tol=edge_tol)
+                ):
+                    # снизу
+                    add_line(model, [base_x, base_y], [base_x, base_y + axis_marks], layer_name="LASER-TEXT")
+                    # сверху
+                    top_y = base_y + length_full
+                    add_line(model, [base_x, top_y], [base_x, top_y - axis_marks], layer_name="LASER-TEXT")
+
+            # --- Теперь проставляем размеры H между верхними точками осей ---
+            if len(top_axis_points) >= 1:
+                top_axis_points.sort(key=lambda p: p[0])
+
+                # --- крайний размер: от левого угла прямоугольника до первой оси ---
+                left_top_corner = ensure_point_variant(rect_top_left)
+                first_axis = ensure_point_variant(top_axis_points[0])
+                add_dimension(adoc, "H", left_top_corner, first_axis, offset=DEFAULT_DIM_OFFSET)
+
+                # --- промежуточные размеры ---
+                for i in range(len(top_axis_points) - 1):
+                    p1 = ensure_point_variant(top_axis_points[i])
+                    p2 = ensure_point_variant(top_axis_points[i + 1])
+                    add_dimension(adoc, "H", p1, p2, offset=DEFAULT_DIM_OFFSET)
+
+                # --- крайний размер: от последней оси до правого угла прямоугольника ---
+                right_top_corner = ensure_point_variant(rect_top_right)
+                last_axis = ensure_point_variant(top_axis_points[-1])
+                add_dimension(adoc, "H", last_axis, right_top_corner, offset=DEFAULT_DIM_OFFSET)
 
         # Формирование текста для меток
         k_text = f"{order_number}"
@@ -197,16 +245,18 @@ def at_shell(data: Dict[str, any]) -> bool:
 
 if __name__ == "__main__":
     input_data = {
-        "insert_point": [0.0, 0.0, 0.0],
-        "diameter": 500,
-        "length": 1000,
-        "angle": 30,
-        "clockwise": False,
+        "insert_point": [-2000.0, 0.0, 0.0],
+        "diameter": 846,
+        "length": 900,
+        "angle": 270,
+        "clockwise": True,
+        "axis": True,
+        "axis_marks": 10.0,
         "layer_name": "0",
         "thickness": "4.0",
-        "order_number": "12345",
-        "detail_number": "1",
-        "weld_allowance_top": 1.0,
-        "weld_allowance_bottom": 1.0
+        "order_number": "K20196",
+        "detail_number": "2-1",
+        "weld_allowance_top": 0.0,
+        "weld_allowance_bottom": 0.0
     }
     at_shell(input_data)

@@ -74,7 +74,6 @@ def ensure_point_variant(point: Union[List[float], Tuple[float, ...], VARIANT]) 
         return point
     return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, tuple(map(float, (list(point) + [0, 0, 0])[:3])))
 
-
 @handle_errors
 def calculate_angles(angle: int, unit: int, A: Tuple[float, float], B: Tuple[float, float],
                     C: Tuple[float, float]) -> Union[float, Tuple[float, float, float]]:
@@ -381,7 +380,7 @@ def convert_to_variant_points(polyline_list: List[List[float]]) -> List:
     return [ensure_point_variant([x, y, 0.0]) for x, y in polyline_list]
 
 
-def get_unwrapped_points(D, L, A_deg, clockwise=False):
+def get_unwrapped_points(D, L, A_deg, clockwise=True):
     """
     Возвращает список (угол, x, y) вдоль развертки цилиндра.
 
@@ -403,8 +402,8 @@ def get_unwrapped_points(D, L, A_deg, clockwise=False):
     A = A_deg % 360
 
     # Выбор правил в зависимости от направления
-    distance = (lambda a1, a2: (a1 - a2) % 360) if not clockwise else (lambda a1, a2: (a2 - a1) % 360)
-    shift    = (lambda ang: (A - ang) % 360)    if not clockwise else (lambda ang: (ang - A) % 360)
+    distance = (lambda a1, a2: (a1 - a2) % 360) if clockwise else (lambda a1, a2: (a2 - a1) % 360)
+    shift    = (lambda ang: (A - ang) % 360)    if clockwise else (lambda ang: (ang - A) % 360)
 
     # Определить набор углов
     marked_angles = sorted(set(base_angles + [A]), key=lambda ang: distance(A, ang))
