@@ -16,7 +16,6 @@
 
 import math
 from typing import Optional, List, Tuple, Union, Dict
-from pyautocad import APoint
 
 from config.at_cad_init import ATCadInit
 from programms.at_input import at_point_input
@@ -185,12 +184,12 @@ def find_intersection_points(pt1: Tuple[float, float], r1: float,
     return [(px1, py1), (px2, py2)]
 
 
-def add_rectangle_points(point: APoint, width: float, height: float, point_direction: str = "left_bottom") -> VARIANT:
+def add_rectangle_points(point:Union[List[float], Tuple[float, ...], VARIANT], width: float, height: float, point_direction: str = "left_bottom") -> VARIANT:
     """
     Вычисляет координаты точек прямоугольника и возвращает COM VARIANT.
 
     Args:
-        point: Начальная точка (APoint или VARIANT).
+        point: Начальная точка (VARIANT).
         width: Ширина прямоугольника.
         height: Высота прямоугольника.
         point_direction: Позиция точки относительно прямоугольника
