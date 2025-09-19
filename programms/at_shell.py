@@ -1,13 +1,31 @@
 """
-programms/at_shell.py
-Программа отрисовки развертки цилиндра с нанесением осей, текста и размеров
+File: programms/at_shell.py
+Назначение: Построение развертки цилиндра (оболочки)
+с нанесением осей, текстов и размеров в AutoCAD
 """
+
+# ============================================================
+# Пример схемы развертки цилиндра (вид сверху):
+#
+#   ^ длина (L)
+#   |
+#   |
+#   +------------------------------------------+
+#   |                                          |
+#   |   |      |      |      |      |      |   |  <- оси (углы)
+#   |                                          |
+#   +------------------------------------------+  -> ширина = π*D
+#
+#   * Сверху и снизу могут быть припуски на сварку
+#   * Вдоль ширины ставятся подписи углов (0°, 45°, 90° ... A°)
+#   * Добавляются габаритные размеры H (по горизонтали) и V (по вертикали)
+#   * Снизу выводятся гравировка (LASER-TEXT) и маркировка (schrift)
+#
+# ============================================================
+
 
 import math
 from typing import Dict
-
-from django.template.defaultfilters import length
-
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programms.at_base import regen
@@ -42,38 +60,60 @@ TRANSLATIONS = {
         "en": "Error adding text {0} ({1}): {2}"
     }
 }
-# Регистрируем переводы сразу при загрузке модуля
+# Регистрируем переводы при загрузке модуля
 loc.register_translations(TRANSLATIONS)
 
 
 def at_shell(data: Dict[str, any]) -> bool:
     """
-    Функция построения развертки оболочки/цилиндра
-    :return: 
+    Основная функция для построения развертки цилиндра (оболочки).
+
+    Параметры:
+        data (dict): словарь исходных данных, содержащий:
+            - insert_point (list/tuple): точка вставки [x, y, z]
+            - diameter (float): диаметр цилиндра
+            - length (float): длина цилиндра
+            - angle (float): угол развертки в градусах
+            - clockwise (bool): направление развертки
+            - axis (bool): рисовать ли оси
+            - axis_marks (float): длина меток осей
+            - layer_name (str): имя слоя для отрисовки
+            - thickness (float|str): толщина детали
+            - order_number (str): номер заказа
+            - detail_number (str): номер детали
+            - weld_allowance_top (float): припуск сварки сверху
+            - weld_allowance_bottom (float): припуск сварки снизу
+
+    Возвращает:
+        bool: True при успешном построении, иначе None.
     """
-    try:     
-        # Инициализация AutoCAD
+    try:
+        # --- Инициализация AutoCAD ---
         cad = ATCadInit()
         adoc = cad.document
         model = cad.model
-        
-        # Проверка данных
+
+        # --- Проверка входных данных ---
         if not data:
-            show_popup(loc.get("no_data_error", "Данные не введены"), popup_type="error")
+            show_popup(loc.get("no_data_error"), popup_type="error")
             return None
-        
-        # Извлекаем данные
+
+        # Проверяем наличие обязательных ключей
         required_keys = ["insert_point", "diameter", "length", "angle", "clockwise"]
         for key in required_keys:
             if key not in data or data[key] is None:
-                show_popup(loc.get("no_data_error", f"Missing or None value for key: {key}"), popup_type="error")
+                show_popup(
+                    loc.get("no_data_error", f"Missing or None value for key: {key}"),
+                    popup_type="error"
+                )
                 return None
-        
+
+        # --- Извлечение параметров ---
         insert_point = data.get("insert_point")
         material = data.get("material", "")
         thickness = float(data.get("thickness", 0.0))
         order_number = data.get("order_number", "")
-        detail_number = data.get("detail_number", "")       
+        detail_number = data.get("detail_number", "")
         diameter = data.get("diameter", 0.0)
         length = data.get("length", 0.0)
         a_deg = data.get("angle", 0.0)
@@ -84,54 +124,48 @@ def at_shell(data: Dict[str, any]) -> bool:
         weld_allowance_top = data.get("weld_allowance_top", 0.0)
         weld_allowance_bottom = data.get("weld_allowance_bottom", 0.0)
 
-        # Проверяем insert_point
+        # --- Проверяем точку вставки ---
         if not isinstance(insert_point, (list, tuple)) or len(insert_point) != 3:
-            show_popup(loc.get("invalid_point_format", "Точка вставки должна быть [x, y, 0]"), popup_type="error")
+            show_popup(loc.get("invalid_point_format"), popup_type="error")
             return None
-        insert_point = list(map(float, insert_point[:3]))  # Берём [x, y, z]
-        data["insert_point"] = insert_point  # Обновляем в data
-        
-        width = math.pi * diameter
+        insert_point = list(map(float, insert_point[:3]))
+        data["insert_point"] = insert_point  # обновляем
+
+        # --- Расчёт габаритов ---
+        width = math.pi * diameter  # длина окружности
         length_full = length + weld_allowance_top + weld_allowance_bottom
-       
-        # Нарисовать прямоугольник развертки
+
+        # --- Построение прямоугольника развертки ---
         add_rectangle(model, insert_point, width, length_full, layer_name=layer_name)
 
-        # Точки для размерных линий
+        # --- Точки для размеров ---
         rect_top_right = offset_point(insert_point, width, length_full)
         rect_top_left = offset_point(insert_point, 0, length_full)
         rect_bottom_left = ensure_point_variant(insert_point)
 
-        # Размеры габаритные
+        # --- Габаритные размеры ---
         add_dimension(adoc, "H", rect_top_left, rect_top_right, offset=DEFAULT_DIM_OFFSET * 2 + 20)
         add_dimension(adoc, "V", rect_bottom_left, rect_top_left, offset=DEFAULT_DIM_OFFSET)
 
+        # --- Отрисовка осей ---
         if axis:
-            drawn_x = set()  # будем помнить, какие линии уже проведены
-
-            # Получить точки для углов осей на развертке цилиндра
+            drawn_x = set()
             points = get_unwrapped_points(D=diameter, L=length, A_deg=a_deg, clockwise=clockwise)
-
-            # Массив для верхних точек осей (для размеров типа H)
             top_axis_points = []
 
-            # заранее вычисляем X-координаты краёв рамки
-            rect_top_left_v = ensure_point_variant(rect_top_left)
-            rect_top_right_v = ensure_point_variant(rect_top_right)
-            left_edge_x = float(rect_top_left_v.value[0])
-            right_edge_x = float(rect_top_right_v.value[0])
+            # координаты краёв рамки
+            left_edge_x = float(ensure_point_variant(rect_top_left).value[0])
+            right_edge_x = float(ensure_point_variant(rect_top_right).value[0])
             edge_tol = 1e-6
 
-            # Отрисовка осей и меток в одном цикле
             for angle, x, y in points:
-                # пропускаем 360°, чтобы не дублировать 0°
                 if angle == 360:
-                    continue
+                    continue  # избегаем дублирования 0°
 
                 base_x = insert_point[0] + x
                 base_y = insert_point[1] + y
 
-                # если по этому X линия уже нарисована – пропускаем
+                # если по этому X линия уже нарисована
                 if round(base_x, 6) in drawn_x:
                     continue
                 drawn_x.add(round(base_x, 6))
@@ -141,22 +175,20 @@ def at_shell(data: Dict[str, any]) -> bool:
                 point_text = [base_x, base_y - 60]
                 point_text2 = [base_x + width, base_y - 60]
 
-                # Форматируем угол: если целое — без дробной части, иначе с одной
+                # текст угла
                 angle_text = f"{int(angle)}°" if angle.is_integer() else f"{angle:.1f}°"
 
                 if angle == a_deg:
-                    # правая граница: только подпись (слева и справа)
+                    # правая граница
                     add_text(model, point_text, angle_text, layer_name="AM_5")
                     add_text(model, point_text2, angle_text, layer_name="AM_5")
                 else:
-                    # остальные углы: линия + подпись
+                    # ось
                     add_line(model, point1, point2, layer_name="AM_5")
                     add_text(model, point_text, angle_text, layer_name="AM_5")
-
-                    # собираем верхние точки для размеров
                     top_axis_points.append(point2)
 
-                # --- Метки (только если задано axis_marks и это не граница прямоугольника) ---
+                # --- Метки на оси ---
                 if axis_marks > 0 and not (
                         math.isclose(base_x, left_edge_x, abs_tol=edge_tol) or
                         math.isclose(base_x, right_edge_x, abs_tol=edge_tol)
@@ -167,38 +199,33 @@ def at_shell(data: Dict[str, any]) -> bool:
                     top_y = base_y + length_full
                     add_line(model, [base_x, top_y], [base_x, top_y - axis_marks], layer_name="LASER-TEXT")
 
-            # --- Теперь проставляем размеры H между верхними точками осей ---
+            # --- Размеры между осями ---
             if len(top_axis_points) >= 1:
                 top_axis_points.sort(key=lambda p: p[0])
 
-                # --- крайний размер: от левого угла прямоугольника до первой оси ---
-                left_top_corner = ensure_point_variant(rect_top_left)
-                first_axis = ensure_point_variant(top_axis_points[0])
-                add_dimension(adoc, "H", left_top_corner, first_axis, offset=DEFAULT_DIM_OFFSET)
+                # от левого края до первой оси
+                add_dimension(adoc, "H", ensure_point_variant(rect_top_left),
+                              ensure_point_variant(top_axis_points[0]), offset=DEFAULT_DIM_OFFSET)
 
-                # --- промежуточные размеры ---
+                # промежуточные
                 for i in range(len(top_axis_points) - 1):
-                    p1 = ensure_point_variant(top_axis_points[i])
-                    p2 = ensure_point_variant(top_axis_points[i + 1])
-                    add_dimension(adoc, "H", p1, p2, offset=DEFAULT_DIM_OFFSET)
+                    add_dimension(adoc, "H",
+                                  ensure_point_variant(top_axis_points[i]),
+                                  ensure_point_variant(top_axis_points[i + 1]),
+                                  offset=DEFAULT_DIM_OFFSET)
 
-                # --- крайний размер: от последней оси до правого угла прямоугольника ---
-                right_top_corner = ensure_point_variant(rect_top_right)
-                last_axis = ensure_point_variant(top_axis_points[-1])
-                add_dimension(adoc, "H", last_axis, right_top_corner, offset=DEFAULT_DIM_OFFSET)
+                # от последней оси до правого края
+                add_dimension(adoc, "H", ensure_point_variant(top_axis_points[-1]),
+                              ensure_point_variant(rect_top_right), offset=DEFAULT_DIM_OFFSET)
 
-        # Формирование текста для меток
+        # --- Формирование текста ---
         k_text = f"{order_number}"
-        f_text = k_text
-        if detail_number:
-            f_text += f"-{detail_number}"
-        text_ab = TEXT_DISTANCE
-        text_h = TEXT_HEIGHT_BIG
-        text_s = TEXT_HEIGHT_SMALL
+        f_text = k_text if not detail_number else f"{k_text}-{detail_number}"
+
         text_point = polar_point(insert_point, 100, 45, as_variant=False)
 
-        # Список текстов для добавления
         text_configs = [
+            # Гравировка
             {
                 "point": ensure_point_variant(text_point),
                 "text": k_text,
@@ -206,44 +233,46 @@ def at_shell(data: Dict[str, any]) -> bool:
                 "text_height": 7,
                 "text_angle": 0,
                 "text_alignment": 12
-            },  # Гравировка
+            },
+            # Маркировка
             {
                 "point": ensure_point_variant(polar_point(text_point, distance=60, alpha=90, as_variant=False)),
                 "text": f_text,
                 "layer_name": "schrift",
-                "text_height": text_s,
+                "text_height": TEXT_HEIGHT_SMALL,
                 "text_angle": 0,
                 "text_alignment": 12
-            }  # Маркировка
+            }
         ]
 
-        # Добавление текстов
+        # --- Добавление текстов ---
         for i, config in enumerate(text_configs):
             try:
-                add_text(
-                    model=model,
-                    point=config["point"],
-                    text=config["text"],
-                    layer_name=config["layer_name"],
-                    text_height=config["text_height"],
-                    text_angle=config["text_angle"],
-                    text_alignment=config["text_alignment"]
-                )
+                add_text(model, **config)
             except Exception as e:
                 show_popup(
-                    loc.get("text_error_details", f"Ошибка добавления текста {i + 1} ({config['text']}): {str(e)}").format(i + 1, config['text'], str(e)),
+                    loc.get(
+                        "text_error_details",
+                        f"Ошибка добавления текста {i + 1} ({config['text']}): {str(e)}"
+                    ).format(i + 1, config['text'], str(e)),
                     popup_type="error"
                 )
                 return None
-    
+
+        # --- Обновляем документ ---
         regen(adoc)
         return True
+
     except Exception as e:
-        show_popup(loc.get("build_error", f"Ошибка построения: {str(e)}").format(str(e)), popup_type="error")
+        show_popup(
+            loc.get("build_error", f"Ошибка построения: {str(e)}").format(str(e)),
+            popup_type="error"
+        )
         return None
 
 
 if __name__ == "__main__":
+    # Пример данных для тестирования
     input_data = {
         "insert_point": [-2000.0, 0.0, 0.0],
         "diameter": 846,

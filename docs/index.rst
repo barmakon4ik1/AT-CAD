@@ -7,15 +7,22 @@ AT-CAD Documentation
 
 Здесь вы найдёте описание модулей, классов и функций.
 
-.. toctree::
-   :maxdepth: 2
-   :caption: API Reference
-
-   modules
-
 Указатели и таблицы
 ===================
 
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API Reference
+
+   modules
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Дополнительно
+
+   todo
