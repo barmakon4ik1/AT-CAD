@@ -1,0 +1,47 @@
+/* Шрифты и базовые цвета */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: #333;
+}
+
+/* Заголовки */
+h1, h2, h3, h4, h5 {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+/* Код */
+.literal-block, pre {
+    background-color: #f7f7f7;
+    border-left: 4px solid #4CAF50;
+    padding: 8px;
+    overflow-x: auto;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    border-radius: 4px;
+}
+
+/* Блоки предупреждений и заметок */
+.admonition {
+    border-left: 4px solid #f39c12;
+    padding: 8px 12px;
+    background-color: #fffbe6;
+    border-radius: 4px;
+}
+
+/* Ссылки */
+a {
+    color: #1a73e8;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+
+
+/* Ссылки чуть плавнее */
+a {
+    transition: color 0.2s;
+}
