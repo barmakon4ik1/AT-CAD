@@ -274,6 +274,7 @@ def at_nozzle(data: Dict[str, Any]) -> bool:
 
         if axis:
             build_axes(model, insert_point, width, generatrix_length, accuracy)
+        if axis_marks > 0:
             build_axis_marks(model, insert_point, width, generatrix_length, accuracy, axis_marks)
 
         build_dimensions(adoc, insert_point, width, generatrix_length, accuracy, rights_bottom_point)
@@ -339,7 +340,7 @@ if __name__ == "__main__":
         "diameter": 150,
         "diameter_main": 300,
         "length": 250,
-        "axis": True,
+        "axis": False,
         "axis_marks": 10,
         "layer_name": "0",
         "thickness": "4.0",
