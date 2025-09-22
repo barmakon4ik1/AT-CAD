@@ -285,11 +285,7 @@ class ATMainWindow(wx.Frame):
             content_name (str): Имя контента для отображения.
         """
         if not isinstance(content_name, str):
-            # logging.warning(f"Нестроковый content_name: {content_name}, преобразование в строку")
             content_name = str(content_name)
-
-        # logging.info(
-        #     f"Переключение на контент: {content_name}, текущий контент: {self.current_content.__class__.__name__ if self.current_content else None}")
 
         # Очищаем текущий контент
         if self.current_content:
@@ -300,10 +296,36 @@ class ATMainWindow(wx.Frame):
         try:
             new_content = at_load_content(content_name, self.content_panel)
             print(f"[DEBUG] switch_content загрузил {type(new_content)}")
+
             if new_content and isinstance(new_content, wx.Window):
                 self.current_content = new_content
                 self.current_content.content_name = content_name
                 self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
+
+                # 🔹 Привязываем callback для отправки данных в build_module
+                if hasattr(self.current_content, "on_submit_callback"):
+                    def on_submit(data):
+                        from windows.at_content_registry import CONTENT_REGISTRY
+                        import importlib
+
+                        content_info = CONTENT_REGISTRY.get(content_name)
+                        if not content_info or "build_module" not in content_info:
+                            print(f"[DEBUG] Нет build_module для {content_name}")
+                            return False
+
+                        try:
+                            build_module = importlib.import_module(content_info["build_module"])
+                            build_func = getattr(build_module, "main", None)
+                            if build_func:
+                                print(f"[DEBUG] Запуск build_func из {content_info['build_module']} для {content_name}")
+                                return build_func(data)
+                            else:
+                                print(f"[DEBUG] В {content_info['build_module']} нет функции main")
+                        except Exception as e:
+                            print(f"[DEBUG] Ошибка при импорте/вызове {content_name}: {e}")
+                        return False
+
+                    self.current_content.on_submit_callback = on_submit
 
                 # 🔹 форсируем обновление языка для новой панели
                 if hasattr(new_content, 'update_ui_language'):
@@ -311,13 +333,11 @@ class ATMainWindow(wx.Frame):
 
             else:
                 error_msg = f"Ошибка загрузки {content_name}"
-                # logging.error(error_msg)
                 self.current_content = wx.StaticText(self.content_panel, label=error_msg)
                 self.current_content.content_name = content_name
                 self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
         except Exception as e:
             error_msg = f"Ошибка загрузки {content_name}: {str(e)}"
-            # logging.error(error_msg)
             self.current_content = wx.StaticText(self.content_panel, label=error_msg)
             self.current_content.content_name = content_name
             self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
@@ -326,7 +346,6 @@ class ATMainWindow(wx.Frame):
         self.content_panel.Refresh()
         self.content_panel.Update()
         self.update_ui(self.settings)
-        # logging.info(f"Контент переключён на {content_name}")
 
     def on_language_change(self, new_lang: str) -> None:
         print(f"[DEBUG] on_language_change вызван, язык={new_lang}")

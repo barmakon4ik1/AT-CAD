@@ -382,7 +382,7 @@ class PlateContentPanel(BaseContentPanel):
         self.labels["allowance"].SetLabel(loc.get("allowance_label", "Отступ от края, мм"))
 
         # Обновляем метки кнопок: ОК, Отмена, Очистить
-        for i, key in enumerate(["ok_button", "cancel_button", "clear_button"]):
+        for i, key in enumerate(["ok_button", "clear_button", "cancel_button"]):
             self.buttons[i].SetLabel(loc.get(key, ["ОК", "Возврат", "Очистить"][i]))
         adjust_button_widths(self.buttons)
 
