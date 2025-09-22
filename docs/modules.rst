@@ -1,4 +1,4 @@
-Modules Documentation
+﻿Modules Documentation
 =====================
 
 .. toctree::
@@ -40,13 +40,13 @@ Modules Documentation
     :show-inheritance:
 
 
-.. automodule:: locales.at_localization_class
+.. automodule:: locales.at_localization
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: locales.at_localization
+.. automodule:: locales.at_localization_class
     :members:
     :undoc-members:
     :show-inheritance:

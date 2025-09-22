@@ -1,14 +1,21 @@
 """
-windows/content_apps.py
+Файл: windows/content_apps.py
+
 Модуль для создания панели со списком доступных программ.
-Отображает текстовые ссылки на программы в один столбец.
+Эта панель отображает текстовые ссылки (StaticText) в один столбец.
+При клике на ссылку управление передаётся главному окну ATMainWindow,
+которое вызывает switch_content и переключает отображаемый контент.
+
+Особенности:
+- Панель не создаёт вложенные панели самостоятельно.
+- Все панели-контенты равноправные: их создание и переключение управляется ATMainWindow.
+- Локализация текста выполняется через loc.get и словарь TRANSLATIONS.
 """
+
 import logging
-import sys
 import wx
-import importlib
 from windows.at_window_utils import BaseContentPanel, get_link_font
-from windows.at_run_dialog_window import at_load_content, load_content
+from windows.at_run_dialog_window import load_content
 from locales.at_translations import loc
 
 # -----------------------------
@@ -49,55 +56,46 @@ TRANSLATIONS = {
 # Регистрируем переводы сразу при загрузке модуля
 loc.register_translations(TRANSLATIONS)
 
-# # Настройка логирования в консоль
-# print("Инициализация логирования в content_apps.py")
-# logging.getLogger().handlers = []
-# logging.getLogger().setLevel(logging.INFO)
-# handler = logging.StreamHandler(sys.stdout)
-# handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-# logging.getLogger().addHandler(handler)
-# print(f"content_apps.py: sys.stdout = {sys.stdout}")
-# # Дополнительная проверка записи в sys.stdout
-# try:
-#     sys.stdout.write("Проверка прямого вывода в sys.stdout из content_apps.py\n")
-#     sys.stdout.flush()
-# except Exception as e:
-#     print(f"content_apps.py: Ошибка записи в sys.stdout: {e}")
 
 def create_window(parent: wx.Window) -> wx.Panel:
     """
-    Создаёт панель со списком программ в виде текстовых ссылок.
+    Фабричная функция для создания панели со списком программ.
 
     Args:
-        parent: Родительский wx.Window (content_panel из ATMainWindow).
+        parent (wx.Window): Родительская панель (обычно content_panel в ATMainWindow).
 
     Returns:
-        wx.Panel: Панель со списком программ.
+        wx.Panel: Инициализированный экземпляр AppsContentPanel.
     """
     return AppsContentPanel(parent)
+
 
 class AppsContentPanel(BaseContentPanel):
     """
     Панель для отображения списка программ в виде текстовых ссылок.
+    Эта панель всегда живёт в главном окне как самостоятельный контент.
+
+    Атрибуты:
+        content_name (str): Имя контента (используется в CONTENT_REGISTRY).
+        links (list): Список ссылок (wx.StaticText), добавленных в панель.
     """
     content_name = "content_apps"
 
-    def __init__(self, parent):
+    def __init__(self, parent: wx.Window):
         """
-        Инициализирует панель со списком программ.
+        Инициализирует панель приложений.
 
         Args:
-            parent: Родительский wx.Window.
+            parent (wx.Window): Родительский элемент интерфейса.
         """
         super().__init__(parent)
         self.links = []
-        self.current_panel = None
         self.setup_ui()
         logging.info(f"AppsContentPanel: UI инициализирован с языком {loc.language}")
 
     def setup_ui(self):
         """
-        Настраивает интерфейс с текстовыми ссылками в один столбец.
+        Строит интерфейс панели: добавляет список ссылок на доступные программы.
         """
         if self.GetSizer():
             self.GetSizer().Clear(True)
@@ -107,10 +105,12 @@ class AppsContentPanel(BaseContentPanel):
         main_sizer.AddSpacer(20)
 
         link_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Получаем список доступных программ из CONTENT_REGISTRY через load_content
         programs = load_content("get_content_menu", self) or []
         logging.info(f"AppsContentPanel: Получены программы: {programs}")
 
-        # Фильтруем content_apps из списка
+        # Исключаем саму панель content_apps
         filtered_programs = [(name, label_key) for name, label_key in programs if name != "content_apps"]
         logging.info(f"AppsContentPanel: Отфильтрованные программы: {filtered_programs}")
 
@@ -139,58 +139,28 @@ class AppsContentPanel(BaseContentPanel):
         self.GetParent().Refresh()
         logging.info(f"AppsContentPanel: UI настроен с языком {loc.language}")
 
+    def update_ui_language(self):
+        """
+        Обновляет тексты интерфейса при смене языка.
+        Пересобирает список ссылок с новыми переводами.
+        """
+        print("[DEBUG] AppsContentPanel.update_ui_language вызван")
+        self.setup_ui()
+
     def on_link_click(self, content_name: str):
         """
-        Обрабатывает клик по ссылке, загружая панель контента и вызывая программу построения.
+        Обрабатывает клик по ссылке и передаёт управление главному окну.
 
         Args:
-            content_name: Имя модуля контента для загрузки (например, 'rings').
+            content_name (str): Имя модуля контента для загрузки (например, 'cone').
         """
-        parent = self.GetParent()
-        sizer = parent.GetSizer()
-        if sizer:
-            sizer.Clear(True)
-
-        if content_name == "rings":
-            from windows.content_rings import create_window as create_rings_window
-            panel = create_rings_window(parent)
+        print(f"[DEBUG] on_link_click: content_name={content_name}")
+        main_window = wx.GetTopLevelParent(self)
+        if hasattr(main_window, "switch_content"):
+            main_window.switch_content(content_name)
         else:
-            panel = at_load_content(content_name, parent)
+            print("[DEBUG] main_window не имеет метода switch_content")
 
-        if not panel:
-            logging.error(f"AppsContentPanel: Не удалось загрузить контент {content_name}")
-            sizer.Add(create_window(parent), 1, wx.EXPAND)
-            parent.Layout()
-            return
-
-        self.current_panel = panel
-        sizer.Add(self.current_panel, 1, wx.EXPAND)
-        parent.Layout()
-        logging.info(f"AppsContentPanel: Загружен контент {content_name}")
-
-        def on_submit(data):
-            from windows.at_content_registry import CONTENT_REGISTRY
-            if not data:
-                logging.warning("AppsContentPanel: Пустые данные от on_submit")
-                return
-
-            content_info = CONTENT_REGISTRY.get(content_name)
-            if not content_info or "build_module" not in content_info:
-                logging.error(f"AppsContentPanel: Некорректный CONTENT_REGISTRY для {content_name}")
-                return
-
-            build_module = importlib.import_module(content_info["build_module"])
-            build_func = getattr(build_module, "main")
-            success = build_func(data)
-            if success and content_name != "cone":
-                sizer = parent.GetSizer()
-                if sizer:
-                    sizer.Clear(True)
-                    new_panel = create_window(parent)
-                    sizer.Add(new_panel, 1, wx.EXPAND)
-                    parent.Layout()
-
-        self.current_panel.on_submit_callback = on_submit
 
 if __name__ == "__main__":
     """

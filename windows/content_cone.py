@@ -559,36 +559,56 @@ class ConeContentPanel(BaseContentPanel):
         Обновляет текст меток и групп при смене языка.
         Проверяет, что элементы не уничтожены.
         """
+        print("[DEBUG] ConeContentPanel.update_ui_language вызван")
         try:
             if self.IsBeingDeleted():
-                logging.warning("Попытка обновления языка в уничтожаемом окне")
+                print("[DEBUG] Окно уничтожается, обновление языка пропущено")
                 return
+
+            # StaticBox labels
             self.static_boxes["main_data"].SetLabel(loc.get("main_data_label", "Основные данные"))
             self.static_boxes["diameter"].SetLabel(loc.get("diameter_label", "Диаметры"))
             self.static_boxes["height"].SetLabel(loc.get("height_label", "Высота"))
+
+            # Прочие метки
             self.labels["order"].SetLabel(loc.get("order_label", "К-№"))
             self.labels["material"].SetLabel(loc.get("material_label", "Материал"))
             self.labels["thickness"].SetLabel(loc.get("thickness_label", "Толщина"))
             self.labels["d"].SetLabel(loc.get("d_label", "d, мм"))
             self.labels["D"].SetLabel(loc.get("D_label", "D, мм"))
+
             self.labels["d_inner"].SetLabel(loc.get("inner_label", "Внутренний"))
             self.labels["d_middle"].SetLabel(loc.get("middle_label", "Средний"))
             self.labels["d_outer"].SetLabel(loc.get("outer_label", "Внешний"))
             self.labels["D_inner"].SetLabel(loc.get("inner_label", "Внутренний"))
             self.labels["D_middle"].SetLabel(loc.get("middle_label", "Средний"))
             self.labels["D_outer"].SetLabel(loc.get("outer_label", "Внешний"))
+
             self.labels["height"].SetLabel(loc.get("height_label_mm", "H, мм"))
             self.labels["steigung"].SetLabel(loc.get("steigung_label", "Наклон"))
             self.labels["angle"].SetLabel(loc.get("angle_label", "α°"))
             self.labels["allowance"].SetLabel(loc.get("weld_allowance_label", "Припуск на сварку, мм"))
 
+            # Кнопки
             for i, key in enumerate(["ok_button", "clear_button", "cancel_button"]):
-                if not self.buttons[i].IsBeingDeleted():
+                if i < len(self.buttons) and not self.buttons[i].IsBeingDeleted():
                     self.buttons[i].SetLabel(loc.get(key, ["ОК", "Очистить", "Возврат"][i]))
             adjust_button_widths(self.buttons)
 
-            update_status_bar_point_selected(self, self.insert_point)
+            # Форсируем перерисовку staticbox'ов и панели
+            for sb in self.static_boxes.values():
+                try:
+                    sb.Refresh()
+                    parent = sb.GetParent()
+                    if parent:
+                        parent.Layout()
+                        parent.Refresh()
+                except Exception:
+                    pass
+
             self.Layout()
+            self.Refresh()
+            self.Update()
             logging.info("Язык UI обновлён")
         except Exception as e:
             logging.error(f"Ошибка при обновлении языка UI: {e}")

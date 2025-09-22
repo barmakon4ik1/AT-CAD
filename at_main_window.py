@@ -299,13 +299,16 @@ class ATMainWindow(wx.Frame):
 
         try:
             new_content = at_load_content(content_name, self.content_panel)
+            print(f"[DEBUG] switch_content загрузил {type(new_content)}")
             if new_content and isinstance(new_content, wx.Window):
                 self.current_content = new_content
                 self.current_content.content_name = content_name
                 self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
+
+                # 🔹 форсируем обновление языка для новой панели
                 if hasattr(new_content, 'update_ui_language'):
                     new_content.update_ui_language()
-                    # logging.info(f"Обновлён язык для контента: {content_name}")
+
             else:
                 error_msg = f"Ошибка загрузки {content_name}"
                 # logging.error(error_msg)
@@ -326,71 +329,48 @@ class ATMainWindow(wx.Frame):
         # logging.info(f"Контент переключён на {content_name}")
 
     def on_language_change(self, new_lang: str) -> None:
-        """
-        Обрабатывает смену языка через меню.
-        """
+        print(f"[DEBUG] on_language_change вызван, язык={new_lang}")
         if not isinstance(new_lang, str):
-            # logging.info(f"Нестроковый new_lang: {new_lang}, игнорируется")
             return
         loc.set_language(new_lang)
-        # logging.info(f"Установлен язык: {new_lang}")
+        print(f"[DEBUG] loc.language после установки = {loc.language}")
+
         self.update_language_icon(new_lang)
         self.update_ui(self.settings)
 
-        # Попробуем обновить язык текущей панели, если она существует
-        current_content_name = getattr(self.current_content, 'content_name', None) if self.current_content else None
-        if self.current_content and hasattr(self.current_content, 'update_ui_language') and current_content_name:
+        if self.current_content and hasattr(self.current_content, 'update_ui_language'):
             try:
                 if not self.current_content.IsBeingDeleted():
+                    print("[DEBUG] вызов update_ui_language у текущего контента")
                     self.current_content.update_ui_language()
-                    # logging.info(f"Язык текущего контента обновлён: {current_content_name}")
             except Exception as e:
-                # logging.error(f"Ошибка при обновлении языка текущего контента: {e}")
+                print(f"[DEBUG] Ошибка в update_ui_language: {e}")
                 show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
 
-        # Пересоздаём панель для полного обновления
-        if current_content_name:
-            # logging.info(f"Пересоздание контента: {current_content_name} с языком {new_lang}")
-            self.switch_content(current_content_name)
-        else:
-            # logging.warning("Текущий контент не определён, обновление только UI главного окна")
-            pass
-
     def on_change_language(self, event) -> None:
-        """
-        Обрабатывает смену языка через иконку флага.
-        """
+        print("[DEBUG] on_change_language вызван")
         current_langs = ["ru", "en", "de"]
         if not isinstance(loc.language, str):
-            # logging.error(f"loc.language не строка: {loc.language}, установка по умолчанию: ru")
             loc.language = "ru"
         current_index = current_langs.index(loc.language) if loc.language in current_langs else 0
         new_index = (current_index + 1) % len(current_langs)
         new_lang = current_langs[new_index]
+        print(f"[DEBUG] переключение языка: {loc.language} → {new_lang}")
 
         loc.set_language(new_lang)
-        # logging.info(f"Установлен язык: {new_lang}")
+        print(f"[DEBUG] loc.language после установки = {loc.language}")
+
         self.update_language_icon(new_lang)
         self.update_ui(self.settings)
 
-        # Попробуем обновить язык текущей панели, если она существует
-        current_content_name = getattr(self.current_content, 'content_name', None) if self.current_content else None
-        if self.current_content and hasattr(self.current_content, 'update_ui_language') and current_content_name:
+        if self.current_content and hasattr(self.current_content, 'update_ui_language'):
             try:
                 if not self.current_content.IsBeingDeleted():
+                    print("[DEBUG] вызов update_ui_language у текущего контента (через флаг)")
                     self.current_content.update_ui_language()
-                    # logging.info(f"Язык текущего контента обновлён: {current_content_name}")
             except Exception as e:
-                # logging.error(f"Ошибка при обновлении языка текущего контента: {e}")
+                print(f"[DEBUG] Ошибка в update_ui_language: {e}")
                 show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
-
-        # Пересоздаём панель для полного обновления
-        if current_content_name:
-            # logging.info(f"Пересоздание контента: {current_content_name} с языком {new_lang}")
-            self.switch_content(current_content_name)
-        else:
-            # logging.warning("Текущий контент не определён, обновление только UI главного окна")
-            pass
 
     def create_banner(self) -> None:
         """

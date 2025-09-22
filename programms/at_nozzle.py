@@ -228,6 +228,7 @@ def at_nozzle(data: Dict[str, Any]) -> bool:
             weld_allowance: Припуск на сварку.
             accuracy: Количество делений.
             offset: Смещение центра.
+            thk_correction: корректировка толщины отвода равнопроходного тройника
 
     Returns:
         True при успешном построении, иначе None.
@@ -255,11 +256,9 @@ def at_nozzle(data: Dict[str, Any]) -> bool:
         weld_allowance = data.get("weld_allowance", 0.0)
         accuracy = data.get("accuracy", 180)
         offset = data.get("offset", 0.0)
-        thickness_correction = True if diameter == diameter_main else False
+        thk_correction = data.get("thk_correction", False)
+        thickness_correction = True if thk_correction else False
 
-        if not isinstance(insert_point, (list, tuple)) or len(insert_point) != 3:
-            show_popup(loc.get("invalid_point_format"), popup_type="error")
-            return None
         insert_point = list(map(float, insert_point[:3]))
         data["insert_point"] = insert_point
 
@@ -341,7 +340,7 @@ if __name__ == "__main__":
         "diameter_main": 300,
         "length": 250,
         "axis": False,
-        "axis_marks": 10,
+        "axis_marks": 0,
         "layer_name": "0",
         "thickness": "4.0",
         "order_number": "20196",
@@ -350,5 +349,6 @@ if __name__ == "__main__":
         "weld_allowance": 0.0,
         "accuracy": 180,
         "offset": 0.0,
+        "thk_correction": False
     }
     at_nozzle(input_data)
