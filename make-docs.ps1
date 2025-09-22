@@ -60,3 +60,4 @@ Write-Host "Opening documentation in browser..."
 Start-Process (Join-Path $BuildPath "index.html")
 
 Write-Host "Documentation build completed!"
+
