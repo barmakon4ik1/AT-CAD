@@ -73,7 +73,6 @@ def ensure_point_variant(point: Union[List[float], Tuple[float, ...], VARIANT]) 
         return point
     return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, tuple(map(float, (list(point) + [0, 0, 0])[:3])))
 
-@handle_errors
 def calculate_angles(angle: int, unit: int, A: Tuple[float, float], B: Tuple[float, float],
                     C: Tuple[float, float]) -> Union[float, Tuple[float, float, float]]:
     """
@@ -114,7 +113,6 @@ def calculate_angles(angle: int, unit: int, A: Tuple[float, float], B: Tuple[flo
     return (angle_A, angle_B, angle_C) if angle == 0 else [angle_A, angle_B, angle_C][angle - 1]
 
 
-@handle_errors
 def deg_to_rad(angle: float) -> Optional[float]:
     """
     Конвертирует угол из градусов в радианы.
@@ -128,7 +126,35 @@ def deg_to_rad(angle: float) -> Optional[float]:
     return math.radians(angle)
 
 
-@handle_errors
+def circle_center_from_points(A: Tuple[float, float],
+                              B: Tuple[float, float],
+                              C: Tuple[float, float]) -> Optional[Tuple[float, float]]:
+    """
+    Находит центр окружности, проходящей через три точки.
+
+    Args:
+        A, B, C: Три точки (x, y).
+
+    Returns:
+        (cx, cy): Координаты центра окружности или None, если точки на одной прямой.
+    """
+    (x1, y1), (x2, y2), (x3, y3) = A, B, C
+
+    # Определяем знаменатель
+    d = 2 * (x1*(y2 - y3) + x2*(y3 - y1) + x3*(y1 - y2))
+    if abs(d) < 1e-6:
+        return None  # точки на одной прямой
+
+    ux = ((x1**2 + y1**2)*(y2 - y3) +
+          (x2**2 + y2**2)*(y3 - y1) +
+          (x3**2 + y3**2)*(y1 - y2)) / d
+    uy = ((x1**2 + y1**2)*(x3 - x2) +
+          (x2**2 + y2**2)*(x1 - x3) +
+          (x3**2 + y3**2)*(x2 - x1)) / d
+
+    return (ux, uy)
+
+
 def at_bulge(start_point: Tuple[float, float], end_point: Tuple[float, float],
              center: Tuple[float, float]) -> Optional[float]:
     """
@@ -146,7 +172,121 @@ def at_bulge(start_point: Tuple[float, float], end_point: Tuple[float, float],
     return math.tan(angle / 4)
 
 
-@handle_errors
+def bulge_from_center(start: Tuple[float, float],
+                      end: Tuple[float, float],
+                      center: Tuple[float, float],
+                      clockwise: bool = False) -> Optional[float]:
+    """
+    Вычисляет bulge (коэффициент выпуклости) для дуги заданной начальной и
+    конечной точками и центром окружности.
+
+    Bulge = tan(sweep / 4), где sweep — угол дуги (в радианах).
+    sweep выбирается так, чтобы направление дуги соответствовало параметру clockwise:
+      - clockwise=False -> выбираем положительный (CCW) sweep (0..2π)
+      - clockwise=True  -> выбираем отрицательный (CW) sweep (0..-2π)
+
+    Args:
+        start: (x, y) — начальная точка дуги.
+        end: (x, y) — конечная точка дуги.
+        center: (x, y) — центр окружности, которой принадлежит дуга.
+        clockwise: направление обхода дуги (False — CCW, True — CW).
+
+    Returns:
+        float: значение bulge (может быть отрицательным для CW-дуг).
+    """
+    # углы радианы относительно центра
+    ang1 = math.atan2(start[1] - center[1], start[0] - center[0])
+    ang2 = math.atan2(end[1] - center[1], end[0] - center[0])
+
+    sweep = ang2 - ang1
+    if not clockwise:
+        # хотим положительный обход (CCW)
+        if sweep <= 0:
+            sweep += 2.0 * math.pi
+    else:
+        # хотим отрицательный обход (CW)
+        if sweep >= 0:
+            sweep -= 2.0 * math.pi
+
+    # защищаемся от нулевого угла
+    if abs(sweep) < 1e-12:
+        return 0.0
+
+    return math.tan(sweep / 4.0)
+
+
+def bulge_from_three_points(start: Tuple[float, float],
+                            mid: Tuple[float, float],
+                            end: Tuple[float, float]) -> Optional[float]:
+    """
+    Вычисляет bulge для дуги, проходящей через три точки (start, mid, end).
+    Точка `mid` должна лежать на самой дуге (не на хорде).
+
+    Алгоритм:
+      1. Находит центр описанной окружности (circumcenter) по трём точкам.
+      2. Определяет, лежит ли средняя точка между start->end по направлению CCW.
+         Если да — считаем направление CCW, иначе — CW.
+      3. Вызывает bulge_from_center для вычисления bulge.
+
+    Args:
+        start: (x, y) — начало дуги.
+        mid: (x, y) — точка на дуге (не на хорде).
+        end: (x, y) — конец дуги.
+
+    Returns:
+        float: bulge (или None при ошибке / вырожденных точках).
+    """
+    ax, ay = start
+    bx, by = mid
+    cx, cy = end
+
+    # Вычисление центра описанной окружности (формула через определитель)
+    d = 2.0 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+    # if abs(d) < 1e-12:
+    #     # Точки почти коллинеарны — дуга вырождается в хорду
+    #     return 0.0
+
+    a2 = ax * ax + ay * ay
+    b2 = bx * bx + by * by
+    c2 = cx * cx + cy * cy
+
+    ux = (a2 * (by - cy) + b2 * (cy - ay) + c2 * (ay - by)) / d
+    uy = (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / d
+    center = (ux, uy)
+
+    # углы относительно центра
+    ang_start = math.atan2(ax - uy + 0.0, ax - ux + 0.0)  # NOTE: will be overwritten below (keeps consistent types)
+    # safer compute:
+    ang_start = math.atan2(start[1] - center[1], start[0] - center[0])
+    ang_mid = math.atan2(mid[1] - center[1], mid[0] - center[0])
+    ang_end = math.atan2(end[1] - center[1], end[0] - center[0])
+
+    # нормализуем в [0, 2pi)
+    def _norm(a: float) -> float:
+        v = a % (2.0 * math.pi)
+        if v < 0:
+            v += 2.0 * math.pi
+        return v
+
+    s = _norm(ang_start)
+    m = _norm(ang_mid)
+    e = _norm(ang_end)
+
+    # проверка, лежит ли m между s->e в CCW направлении
+    def _between_ccw(a: float, b: float, t: float) -> bool:
+        # возвращает True если t лежит на дуге CCW от a до b (включая границы)
+        if a <= b:
+            return a <= t <= b
+        # обёрнутый случай
+        return t >= a or t <= b
+
+    ccw_contains = _between_ccw(s, e, m)
+    clockwise = not ccw_contains  # если mid не в CCW промежутке, значит нужная дуга — в CW направлении
+
+    return bulge_from_center(start, end, center, clockwise=clockwise)
+
+
+
 def find_intersection_points(pt1: Tuple[float, float], r1: float,
                              pt2: Tuple[float, float], r2: float) -> Optional[List[Tuple[float, float]]]:
     """
@@ -260,6 +400,7 @@ def offset_point(input_point: Union[List[float], Tuple[float, ...], VARIANT],
         return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [new_x, new_y, 0.0])
     return [new_x, new_y]
 
+
 def polar_point(base_point: Union[List[float], Tuple[float, ...], VARIANT],
                 distance: float,
                 alpha: float,
@@ -295,12 +436,12 @@ def polar_point(base_point: Union[List[float], Tuple[float, ...], VARIANT],
         return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [new_x, new_y, 0.0])
     return [new_x, new_y]
 
-def build_polyline_list(plate_data: Dict) -> Optional[List[List[float]]]:
+def build_polyline_list(data: Dict) -> Optional[List[List[float]]]:
     """
     Создаёт список точек для полилинии на основе данных листа.
 
     Args:
-        plate_data: Словарь с данными (insert_point, point_list, material, thickness, melt_no, allowance).
+        data: Словарь с данными (insert_point, point_list, material, thickness, melt_no, allowance).
 
     Returns:
         List[List[float]]: Список точек в формате [[x1, y1], [x2, y2], ...] или None при ошибке.
@@ -310,8 +451,8 @@ def build_polyline_list(plate_data: Dict) -> Optional[List[List[float]]]:
         polyline_list = []
 
         # Извлекаем данные
-        insert_point = plate_data.get("insert_point")
-        point_list = plate_data.get("point_list")
+        insert_point = data.get("insert_point")
+        point_list = data.get("point_list")
 
         # Проверка наличия точек
         if not point_list:
@@ -362,6 +503,7 @@ def build_polyline_list(plate_data: Dict) -> Optional[List[List[float]]]:
     except Exception as e:
         show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
         return None
+
 
 def convert_to_variant_points(polyline_list: List[List[float]]) -> List:
     """
@@ -420,6 +562,9 @@ def get_unwrapped_points(D, L, A_deg, clockwise=True):
         points.append((ang % 360, x, y))
 
     return points
+
+
+
 
 
 

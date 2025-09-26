@@ -1,235 +1,275 @@
+# -*- coding: utf-8 -*-
 """
 File: programms/at_cutout.py
-Назначение: Построение выреза в трубе для штуцера (корректная версия).
-           Строит один замкнутый контур: left -> top -> right -> bottom -> (замыкание в AutoCAD).
-           Универсальный алгоритм работает для любого offset (включая 0).
+Назначение: Построение выреза в трубе для штуцера.
+Поддерживает три режима:
+    - polyline (отрезки)
+    - bulge (полилиния с дугами)
+    - spline (сплайн)
+Принцип работы:
+1. Аналитически находим φ-границы пересечения (|R sin φ - o| = r)
+2. Выбираем интервал, содержащий phi_max = asin(offset / R)
+3. Дискретизируем интервал φ: s = R * φ (радианы), z = ± sqrt(r² - (R sin φ - o)²)
+4. Формируем верхнюю и нижнюю ветви
+5. Вычисляем bulges локально по трём точкам с добавлением фиктивных точек для скругления концов
+6. Собираем контур: верхняя ветвь + нижняя перевёрнутая без дубликатов концов
 """
 
 import math
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple
+
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programms.at_base import regen
-from programms.at_construction import add_polyline, add_dimension, add_line
-from programms.at_geometry import ensure_point_variant, convert_to_variant_points
+from programms.at_construction import (
+    add_polyline,
+    add_dimension,
+    add_line,
+    add_polyline_with_bilge,
+    add_spline,
+)
+from programms.at_geometry import (
+    ensure_point_variant,
+    convert_to_variant_points,
+    circle_center_from_points,
+)
 from windows.at_gui_utils import show_popup
 
-# Переводы (локальные)
+# Переводы сообщений
 TRANSLATIONS = {
-    "no_data_error": {"ru": "Данные не введены", "de": "Keine Daten eingegeben", "en": "No data provided"},
-    "invalid_point_format": {"ru": "Точка вставки должна быть [x, y, 0]", "de": "Einfügepunkt muss [x, y, 0] sein", "en": "Insertion point must be [x, y, 0]"},
-    "build_error": {"ru": "Ошибка построения: {0}", "de": "Baufehler: {0}", "en": "Build error: {0}"},
-    "contour_not_built": {"ru": "Контур выреза не построен (нет допустимых точек)", "de": "Schnittkontur nicht erstellt (keine gültigen Punkte)", "en": "Cutout contour not built (no valid points)"},
+    "no_data_error": {
+        "ru": "Данные не введены",
+        "de": "Keine Daten eingegeben",
+        "en": "No data provided"
+    },
+    "invalid_point_format": {
+        "ru": "Точка вставки должна быть [x, y, 0]",
+        "de": "Einfügepunkt muss [x, y, 0] sein",
+        "en": "Insertion point must be [x, y, 0]"
+    },
+    "build_error": {
+        "ru": "Ошибка построения: {0}",
+        "de": "Baufehler: {0}",
+        "en": "Build error: {0}"
+    },
+    "contour_not_built": {
+        "ru": "Контур выреза не построен (нет допустимых точек)",
+        "de": "Schnittkontur nicht erstellt (keine gültigen Punkte)",
+        "en": "Cutout contour not built (no valid points)"
+    },
+    "unknown_mode": {
+        "ru": "Неизвестный режим: {0}",
+        "de": "Unbekannter Modus: {0}",
+        "en": "Unknown mode: {0}"
+    },
 }
 loc.register_translations(TRANSLATIONS)
 
 
-def _f_discr(alpha: float, R: float, r: float, offset: float) -> float:
-    """
-    Подкоренное выражение: discr(alpha) = r^2 - (R*cos(alpha) - offset)^2
-    Если discr >= 0, существует пересечение на этой альфе и y = sqrt(discr).
-    """
-    term = R * math.cos(alpha) - offset
-    return r * r - term * term
-
-
-def _find_root_bisect(f, a: float, b: float, args: Tuple, tol: float = 1e-9, max_iter: int = 80) -> Optional[float]:
-    """
-    Бисекция: находит корень f(alpha, *args)=0 на отрезке [a,b].
-    Требуется f(a) и f(b) разных знаков. Возвращает корень или None.
-    """
-    fa = f(a, *args)
-    fb = f(b, *args)
-    if abs(fa) <= tol:
-        return a
-    if abs(fb) <= tol:
-        return b
-    if fa * fb > 0:
-        return None
-    lo, hi = a, b
-    for _ in range(max_iter):
-        mid = 0.5 * (lo + hi)
-        fm = f(mid, *args)
-        if abs(fm) <= tol:
-            return mid
-        if fa * fm <= 0:
-            hi, fb = mid, fm
-        else:
-            lo, fa = mid, fm
-    return 0.5 * (lo + hi)
-
-
-def build_cutout_contour(
+def compute_cyl_cyl_intersection_unwrap(
     R: float,
     r: float,
-    offset: float = 0.0,
-    steps: int = 360,
-    insert_point: Tuple[float, float] = (0.0, 0.0)
-) -> List[Tuple[float, float]]:
+    offset: float,
+    steps: int = 2048,
+    eps: float = 1e-12
+) -> List[List[Tuple[float, float, float]]]:
     """
-    Возвращает список вершин замкнутого контура выреза.
-    Алгоритм универсален: работает при offset = 0 и offset != 0.
+    Возвращает одну полилинию (замкнутый контур) развёртки пересечения.
+    Формат: [ [(s, z, bulge), ...] ] или [] если нет пересечения.
 
-    Параметры:
-      R - радиус основной трубы (мм)
-      r - радиус штуцера (мм)
-      offset - смещение центра выреза по оси X (мм)
-      steps - количество шагов сетки по alpha (чем больше — тем точнее)
-      insert_point - (x0, y0) базовая точка развёртки (центр)
-
-    Логика:
-      - формируем сетку alpha ∈ [-π, π]
-      - находим блок, где discr(alpha) >= 0
-      - уточняем границы блока (бисекция)
-      - находим alpha_center (максимум y)
-      - строим верхнюю ветвь (left→right), нижнюю (right→left)
-      - добавляем больше точек около xmin и xmax для сглаживания
+    Принцип:
+    - аналитически находим φ-границы пересечения (|R sin φ - o| = r),
+    - выбираем интервал, содержащий asin(o/R),
+    - дискретизируем интервал φ, s = R * φ (радианы), z = ± sqrt(r² - (R sin φ - o)²),
+    - формируем upper и lower ветви,
+    - собираем контур: upper forward + lower reversed без дубликатов концов,
+    - вычисляем bulges локально по трём точкам (prev, current, next).
     """
-    x0, y0 = insert_point
+    import math
+    from programms.at_geometry import circle_center_from_points
 
-    # 1. сетка alpha
-    alpha_grid = [-math.pi + (2.0 * math.pi) * i / steps for i in range(steps + 1)]
-    discr_vals = [_f_discr(a, R, r, offset) for a in alpha_grid]
-    valid_mask = [d >= 0.0 for d in discr_vals]
+    two_pi = 2.0 * math.pi
 
-    valid_idxs = [i for i, v in enumerate(valid_mask) if v]
-    if not valid_idxs:
+    if R <= 0 or r < 0:
         return []
 
-    # 2. блоки непрерывных alpha
-    blocks: List[Tuple[int, int]] = []
-    start_idx, prev_idx = valid_idxs[0], valid_idxs[0]
-    for idx in valid_idxs[1:]:
-        if idx == prev_idx + 1:
-            prev_idx = idx
+    # --- границы пересечения ---
+    s_low = (offset - r) / R
+    s_high = (offset + r) / R
+    if s_low > 1.0 or s_high < -1.0:
+        return []
+
+    s_low_clamped = max(-1.0, min(1.0, s_low))
+    s_high_clamped = max(-1.0, min(1.0, s_high))
+    phi_a = math.asin(s_low_clamped)
+    phi_b = math.asin(s_high_clamped)
+    if phi_a > phi_b:
+        phi_a, phi_b = phi_b, phi_a
+
+    I1 = (phi_a, phi_b)
+    I2 = (math.pi - phi_b, math.pi - phi_a)
+
+    # Выбираем интервал, содержащий phi_max
+    phi_max = math.asin(offset / R) if abs(offset / R) <= 1 else 0
+    def contains_phi(interval, target):
+        s, e = interval
+        if s <= e:
+            return s <= target <= e
         else:
-            blocks.append((start_idx, prev_idx))
-            start_idx, prev_idx = idx, idx
-    blocks.append((start_idx, prev_idx))
+            return target >= s or target <= e
 
-    # 3. выбираем блок с max(y)
-    best_block, best_maxy = None, -1.0
-    for b0, b1 in blocks:
-        block_maxy = max(math.sqrt(discr_vals[ii]) for ii in range(b0, b1 + 1) if discr_vals[ii] >= 0)
-        if block_maxy > best_maxy:
-            best_maxy = block_maxy
-            best_block = (b0, b1)
-    if best_block is None:
+    chosen_interval = I1 if contains_phi(I1, phi_max) else I2
+    start_phi, end_phi = chosen_interval
+    if end_phi <= start_phi:
+        end_phi += two_pi
+
+    segment_length = end_phi - start_phi
+    if segment_length <= 0:
         return []
 
-    b0, b1 = best_block
-    left_alpha, right_alpha = alpha_grid[b0], alpha_grid[b1]
+    # --- дискретизация ---
+    n_pts = max(3, int(math.ceil(steps * (segment_length / two_pi))))
+    phis = [start_phi + (i / (n_pts - 1)) * segment_length for i in range(n_pts)]
 
-    # 4. уточняем границы
-    if b0 > 0 and not valid_mask[b0 - 1]:
-        root_l = _find_root_bisect(_f_discr, alpha_grid[b0 - 1], alpha_grid[b0], (R, r, offset))
-        if root_l is not None:
-            left_alpha = root_l
-    if b1 < len(alpha_grid) - 1 and not valid_mask[b1 + 1]:
-        root_r = _find_root_bisect(_f_discr, alpha_grid[b1], alpha_grid[b1 + 1], (R, r, offset))
-        if root_r is not None:
-            right_alpha = root_r
-    if right_alpha <= left_alpha:
+    s_list: List[float] = []
+    z_list: List[float] = []
+    for ph in phis:
+        y = R * math.sin(ph)
+        dy = y - offset
+        val = r * r - dy * dy
+        if val < -eps:
+            continue
+        z_abs = math.sqrt(max(0.0, val))
+        s = R * ph
+        s_list.append(s)
+        z_list.append(z_abs)
+
+    if not s_list:
         return []
 
-    # 5. центр (max y)
-    nsearch = max(50, int((right_alpha - left_alpha) / (2.0 * math.pi) * steps * 3))
-    alpha_center = max(
-        (left_alpha + (right_alpha - left_alpha) * j / nsearch for j in range(nsearch + 1)),
-        key=lambda aa: math.sqrt(_f_discr(aa, R, r, offset)) if _f_discr(aa, R, r, offset) >= 0 else -1
-    )
+    # --- формируем контур верх/низ ---
+    top_pts: List[Tuple[float, float]] = []
+    bottom_pts: List[Tuple[float, float]] = []
+    tol_z = 1e-12
+    for s, z in zip(s_list, z_list):
+        if abs(z) <= tol_z:
+            top_pts.append((s, 0.0))
+            bottom_pts.append((s, 0.0))
+        else:
+            top_pts.append((s, z))
+            bottom_pts.append((s, -z))
 
-    # 6. дискретизация
-    n_seg = max(16, int(round((right_alpha - left_alpha) / (2.0 * math.pi) * steps * 2)))
-    center_x = x0 + offset
+    contour_xy: List[Tuple[float, float]] = top_pts + list(reversed(bottom_pts))[1:]
 
-    # 7. точки границы
-    root_l, root_r = left_alpha, right_alpha
-    left_point = (center_x + R * (root_l - alpha_center), y0)
-    right_point = (center_x + R * (root_r - alpha_center), y0)
+    # --- удаляем дубликаты ---
+    dedup_tol = 1e-9
+    dedup: List[Tuple[float, float]] = [contour_xy[0]]
+    for pt in contour_xy[1:]:
+        last = dedup[-1]
+        if abs(pt[0] - last[0]) > dedup_tol or abs(pt[1] - last[1]) > dedup_tol:
+            dedup.append(pt)
+    contour_xy = dedup
 
-    pts: List[Tuple[float, float]] = []
-    pts.append(left_point)
+    n = len(contour_xy)
+    if n < 3:
+        return []
 
-    # верх: добавляем точки ближе к краям (сглаживание)
-    for j in range(1, n_seg):
-        aa = left_alpha + (right_alpha - left_alpha) * j / n_seg
-        d = _f_discr(aa, R, r, offset)
-        if d < 0:
+    # --- вычисление bulges ---
+    bulges_contour = []
+
+    # Подменяем фиктивные точки реальными: -2 и 1
+    extended_pts = [contour_xy[-2]] + contour_xy + [contour_xy[1]]
+
+    for i in range(1, n+1):
+        prev_i = i - 1
+        next_i = i + 1
+        p0 = extended_pts[prev_i]
+        p1 = extended_pts[i]
+        p2 = extended_pts[next_i]
+        center = circle_center_from_points(p0, p1, p2)
+        if center is None:
+            bulges_contour.append(0.0)
             continue
-        x = center_x + R * (aa - alpha_center)
-        y = y0 + math.sqrt(d)
-        pts.append((x, y))
-    pts.append(right_point)
+        cx, cy = center
+        ang1 = math.atan2(p1[1] - cy, p1[0] - cx)
+        ang2 = math.atan2(p2[1] - cy, p2[0] - cx)
+        sweep = ang2 - ang1
+        sweep = (sweep + math.pi) % (2*math.pi) - math.pi
+        bulges_contour.append(math.tan(sweep / 4.0))
 
-    # низ: симметрично, обратный проход
-    for j in range(n_seg - 1, 0, -1):
-        aa = left_alpha + (right_alpha - left_alpha) * j / n_seg
-        d = _f_discr(aa, R, r, offset)
-        if d < 0:
-            continue
-        x = center_x + R * (aa - alpha_center)
-        y = y0 - math.sqrt(d)
-        pts.append((x, y))
+    contour_with_bulge: List[Tuple[float, float, float]] = [
+        (s, z, b) for (s, z), b in zip(contour_xy, bulges_contour)
+    ]
 
-    # фильтрация подряд одинаковых
-    cleaned: List[Tuple[float, float]] = []
-    last = None
-    for p in pts:
-        if last is None or abs(p[0] - last[0]) > 1e-6 or abs(p[1] - last[1]) > 1e-6:
-            cleaned.append(p)
-            last = p
+    return [contour_with_bulge]
 
-    return cleaned
+
 
 
 def at_cutout(data: Dict[str, Any]) -> bool:
     """
-    Интеграция с AutoCAD: строит полилинию выреза и добавляет контрольные линии/размер.
-    Ожидаемые ключи data:
-      insert_point: [x, y, z]
-      diameter: диаметр штуцера
-      diameter_main: диаметр основной трубы
-      offset: смещение центра выреза (мм)
-      steps: шаг дискретизации (по умолчанию 45..720)
-      layer_name: слой для полилинии
+    Интеграция с AutoCAD: строит контур выреза.
+    Поддерживает режимы: polyline, bulge, spline.
+    Ожидаемые ключи в data:
+      - insert_point: [x, y, z]
+      - diameter: диаметр отвода
+      - diameter_main: диаметр основной трубы
+      - offset: отступ осей
+      - steps: число шагов дискретизации
+      - layer_name: имя слоя
+      - mode: "polyline", "bulge" или "spline"
     """
     try:
         cad = ATCadInit()
         adoc = cad.document
         model = cad.model
 
-        insert_point = data["insert_point"]
-        diameter = float(data["diameter"])
-        diameter_main = float(data["diameter_main"])
-        offset = float(data["offset"])
-        steps = int(data.get("steps", 45))
+        insert_point = data.get("insert_point")
+        if not isinstance(insert_point, (list, tuple)) or len(insert_point) < 3:
+            show_popup(loc.get("invalid_point_format"), popup_type="error")
+            return False
+
+        diameter = float(data.get("diameter", 0.0))
+        diameter_main = float(data.get("diameter_main", 0.0))
+        offset = float(data.get("offset", 0.0))
+        steps = int(data.get("steps", 2048))
         layer_name = data.get("layer_name", "0")
+        mode = data.get("mode", "bulge").lower()
 
         r = diameter / 2.0
         R = diameter_main / 2.0
+        x0, y0 = insert_point[0], insert_point[1]
 
-        contour_pairs = build_cutout_contour(R, r, offset=offset, steps=steps, insert_point=(insert_point[0], insert_point[1]))
-        if not contour_pairs:
+        # Контрольные линии
+        center_s = R * math.asin(offset / R) if abs(offset / R) <= 1 else offset
+        p_top = ensure_point_variant([x0 + center_s, y0 + r, 0.0])
+        p_bottom = ensure_point_variant([x0 + center_s, y0 - r, 0.0])
+        p_left = ensure_point_variant([x0 + center_s - 1.3 * r, y0, 0.0])
+        p_right = ensure_point_variant([x0 + center_s + 1.3 * r, y0, 0.0])
+        add_dimension(adoc, "V", p_bottom, p_top, offset=r + 100)
+        add_line(model, p_bottom, p_top, layer_name="AM_7")
+        add_line(model, p_left, p_right, layer_name="AM_7")
+
+        polylines = compute_cyl_cyl_intersection_unwrap(R, r, offset, steps)
+        if not polylines:
             show_popup(loc.get("contour_not_built"), popup_type="error")
             return False
 
-        var_pts = convert_to_variant_points(contour_pairs)
-        poly = add_polyline(model, var_pts, layer_name=layer_name, closed=True)
-        if poly is None:
-            show_popup(loc.get("build_error").format("Не удалось создать полилинию"), popup_type="error")
-            return False
-
-        # контрольный размер и линии
-        center_x = insert_point[0] + offset
-        p_top = ensure_point_variant([center_x, insert_point[1] + r, 0.0])
-        p_bottom = ensure_point_variant([center_x, insert_point[1] - r, 0.0])
-        add_dimension(adoc, "V", p_bottom, p_top, offset=r + 100)
-
-        add_line(model, p_bottom, p_top, layer_name="AM_7")
-        p_links = ensure_point_variant([center_x - 1.3 * r, insert_point[1], 0.0])
-        p_right = ensure_point_variant([center_x + 1.3 * r, insert_point[1], 0.0])
-        add_line(model, p_links, p_right, layer_name="AM_7")
+        # Переносим точки в систему координат вставки
+        for poly in polylines:
+            if mode == "polyline":
+                points_xy = [[x0 + s, y0 + z] for s, z, _ in poly]
+                pts_variant = convert_to_variant_points(points_xy)
+                add_polyline(model, pts_variant, closed=True, layer_name=layer_name)
+            elif mode == "bulge":
+                pts = [(x0 + s, y0 + z, b) for s, z, b in poly]
+                add_polyline_with_bilge(model, pts, layer_name=layer_name, closed=True)
+            elif mode == "spline":
+                points_xy = [[x0 + s, y0 + z] for s, z, _ in poly]
+                add_spline(model, points_xy, layer_name=layer_name, closed=True)
+            else:
+                show_popup(loc.get("unknown_mode").format(mode), popup_type="info")
+                return False
 
         regen(adoc)
         return True
@@ -240,13 +280,13 @@ def at_cutout(data: Dict[str, Any]) -> bool:
 
 
 if __name__ == "__main__":
-    # Пример локального теста
     data = {
         "insert_point": [0.0, 0.0, 0.0],
         "diameter": 200.0,
         "diameter_main": 300.0,
-        "offset": 0.0,
-        "steps": 720,
+        "offset": 0,
+        "steps": 60,
         "layer_name": "0",
+        "mode": "bulge"
     }
     at_cutout(data)
