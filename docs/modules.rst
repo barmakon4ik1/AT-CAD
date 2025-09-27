@@ -94,6 +94,12 @@
     :show-inheritance:
 
 
+.. automodule:: programms.at_cutout
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
 .. automodule:: programms.at_data_manager
     :members:
     :undoc-members:
