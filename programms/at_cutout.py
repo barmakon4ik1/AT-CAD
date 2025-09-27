@@ -17,7 +17,6 @@ File: programms/at_cutout.py
 
 import math
 from typing import Dict, Any, List, Tuple
-
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programms.at_base import regen
@@ -25,7 +24,6 @@ from programms.at_construction import (
     add_polyline,
     add_dimension,
     add_line,
-    add_polyline_with_bilge,
     add_spline,
 )
 from programms.at_geometry import (
@@ -70,24 +68,13 @@ def compute_cyl_cyl_intersection_unwrap(
     R: float,
     r: float,
     offset: float,
-    steps: int = 2048,
+    steps: int = 360,
     eps: float = 1e-12
 ) -> List[List[Tuple[float, float, float]]]:
     """
     Возвращает одну полилинию (замкнутый контур) развёртки пересечения.
     Формат: [ [(s, z, bulge), ...] ] или [] если нет пересечения.
-
-    Принцип:
-    - аналитически находим φ-границы пересечения (|R sin φ - o| = r),
-    - выбираем интервал, содержащий asin(o/R),
-    - дискретизируем интервал φ, s = R * φ (радианы), z = ± sqrt(r² - (R sin φ - o)²),
-    - формируем upper и lower ветви,
-    - собираем контур: upper forward + lower reversed без дубликатов концов,
-    - вычисляем bulges локально по трём точкам (prev, current, next).
     """
-    import math
-    from programms.at_geometry import circle_center_from_points
-
     two_pi = 2.0 * math.pi
 
     if R <= 0 or r < 0:
@@ -111,6 +98,7 @@ def compute_cyl_cyl_intersection_unwrap(
 
     # Выбираем интервал, содержащий phi_max
     phi_max = math.asin(offset / R) if abs(offset / R) <= 1 else 0
+
     def contains_phi(interval, target):
         s, e = interval
         if s <= e:
@@ -159,10 +147,11 @@ def compute_cyl_cyl_intersection_unwrap(
             top_pts.append((s, z))
             bottom_pts.append((s, -z))
 
+    # Собираем контур: верхняя ветвь + нижняя перевёрнутая без дубликатов концов
     contour_xy: List[Tuple[float, float]] = top_pts + list(reversed(bottom_pts))[1:]
 
     # --- удаляем дубликаты ---
-    dedup_tol = 1e-9
+    dedup_tol = 1e-6  # Увеличиваем допуск для надёжности
     dedup: List[Tuple[float, float]] = [contour_xy[0]]
     for pt in contour_xy[1:]:
         last = dedup[-1]
@@ -170,17 +159,21 @@ def compute_cyl_cyl_intersection_unwrap(
             dedup.append(pt)
     contour_xy = dedup
 
+    # Проверяем, что первая и последняя точки совпадают для замыкания
+    if len(contour_xy) > 1:
+        tol = 1e-6
+        if abs(contour_xy[-1][0] - contour_xy[0][0]) > tol or abs(contour_xy[-1][1] - contour_xy[0][1]) > tol:
+            contour_xy.append(contour_xy[0])  # Добавляем первую точку в конец
+
     n = len(contour_xy)
     if n < 3:
         return []
 
     # --- вычисление bulges ---
     bulges_contour = []
+    extended_pts = [contour_xy[-1]] + contour_xy + [contour_xy[0]]  # Замкнутость
 
-    # Подменяем фиктивные точки реальными: -2 и 1
-    extended_pts = [contour_xy[-2]] + contour_xy + [contour_xy[1]]
-
-    for i in range(1, n+1):
+    for i in range(1, n + 1):
         prev_i = i - 1
         next_i = i + 1
         p0 = extended_pts[prev_i]
@@ -194,15 +187,24 @@ def compute_cyl_cyl_intersection_unwrap(
         ang1 = math.atan2(p1[1] - cy, p1[0] - cx)
         ang2 = math.atan2(p2[1] - cy, p2[0] - cx)
         sweep = ang2 - ang1
-        sweep = (sweep + math.pi) % (2*math.pi) - math.pi
+        sweep = (sweep + math.pi) % (2 * math.pi) - math.pi
         bulges_contour.append(math.tan(sweep / 4.0))
+
+    # Подмена bulge для первого сегмента
+    if len(bulges_contour) >= 2:
+        bulges_contour[0] = bulges_contour[-2]  # Симметрия относительно предпоследнего
+
+    # Отладка радиуса дуги
+    if contour_xy and bulges_contour:
+        chord = math.sqrt((contour_xy[1][0] - contour_xy[0][0]) ** 2 + (contour_xy[1][1] - contour_xy[0][1]) ** 2)
+        radius = chord / (2 * math.sin(2 * math.atan(abs(bulges_contour[0])))) if bulges_contour[0] != 0 else float('inf')
+        print(f"First segment: chord={chord:.3f}, bulge={bulges_contour[0]:.6f}, radius={radius:.3f}")
 
     contour_with_bulge: List[Tuple[float, float, float]] = [
         (s, z, b) for (s, z), b in zip(contour_xy, bulges_contour)
     ]
 
     return [contour_with_bulge]
-
 
 
 
@@ -260,10 +262,10 @@ def at_cutout(data: Dict[str, Any]) -> bool:
             if mode == "polyline":
                 points_xy = [[x0 + s, y0 + z] for s, z, _ in poly]
                 pts_variant = convert_to_variant_points(points_xy)
-                add_polyline(model, pts_variant, closed=True, layer_name=layer_name)
+                add_polyline(model, pts_variant, layer_name=layer_name, closed=True)
             elif mode == "bulge":
                 pts = [(x0 + s, y0 + z, b) for s, z, b in poly]
-                add_polyline_with_bilge(model, pts, layer_name=layer_name, closed=True)
+                add_polyline(model, pts, layer_name=layer_name)
             elif mode == "spline":
                 points_xy = [[x0 + s, y0 + z] for s, z, _ in poly]
                 add_spline(model, points_xy, layer_name=layer_name, closed=True)
@@ -285,7 +287,7 @@ if __name__ == "__main__":
         "diameter": 200.0,
         "diameter_main": 300.0,
         "offset": 0,
-        "steps": 60,
+        "steps": 36,
         "layer_name": "0",
         "mode": "bulge"
     }

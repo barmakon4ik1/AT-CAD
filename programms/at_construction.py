@@ -470,177 +470,157 @@ def add_line(model: Any, point1: Union[List[float], VARIANT],
         return None
 
 
-def add_polyline(model: Any, points: Union[VARIANT, List[VARIANT]],
-                 layer_name: str = "0", closed: bool = True) -> Optional[Any]:
+def add_polyline(
+    model: Any,
+    points: Union[VARIANT, List[VARIANT], List[tuple]],
+    layer_name: str = "0",
+    closed: bool = True,
+    bulges: Optional[List[float]] = None
+) -> Optional[Any]:
     """
-    Создаёт легковесную полилинию в модельном пространстве.
+    Создаёт легковесную полилинию в AutoCAD с опциональными значениями bulge.
 
     Args:
         model: Объект ModelSpace активного документа AutoCAD.
-        points: COM VARIANT с координатами вершин (x1, y1, x2, y2, ...) или список VARIANT-объектов с точками [x, y, z].
+        points: COM VARIANT с координатами вершин (x1, y1, x2, y2, ...) или список VARIANT-объектов
+                с точками [x, y, z], или список кортежей (x, y, [bulge]).
         layer_name: Имя слоя для полилинии.
         closed: Закрывать полилинию или нет (по умолчанию True).
+        bulges: Опциональный список значений bulge для каждого сегмента (используется, если points не содержит bulge).
 
     Returns:
         Optional[Any]: Объект полилинии или None при ошибке.
     """
     try:
-        if isinstance(points, list) and all(isinstance(p, VARIANT) for p in points):
-            flat_points = []
+        # Формируем плоский массив координат и извлекаем bulge, если есть
+        flat_points = []
+        extracted_bulges = []
+
+        if isinstance(points, VARIANT):
+            flat_points = list(points.value)
+            extracted_bulges = [0.0] * (len(flat_points) // 2)  # Нет bulge для VARIANT
+        elif isinstance(points, list) and all(isinstance(p, VARIANT) for p in points):
             for point in points:
                 coords = point.value
                 if len(coords) < 2 or any(c is None or not isinstance(c, (int, float)) for c in coords[:2]):
                     raise ValueError("Неправильные координаты точки")
                 flat_points.extend([float(coords[0]), float(coords[1])])
-            points_variant = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, flat_points)
-        elif isinstance(points, VARIANT):
-            points_variant = points
+            extracted_bulges = [0.0] * len(points)  # Нет bulge для списка VARIANT
+        elif isinstance(points, list) and all(isinstance(p, (list, tuple)) for p in points):
+            for pt in points:
+                flat_points.extend([float(pt[0]), float(pt[1])])
+                extracted_bulges.append(float(pt[2]) if len(pt) > 2 else 0.0)
         else:
-            raise TypeError("Точки должны быть типа VARIANT либо списком объектов VARIANT")
+            raise TypeError("Точки должны быть VARIANT, списком VARIANT или списком кортежей (x, y, [bulge])")
+
+        # Используем предоставленный bulges, если есть, иначе extracted_bulges
+        final_bulges = bulges if bulges is not None else extracted_bulges
+        if len(final_bulges) != len(flat_points) // 2:
+            raise ValueError("Число значений bulge не соответствует числу точек")
+
+        # Создаём полилинию
+        points_variant = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, flat_points)
         polyline = model.AddLightWeightPolyline(points_variant)
         polyline.Closed = closed
         polyline.Layer = layer_name
+
+        # Устанавливаем bulge, если они есть
+        if any(b != 0.0 for b in final_bulges):
+            for i, bulge in enumerate(final_bulges):
+                polyline.SetBulge(i, float(bulge))
+
         return polyline
+
     except Exception as e:
         logger.error(f"add_polyline failed: {str(e)}")
         show_popup(loc.get("polyline_error", f"Ошибка при создании полилинии: {str(e)}"), popup_type="error")
         return None
 
-def add_polyline_with_bilge(
-        model: Any,
-        points: List[Union[List[float], VARIANT, tuple]],
-        mode: str = "bulge",  # "polyline", "bulge", "spline"
-        layer_name: str = "0",
-        closed: bool = True
-) -> Optional[Any]:
-    """
-    Создаёт полилинию в AutoCAD:
-      - polyline: обычная полилиния
-      - bulge: полилиния с вычислением кривизны (bulge) для каждого сегмента
-      - spline: создаёт SplineEntity через все точки
-
-    Args:
-        model: ModelSpace документа
-        points: Список точек [x, y] или VARIANT
-        mode: "polyline", "bulge", "spline"
-        layer_name: имя слоя
-        closed: закрывать полилинию или нет
-
-    Returns:
-        COM объект полилинии или None
-    """
-    try:
-        if len(points) < 2:
-            show_popup(loc.get("to_small_points", "Мало точек"), popup_type="error")
-            return None
-
-        # Преобразуем все точки в формат [x, y]
-        pts: List[List[float]] = []
-        for p in points:
-            if isinstance(p, VARIANT):
-                pts.append(list(p.value[:2]))
-            elif isinstance(p, (list, tuple)):
-                pts.append([float(p[0]), float(p[1])])
-            else:
-                raise TypeError("Точки должны быть списком, кортежем или VARIANT")
-
-        # ------------------------------
-        # Режим Spline
-        # ------------------------------
-        if mode == "spline":
-            # Spline через все точки
-            spline = model.AddSpline(VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8,
-                                             [coord for pt in pts for coord in pt]))
-            spline.Closed = closed
-            spline.Layer = layer_name
-            return spline
-
-        # ------------------------------
-        # Режим polyline или bulge
-        # ------------------------------
-        # Формируем плоский массив координат
-        flat_points = [coord for pt in pts for coord in pt]
-        polyline = model.AddLightWeightPolyline(VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, flat_points))
-        polyline.Closed = closed
-        polyline.Layer = layer_name
-
-        if mode == "bulge":
-            # вычисляем bulge для каждого сегмента по трём точкам
-            n = len(pts)
-            for i in range(n):
-                p0 = pts[i - 1 if i > 0 else (0 if closed else 0)]
-                p1 = pts[i]
-                p2 = pts[(i + 1) % n] if (i + 1 < n) else (pts[0] if closed else pts[-1])
-                # вычисляем центр окружности
-                d = 2.0 * (p0[0] * (p1[1] - p2[1]) + p1[0] * (p2[1] - p0[1]) + p2[0] * (p0[1] - p1[1]))
-                if abs(d) < 1e-12:
-                    bulge = 0.0
-                else:
-                    a2 = p0[0] ** 2 + p0[1] ** 2
-                    b2 = p1[0] ** 2 + p1[1] ** 2
-                    c2 = p2[0] ** 2 + p2[1] ** 2
-                    ux = (a2 * (p1[1] - p2[1]) + b2 * (p2[1] - p0[1]) + c2 * (p0[1] - p1[1])) / d
-                    uy = (a2 * (p2[0] - p1[0]) + b2 * (p0[0] - p2[0]) + c2 * (p1[0] - p0[0])) / d
-                    ang1 = math.atan2(p1[1] - uy, p1[0] - ux)
-                    ang2 = math.atan2(p2[1] - uy, p2[0] - ux)
-                    sweep = (ang2 - ang1 + math.pi) % (2 * math.pi) - math.pi
-                    bulge = math.tan(sweep / 4.0)
-                try:
-                    polyline.SetBulge(i, float(bulge))
-                except Exception as ex:
-                    logger.warning(f"SetBulge failed at index {i}: {ex}")
-        return polyline
-
-    except Exception as e:
-        logger.error(f"add_polyline_with_bilge failed: {e}")
-        show_popup(loc.get("polyline_error", f"Ошибка при создании полилинии: {str(e)}"), popup_type="error")
-        return None
-
 
 def add_spline(
-        model: Any,
-        points: List[Union[List[float], tuple, VARIANT]],
-        layer_name: str = "0",
-        closed: bool = False
-) -> Any:
+    model: Any,
+    points: Union[VARIANT, List[VARIANT], List[tuple]],
+    layer_name: str = "0",
+    closed: bool = True
+) -> Optional[Any]:
     """
     Создаёт сплайн в AutoCAD через заданные точки.
 
     Args:
-        model: ModelSpace документа AutoCAD.
-        points: Список точек [x, y] или VARIANT.
+        model: Объект ModelSpace активного документа AutoCAD.
+        points: COM VARIANT с координатами (x1, y1, z1, x2, y2, z2, ...),
+                список VARIANT-объектов с точками [x, y, z],
+                или список кортежей (x, y) или (x, y, z).
         layer_name: Имя слоя для сплайна.
-        closed: Замкнуть сплайн или нет.
+        closed: Замкнуть сплайн или нет (по умолчанию True).
 
     Returns:
-        COM объект сплайна или None при ошибке.
+        Optional[Any]: COM-объект сплайна или None при ошибке.
     """
     try:
-        if len(points) < 2:
-            show_popup(loc.get("to_small_points", "Мало точек"), popup_type="error")
-            return None
-
-        # Преобразуем точки в плоский список координат [x1, y1, x2, y2, ...]
+        # Формируем плоский массив координат [x1, y1, z1, x2, y2, z2, ...]
         flat_points = []
-        for p in points:
-            if isinstance(p, VARIANT):
-                flat_points.extend(list(p.value[:2]))
-            elif isinstance(p, (list, tuple)):
-                flat_points.extend([float(p[0]), float(p[1])])
-            else:
-                raise TypeError("Точки должны быть списком, кортежем или VARIANT")
+        processed_points = []
+        if isinstance(points, VARIANT):
+            coords = list(points.value)
+            if len(coords) % 3 != 0:
+                raise ValueError("Число координат в VARIANT должно быть кратно 3")
+            flat_points = [float(c) for c in coords]
+            processed_points = [[coords[i], coords[i+1], coords[i+2]] for i in range(0, len(coords), 3)]
+        elif isinstance(points, list) and all(isinstance(p, VARIANT) for p in points):
+            for point in points:
+                coords = point.value
+                flat_points.extend([float(coords[0]), float(coords[1]), float(coords[2]) if len(coords) > 2 else 0.0])
+                processed_points.append([float(coords[0]), float(coords[1]), float(coords[2]) if len(coords) > 2 else 0.0])
+        elif isinstance(points, list) and all(isinstance(p, (list, tuple)) for p in points):
+            for pt in points:
+                if len(pt) < 2:
+                    raise ValueError("Некорректные координаты точки в кортеже")
+                flat_points.extend([float(pt[0]), float(pt[1]), float(pt[2]) if len(pt) > 2 else 0.0])
+                processed_points.append([float(pt[0]), float(pt[1]), float(pt[2]) if len(pt) > 2 else 0.0])
+        else:
+            raise TypeError("Точки должны быть VARIANT, списком VARIANT или списком кортежей (x, y, [z])")
+
+        # Проверяем минимальное количество точек (минимум 2 точки для сплайна)
+        if len(flat_points) < 6:  # 2 точки * 3 координаты
+            raise ValueError("Для создания сплайна требуется минимум 2 точки")
+
+        # Если closed=True, проверяем совпадение первой и последней точек
+        if closed and len(processed_points) >= 2:
+            tol = 1e-6  # Допуск для совпадения точек
+            p0, p_last = processed_points[0], processed_points[-1]
+            if not (abs(p0[0] - p_last[0]) < tol and abs(p0[1] - p_last[1]) < tol and abs(p0[2] - p_last[2]) < tol):
+                # Добавляем первую точку в конец для замыкания
+                processed_points.append(p0)
+                flat_points.extend([p0[0], p0[1], p0[2]])
+
+        # Отладочный вывод
+        print(f"Flat points (length={len(flat_points)}): {flat_points}")
+
+        # Создаём VARIANT для точек и касательных
+        points_variant = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, flat_points)
+        start_tangent = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [0.0, 0.0, 0.0])
+        end_tangent = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [0.0, 0.0, 0.0])
 
         # Создаём сплайн
-        spline = model.AddSpline(VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, flat_points))
-        spline.Closed = closed
+        spline = model.AddSpline(points_variant, start_tangent, end_tangent)
         spline.Layer = layer_name
+
+        # Пытаемся установить Closed, если требуется
+        if closed:
+            try:
+                spline.Closed = True
+            except Exception as e:
+                logger.warning(f"Failed to set spline.Closed: {str(e)}. Spline may already be closed or points are not coincident.")
+                # Продолжаем, так как сплайн уже создан
 
         return spline
 
     except Exception as e:
-        logger.error(f"add_spline failed: {e}")
-        show_popup(loc.get("polyline_error", f"Ошибка при создании сплайна: {str(e)}"), popup_type="error")
+        logger.error(f"add_spline failed: {str(e)}")
+        show_popup(loc.get("spline_error", f"Ошибка при создании сплайна: {str(e)}"), popup_type="error")
         return None
+
 
 def add_rectangle(model: Any, point: Union[List[float], VARIANT],
                   width: float, height: float,
