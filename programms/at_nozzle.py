@@ -1,8 +1,13 @@
+# -*- coding: utf-8 -*-
 """
 File: programms/at_nozzle.py
 Назначение: Построение развертки патрубка
 прямоугольного простого переходного тройника
 с сопутствующими данными (текстами, размерами и т.п.)
+Поддерживает три режима:
+    - polyline (отрезки)
+    - bulge (полилиния с дугами: верхняя часть криволинейная, левая/нижняя/правая стороны прямые)
+    - spline (сплайн для верхней части, полилиния для боковых и нижней сторон)
 """
 
 import math
@@ -10,9 +15,9 @@ from typing import Dict, Any, List, Tuple
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programms.at_base import regen
-from programms.at_construction import add_text, add_polyline
-from programms.at_geometry import ensure_point_variant, polar_point, convert_to_variant_points
-from at_construction import add_line, add_dimension
+from programms.at_construction import add_text, add_polyline, add_spline
+from programms.at_geometry import ensure_point_variant, polar_point, convert_to_variant_points, circle_center_from_points
+from programms.at_construction import add_line, add_dimension
 from windows.at_gui_utils import show_popup
 from config.at_config import TEXT_HEIGHT_SMALL, DEFAULT_DIM_OFFSET
 
@@ -44,7 +49,17 @@ TRANSLATIONS = {
         "ru": "{0} мм {1}",
         "de": "{0} mm {1}",
         "en": "{0} mm {1}"
-    }
+    },
+    "contour_not_built": {
+        "ru": "Контур выреза не построен (нет допустимых точек)",
+        "de": "Schnittkontur nicht erstellt (keine gültigen Punkte)",
+        "en": "Cutout contour not built (no valid points)"
+    },
+    "unknown_mode": {
+        "ru": "Неизвестный режим: {0}",
+        "de": "Unbekannter Modus: {0}",
+        "en": "Unknown mode: {0}"
+    },
 }
 loc.register_translations(TRANSLATIONS)
 
@@ -61,10 +76,11 @@ def build_unwrapped_contour(
     accuracy: int,
     offset: float,
     thickness: float,
-    thickness_correction: bool
-) -> Tuple[List[Tuple[float, float]], List[float], float]:
+    thk_correction: bool,
+    mode: str
+) -> Tuple[List[Tuple[float, float, float]], List[Tuple[float, float, float]], List[float], float]:
     """
-    Строит контур развертки.
+    Строит контур развёртки.
 
     Args:
         insert_point: Точка вставки [x, y, z].
@@ -75,15 +91,17 @@ def build_unwrapped_contour(
         accuracy: Количество делений развертки.
         offset: Смещение центра.
         thickness: Толщина материала.
-        thickness_correction: Признак корректировки толщины.
+        thk_correction: Признак корректировки толщины.
+        mode: "polyline", "bulge" или "spline" (режим построения контура).
 
     Returns:
-        point_list: Список координат контура.
+        contour_upper: Список координат верхней криволинейной части [(x, y, bulge), ...].
+        contour_rect: Список координат прямоугольной части (правая, нижняя, левая стороны) [(x, y, bulge), ...].
         generatrix_length: Список длин образующих.
         width: Полная ширина развертки.
     """
     length_full = length + weld_allowance
-    radius = (diameter - thickness) / 2.0 if thickness_correction else diameter / 2.0
+    radius = (diameter - thickness) / 2.0 if thk_correction else diameter / 2.0
     width = 2 * math.pi * radius
 
     angle_list = [2 * math.pi - i * (math.pi / (0.5 * accuracy)) for i in range(accuracy + 1)]
@@ -93,6 +111,7 @@ def build_unwrapped_contour(
         for w in angle_list
     ]
 
+    # Формируем точки верхней части (криволинейной)
     point_list = [
         (
             insert_point[0] + x * (width / accuracy),
@@ -101,10 +120,65 @@ def build_unwrapped_contour(
         for x, y in zip(range(accuracy + 1), generatrix_length)
     ]
 
-    point_list.append((insert_point[0] + width, insert_point[1]))
-    point_list.append((insert_point[0], insert_point[1]))
+    # Удаляем дубликаты в верхней части
+    dedup_tol = 1e-6
+    dedup: List[Tuple[float, float]] = [point_list[0]]
+    for pt in point_list[1:]:
+        last = dedup[-1]
+        if abs(pt[0] - last[0]) > dedup_tol or abs(pt[1] - last[1]) > dedup_tol:
+            dedup.append(pt)
+    point_list = dedup
 
-    return point_list, generatrix_length, width
+    n_upper = len(point_list)
+    if n_upper < 2:
+        return [], [], generatrix_length, width
+
+    # Вычисление bulges для верхней части (для режима bulge или spline)
+    bulges_contour = []
+    extended_pts = [point_list[-1]] + point_list + [point_list[0]]  # Замкнутость для верхней части
+
+    for i in range(1, n_upper + 1):
+        prev_i = i - 1
+        next_i = i + 1
+        p0 = extended_pts[prev_i]
+        p1 = extended_pts[i]
+        p2 = extended_pts[next_i]
+        if mode == "polyline" or i == n_upper:  # Устанавливаем bulge=0 для последней точки
+            bulges_contour.append(0.0)
+            continue
+        center = circle_center_from_points(p0, p1, p2)
+        if center is None:
+            bulges_contour.append(0.0)
+            continue
+        cx, cy = center
+        ang1 = math.atan2(p1[1] - cy, p1[0] - cx)
+        ang2 = math.atan2(p2[1] - cy, p2[0] - cx)
+        sweep = ang2 - ang1
+        sweep = (sweep + math.pi) % (2 * math.pi) - math.pi
+        bulges_contour.append(math.tan(sweep / 4.0))
+
+    # Подмена bulge для первого сегмента
+    if len(bulges_contour) >= 2 and mode != "polyline":
+        bulges_contour[0] = bulges_contour[-2]  # Симметрия относительно предпоследнего сегмента
+
+    # Формируем верхний контур с bulges
+    contour_upper: List[Tuple[float, float, float]] = [
+        (x, y, b) for (x, y), b in zip(point_list, bulges_contour)
+    ]
+
+    # Формируем прямоугольную часть (правая, нижняя, левая стороны)
+    contour_rect: List[Tuple[float, float, float]] = [
+        (insert_point[0] + width, generatrix_length[-1], 0.0),  # Правая сторона (начало)
+        (insert_point[0] + width, insert_point[1], 0.0),       # Правая сторона (конец)
+        (insert_point[0], insert_point[1], 0.0),               # Нижняя сторона
+        (insert_point[0], generatrix_length[0], 0.0)           # Левая сторона (замыкание)
+    ]
+
+    # Отладка
+    print(f"Upper contour: {contour_upper}")
+    print(f"Rect contour: {contour_rect}")
+
+    return contour_upper, contour_rect, generatrix_length, width
 
 
 def get_profile_point(
@@ -228,10 +302,11 @@ def at_nozzle(data: Dict[str, Any]) -> bool:
             weld_allowance: Припуск на сварку.
             accuracy: Количество делений.
             offset: Смещение центра.
-            thk_correction: корректировка толщины отвода равнопроходного тройника
+            thk_correction: Корректировка толщины отвода равнопроходного тройника.
+            mode: "polyline", "bulge" или "spline" (режим построения контура).
 
     Returns:
-        True при успешном построении, иначе None.
+        bool: True при успешном построении, False при ошибке.
     """
     try:
         cad = ATCadInit()
@@ -240,36 +315,61 @@ def at_nozzle(data: Dict[str, Any]) -> bool:
 
         if not data:
             show_popup(loc.get("no_data_error"), popup_type="error")
-            return None
+            return False
 
         insert_point = data.get("insert_point")
         material = data.get("material", "")
         thickness = float(data.get("thickness", 0.0))
         order_number = data.get("order_number", "")
         detail_number = data.get("detail_number", "")
-        diameter = data.get("diameter", 0.0)
+        diameter = float(data.get("diameter", 0.0))
         diameter_main = float(data.get("diameter_main", 0.0))
-        length = data.get("length", 0.0)
+        length = float(data.get("length", 0.0))
         axis = data.get("axis", True)
-        axis_marks = data.get("axis_marks", 0.0)
+        axis_marks = float(data.get("axis_marks", 0.0))
         layer_name = data.get("layer_name", "0")
-        weld_allowance = data.get("weld_allowance", 0.0)
-        accuracy = data.get("accuracy", 180)
-        offset = data.get("offset", 0.0)
+        weld_allowance = float(data.get("weld_allowance", 0.0))
+        accuracy = int(data.get("accuracy", 180))
+        offset = float(data.get("offset", 0.0))
         thk_correction = data.get("thk_correction", False)
-        thickness_correction = True if thk_correction else False
+        mode = data.get("mode", "polyline").lower()
 
         insert_point = list(map(float, insert_point[:3]))
         data["insert_point"] = insert_point
 
-        point_list, generatrix_length, width = build_unwrapped_contour(
-            insert_point, diameter, diameter_main, length,
-            weld_allowance, accuracy, offset, thickness, thickness_correction
+        # Вызов функции build_unwrapped_contour
+        contour_upper, contour_rect, generatrix_length, width = build_unwrapped_contour(
+            insert_point, diameter, diameter_main, length, weld_allowance, accuracy, offset, thickness, thk_correction, mode
         )
         rights_bottom_point = (insert_point[0] + width, insert_point[1])
 
-        variant_points = convert_to_variant_points(point_list)
-        add_polyline(model, variant_points, layer_name=layer_name)
+        if not contour_upper or not contour_rect:
+            show_popup(loc.get("contour_not_built"), popup_type="error")
+            return False
+
+        # Построение контура в зависимости от режима
+        if mode == "polyline" or mode == "bulge":
+            # Объединяем верхнюю и прямоугольную части в единый контур
+            contour_with_bulge = contour_upper + contour_rect[1:]  # Пропускаем первую точку contour_rect
+            add_polyline(model, contour_with_bulge, layer_name=layer_name, closed=True)
+        elif mode == "spline":
+            # Верхняя часть как сплайн
+            points_xy = [[x, y] for x, y, _ in contour_upper]
+            add_spline(model, points_xy, layer_name=layer_name, closed=False)
+            # Прямоугольная часть как полилиния
+            add_polyline(model, contour_rect, layer_name=layer_name, closed=False)
+            # Соединяем концы сплайна и полилинии для замыкания
+            add_line(model,
+                     ensure_point_variant([contour_upper[-1][0], contour_upper[-1][1], 0]),
+                     ensure_point_variant([contour_rect[0][0], contour_rect[0][1], 0]),
+                     layer_name=layer_name)
+            add_line(model,
+                     ensure_point_variant([contour_rect[-1][0], contour_rect[-1][1], 0]),
+                     ensure_point_variant([contour_upper[0][0], contour_upper[0][1], 0]),
+                     layer_name=layer_name)
+        else:
+            show_popup(loc.get("unknown_mode").format(mode), popup_type="info")
+            return False
 
         if axis:
             build_axes(model, insert_point, width, generatrix_length, accuracy)
@@ -312,7 +412,7 @@ def at_nozzle(data: Dict[str, Any]) -> bool:
                     loc.get("text_error_details").format(i + 1, config['text'], str(e)),
                     popup_type="error"
                 )
-                return None
+                return False
 
         _, top_quarter_variant, (x_quarter, y_quarter) = get_profile_point(
             insert_point, width, generatrix_length, accuracy, 1 / 4
@@ -330,25 +430,26 @@ def at_nozzle(data: Dict[str, Any]) -> bool:
             loc.get("build_error").format(str(e)),
             popup_type="error"
         )
-    return None
+        return False
 
 
 if __name__ == "__main__":
     input_data = {
         "insert_point": [0.0, 0.0, 0.0],
-        "diameter": 150,
-        "diameter_main": 300,
-        "length": 250,
-        "axis": True,
-        "axis_marks": 10,
+        "diameter": 150.0,
+        "diameter_main": 300.0,
+        "length": 250.0,
+        "axis": False,
+        "axis_marks": 0.0,
         "layer_name": "0",
-        "thickness": "4.0",
+        "thickness": 4.0,
         "order_number": "20196",
         "detail_number": "2-1",
         "material": "1.4301",
         "weld_allowance": 0.0,
-        "accuracy": 180,
+        "accuracy": 16,
         "offset": 0.0,
-        "thk_correction": False
+        "thk_correction": False,
+        "mode": "bulge"
     }
     at_nozzle(input_data)
