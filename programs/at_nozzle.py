@@ -18,6 +18,7 @@ from programs.at_base import regen
 from programs.at_construction import add_text, add_polyline, add_spline
 from programs.at_geometry import ensure_point_variant, polar_point, convert_to_variant_points, circle_center_from_points
 from programs.at_construction import add_line, add_dimension
+from programs.at_input import at_point_input
 from windows.at_gui_utils import show_popup
 from config.at_config import TEXT_HEIGHT_SMALL, DEFAULT_DIM_OFFSET
 
@@ -168,10 +169,10 @@ def build_unwrapped_contour(
 
     # Формируем прямоугольную часть (правая, нижняя, левая стороны)
     contour_rect: List[Tuple[float, float, float]] = [
-        (insert_point[0] + width, generatrix_length[-1], 0.0),  # Правая сторона (начало)
-        (insert_point[0] + width, insert_point[1], 0.0),       # Правая сторона (конец)
-        (insert_point[0], insert_point[1], 0.0),               # Нижняя сторона
-        (insert_point[0], generatrix_length[0], 0.0)           # Левая сторона (замыкание)
+        (insert_point[0] + width, insert_point[1] + generatrix_length[-1], 0.0),  # правая верхняя
+        (insert_point[0] + width, insert_point[1], 0.0),  # правая нижняя
+        (insert_point[0], insert_point[1], 0.0),  # левая нижняя
+        (insert_point[0], insert_point[1] + generatrix_length[0], 0.0)  # левая верхняя
     ]
 
     # Отладка
@@ -434,19 +435,23 @@ def at_nozzle(data: Dict[str, Any]) -> bool:
 
 
 if __name__ == "__main__":
+    cad = ATCadInit()
+    adoc = cad.document
+    model = cad.model_space
+
     input_data = {
-        "insert_point": [0.0, 0.0, 0.0],
-        "diameter": 150.0,
-        "diameter_main": 300.0,
-        "length": 250.0,
+        "insert_point": at_point_input(adoc, prompt=loc.get("select_point", "Укажите центр отвода"), as_variant=False),
+        "diameter": 163.3,
+        "diameter_main": 800.0,
+        "length": 495.0,
         "axis": False,
         "axis_marks": 0.0,
         "layer_name": "0",
-        "thickness": 4.0,
-        "order_number": "20196",
-        "detail_number": "2-1",
+        "thickness": 5.0,
+        "order_number": "20202",
+        "detail_number": "17",
         "material": "1.4301",
-        "weld_allowance": 0.0,
+        "weld_allowance": 3.0,
         "accuracy": 16,
         "offset": 0.0,
         "thk_correction": False,
