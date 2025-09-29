@@ -1,5 +1,5 @@
 """
-programms/at_addhead.py
+programs/at_addhead.py
 Модуль для построения днища в AutoCAD.
 Создаёт внутреннюю и внешнюю полилинии днища на основе заданных параметров.
 Поддерживает локализацию, логирование и интеграцию с ATCadInit.
@@ -10,8 +10,8 @@ import logging
 from typing import Tuple, List, Optional, Dict
 import wx
 from config.at_cad_init import ATCadInit
-from programms.at_base import layer_context, ensure_layer
-from programms.at_geometry import at_bulge
+from programs.at_base import layer_context, ensure_layer
+from programs.at_geometry import at_bulge
 from windows.at_window_utils import show_popup
 from locales.at_translations import loc
 

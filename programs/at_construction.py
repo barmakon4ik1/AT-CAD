@@ -1,6 +1,6 @@
 """
 Файл: at_construction.py
-Путь: programms/at_construction.py
+Путь: programs/at_construction.py
 
 Описание:
 Модуль для создания геометрических объектов в AutoCAD через COM-интерфейс.
@@ -25,10 +25,10 @@ import pythoncom
 
 from config.at_cad_init import ATCadInit
 from config.at_config import DEFAULT_TEXT_LAYER, DEFAULT_DIM_OFFSET
-from programms.at_base import regen
-from programms.at_dimension import add_dimension
-from programms.at_geometry import add_rectangle_points, offset_point, polar_point, ensure_point_variant
-from programms.at_input import at_point_input
+from programs.at_base import regen
+from programs.at_dimension import add_dimension
+from programs.at_geometry import add_rectangle_points, offset_point, polar_point, ensure_point_variant
+from programs.at_input import at_point_input
 from windows.at_gui_utils import show_popup
 from locales.at_translations import loc
 

@@ -51,6 +51,11 @@ TRANSLATIONS = {
         "ru": "Днище",
         "de": "Boden",
         "en": "Head"
+    },
+    "at_run_shell": {
+        "ru": "Оболочка",
+        "de": "Mantel",
+        "en": "Shell"
     }
 }
 # Регистрируем переводы сразу при загрузке модуля

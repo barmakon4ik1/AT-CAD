@@ -1,5 +1,5 @@
 """
-File: programms/at_shell.py
+File: programs/at_shell.py
 Назначение: Построение развертки цилиндра (оболочки)
 с нанесением осей, текстов и размеров в AutoCAD
 """
@@ -28,10 +28,10 @@ import math
 from typing import Dict
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
-from programms.at_base import regen
-from programms.at_construction import add_text
-from programms.at_geometry import ensure_point_variant, get_unwrapped_points, offset_point, polar_point
-from at_construction import add_rectangle, add_line, add_dimension
+from programs.at_base import regen
+from programs.at_construction import add_text
+from programs.at_geometry import ensure_point_variant, get_unwrapped_points, offset_point, polar_point
+from programs.at_construction import add_rectangle, add_line, add_dimension
 from windows.at_gui_utils import show_popup
 from config.at_config import TEXT_HEIGHT_BIG, TEXT_HEIGHT_SMALL, TEXT_DISTANCE, DEFAULT_DIM_OFFSET
 
@@ -63,6 +63,8 @@ TRANSLATIONS = {
 # Регистрируем переводы при загрузке модуля
 loc.register_translations(TRANSLATIONS)
 
+def main(data):
+    return at_shell(data)
 
 def at_shell(data: Dict[str, any]) -> bool:
     """
@@ -274,17 +276,17 @@ def at_shell(data: Dict[str, any]) -> bool:
 if __name__ == "__main__":
     # Пример данных для тестирования
     input_data = {
-        "insert_point": [-2000.0, 0.0, 0.0],
-        "diameter": 846,
-        "length": 900,
-        "angle": 270,
+        "insert_point": [-3000.0, 0.0, 0.0],
+        "diameter": 790,
+        "length": 1700,
+        "angle": 340,
         "clockwise": True,
         "axis": True,
-        "axis_marks": 10.0,
+        "axis_marks": 0.0,
         "layer_name": "0",
-        "thickness": "4.0",
-        "order_number": "K20196",
-        "detail_number": "2-1",
+        "thickness": "10.0",
+        "order_number": "K20202",
+        "detail_number": "1",
         "weld_allowance_top": 0.0,
         "weld_allowance_bottom": 0.0
     }

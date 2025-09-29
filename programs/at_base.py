@@ -1,7 +1,7 @@
-# programms/at_base.py
+# programs/at_base.py
 """
 Файл: at_base.py
-Путь: programms/at_base.py
+Путь: programs/at_base.py
 
 Описание:
 Модуль для базовых операций с AutoCAD через COM-интерфейс.
@@ -12,6 +12,42 @@ from contextlib import contextmanager
 from config.at_cad_init import ATCadInit
 from locales.at_localization_class import loc
 from windows.at_gui_utils import show_popup
+import importlib
+import logging
+from typing import Any
+
+def run_program(module_name: str, data: Any = None) -> Any:
+    """
+    Универсальный запуск build-модуля по имени модуля.
+    1) Пытается вызвать module.main(data)
+    2) Если main отсутствует — пробует вызвать функцию с именем module_name.split('.')[-1]
+    Возвращает результат вызова или None при ошибке.
+    """
+    try:
+        module = importlib.import_module(module_name)
+    except Exception as e:
+        logging.error(f"[run_program] Не удалось импортировать модуль {module_name}: {e}")
+        return None
+
+    # 1) main
+    if hasattr(module, "main"):
+        try:
+            return getattr(module, "main")(data)
+        except Exception as e:
+            logging.exception(f"[run_program] Ошибка при вызове {module_name}.main: {e}")
+            return None
+
+    # 2) fallback по имени модуля (последняя часть)
+    func_name = module_name.split(".")[-1]
+    if hasattr(module, func_name):
+        try:
+            return getattr(module, func_name)(data)
+        except Exception as e:
+            logging.exception(f"[run_program] Ошибка при вызове {module_name}.{func_name}: {e}")
+            return None
+
+    logging.debug(f"[run_program] В модуле {module_name} нет функции 'main' и нет '{func_name}'")
+    return None
 
 
 def regen(adoc: object) -> bool:

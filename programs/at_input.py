@@ -1,6 +1,6 @@
 """
 Файл: at_input.py
-Путь: programms/at_input.py
+Путь: programs/at_input.py
 
 Описание:
 Модуль для обработки пользовательского ввода точек в AutoCAD через COM-интерфейс.
@@ -11,7 +11,7 @@ from typing import Optional, List, Union
 from win32com.client import VARIANT
 from config.at_cad_init import ATCadInit
 from locales.at_localization_class import loc
-from programms.at_com_utils import safe_utility_call
+from programs.at_com_utils import safe_utility_call
 
 
 def at_point_input(adoc: object = None, as_variant: bool = True, prompt: str = None) -> Optional[Union[List[float], VARIANT]]:

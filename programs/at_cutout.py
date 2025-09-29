@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-File: programms/at_cutout.py
+File: programs/at_cutout.py
 Назначение: Построение выреза в трубе для штуцера.
 Поддерживает три режима:
     - polyline (отрезки)
@@ -19,18 +19,19 @@ import math
 from typing import Dict, Any, List, Tuple
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
-from programms.at_base import regen
-from programms.at_construction import (
+from programs.at_base import regen
+from programs.at_construction import (
     add_polyline,
     add_dimension,
     add_line,
     add_spline,
 )
-from programms.at_geometry import (
+from programs.at_geometry import (
     ensure_point_variant,
     convert_to_variant_points,
     circle_center_from_points,
 )
+from programs.at_input import at_point_input
 from windows.at_gui_utils import show_popup
 
 # Переводы сообщений
@@ -68,7 +69,7 @@ def compute_cyl_cyl_intersection_unwrap(
     R: float,
     r: float,
     offset: float,
-    steps: int = 360,
+    steps: int = 180,
     eps: float = 1e-12
 ) -> List[List[Tuple[float, float, float]]]:
     """
@@ -282,12 +283,16 @@ def at_cutout(data: Dict[str, Any]) -> bool:
 
 
 if __name__ == "__main__":
+    cad = ATCadInit()
+    adoc = cad.document
+    model = cad.model_space
+
     data = {
-        "insert_point": [0.0, 0.0, 0.0],
-        "diameter": 200.0,
-        "diameter_main": 300.0,
-        "offset": 0,
-        "steps": 36,
+        "insert_point": at_point_input(adoc, prompt=loc.get("select_point", "Укажите центр отвода"), as_variant=False),
+        "diameter": 170,
+        "diameter_main": 790.0,
+        "offset": 250,
+        "steps": 180,
         "layer_name": "0",
         "mode": "bulge"
     }

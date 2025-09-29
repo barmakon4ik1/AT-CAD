@@ -1,5 +1,5 @@
 """
-Файл: programms/at_run_cone.py
+Файл: programs/at_run_cone.py
 Описание:
 Модуль для построения развертки конуса в AutoCAD с использованием Win32com (COM).
 Использует данные из окна content_cone.py для создания развертки конуса, добавления текстовых меток
@@ -14,10 +14,10 @@ from win32com.client import VARIANT
 from config.at_cad_init import ATCadInit
 from config.at_config import TEXT_HEIGHT_BIG, TEXT_HEIGHT_SMALL, TEXT_DISTANCE, DEFAULT_DIM_OFFSET
 from locales.at_translations import loc
-from programms.at_construction import at_cone_sheet, polar_point, add_text
-from programms.at_base import ensure_layer, regen
-from programms.at_dimension import add_dimension
-from programms.at_geometry import ensure_point_variant
+from programs.at_construction import at_cone_sheet, polar_point, add_text
+from programs.at_base import ensure_layer, regen
+from programs.at_dimension import add_dimension
+from programs.at_geometry import ensure_point_variant
 from windows.at_gui_utils import show_popup
 
 # -----------------------------

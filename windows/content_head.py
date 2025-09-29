@@ -17,7 +17,7 @@ from windows.at_window_utils import (
     create_standard_buttons, adjust_button_widths, update_status_bar_point_selected,
     BaseContentPanel, load_user_settings, load_common_data
 )
-from programms.at_input import at_point_input
+from programs.at_input import at_point_input
 
 # Настройка логирования только для критических ошибок
 logging.basicConfig(

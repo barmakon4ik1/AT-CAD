@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Модуль: at_geometry.py
-Путь: programms\at_geometry.py
+Путь: programs\at_geometry.py
 
 Модуль для геометрических вычислений.
 
@@ -18,8 +18,8 @@ import math
 from typing import Optional, List, Tuple, Union, Dict
 
 from config.at_cad_init import ATCadInit
-from programms.at_input import at_point_input
-from programms.at_utils import handle_errors
+from programs.at_input import at_point_input
+from programs.at_utils import handle_errors
 from win32com.client import VARIANT
 import pythoncom
 from locales.at_translations import loc

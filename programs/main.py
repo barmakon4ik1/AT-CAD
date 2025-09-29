@@ -1,4 +1,4 @@
-# programms/main.py
+# programs/main.py
 
 def get_input_data(window_title: str, window_func) -> dict:
     """

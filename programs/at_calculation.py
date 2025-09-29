@@ -1,6 +1,6 @@
 """
 Файл: at_calculation.py
-Путь: programms/at_calculation.py
+Путь: programs/at_calculation.py
 """
 import json
 import os

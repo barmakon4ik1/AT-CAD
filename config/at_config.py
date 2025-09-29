@@ -33,6 +33,7 @@ HEAD_IMAGE_PATH: Path = IMAGES_DIR / "head_image.png"
 PLATE_IMAGE_PATH: Path = IMAGES_DIR / "plate_image.png"
 CONE_IMAGE_PATH: Path = IMAGES_DIR / "cone_image.png"
 DONE_ICON_PATH: Path = IMAGES_DIR / "done-icon.png"
+SHELL_IMAGE_PATH: Path = IMAGES_DIR / "shell_image.png"
 
 # --- Иконки языков ---
 LANGUAGE_ICONS: dict[str, Path] = {

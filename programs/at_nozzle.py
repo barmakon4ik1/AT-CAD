@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-File: programms/at_nozzle.py
+File: programs/at_nozzle.py
 Назначение: Построение развертки патрубка
 прямоугольного простого переходного тройника
 с сопутствующими данными (текстами, размерами и т.п.)
@@ -14,10 +14,10 @@ import math
 from typing import Dict, Any, List, Tuple
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
-from programms.at_base import regen
-from programms.at_construction import add_text, add_polyline, add_spline
-from programms.at_geometry import ensure_point_variant, polar_point, convert_to_variant_points, circle_center_from_points
-from programms.at_construction import add_line, add_dimension
+from programs.at_base import regen
+from programs.at_construction import add_text, add_polyline, add_spline
+from programs.at_geometry import ensure_point_variant, polar_point, convert_to_variant_points, circle_center_from_points
+from programs.at_construction import add_line, add_dimension
 from windows.at_gui_utils import show_popup
 from config.at_config import TEXT_HEIGHT_SMALL, DEFAULT_DIM_OFFSET
 

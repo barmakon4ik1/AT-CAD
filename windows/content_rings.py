@@ -9,7 +9,7 @@ import wx
 import win32com.client
 from config.at_config import *
 from locales.at_translations import loc
-from programms.at_input import at_point_input
+from programs.at_input import at_point_input
 from windows.at_window_utils import (
     CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel,
     create_standard_buttons, adjust_button_widths, update_status_bar_point_selected,

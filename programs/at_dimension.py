@@ -1,5 +1,5 @@
 """
-Файл: programms/add_dimension.py
+Файл: programs/add_dimension.py
 Описание:
     Добавление размеров в AutoCAD через COM API.
     Поддерживаются типы размеров:
@@ -12,8 +12,8 @@
 
 Зависимости:
     - config.at_cad_init.ATCadInit — инициализация AutoCAD COM API
-    - programms.at_base.regen — регенерация чертежа
-    - programms.at_input.at_point_input — запрос точки у пользователя
+    - programs.at_base.regen — регенерация чертежа
+    - programs.at_input.at_point_input — запрос точки у пользователя
     - config.at_config — значения по умолчанию (масштаб, отступ, стиль, слой)
     - locales.at_localization_class.loc — локализация
 
@@ -25,7 +25,7 @@
     - AddDimAngular(angleVertex, firstEndPoint, secondEndPoint, textPoint)
 """
 
-# ============================== programms/add_dimension.py ==============================
+# ============================== programs/add_dimension.py ==============================
 
 import math
 import pythoncom
@@ -33,8 +33,8 @@ from typing import Optional, Union
 from win32com.client import VARIANT
 
 from config.at_cad_init import ATCadInit
-from programms.at_base import regen
-from programms.at_input import at_point_input
+from programs.at_base import regen
+from programs.at_input import at_point_input
 from config.at_config import (
     DEFAULT_DIM_SCALE,
     DEFAULT_DIM_OFFSET,

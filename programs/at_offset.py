@@ -1,5 +1,5 @@
 """
-Файл: programms/at_offset.py
+Файл: programs/at_offset.py
 """
 import win32com.client
 import pythoncom
@@ -8,11 +8,11 @@ from typing import List, Any
 from win32com.client import VARIANT
 
 from config.at_cad_init import ATCadInit
-from programms.at_base import regen
-from programms.at_dimension import add_dimension
-from programms.at_construction import add_text, add_polyline
-from programms.at_geometry import polar_point, offset_point
-from programms.at_input import at_point_input
+from programs.at_base import regen
+from programs.at_dimension import add_dimension
+from programs.at_construction import add_text, add_polyline
+from programs.at_geometry import polar_point, offset_point
+from programs.at_input import at_point_input
 
 
 def at_offset(polyline: Any, offset_distance: float, doc: Any, model: Any) -> list[Any] | None:

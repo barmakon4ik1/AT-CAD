@@ -1,5 +1,5 @@
 """
-programms/at_ringe.py
+programs/at_ringe.py
 Модуль для построения колец в AutoCAD на основе данных из диалогового окна.
 Создаёт окружности с заданными диаметрами и добавляет текстовые метки с номером работы.
 """
@@ -8,9 +8,9 @@ from win32com.client import VARIANT
 from config.at_cad_init import ATCadInit
 from config.at_config import DEFAULT_CIRCLE_LAYER
 from locales.at_translations import loc
-from programms.at_construction import add_circle, add_text
-from programms.at_base import layer_context, regen
-from programms.at_geometry import ensure_point_variant
+from programs.at_construction import add_circle, add_text
+from programs.at_base import layer_context, regen
+from programs.at_geometry import ensure_point_variant
 from windows.at_gui_utils import show_popup
 
 # -----------------------------

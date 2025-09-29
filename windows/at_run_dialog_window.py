@@ -11,15 +11,16 @@
 import wx
 import logging
 import importlib
-from typing import Union, List, Tuple  # Добавляем импорт Union, List, Tuple
-from windows.at_content_registry import CONTENT_REGISTRY
+from typing import Union, List, Tuple
+from windows.at_content_registry import CONTENT_REGISTRY, run_build
 
-# # Настройка логирования в консоль
-# logging.basicConfig(
-#     level=logging.INFO,
-#     format="%(asctime)s - %(levelname)s - %(message)s",
-#     handlers=[logging.StreamHandler()]
-# )
+# Настройка логирования в консоль
+logging.basicConfig(
+    level=logging.INFO,  # 👈 чтобы видеть отладочные сообщения
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()]
+)
+
 
 def load_content(content_name: str, parent: wx.Window) -> Union[List[Tuple[str, str]], wx.Window, None]:
     """
@@ -30,28 +31,41 @@ def load_content(content_name: str, parent: wx.Window) -> Union[List[Tuple[str, 
         parent: Родительский элемент (обычно content_panel).
 
     Returns:
-        Union[List[Tuple[str, str]], wx.Window, None]: Список программ для меню или панель контента.
+        Union[List[Tuple[str, str]], wx.Window, None]:
+            - список программ для меню (если content_name == "get_content_menu"),
+            - панель контента (wx.Window),
+            - None при ошибке.
     """
-    logging.info(f"load_content: Попытка загрузки {content_name}")
+    logging.info(f"[at_run_dialog_window] Попытка загрузки {content_name}")
+
     if content_name == "get_content_menu":
         result = [(name, info.get("label", name)) for name, info in CONTENT_REGISTRY.items()]
-        logging.info(f"load_content: Возвращён список программ: {result}")
+        logging.info(f"[at_run_dialog_window] Возвращён список программ: {result}")
         return result
 
     content_info = CONTENT_REGISTRY.get(content_name)
     if not content_info:
-        logging.error(f"Контент {content_name} не найден в CONTENT_REGISTRY")
+        logging.error(f"[at_run_dialog_window] Контент {content_name} не найден в CONTENT_REGISTRY")
         return None
 
     try:
         module = importlib.import_module(content_info.get("module", ""))
         create_window = getattr(module, "create_window")
         panel = create_window(parent)
-        logging.info(f"load_content: Успешно загружен контент {content_name}, тип: {panel.__class__.__name__}")
+
+        # 🔑 Назначаем универсальный callback на submit (если панель его поддерживает)
+        if hasattr(panel, "on_submit_callback"):
+            panel.on_submit_callback = lambda data, name=content_name: run_build(name, data)
+            logging.info(f"[at_run_dialog_window] Назначен on_submit_callback для {content_name}")
+
+        logging.info(f"[at_run_dialog_window] Успешно загружен контент {content_name}, "
+                     f"тип: {panel.__class__.__name__}")
         return panel
+
     except Exception as e:
-        logging.error(f"Ошибка загрузки контента {content_name}: {e}")
+        logging.exception(f"[at_run_dialog_window] Ошибка загрузки контента {content_name}: {e}")
         return None
+
 
 def at_load_content(content_name: str, parent: wx.Window) -> wx.Window | None:
     """

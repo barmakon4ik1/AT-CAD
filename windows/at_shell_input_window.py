@@ -7,7 +7,7 @@
 import wx
 from typing import Optional, Dict
 from config.at_config import BACKGROUND_COLOR, LANGUAGE
-from programms.at_construction import at_diameter
+from programs.at_construction import at_diameter
 from locales.at_localization_class import loc
 from windows.at_window_utils import BaseInputWindow, CanvasPanel, save_last_input, show_popup, get_standard_font, create_standard_buttons, create_window
 

@@ -15,7 +15,7 @@ import wx
 from typing import Tuple, Dict, Optional, List
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
-from programms.at_input import at_point_input
+from programs.at_input import at_point_input
 from windows.at_style import style_textctrl, style_combobox, style_radiobutton, style_staticbox, style_label
 from config.at_config import load_user_settings, DEFAULT_SETTINGS, get_setting, ICON_PATH, RESOURCE_DIR
 from config.at_last_input import save_last_input

@@ -1,6 +1,6 @@
 """
 Файл: at_com_utils.py
-Путь: programms/at_com_utils.py
+Путь: programs/at_com_utils.py
 
 Описание:
 Утилиты для безопасного вызова методов AutoCAD через COM API.

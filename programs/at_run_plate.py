@@ -1,4 +1,4 @@
-# programms/at_run_plate.py
+# programs/at_run_plate.py
 """
 Модуль для построения листа для лазерной резки в AutoCAD с использованием Win32com (COM).
 
@@ -10,13 +10,13 @@ from win32com.client import VARIANT
 from config.at_cad_init import ATCadInit
 from config.at_config import DEFAULT_CIRCLE_LAYER, TEXT_HEIGHT_BIG, DEFAULT_DIM_OFFSET
 from locales.at_translations import loc
-from programms.at_calculation import at_density, at_plate_weight
-from programms.at_construction import add_circle, add_text, add_polyline
-from programms.at_base import layer_context, regen
-from programms.at_dimension import add_dimension
-from programms.at_geometry import ensure_point_variant, polar_point, offset_point, build_polyline_list, \
+from programs.at_calculation import at_density, at_plate_weight
+from programs.at_construction import add_circle, add_text, add_polyline
+from programs.at_base import layer_context, regen
+from programs.at_dimension import add_dimension
+from programs.at_geometry import ensure_point_variant, polar_point, offset_point, build_polyline_list, \
     convert_to_variant_points
-from programms.at_offset import at_offset
+from programs.at_offset import at_offset
 from windows.at_gui_utils import show_popup
 
 # -----------------------------
