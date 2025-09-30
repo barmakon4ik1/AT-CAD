@@ -426,7 +426,7 @@ def get_link_font() -> wx.Font:
     return wx.Font(font_size, wx.FONTFAMILY_ROMAN, font_style, font_weight, faceName=font_name)
 
 
-def fit_text_to_height(ctrl, text: str, max_width: int, max_height: int, font_name: str, style_flags: Dict) -> int:
+def fit_text_to_height(ctrl: object, text: str, max_width: int, max_height: int, font_name: str, style_flags: Dict) -> int:
     """
     Подбирает наибольший размер шрифта, при котором текст помещается по высоте.
 

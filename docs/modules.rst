@@ -58,115 +58,121 @@
     :show-inheritance:
 
 
-.. automodule:: programms.at_addhead
+.. automodule:: programs.at_addhead
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: programms.at_base
+.. automodule:: programs.at_base
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: programms.at_build_cone_sweep
+.. automodule:: programs.at_build_cone_sweep
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: programms.at_calculation
+.. automodule:: programs.at_calculation
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: programms.at_com_utils
+.. automodule:: programs.at_com_utils
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: programms.at_construction
+.. automodule:: programs.at_construction
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: programms.at_cutout
+.. automodule:: programs.at_cutout
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: programms.at_data_manager
+.. automodule:: programs.at_data_manager
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: programms.at_dimension
+.. automodule:: programs.at_dimension
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: programms.at_geometry
+.. automodule:: programs.at_geometry
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: programms.at_input
+.. automodule:: programs.at_input
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: programms.at_nozzle
+.. automodule:: programs.at_nozzle
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: programms.at_offset
+.. automodule:: programs.at_offset
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: programms.at_ringe
+.. automodule:: programs.at_ringe
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: programms.at_run_cone
+.. automodule:: programs.at_run_cone
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: programms.at_run_plate
+.. automodule:: programs.at_run_plate
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: programms.at_shell
+.. automodule:: programs.at_shell
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: programms.at_utils
+.. automodule:: programs.at_utils
     :members:
     :undoc-members:
     :show-inheritance:
 
 
-.. automodule:: programms.main
+.. automodule:: programs.main
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+.. automodule:: utils.fix_png
     :members:
     :undoc-members:
     :show-inheritance:
@@ -238,6 +244,12 @@
     :show-inheritance:
 
 
+.. automodule:: windows.content_nozzle
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
 .. automodule:: windows.content_plate
     :members:
     :undoc-members:
@@ -245,6 +257,12 @@
 
 
 .. automodule:: windows.content_rings
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+.. automodule:: windows.content_shell
     :members:
     :undoc-members:
     :show-inheritance:

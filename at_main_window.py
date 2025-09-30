@@ -107,6 +107,11 @@ TRANSLATIONS = {
         "ru": "Настройки",
         "de": "Einstellungen",
         "en": "Settings"
+    },
+    "status_ready": {
+        "ru": "Система готова к работе",
+        "de": "Das System ist betriebsbereit",
+        "en": "The system is ready for operation"
     }
 }
 # Регистрируем переводы сразу при загрузке модуля (до любых вызовов loc.get)
@@ -154,7 +159,6 @@ class ATMainWindow(wx.Frame):
                     lang = lang_data.get("language")
                     if isinstance(lang, str) and lang in ["ru", "en", "de"]:
                         loc.set_language(lang)
-                        logging.info(f"Язык загружен из user_language.json: {lang}")
                     else:
                         logging.warning(
                             f"Некорректный или отсутствующий язык в user_language.json: {lang}, используется {loc.language}")
@@ -295,7 +299,6 @@ class ATMainWindow(wx.Frame):
 
         try:
             new_content = at_load_content(content_name, self.content_panel)
-            print(f"[DEBUG] switch_content загрузил {type(new_content)}")
 
             if new_content and isinstance(new_content, wx.Window):
                 self.current_content = new_content
@@ -310,17 +313,13 @@ class ATMainWindow(wx.Frame):
 
                         content_info = CONTENT_REGISTRY.get(content_name)
                         if not content_info or "build_module" not in content_info:
-                            print(f"[DEBUG] Нет build_module для {content_name}")
                             return False
 
                         try:
                             build_module = importlib.import_module(content_info["build_module"])
                             build_func = getattr(build_module, "main", None)
                             if build_func:
-                                print(f"[DEBUG] Запуск build_func из {content_info['build_module']} для {content_name}")
                                 return build_func(data)
-                            else:
-                                print(f"[DEBUG] В {content_info['build_module']} нет функции main")
                         except Exception as e:
                             print(f"[DEBUG] Ошибка при импорте/вызове {content_name}: {e}")
                         return False
@@ -348,11 +347,9 @@ class ATMainWindow(wx.Frame):
         self.update_ui(self.settings)
 
     def on_language_change(self, new_lang: str) -> None:
-        print(f"[DEBUG] on_language_change вызван, язык={new_lang}")
         if not isinstance(new_lang, str):
             return
         loc.set_language(new_lang)
-        print(f"[DEBUG] loc.language после установки = {loc.language}")
 
         self.update_language_icon(new_lang)
         self.update_ui(self.settings)
@@ -360,24 +357,18 @@ class ATMainWindow(wx.Frame):
         if self.current_content and hasattr(self.current_content, 'update_ui_language'):
             try:
                 if not self.current_content.IsBeingDeleted():
-                    print("[DEBUG] вызов update_ui_language у текущего контента")
                     self.current_content.update_ui_language()
             except Exception as e:
-                print(f"[DEBUG] Ошибка в update_ui_language: {e}")
                 show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
 
     def on_change_language(self, event) -> None:
-        print("[DEBUG] on_change_language вызван")
         current_langs = ["ru", "en", "de"]
         if not isinstance(loc.language, str):
             loc.language = "ru"
         current_index = current_langs.index(loc.language) if loc.language in current_langs else 0
         new_index = (current_index + 1) % len(current_langs)
         new_lang = current_langs[new_index]
-        print(f"[DEBUG] переключение языка: {loc.language} → {new_lang}")
-
         loc.set_language(new_lang)
-        print(f"[DEBUG] loc.language после установки = {loc.language}")
 
         self.update_language_icon(new_lang)
         self.update_ui(self.settings)
@@ -385,10 +376,8 @@ class ATMainWindow(wx.Frame):
         if self.current_content and hasattr(self.current_content, 'update_ui_language'):
             try:
                 if not self.current_content.IsBeingDeleted():
-                    print("[DEBUG] вызов update_ui_language у текущего контента (через флаг)")
                     self.current_content.update_ui_language()
             except Exception as e:
-                print(f"[DEBUG] Ошибка в update_ui_language: {e}")
                 show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
 
     def create_banner(self) -> None:
@@ -447,8 +436,10 @@ class ATMainWindow(wx.Frame):
             wx.FONTFAMILY_DEFAULT,
             style_flags["style"],
             style_flags["weight"],
-            faceName=self.settings.get("FONT_NAME", DEFAULT_SETTINGS["FONT_NAME"])
+            False,  # underline
+            self.settings.get("FONT_NAME", DEFAULT_SETTINGS["FONT_NAME"])  # faceName
         )
+
         self.title.SetFont(font)
         self.title.SetForegroundColour(wx.Colour(self.settings.get("BANNER_TEXT_COLOR", DEFAULT_SETTINGS["BANNER_TEXT_COLOR"])))
         self.title.SetLabel(title_text)
@@ -776,7 +767,7 @@ class ATMainWindow(wx.Frame):
         if hasattr(self, "status_text"):
             self.status_text.SetLabel(loc.get("status_ready", "Готово"))
             font = wx.Font(
-                settings.get("FONT_SIZE", DEFAULT_SETTINGS["FONT_SIZE"]),
+                settings.get("STATUS_FONT_SIZE", DEFAULT_SETTINGS["STATUS_FONT_SIZE"]),
                 wx.FONTFAMILY_DEFAULT,
                 wx.FONTSTYLE_NORMAL if settings.get("FONT_TYPE", "normal") == "normal" else wx.FONTSTYLE_ITALIC,
                 wx.FONTWEIGHT_BOLD if settings.get("FONT_TYPE", "normal") in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL,

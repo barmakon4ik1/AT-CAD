@@ -559,10 +559,8 @@ class ConeContentPanel(BaseContentPanel):
         Обновляет текст меток и групп при смене языка.
         Проверяет, что элементы не уничтожены.
         """
-        print("[DEBUG] ConeContentPanel.update_ui_language вызван")
         try:
             if self.IsBeingDeleted():
-                print("[DEBUG] Окно уничтожается, обновление языка пропущено")
                 return
 
             # StaticBox labels

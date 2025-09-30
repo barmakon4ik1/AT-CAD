@@ -96,7 +96,6 @@ class AppsContentPanel(BaseContentPanel):
         super().__init__(parent)
         self.links = []
         self.setup_ui()
-        logging.info(f"AppsContentPanel: UI инициализирован с языком {loc.language}")
 
     def setup_ui(self):
         """
@@ -113,11 +112,9 @@ class AppsContentPanel(BaseContentPanel):
 
         # Получаем список доступных программ из CONTENT_REGISTRY через load_content
         programs = load_content("get_content_menu", self) or []
-        logging.info(f"AppsContentPanel: Получены программы: {programs}")
 
         # Исключаем саму панель content_apps
         filtered_programs = [(name, label_key) for name, label_key in programs if name != "content_apps"]
-        logging.info(f"AppsContentPanel: Отфильтрованные программы: {filtered_programs}")
 
         for content_name, label_key in filtered_programs:
             if not isinstance(content_name, str):
@@ -136,20 +133,17 @@ class AppsContentPanel(BaseContentPanel):
             link.Bind(wx.EVT_LEFT_DOWN, lambda evt, name=content_name: self.on_link_click(name))
             self.links.append(link)
             link_sizer.Add(link, 0, wx.ALL | wx.ALIGN_LEFT, 10)
-            logging.info(f"AppsContentPanel: Добавлена ссылка: {label} (content_name={content_name}, label_key={label_key})")
 
         main_sizer.Add(link_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 10)
         self.SetSizer(main_sizer)
         self.GetParent().Layout()
         self.GetParent().Refresh()
-        logging.info(f"AppsContentPanel: UI настроен с языком {loc.language}")
 
     def update_ui_language(self):
         """
         Обновляет тексты интерфейса при смене языка.
         Пересобирает список ссылок с новыми переводами.
         """
-        print("[DEBUG] AppsContentPanel.update_ui_language вызван")
         self.setup_ui()
 
     def on_link_click(self, content_name: str):
@@ -159,12 +153,9 @@ class AppsContentPanel(BaseContentPanel):
         Args:
             content_name (str): Имя модуля контента для загрузки (например, 'cone').
         """
-        print(f"[DEBUG] on_link_click: content_name={content_name}")
         main_window = wx.GetTopLevelParent(self)
         if hasattr(main_window, "switch_content"):
             main_window.switch_content(content_name)
-        else:
-            print("[DEBUG] main_window не имеет метода switch_content")
 
 
 if __name__ == "__main__":

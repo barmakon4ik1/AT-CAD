@@ -42,9 +42,9 @@ TRANSLATIONS = {
         "en": "Material"
     },
     "thickness_label": {
-        "ru": "Толщина",
-        "de": "Dicke",
-        "en": "Thickness"
+        "ru": "Толщина S",
+        "de": "Dicke S",
+        "en": "Thickness S"
     },
     "melt_no_label": {
         "ru": "Номер плавки",
