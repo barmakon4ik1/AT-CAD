@@ -306,6 +306,7 @@ def save_last_position(x: int, y: int) -> None:
     except (PermissionError, OSError) as e:
         logging.error(f"Ошибка сохранения {config_path}: {e}")
 
+
 def load_last_position() -> Tuple[int, int]:
     """
     Загружает координаты последней позиции окна из файла 'config/last_position.json'.
@@ -321,6 +322,7 @@ def load_last_position() -> Tuple[int, int]:
     except (FileNotFoundError, json.JSONDecodeError) as e:
         logging.error(f"Ошибка загрузки {config_path}: {e}")
         return (-1, -1)
+
 
 def load_last_input(filename: str) -> Dict:
     """
@@ -468,7 +470,7 @@ def parse_float(value: str) -> Optional[float]:
     try:
         cleaned_value = value.strip().replace(',', '.')
         return float(cleaned_value) if cleaned_value else None
-    except ValueError:
+    except (ValueError, TypeError):
         return None
 
 

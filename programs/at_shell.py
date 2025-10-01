@@ -224,7 +224,7 @@ def at_shell(data: Dict[str, any]) -> bool:
         k_text = f"{order_number}"
         f_text = k_text if not detail_number else f"{k_text}-{detail_number}"
 
-        text_point = polar_point(insert_point, 100, 45, as_variant=False)
+        text_point = polar_point(insert_point, 20, 45, as_variant=False)
 
         text_configs = [
             # Гравировка
@@ -238,7 +238,7 @@ def at_shell(data: Dict[str, any]) -> bool:
             },
             # Маркировка
             {
-                "point": ensure_point_variant(polar_point(text_point, distance=60, alpha=90, as_variant=False)),
+                "point": ensure_point_variant(polar_point(text_point, distance=30, alpha=90, as_variant=False)),
                 "text": f_text,
                 "layer_name": "schrift",
                 "text_height": TEXT_HEIGHT_SMALL,

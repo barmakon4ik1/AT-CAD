@@ -289,9 +289,9 @@ if __name__ == "__main__":
 
     data = {
         "insert_point": at_point_input(adoc, prompt=loc.get("select_point", "Укажите центр отвода"), as_variant=False),
-        "diameter": 61,
-        "diameter_main": 790.0,
-        "offset": -175,
+        "diameter": 162.3,
+        "diameter_main": 219.1,
+        "offset": 0,
         "steps": 180,
         "layer_name": "0",
         "mode": "bulge"

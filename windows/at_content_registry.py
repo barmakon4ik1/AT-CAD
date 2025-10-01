@@ -46,15 +46,20 @@ TRANSLATIONS = {
         "de": "Boden",
         "en": "Head"
     },
+    "at_run_shell": {
+        "ru": "Обечайка",
+        "de": "Mantel",
+        "en": "Shell"
+    },
+    "at_run_nozzle": {
+        "ru": "Отвод",
+        "de": "Stutzen",
+        "en": "Nozzle"
+    },
     "at_run_plate": {
         "ru": "Лист",
         "de": "Platte",
         "en": "Plate"
-    },
-    "at_run_shell": {
-        "ru": "Оболочка",
-        "de": "Mantel",
-        "en": "Shell"
     }
 }
 
@@ -92,6 +97,11 @@ CONTENT_REGISTRY = {
         "module": "windows.content_shell",
         "label": "at_run_shell",
         "build_module": "programs.at_shell"
+    },
+    "nozzle": {
+        "module": "windows.content_nozzle",
+        "label": "at_run_nozzle",
+        "build_module": "programs.at_nozzle"
     }
 }
 

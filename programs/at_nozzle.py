@@ -175,10 +175,6 @@ def build_unwrapped_contour(
         (insert_point[0], insert_point[1] + generatrix_length[0], 0.0)  # левая верхняя
     ]
 
-    # Отладка
-    print(f"Upper contour: {contour_upper}")
-    print(f"Rect contour: {contour_rect}")
-
     return contour_upper, contour_rect, generatrix_length, width
 
 
@@ -283,6 +279,12 @@ def build_dimensions(adoc, insert_point, width, generatrix_length, accuracy, rig
 # -----------------------------
 # Основная функция
 # -----------------------------
+def main(data):
+    """
+    Чтобы функция корректно работала в связке с остальными программами в основном окне.
+    """
+    return at_nozzle(data)
+
 def at_nozzle(data: Dict[str, Any]) -> bool:
     """
     Основная функция построения развертки патрубка.
@@ -422,6 +424,7 @@ def at_nozzle(data: Dict[str, Any]) -> bool:
         mat_point = ensure_point_variant(mat_point)
         mat_text = loc.get("material_text").format(thickness, material)
         add_text(model, mat_point, mat_text, layer_name="AM_5", text_alignment=0)
+
 
         regen(adoc)
         return True

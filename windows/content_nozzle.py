@@ -54,32 +54,41 @@ from windows.at_content_registry import run_build
 TRANSLATIONS = {
     "error": {"ru": "Ошибка", "de": "Fehler", "en": "Error"},
     "main_data_label": {"ru": "Основные данные", "de": "Hauptdaten", "en": "Main Data"},
-    "order_label": {"ru": "К-№", "de": "Auftragsnummer", "en": "Order No."},
+    "order_label": {"ru": "К-№", "de": "Auftrags-Nr.", "en": "Order No."},
     "material_label": {"ru": "Материал", "de": "Material", "en": "Material"},
-    "thickness_label": {"ru": "Толщина", "de": "Dicke", "en": "Thickness"},
-    "nozzle_params_label": {"ru": "Параметры отвода", "de": "Abzweigparameter", "en": "Nozzle Params"},
-    "diameter_label": {"ru": "Диаметр отвода, d", "de": "Abzweigdurchmesser, d", "en": "Nozzle Diameter, d"},
-    "diameter_main_label": {"ru": "Диаметр магистрали, D", "de": "Hauptdurchmesser, D", "en": "Main Diameter, D"},
-    "length_label": {"ru": "Длина L", "de": "Länge L", "en": "Length L"},
+    "thickness_label": {"ru": "Толщина, S", "de": "Dicke, S", "en": "Thickness, S"},
+    "nozzle_params_label": {"ru": "Параметры отвода", "de": "Stutzenparameter", "en": "Nozzle Params"},
+    "diameter_label": {"ru": "Диаметр, d", "de": "Durchmesser, d", "en": "Diameter, d"},
+    "diameter_main_label": {"ru": "Диаметр магистрали, D", "de": "Main Durchmesser, D", "en": "Main Diameter, D"},
+    "length_label": {"ru": "Длина, L", "de": "Länge, L", "en": "Length, L"},
     "weld_allowance_label": {"ru": "Припуск на сварку", "de": "Schweißnahtzugabe", "en": "Weld Allowance"},
-    "offset_label": {"ru": "Смещение", "de": "Versatz", "en": "Offset"},
+    "offset_label": {"ru": "Смещение, O", "de": "Versatz, O", "en": "Offset, O"},
     "mode_label": {"ru": "Режим построения", "de": "Konstruktionsmodus", "en": "Build Mode"},
+    "mode_bulge": {"ru": "Дуги", "de": "Bogen", "en": "Bulge"},
+    "mode_polyline": {"ru": "Полилиния", "de": "Polylinie", "en": "Polyline"},
+    "mode_spline": {"ru": "Сплайн", "de": "Spline", "en": "Spline"},
     "accuracy_label": {"ru": "Точность (точек)", "de": "Genauigkeit (Punkte)", "en": "Accuracy (points)"},
     "additional_label": {"ru": "Доп. условия", "de": "Zusatzbedingungen", "en": "Additional"},
-    "axis_checkbox": {"ru": "Отрисовка осей", "de": "Achsen zeichnen", "en": "Draw axes"},
-    "axis_marks_label": {"ru": "Метки осей", "de": "Achsenmarken", "en": "Axis marks"},
+    "axis_checkbox": {"ru": "Показать оси на чертеже", "de": "Achsen zeichnen", "en": "Draw axes"},
+    "axis_marks_label": {"ru": "Метки осей, мм", "de": "Achsenmarken, mm", "en": "Axis marks, mm"},
     "ok_button": {"ru": "ОК", "de": "OK", "en": "OK"},
     "clear_button": {"ru": "Очистить", "de": "Zurücksetzen", "en": "Clear"},
     "cancel_button": {"ru": "Возврат", "de": "Zurück", "en": "Return"},
     "point_prompt": {"ru": "Укажите центр отвода", "de": "Geben Sie das Zentrum des Abzweigs an", "en": "Select nozzle center"},
     "point_selection_error": {"ru": "Точка не выбрана", "de": "Punkt nicht gewählt", "en": "Point not selected"},
+    "yes_label": {"ru": "Да", "de": "Ja", "en": "Yes"},
+    "no_label": {"ru": "Нет", "de": "Nein", "en": "No"},
+    "external_diameter_label": {"ru": "Внешний", "de": "Außen", "en": "External"},
+    "middle_diameter_label": {"ru": "Средний", "de": "Mitte", "en": "Middle"},
+    "internal_diameter_label": {"ru": "Внутренний", "de": "Innen", "en": "Internal"},
+    "build_conditions_label": {"ru": "Условия построения", "de": "Bau-Bedingungen", "en": "Build Conditions"},
 }
 loc.register_translations(TRANSLATIONS)
 
 # Значения по умолчанию
 default_allowances = ["0", "1", "2", "3", "4", "5", "10", "20"]
 default_axis_marks = ["0", "10", "20"]
-default_modes = ["bulge", "polyline", "spline"]
+default_modes = ["mode_bulge", "mode_polyline", "mode_spline"]
 
 # Рекомендуемые наборы значений accuracy по режимам
 ACCURACY_OPTIONS = {
@@ -90,23 +99,12 @@ ACCURACY_OPTIONS = {
 
 # Фабричная функция для создания панели
 def create_window(parent: wx.Window) -> wx.Panel:
-    """
-    Фабричная функция для создания панели NozzleContentPanel.
-
-    Args:
-        parent (wx.Window): Родительская панель.
-
-    Returns:
-        wx.Panel: Инициализированный экземпляр NozzleContentPanel.
-    """
     return NozzleContentPanel(parent)
 
 
 class NozzleContentPanel(BaseContentPanel):
     """
     Панель для настройки параметров одиночного отвода.
-
-    По функционалу и расположению виджетов максимально унифицирована с ShellContentPanel.
     """
     def __init__(self, parent, callback=None):
         super().__init__(parent)
@@ -117,32 +115,30 @@ class NozzleContentPanel(BaseContentPanel):
         self.buttons = []
         self.insert_point = None
 
-        # Состояние/виджеты специфичные для отвода
+        # Виджеты
         self.mode_combo: Optional[wx.ComboBox] = None
         self.accuracy_combo: Optional[wx.ComboBox] = None
         self.diameter_main_input: Optional[wx.TextCtrl] = None
         self.weld_allowance_input: Optional[wx.ComboBox] = None
         self.offset_input: Optional[wx.TextCtrl] = None
+        self.diameter_type_choice: Optional[wx.Choice] = None
+        self.axis_combo: Optional[wx.ComboBox] = None
 
         self.setup_ui()
         self.order_input.SetFocus()
 
     def setup_ui(self):
-        """
-        Создает и располагает все элементы управления.
-        """
         if self.GetSizer():
             self.GetSizer().Clear(True)
 
         main_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.left_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        # Левый блок: изображение и кнопки
+        # Левый блок (изображение и кнопки)
         image_path = str(NOZZLE_IMAGE_PATH)
         self.canvas = CanvasPanel(self, image_file=image_path, size=(600, 400))
         self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
 
-        # Стандартные кнопки: OK, Clear, Return
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.buttons = create_standard_buttons(self, self.on_ok, self.on_cancel, self.on_clear)
         for button in self.buttons:
@@ -150,11 +146,10 @@ class NozzleContentPanel(BaseContentPanel):
         adjust_button_widths(self.buttons)
         self.left_sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
 
-        # Правый блок: поля ввода
+        # Правый блок (поля ввода)
         self.right_sizer = wx.BoxSizer(wx.VERTICAL)
         font = get_standard_font()
-        font_big = get_standard_font().Bold()
-        field_size = (150, -1)
+        field_size = (120, -1) # ширина 150, высота автоматическая
 
         # --- Основные данные ---
         main_data_box = wx.StaticBox(self, label=loc.get("main_data_label", "Основные данные"))
@@ -171,8 +166,8 @@ class NozzleContentPanel(BaseContentPanel):
         self.detail_input = wx.TextCtrl(main_data_box, value="", size=field_size)
         style_textctrl(self.detail_input)
         row1.Add(self.labels["order"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-        row1.Add(self.order_input, 0, wx.RIGHT, 10)
         row1.AddStretchSpacer()
+        row1.Add(self.order_input, 0, wx.RIGHT, 10)
         row1.Add(self.detail_input, 0)
         main_data_sizer.Add(row1, 0, wx.EXPAND | wx.ALL, 5)
 
@@ -216,7 +211,7 @@ class NozzleContentPanel(BaseContentPanel):
         row3.Add(self.thickness_combo, 0)
         main_data_sizer.Add(row3, 0, wx.EXPAND | wx.ALL, 5)
 
-        self.right_sizer.Add(main_data_sizer, 0, wx.EXPAND | wx.ALL, 10)
+        self.right_sizer.Add(main_data_sizer, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 5)
 
         # --- Параметры отвода ---
         nozzle_box = wx.StaticBox(self, label=loc.get("nozzle_params_label", "Параметры отвода"))
@@ -226,13 +221,26 @@ class NozzleContentPanel(BaseContentPanel):
 
         # Диаметр отвода
         row_d = wx.BoxSizer(wx.HORIZONTAL)
-        self.labels["diameter"] = wx.StaticText(nozzle_box, label=loc.get("diameter_label", "Диаметр отвода, d"))
+        self.labels["diameter"] = wx.StaticText(nozzle_box, label=loc.get("diameter_label", "Диаметр, d"))
         style_label(self.labels["diameter"])
         self.diameter_input = wx.TextCtrl(nozzle_box, value="", size=field_size)
         style_textctrl(self.diameter_input)
         row_d.Add(self.labels["diameter"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-        row_d.AddStretchSpacer()
-        row_d.Add(self.diameter_input, 0)
+        row_d.Add(self.diameter_input, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
+
+        # Тип диаметра
+        self.diameter_type_choice = wx.Choice(
+            nozzle_box,
+            choices=[
+                loc.get("external_diameter_label", "Внешний"),
+                loc.get("middle_diameter_label", "Средний"),
+                loc.get("internal_diameter_label", "Внутренний"),
+            ]
+        )
+        self.diameter_type_choice.SetMinSize(field_size)
+        self.diameter_type_choice.SetInitialSize(field_size)
+        self.diameter_type_choice.SetSelection(0)
+        row_d.Add(self.diameter_type_choice, 1, wx.EXPAND)
         nozzle_sizer.Add(row_d, 0, wx.EXPAND | wx.ALL, 5)
 
         # Диаметр магистрали
@@ -268,397 +276,351 @@ class NozzleContentPanel(BaseContentPanel):
         row_off.Add(self.offset_input, 0)
         nozzle_sizer.Add(row_off, 0, wx.EXPAND | wx.ALL, 5)
 
-        # Режим и Точность (accuracy)
-        row_mode = wx.BoxSizer(wx.HORIZONTAL)
-        self.labels["mode"] = wx.StaticText(nozzle_box, label=loc.get("mode_label", "Режим построения"))
-        style_label(self.labels["mode"])
-        self.mode_combo = wx.ComboBox(nozzle_box, choices=default_modes, value="bulge", style=wx.CB_DROPDOWN, size=field_size)
-        style_combobox(self.mode_combo)
-        self.mode_combo.Bind(wx.EVT_COMBOBOX, self.on_mode_changed)
-        self.mode_combo.Bind(wx.EVT_TEXT, self.on_mode_changed)
+        self.right_sizer.Add(nozzle_sizer, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 5)
 
+        # --- Условия построения ---
+        build_box = wx.StaticBox(self, label=loc.get("build_conditions_label", "Условия построения"))
+        style_staticbox(build_box)
+        self.static_boxes["build_conditions"] = build_box
+        build_sizer = wx.StaticBoxSizer(build_box, wx.VERTICAL)
+
+        # Режим построения
+        row_mode = wx.BoxSizer(wx.HORIZONTAL)
+        self.labels["mode"] = wx.StaticText(build_box, label=loc.get("mode_label", "Режим"))
+        style_label(self.labels["mode"])
+        self.mode_combo = wx.ComboBox(
+            build_box,
+            choices=[loc.get(mode, mode) for mode in default_modes],
+            value=loc.get("mode_bulge", "Bulge"),
+            style=wx.CB_READONLY,
+            size=field_size
+        )
+        style_combobox(self.mode_combo)
+        self.mode_combo.Bind(wx.EVT_COMBOBOX, self.on_mode_change)
         row_mode.Add(self.labels["mode"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         row_mode.AddStretchSpacer()
         row_mode.Add(self.mode_combo, 0)
-        nozzle_sizer.Add(row_mode, 0, wx.EXPAND | wx.ALL, 5)
+        build_sizer.Add(row_mode, 0, wx.EXPAND | wx.ALL, 5)
 
+        # Точность
         row_acc = wx.BoxSizer(wx.HORIZONTAL)
-        self.labels["accuracy"] = wx.StaticText(nozzle_box, label=loc.get("accuracy_label", "Точность (точек)"))
+        self.labels["accuracy"] = wx.StaticText(build_box, label=loc.get("accuracy_label", "Точность"))
         style_label(self.labels["accuracy"])
-        # editable combobox: пользователь может ввести своё число
-        self.accuracy_combo = wx.ComboBox(nozzle_box, choices=ACCURACY_OPTIONS["bulge"], value=ACCURACY_OPTIONS["bulge"][1], style=wx.CB_DROPDOWN, size=field_size)
+        self.accuracy_combo = wx.ComboBox(
+            build_box,
+            choices=ACCURACY_OPTIONS["bulge"],
+            value="24",
+            style=wx.CB_DROPDOWN,
+            size=field_size
+        )
         style_combobox(self.accuracy_combo)
         row_acc.Add(self.labels["accuracy"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         row_acc.AddStretchSpacer()
         row_acc.Add(self.accuracy_combo, 0)
-        nozzle_sizer.Add(row_acc, 0, wx.EXPAND | wx.ALL, 5)
+        build_sizer.Add(row_acc, 0, wx.EXPAND | wx.ALL, 5)
 
         # Припуск на сварку
         row_weld = wx.BoxSizer(wx.HORIZONTAL)
-        self.labels["weld_allowance"] = wx.StaticText(nozzle_box, label=loc.get("weld_allowance_label", "Припуск на сварку"))
+        self.labels["weld_allowance"] = wx.StaticText(build_box,
+                                                      label=loc.get("weld_allowance_label", "Припуск на сварку"))
         style_label(self.labels["weld_allowance"])
-        self.weld_allowance_input = wx.ComboBox(nozzle_box, choices=default_allowances, value="0", style=wx.CB_DROPDOWN, size=field_size)
+        self.weld_allowance_input = wx.ComboBox(
+            build_box,
+            choices=default_allowances,
+            value="0",
+            style=wx.CB_DROPDOWN,
+            size=field_size
+        )
         style_combobox(self.weld_allowance_input)
         row_weld.Add(self.labels["weld_allowance"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         row_weld.AddStretchSpacer()
         row_weld.Add(self.weld_allowance_input, 0)
-        nozzle_sizer.Add(row_weld, 0, wx.EXPAND | wx.ALL, 5)
+        build_sizer.Add(row_weld, 0, wx.EXPAND | wx.ALL, 5)
 
-        self.right_sizer.Add(nozzle_sizer, 0, wx.EXPAND | wx.ALL, 10)
+        # Показать оси (замена CheckBox на ComboBox)
+        row_axis = wx.BoxSizer(wx.HORIZONTAL)
+        self.labels["axis"] = wx.StaticText(build_box, label=loc.get("axis_checkbox", "Показать оси"))
+        style_label(self.labels["axis"])
+        self.axis_combo = wx.ComboBox(
+            build_box,
+            choices=[loc.get("yes_label", "Да"), loc.get("no_label", "Нет")],
+            value=loc.get("yes_label", "Да"),
+            style=wx.CB_READONLY,
+            size=field_size
+        )
+        style_combobox(self.axis_combo)
+        row_axis.Add(self.labels["axis"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
+        row_axis.AddStretchSpacer()
+        row_axis.Add(self.axis_combo, 0)
+        build_sizer.Add(row_axis, 0, wx.EXPAND | wx.ALL, 5)
 
-        # --- Дополнительные условия ---
-        additional_box = wx.StaticBox(self, label=loc.get("additional_label", "Доп. условия"))
-        style_staticbox(additional_box)
-        self.static_boxes["additional"] = additional_box
-        additional_sizer = wx.StaticBoxSizer(additional_box, wx.VERTICAL)
-
-        self.axis_checkbox = wx.CheckBox(additional_box, label=loc.get("axis_checkbox", "Отрисовка осей"))
-        self.axis_checkbox.SetFont(font_big)
-        self.axis_checkbox.SetValue(True)
-        additional_sizer.Add(self.axis_checkbox, 0, wx.ALL | wx.ALIGN_RIGHT, 5)
 
         # Метки осей
-        row_am = wx.BoxSizer(wx.HORIZONTAL)
-        self.labels["axis_marks"] = wx.StaticText(additional_box, label=loc.get("axis_marks_label", "Шаг меток (мм)"))
+        row_marks = wx.BoxSizer(wx.HORIZONTAL)
+        self.labels["axis_marks"] = wx.StaticText(build_box, label=loc.get("axis_marks_label", "Метки осей"))
         style_label(self.labels["axis_marks"])
-        self.axis_marks_combo = wx.ComboBox(additional_box, choices=default_axis_marks, value="10", style=wx.CB_DROPDOWN, size=field_size)
-        style_combobox(self.axis_marks_combo)
-        row_am.Add(self.labels["axis_marks"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-        row_am.AddStretchSpacer()
-        row_am.Add(self.axis_marks_combo, 0)
-        additional_sizer.Add(row_am, 0, wx.EXPAND | wx.ALL, 5)
+        self.axis_marks_input = wx.ComboBox(
+            build_box,
+            choices=default_axis_marks,
+            value="0",
+            style=wx.CB_DROPDOWN,
+            size=field_size
+        )
+        style_combobox(self.axis_marks_input)
+        row_marks.Add(self.labels["axis_marks"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
+        row_marks.AddStretchSpacer()
+        row_marks.Add(self.axis_marks_input, 0)
+        build_sizer.Add(row_marks, 0, wx.EXPAND | wx.ALL, 5)
 
-        self.right_sizer.Add(additional_sizer, 0, wx.EXPAND | wx.ALL, 10)
+        self.right_sizer.Add(build_sizer, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 5)
 
-        # Собираем общий макет
-        main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
-        main_sizer.Add(self.right_sizer, 0, wx.EXPAND | wx.ALL, 10)
+        main_sizer.Add(self.left_sizer, 1, wx.EXPAND) # Левый блок растягивается, чтобы занять больше пространства
+        main_sizer.Add(self.right_sizer, 0, wx.EXPAND | wx.ALL, 10) # Правый блок фиксированного размера с отступами
+
         self.SetSizer(main_sizer)
         apply_styles_to_panel(self)
         self.Layout()
 
-    # --- Работа с режимом и accuracy ---
-    def on_mode_changed(self, event=None):
-        """
-        Обновляет список опций accuracy в зависимости от выбранного режима.
-        Значение accuracy остаётся, если оно подходит; иначе выбирается значение по умолчанию из списка.
-        """
-        try:
-            mode = self.mode_combo.GetValue() if self.mode_combo else "bulge"
-            if mode not in ACCURACY_OPTIONS:
-                mode = "bulge"
-            current = self.accuracy_combo.GetValue() if self.accuracy_combo else ""
-            options = ACCURACY_OPTIONS.get(mode, ACCURACY_OPTIONS["bulge"])
-            # Обновляем список сохраня при этом пользовательский ввод если он числовой
-            self.accuracy_combo.Clear()
-            for v in options:
-                self.accuracy_combo.Append(v)
-            # Попытка сохранить текущее значение, иначе выбрать среднее/предустановленное
-            if current and current.strip().isdigit():
-                self.accuracy_combo.SetValue(current.strip())
-            else:
-                self.accuracy_combo.SetValue(options[1])  # второй элемент как разумный дефолт
-        except Exception as e:
-            show_popup(loc.get("error", f"Ошибка при смене режима: {str(e)}"), popup_type="error")
+    # ----------------------------------------------------------------
+    # Обработчики событий
+    # ----------------------------------------------------------------
 
-    def collect_input_data(self) -> Dict:
-        """
-        Собирает данные из полей ввода в словарь.
-        """
-        try:
-            # Преобразования числовых полей
-            diameter = parse_float(self.diameter_input.GetValue())
-            diameter_main = parse_float(self.diameter_main_input.GetValue())
-            thickness = parse_float(self.thickness_combo.GetValue())
-            length = parse_float(self.length_input.GetValue())
-            offset = parse_float(self.offset_input.GetValue()) or 0.0
-            weld_allowance = parse_float(self.weld_allowance_input.GetValue()) or 0.0
-            axis_marks = parse_float(self.axis_marks_combo.GetValue()) or 0.0
-
-            # Обработка диаметра с учетом типа (аналогично оболочке, используем at_diameter если нужно)
-            # Тут предположим, что пользователь задаёт наружный диаметр отвода,
-            # если потребуется, можно добавить выбор типа диаметра.
-            diameter_calc = at_diameter(diameter, thickness, "outer") if diameter and thickness else diameter
-
-            # accuracy: попытка получить целое число из ComboBox (включая пользовательский ввод)
-            acc_raw = self.accuracy_combo.GetValue() if self.accuracy_combo else ""
-            try:
-                accuracy = int(float(acc_raw))
-            except Exception:
-                accuracy = None
-
-            data = {
-                "insert_point": self.insert_point,
-                "diameter": diameter_calc,
-                "diameter_main": diameter_main,
-                "length": length,
-                "axis": self.axis_checkbox.GetValue(),
-                "axis_marks": axis_marks,
-                "layer_name": "0",  # берётся из конфига, не спрашиваем у пользователя
-                "thickness": thickness,
-                "order_number": self.order_input.GetValue(),
-                "detail_number": self.detail_input.GetValue(),
-                "material": self.material_combo.GetValue(),
-                "weld_allowance": weld_allowance,
-                "accuracy": accuracy,
-                "offset": offset,
-                "thk_correction": False,  # вычисляется ниже
-                "mode": self.mode_combo.GetValue() if self.mode_combo else "bulge"
-            }
-
-            # thk_correction — True если диаметр отвода равен диаметру магистрали (с допустимой погрешностью)
-            try:
-                if data.get("diameter") is not None and data.get("diameter_main") is not None:
-                    if abs(float(data["diameter"]) - float(data["diameter_main"])) < 1e-6:
-                        data["thk_correction"] = True
-                    else:
-                        data["thk_correction"] = False
-            except Exception:
-                data["thk_correction"] = False
-
-            return data
-        except Exception as e:
-            show_popup(loc.get("error", f"Ошибка сбора данных: {str(e)}"), popup_type="error")
-            return {}
-
-    def validate_input(self, data: Dict) -> bool:
-        """
-        Минимальная валидация полей.
-        """
-        # Проверка числовых значений и обязательных полей
-        if data.get("diameter") is None or data.get("diameter") <= 0:
-            show_popup(loc.get("error", "Некорректный диаметр отвода"), popup_type="error")
-            return False
-        if data.get("diameter_main") is None or data.get("diameter_main") <= 0:
-            show_popup(loc.get("error", "Некорректный диаметр магистрали"), popup_type="error")
-            return False
-        if data.get("length") is None or data.get("length") <= 0:
-            show_popup(loc.get("error", "Некорректная длина"), popup_type="error")
-            return False
-        if not data.get("material"):
-            show_popup(loc.get("error", "Материал не выбран"), popup_type="error")
-            return False
-        if not data.get("thickness"):
-            show_popup(loc.get("error", "Толщина не выбрана"), popup_type="error")
-            return False
-        if not data.get("insert_point"):
-            show_popup(loc.get("point_selection_error", "Точка не выбрана"), popup_type="error")
-            return False
-        # accuracy как целое положительное число
-        acc = data.get("accuracy")
-        if acc is None:
-            show_popup(loc.get("error", "Некорректная точность (accuracy)"), popup_type="error")
-            return False
-        try:
-            acc_i = int(acc)
-            if acc_i <= 0:
-                show_popup(loc.get("error", "Точность должна быть положительным числом"), popup_type="error")
-                return False
-            # Не навязываем строгие пределы, но предупреждаем при экстремальных значениях
-            # (оставляем успешную валидацию)
-        except Exception:
-            show_popup(loc.get("error", "Точность должна быть целым числом"), popup_type="error")
-            return False
-
-        return True
-
-    def process_input(self, data: Dict) -> bool:
-        """
-        Передаёт данные через callback.
-        """
-        try:
-            if self.on_submit_callback:
-                self.on_submit_callback(data)
-            return True
-        except Exception as e:
-            show_popup(loc.get("error", f"Ошибка обработки данных: {str(e)}"), popup_type="error")
-            return False
-
-    def clear_input_fields(self):
-        """
-        Сброс всех полей в значения по умолчанию.
-        """
-        self.order_input.SetValue("")
-        self.detail_input.SetValue("")
-        self.material_combo.SetSelection(wx.NOT_FOUND)
-        self.thickness_combo.SetSelection(wx.NOT_FOUND)
-        self.diameter_input.SetValue("")
-        self.diameter_main_input.SetValue("")
-        self.length_input.SetValue("")
-        self.offset_input.SetValue("0")
-        self.mode_combo.SetValue("bulge")
-        # обновим accuracy под bulge
-        self.on_mode_changed()
-        self.weld_allowance_input.SetValue("0")
-        self.axis_checkbox.SetValue(True)
-        self.axis_marks_combo.SetValue("10")
-        self.insert_point = None
+    def on_mode_change(self, event):
+        """Меняет список значений accuracy при смене режима построения."""
+        mode_map = {
+            loc.get("mode_bulge", "Bulge"): "bulge",
+            loc.get("mode_polyline", "Polyline"): "polyline",
+            loc.get("mode_spline", "Spline"): "spline",
+        }
+        selected_mode = mode_map.get(self.mode_combo.GetValue(), "bulge")
+        options = ACCURACY_OPTIONS.get(selected_mode, ACCURACY_OPTIONS["bulge"])
+        self.accuracy_combo.SetItems(options)
+        self.accuracy_combo.SetValue(options[0])
 
     def on_ok(self, event: wx.Event):
         """
-        Обработка кнопки ОК: запрос точки через AutoCAD и передача данных.
+        Обрабатывает нажатие кнопки "ОК": запрашивает точку вставки и передает данные в callback.
+
+        Аргументы:
+            event: Событие wxPython.
         """
         try:
-            # Собираем предварительные данные
-            data = self.collect_input_data()
+            # Собираем данные из полей
+            data = self.get_data()
+            if not data:
+                return
 
-            # Свернем главное окно перед выбором точки
+            # Получаем главное окно
             main_window = wx.GetTopLevelParent(self)
-            if main_window:
-                main_window.Iconize(True)
+
+            # Сворачиваем окно перед выбором точки
+            main_window.Iconize(True)
 
             # Инициализация CAD и выбор точки
             cad = ATCadInit()
-            pt = None
-            try:
-                pt = at_point_input(
-                    cad.document,
-                    prompt=loc.get("point_prompt", "Укажите центр отвода"),
-                    as_variant=False
-                )
-            except Exception as e:
-                # Показываем ошибку выбора точки, но не падаем
-                show_popup(loc.get("point_selection_error", f"Ошибка выбора точки: {str(e)}"), popup_type="error")
-                pt = None
+            pt = at_point_input(
+                cad.document,
+                prompt=loc.get("point_prompt", "Укажите центр отвода"),
+                as_variant=False
+            )
 
             # Разворачиваем окно обратно
-            if main_window:
-                main_window.Iconize(False)
-                main_window.Raise()
-                main_window.SetFocus()
+            main_window.Iconize(False)
+            main_window.Raise()
+            main_window.SetFocus()
 
             if not pt:
-                # Если точка не выбрана — выходим (пользователь мог отменить)
-                print("Точка не выбрана")
+                show_popup(loc.get("point_selection_error", "Точка не выбрана"), popup_type="error")
                 return
 
             # Сохраняем точку и обновляем словарь
             self.insert_point = pt
             data["insert_point"] = pt
 
-            # Валидация
-            if not self.validate_input(data):
-                return
-
-            # Передаём данные в callback
+            # Передаем данные дальше через callback или run_build
             if self.on_submit_callback:
-                wx.CallAfter(self.process_input, data)
+                self.on_submit_callback(data)
+            else:
+                run_build("nozzle", data)
 
         except Exception as e:
-            show_popup(loc.get("error", f"Ошибка при обработке ОК: {str(e)}"), popup_type="error")
+            show_popup(f"{loc.get('error', 'Ошибка')}: {e}", popup_type="error")
 
-    def on_clear(self, event=None):
+    def on_cancel(self, event):
+        parent = wx.GetTopLevelParent(self)
+        if hasattr(parent, "switch_content"):
+            parent.switch_content("content_apps")
+
+    def on_clear(self, event):
+        self.order_input.SetValue("")
+        self.detail_input.SetValue("")
+        self.diameter_input.SetValue("")
+        self.diameter_main_input.SetValue("")
+        self.length_input.SetValue("")
+        self.offset_input.SetValue("0")
+        self.material_combo.SetSelection(0 if self.material_combo.GetCount() > 0 else -1)
+        self.thickness_combo.SetSelection(0 if self.thickness_combo.GetCount() > 0 else -1)
+        self.weld_allowance_input.SetValue("0")
+        self.axis_combo.SetValue(loc.get("yes_label", "Да"))
+        self.axis_marks_input.SetValue("0")
+        self.mode_combo.SetValue(loc.get("mode_bulge", "Bulge"))
+        self.accuracy_combo.SetValue("24")
+
+    # ----------------------------------------------------------------
+    # Сбор данных
+    # ----------------------------------------------------------------
+
+    def get_data(self) -> Optional[Dict]:
         """
-        Обработка кнопки Очистить.
+        Собирает данные из полей ввода в словарь.
+
+        Returns:
+            Словарь с данными или None в случае ошибки.
         """
         try:
-            self.clear_input_fields()
-        except Exception as e:
-            show_popup(loc.get("error", f"Ошибка при очистке: {str(e)}"), popup_type="error")
+            # Проверка комбобоксов
+            if not self.material_combo.GetValue():
+                show_popup(
+                    loc.get("invalid_input", "Некорректный ввод: {0}").format(loc.get("material_label", "Материал")),
+                    popup_type="error")
+                return None
+            if not self.thickness_combo.GetValue():
+                show_popup(
+                    loc.get("invalid_input", "Некорректный ввод: {0}").format(loc.get("thickness_label", "Толщина, S")),
+                    popup_type="error")
+                return None
 
-    def on_cancel(self, event=None):
-        """
-        Обработка кнопки возврат/закрыть: просто скрываем/уничтожаем родительское диалоговое окно,
-        но реализация зависит от того, как окно интегрировано в основное приложение.
-        Здесь просто пытаемся закрыть родительский фрейм если это отдельное окно.
-        """
-        try:
-            top = wx.GetTopLevelParent(self)
-            if top and isinstance(top, wx.Frame):
-                top.Close()
+            # Парсинг числовых полей
+            diameter = parse_float(self.diameter_input.GetValue())
+            if diameter is None or diameter <= 0:
+                show_popup(loc.get("invalid_input", "Некорректный ввод: {0}").format(
+                    loc.get("diameter_label", "Диаметр отвода, d")), popup_type="error")
+                return None
+
+            thickness = parse_float(self.thickness_combo.GetValue())
+            if thickness is None or thickness <= 0:
+                show_popup(
+                    loc.get("invalid_input", "Некорректный ввод: {0}").format(loc.get("thickness_label", "Толщина, S")),
+                    popup_type="error")
+                return None
+
+            diameter_main = parse_float(self.diameter_main_input.GetValue())
+            if diameter_main is None or diameter_main <= 0:
+                show_popup(loc.get("invalid_input", "Некорректный ввод: {0}").format(
+                    loc.get("diameter_main_label", "Диаметр магистрали, D")), popup_type="error")
+                return None
+
+            length = parse_float(self.length_input.GetValue())
+            if length is None or length <= 0:
+                show_popup(
+                    loc.get("invalid_input", "Некорректный ввод: {0}").format(loc.get("length_label", "Длина, L")),
+                    popup_type="error")
+                return None
+
+            axis_marks = parse_float(self.axis_marks_input.GetValue()) or 0.0
+            weld_allowance = parse_float(self.weld_allowance_input.GetValue()) or 0.0
+            accuracy = parse_float(self.accuracy_combo.GetValue())
+            if accuracy is None or accuracy < 4:
+                show_popup(loc.get("invalid_input", "Некорректный ввод: {0}").format(
+                    loc.get("accuracy_label", "Точность (точек)")), popup_type="error")
+                return None
+            offset = parse_float(self.offset_input.GetValue()) or 0.0
+
+            # Маппинг типа диаметра
+            diameter_type_map = {
+                0: "outer",
+                1: "middle",
+                2: "inner"
+            }
+            flag = diameter_type_map.get(self.diameter_type_choice.GetSelection(), "outer")
+
+            # Вычисление среднего диаметра через at_diameter
+            try:
+                diameter = at_diameter(diameter, thickness, flag)
+            except ValueError as e:
+                show_popup(loc.get("invalid_input", "Некорректный ввод: {0}").format(
+                    loc.get("diameter_label", "Диаметр отвода, d")), popup_type="error")
+                return None
+
+            mode_map = {
+                loc.get("mode_bulge", "Bulge"): "bulge",
+                loc.get("mode_polyline", "Polyline"): "polyline",
+                loc.get("mode_spline", "Spline"): "spline",
+            }
+
+            # Маппинг значения axis_combo
+            axis_value = self.axis_combo.GetValue() == loc.get("yes_label", "Да")
+
+            return {
+                "insert_point": self.insert_point,
+                "diameter": diameter,
+                "diameter_main": diameter_main,
+                "length": length,
+                "axis": axis_value,
+                "axis_marks": axis_marks,
+                "layer_name": "0",
+                "thickness": thickness,
+                "order_number": self.order_input.GetValue(),
+                "detail_number": self.detail_input.GetValue(),
+                "material": self.material_combo.GetValue(),
+                "weld_allowance": weld_allowance,
+                "accuracy": int(accuracy),
+                "offset": offset,
+                "thk_correction": False,
+                "mode": mode_map.get(self.mode_combo.GetValue(), "bulge")
+            }
         except Exception as e:
-            show_popup(loc.get("error", f"Ошибка при закрытии окна: {str(e)}"), popup_type="error")
+            show_popup(f"{loc.get('error', 'Ошибка')}: {e}", popup_type="error")
+            return None
 
     def update_ui_language(self):
-        """
-        Обновляет метки и надписи при смене языка.
-        """
-        try:
-            # Групповые заголовки
-            if "main_data" in self.static_boxes:
-                self.static_boxes["main_data"].SetLabel(loc.get("main_data_label", "Основные данные"))
-            if "nozzle_params" in self.static_boxes:
-                self.static_boxes["nozzle_params"].SetLabel(loc.get("nozzle_params_label", "Параметры отвода"))
-            if "additional" in self.static_boxes:
-                self.static_boxes["additional"].SetLabel(loc.get("additional_label", "Доп. условия"))
+        """Переводит все подписи при смене языка."""
+        self.static_boxes["main_data"].SetLabel(loc.get("main_data_label", "Основные данные"))
+        self.static_boxes["nozzle_params"].SetLabel(loc.get("nozzle_params_label", "Параметры отвода"))
+        self.static_boxes["build_conditions"].SetLabel(loc.get("build_conditions_label", "Условия построения"))
 
-            # Метки полей
-            self.labels["order"].SetLabel(loc.get("order_label", "К-№"))
-            self.labels["material"].SetLabel(loc.get("material_label", "Материал"))
-            self.labels["thickness"].SetLabel(loc.get("thickness_label", "Толщина, S"))
-            self.labels["diameter"].SetLabel(loc.get("diameter_label", "Диаметр отвода, d"))
-            self.labels["diameter_main"].SetLabel(loc.get("diameter_main_label", "Диаметр магистрали, D"))
-            self.labels["length"].SetLabel(loc.get("length_label", "Длина L"))
-            self.labels["offset"].SetLabel(loc.get("offset_label", "Смещение"))
-            self.labels["mode"].SetLabel(loc.get("mode_label", "Режим построения"))
-            self.labels["accuracy"].SetLabel(loc.get("accuracy_label", "Точность (точек)"))
-            self.labels["weld_allowance"].SetLabel(loc.get("weld_allowance_label", "Припуск на сварку"))
-            self.labels["axis_marks"].SetLabel(loc.get("axis_marks_label", "Шаг меток (мм)"))
+        self.labels["order"].SetLabel(loc.get("order_label", "К-№"))
+        self.labels["material"].SetLabel(loc.get("material_label", "Материал"))
+        self.labels["thickness"].SetLabel(loc.get("thickness_label", "Толщина, S"))
+        self.labels["diameter"].SetLabel(loc.get("diameter_label", "Диаметр отвода, d"))
+        self.labels["diameter_main"].SetLabel(loc.get("diameter_main_label", "Диаметр магистрали, D"))
+        self.labels["length"].SetLabel(loc.get("length_label", "Длина, L"))
+        self.labels["offset"].SetLabel(loc.get("offset_label", "Смещение, O"))
+        self.labels["mode"].SetLabel(loc.get("mode_label", "Режим"))
+        self.labels["accuracy"].SetLabel(loc.get("accuracy_label", "Точность"))
+        self.labels["weld_allowance"].SetLabel(loc.get("weld_allowance_label", "Припуск на сварку"))
+        self.labels["axis"].SetLabel(loc.get("axis_checkbox", "Показать оси"))
+        self.labels["axis_marks"].SetLabel(loc.get("axis_marks_label", "Метки осей"))
 
-            # Чекбоксы и кнопки
-            self.axis_checkbox.SetLabel(loc.get("axis_checkbox", "Отрисовка осей"))
-            self.buttons[0].SetLabel(loc.get("ok_button", "ОК"))
-            if len(self.buttons) > 2:
-                self.buttons[1].SetLabel(loc.get("clear_button", "Очистить"))
-                self.buttons[2].SetLabel(loc.get("cancel_button", "Возврат"))
-            else:
-                self.buttons[1].SetLabel(loc.get("cancel_button", "Возврат"))
+        # Обновление списка режимов построения
+        self.mode_combo.SetItems([loc.get(mode, mode) for mode in default_modes])
+        self.mode_combo.SetValue(loc.get("mode_bulge", "Bulge"))
 
-            apply_styles_to_panel(self)
-            self.Layout()
-        except Exception as e:
-            show_popup(loc.get("error", f"Ошибка обновления языка: {str(e)}"), popup_type="error")
+        # Обновление списка типов диаметра
+        self.diameter_type_choice.SetItems([
+            loc.get("external_diameter_label", "Внешний"),
+            loc.get("middle_diameter_label", "Средний"),
+            loc.get("internal_diameter_label", "Внутренний"),
+        ])
+        self.diameter_type_choice.SetSelection(0)
 
+        # Обновление списка для axis_combo
+        self.axis_combo.SetItems([
+            loc.get("yes_label", "Да"),
+            loc.get("no_label", "Нет")
+        ])
+        self.axis_combo.SetValue(loc.get("yes_label", "Да"))
 
+        self.Layout()
+        self.Refresh()
+
+# ----------------------------------------------------------------
+# Тестовый запуск
+# ----------------------------------------------------------------
 if __name__ == "__main__":
-    """
-    Тестовый запуск панели NozzleContentPanel.
-    Выводит собранный словарь в консоль через тестовый callback.
-    """
     app = wx.App(False)
-    frame = wx.Frame(None, title="Тест NozzleContentPanel", size=(1000, 700))
+    frame = wx.Frame(None, title="Test NozzleContentPanel", size=(1000, 600))
     panel = NozzleContentPanel(frame)
-
-    def on_ok_test(data):
-        try:
-            print("Собранные данные:", data)
-            # простая симуляция обработки
-            wx.MilliSleep(100)
-        except Exception as e:
-            print(f"Ошибка в тестовом callback: {e}")
-
-    def on_ok_event(event):
-        try:
-            # Собираем данные, просим точку и выполняем валидацию (аналогично реальной on_ok)
-            data = panel.collect_input_data()
-            cad = ATCadInit()
-            frame.Iconize(True)
-            try:
-                pt = at_point_input(cad.document, prompt=loc.get("point_prompt", "Укажите центр отвода"), as_variant=False)
-            except Exception as e:
-                show_popup(loc.get("point_selection_error", f"Ошибка выбора точки: {str(e)}"), popup_type="error")
-                pt = None
-            frame.Iconize(False)
-            frame.Raise()
-            frame.SetFocus()
-
-            if not pt:
-                show_popup(loc.get("point_selection_error", "Точка не выбрана"), popup_type="error")
-                return
-
-            panel.insert_point = pt
-            data["insert_point"] = pt
-
-            if not panel.validate_input(data):
-                return
-
-            panel.on_submit_callback = on_ok_test
-            wx.CallAfter(panel.process_input, data)
-        except Exception as e:
-            print(f"Ошибка в тестовом запуске: {e}")
-
-    panel.buttons[0].Bind(wx.EVT_BUTTON, on_ok_event)
-
     sizer = wx.BoxSizer(wx.VERTICAL)
     sizer.Add(panel, 1, wx.EXPAND)
     frame.SetSizer(sizer)

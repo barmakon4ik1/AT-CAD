@@ -123,6 +123,11 @@ TRANSLATIONS = {
         "de": "Schweißnahtzugabe, mm",
         "en": "Weld Allowance, mm"
     },
+    "diameter_adjustment_label": {
+        "ru": "Коррекция диаметра D, мм",
+        "de": "Durchmesseranpassung D, mm",
+        "en": "Diameter Adjustment D, mm"
+    },
     "ok_button": {
         "ru": "ОК",
         "de": "OK",
@@ -254,6 +259,22 @@ class ConeContentPanel(BaseContentPanel):
         self._updating = False
         self._debounce_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.on_debounce_timeout, self._debounce_timer)
+
+        # Виджеты
+        self.order_input: Optional[wx.TextCtrl] = None
+        self.detail_input: Optional[wx.TextCtrl] = None
+        self.material_combo: Optional[wx.ComboBox] = None
+        self.thickness_combo: Optional[wx.ComboBox] = None
+        self.d_input: Optional[wx.TextCtrl] = None
+        self.D_input: Optional[wx.TextCtrl] = None
+        self.d_type_choice: Optional[wx.Choice] = None
+        self.D_type_choice: Optional[wx.Choice] = None
+        self.D_adjustment_input: Optional[wx.TextCtrl] = None
+        self.height_input: Optional[wx.TextCtrl] = None
+        self.steigung_input: Optional[wx.TextCtrl] = None
+        self.angle_input: Optional[wx.TextCtrl] = None
+        self.allowance_combo: Optional[wx.ComboBox] = None
+
         self.setup_ui()
         self.load_last_input()
         self.order_input.SetFocus()
@@ -270,6 +291,7 @@ class ConeContentPanel(BaseContentPanel):
         self.static_boxes.clear()
         self.buttons.clear()
 
+        INPUT_FIELD_SIZE = (120, -1)
         main_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.left_sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -301,8 +323,7 @@ class ConeContentPanel(BaseContentPanel):
         common_data = load_common_data()
         material_options = [mat["name"] for mat in common_data.get("material", []) if mat["name"]]
         thickness_options = common_data.get("thicknesses", [])
-        default_thickness = "4" if "4" in thickness_options or "4.0" in thickness_options else thickness_options[
-            0] if thickness_options else ""
+        default_thickness = "4" if "4" in thickness_options or "4.0" in thickness_options else thickness_options[0] if thickness_options else ""
 
         # Группа "Основные данные"
         main_data_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, loc.get("main_data_label", "Основные данные"))
@@ -367,27 +388,22 @@ class ConeContentPanel(BaseContentPanel):
         self.labels["d"] = d_label
         self.d_input = wx.TextCtrl(diameter_box, value="", size=INPUT_FIELD_SIZE)
         self.d_input.SetFont(font)
+        self.d_type_choice = wx.Choice(
+            diameter_box,
+            choices=[
+                loc.get("inner_label", "Внутренний"),
+                loc.get("middle_label", "Средний"),
+                loc.get("outer_label", "Внешний")
+            ],
+            size=(100, -1)  # Устанавливаем ширину для единообразия
+        )
+        self.d_type_choice.SetFont(font)
+        self.d_type_choice.SetSelection(0)  # Внутренний по умолчанию
         d_sizer.AddStretchSpacer()
         d_sizer.Add(d_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        d_sizer.Add(self.d_input, 0, wx.ALL, 5)
+        d_sizer.Add(self.d_input, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        d_sizer.Add(self.d_type_choice, 0, wx.ALIGN_CENTER_VERTICAL, 5)
         diameter_sizer.Add(d_sizer, 0, wx.EXPAND | wx.ALL, 5)
-
-        # Радиокнопки для диаметра вершины
-        d_radio_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.d_inner = wx.RadioButton(diameter_box, label=loc.get("inner_label", "Внутренний"), style=wx.RB_GROUP)
-        self.d_middle = wx.RadioButton(diameter_box, label=loc.get("middle_label", "Средний"))
-        self.d_outer = wx.RadioButton(diameter_box, label=loc.get("outer_label", "Внешний"))
-        for rb in [self.d_inner, self.d_middle, self.d_outer]:
-            rb.SetFont(font)
-        self.d_inner.SetValue(True)
-        self.labels["d_inner"] = self.d_inner
-        self.labels["d_middle"] = self.d_middle
-        self.labels["d_outer"] = self.d_outer
-        d_radio_sizer.AddStretchSpacer()
-        d_radio_sizer.Add(self.d_inner, 0, wx.RIGHT, 5)
-        d_radio_sizer.Add(self.d_middle, 0, wx.RIGHT, 5)
-        d_radio_sizer.Add(self.d_outer, 0, wx.RIGHT, 5)
-        diameter_sizer.Add(d_radio_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         # Диаметр основания (D)
         D_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -396,27 +412,35 @@ class ConeContentPanel(BaseContentPanel):
         self.labels["D"] = D_label
         self.D_input = wx.TextCtrl(diameter_box, value="", size=INPUT_FIELD_SIZE)
         self.D_input.SetFont(font)
+        self.D_type_choice = wx.Choice(
+            diameter_box,
+            choices=[
+                loc.get("inner_label", "Внутренний"),
+                loc.get("middle_label", "Средний"),
+                loc.get("outer_label", "Внешний")
+            ],
+            size=(100, -1)  # Устанавливаем ширину для единообразия
+        )
+        self.D_type_choice.SetFont(font)
+        self.D_type_choice.SetSelection(0)  # Внутренний по умолчанию
         D_sizer.AddStretchSpacer()
         D_sizer.Add(D_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        D_sizer.Add(self.D_input, 0, wx.ALL, 5)
+        D_sizer.Add(self.D_input, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        D_sizer.Add(self.D_type_choice, 0, wx.ALIGN_CENTER_VERTICAL, 5)
         diameter_sizer.Add(D_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
-        # Радиокнопки для диаметра основания
-        D_radio_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.D_inner = wx.RadioButton(diameter_box, label=loc.get("inner_label", "Внутренний"), style=wx.RB_GROUP)
-        self.D_middle = wx.RadioButton(diameter_box, label=loc.get("middle_label", "Средний"))
-        self.D_outer = wx.RadioButton(diameter_box, label=loc.get("outer_label", "Внешний"))
-        for rb in [self.D_inner, self.D_middle, self.D_outer]:
-            rb.SetFont(font)
-        self.D_inner.SetValue(True)
-        self.labels["D_inner"] = self.D_inner
-        self.labels["D_middle"] = self.D_middle
-        self.labels["D_outer"] = self.D_outer
-        D_radio_sizer.AddStretchSpacer()
-        D_radio_sizer.Add(self.D_inner, 0, wx.RIGHT, 5)
-        D_radio_sizer.Add(self.D_middle, 0, wx.RIGHT, 5)
-        D_radio_sizer.Add(self.D_outer, 0, wx.RIGHT, 5)
-        diameter_sizer.Add(D_radio_sizer, 0, wx.EXPAND | wx.ALL, 5)
+        # Коррекция диаметра D
+        D_adjustment_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        D_adjustment_label = wx.StaticText(diameter_box,
+                                           label=loc.get("diameter_adjustment_label", "Коррекция диаметра D, мм"))
+        D_adjustment_label.SetFont(font)
+        self.labels["D_adjustment"] = D_adjustment_label
+        self.D_adjustment_input = wx.TextCtrl(diameter_box, value="0", size=INPUT_FIELD_SIZE)
+        self.D_adjustment_input.SetFont(font)
+        D_adjustment_sizer.AddStretchSpacer()
+        D_adjustment_sizer.Add(D_adjustment_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        D_adjustment_sizer.Add(self.D_adjustment_input, 0, wx.ALIGN_CENTER_VERTICAL, 5)
+        diameter_sizer.Add(D_adjustment_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         self.right_sizer.Add(diameter_sizer, 0, wx.EXPAND | wx.ALL, 10)
 
@@ -526,10 +550,12 @@ class ConeContentPanel(BaseContentPanel):
                 self.d_input.SetValue("")
             if not self.D_input.IsBeingDeleted():
                 self.D_input.SetValue("")
-            if not self.d_inner.IsBeingDeleted():
-                self.d_inner.SetValue(True)
-            if not self.D_inner.IsBeingDeleted():
-                self.D_inner.SetValue(True)
+            if not self.d_type_choice.IsBeingDeleted():
+                self.d_type_choice.SetSelection(0)
+            if not self.D_type_choice.IsBeingDeleted():
+                self.D_type_choice.SetSelection(0)
+            if not self.D_adjustment_input.IsBeingDeleted():
+                self.D_adjustment_input.SetValue("0")
             if not self.height_input.IsBeingDeleted():
                 self.height_input.SetValue("")
             if not self.steigung_input.IsBeingDeleted():
@@ -547,7 +573,7 @@ class ConeContentPanel(BaseContentPanel):
             if not self.order_input.IsBeingDeleted():
                 self.order_input.SetFocus()
             logging.info(
-                "Очищены поля: detail_number, diameter_top, diameter_base, height, steigung, angle, insert_point, d_type, D_type")
+                "Очищены поля: detail_number, diameter_top, diameter_base, height, steigung, angle, insert_point, d_type, D_type, D_adjustment")
             logging.getLogger().handlers[0].flush()
         except Exception as e:
             logging.error(f"Ошибка при очистке полей: {e}")
@@ -574,18 +600,26 @@ class ConeContentPanel(BaseContentPanel):
             self.labels["thickness"].SetLabel(loc.get("thickness_label", "Толщина"))
             self.labels["d"].SetLabel(loc.get("d_label", "d, мм"))
             self.labels["D"].SetLabel(loc.get("D_label", "D, мм"))
-
-            self.labels["d_inner"].SetLabel(loc.get("inner_label", "Внутренний"))
-            self.labels["d_middle"].SetLabel(loc.get("middle_label", "Средний"))
-            self.labels["d_outer"].SetLabel(loc.get("outer_label", "Внешний"))
-            self.labels["D_inner"].SetLabel(loc.get("inner_label", "Внутренний"))
-            self.labels["D_middle"].SetLabel(loc.get("middle_label", "Средний"))
-            self.labels["D_outer"].SetLabel(loc.get("outer_label", "Внешний"))
-
             self.labels["height"].SetLabel(loc.get("height_label_mm", "H, мм"))
             self.labels["steigung"].SetLabel(loc.get("steigung_label", "Наклон"))
             self.labels["angle"].SetLabel(loc.get("angle_label", "α°"))
             self.labels["allowance"].SetLabel(loc.get("weld_allowance_label", "Припуск на сварку, мм"))
+            self.labels["D_adjustment"].SetLabel(loc.get("diameter_adjustment_label", "Коррекция диаметра D, мм"))
+
+            # Обновление списков типов диаметров
+            self.d_type_choice.SetItems([
+                loc.get("inner_label", "Внутренний"),
+                loc.get("middle_label", "Средний"),
+                loc.get("outer_label", "Внешний")
+            ])
+            self.d_type_choice.SetSelection(0)
+
+            self.D_type_choice.SetItems([
+                loc.get("inner_label", "Внутренний"),
+                loc.get("middle_label", "Средний"),
+                loc.get("outer_label", "Внешний")
+            ])
+            self.D_type_choice.SetSelection(0)
 
             # Кнопки
             for i, key in enumerate(["ok_button", "clear_button", "cancel_button"]):
@@ -737,6 +771,8 @@ class ConeContentPanel(BaseContentPanel):
         - Если тип диаметра 'middle', диаметр остаётся без изменений.
         Высота:
         - К высоте прибавляется припуск на сварку.
+        Диаметр основания:
+        - К диаметру D прибавляется коррекция диаметра D перед обработкой.
 
         Returns:
             Optional[Dict]: Словарь с данными (order_number, detail_number, material, thickness, diameter_top,
@@ -744,15 +780,16 @@ class ConeContentPanel(BaseContentPanel):
             или None при ошибке.
         """
         try:
+            D_adjustment = parse_float(self.D_adjustment_input.GetValue()) or 0.0
             data = {
                 "order_number": self.order_input.GetValue().strip(),
                 "detail_number": self.detail_input.GetValue().strip(),
                 "material": self.material_combo.GetValue().strip(),
                 "thickness": parse_float(self.thickness_combo.GetValue()),
                 "diameter_top": parse_float(self.d_input.GetValue()) or 0,
-                "diameter_base": parse_float(self.D_input.GetValue()) or 0,
-                "d_type": "inner" if self.d_inner.GetValue() else "middle" if self.d_middle.GetValue() else "outer",
-                "D_type": "inner" if self.D_inner.GetValue() else "middle" if self.D_middle.GetValue() else "outer",
+                "diameter_base": (parse_float(self.D_input.GetValue()) or 0) + D_adjustment,
+                "d_type": ["inner", "middle", "outer"][self.d_type_choice.GetSelection()],
+                "D_type": ["inner", "middle", "outer"][self.D_type_choice.GetSelection()],
                 "height": parse_float(self.height_input.GetValue()),
                 "steigung": parse_float(self.steigung_input.GetValue()),
                 "angle": parse_float(self.angle_input.GetValue()),
@@ -1039,8 +1076,8 @@ if __name__ == "__main__":
                 print(f"steigung: {panel.steigung_input.GetValue()}")
                 print(f"angle: {panel.angle_input.GetValue()}")
                 print(f"insert_point: {panel.insert_point}")
-                print(f"d_type: {'inner' if panel.d_inner.GetValue() else 'middle' if panel.d_middle.GetValue() else 'outer'}")
-                print(f"D_type: {'inner' if panel.D_inner.GetValue() else 'middle' if panel.D_middle.GetValue() else 'outer'}")
+                print(f"d_type: {['inner', 'middle', 'outer'][panel.d_type_choice.GetSelection()]}")
+                print(f"D_type: {['inner', 'middle', 'outer'][panel.D_type_choice.GetSelection()]}")
                 print("Окно должно остаться открытым")
             else:
                 print("Окно уничтожено после нажатия ОК")

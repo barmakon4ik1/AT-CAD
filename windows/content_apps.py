@@ -42,20 +42,20 @@ TRANSLATIONS = {
         "de": "Kegel",
         "en": "Cone"
     },
-    "at_run_plate": {
-        "ru": "Лист",
-        "de": "Platte",
-        "en": "Plate"
-    },
     "at_run_heads": {
         "ru": "Днище",
         "de": "Boden",
         "en": "Head"
     },
     "at_run_shell": {
-        "ru": "Оболочка",
+        "ru": "Обечайка",
         "de": "Mantel",
         "en": "Shell"
+    },
+    "at_run_plate": {
+        "ru": "Лист",
+        "de": "Platte",
+        "en": "Plate"
     }
 }
 # Регистрируем переводы сразу при загрузке модуля
@@ -164,7 +164,7 @@ if __name__ == "__main__":
     """
     app = wx.App(False)
     frame = wx.Frame(None, title="Test AppsContentPanel", size=(800, 600))
-    loc.set_language("en")  # Тестируем с английским языком
+    loc.set_language("de")  # Тестируем с DE
     panel = AppsContentPanel(frame)
     sizer = wx.BoxSizer(wx.VERTICAL)
     sizer.Add(panel, 1, wx.EXPAND)

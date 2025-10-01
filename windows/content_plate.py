@@ -228,8 +228,8 @@ class PlateContentPanel(BaseContentPanel):
         self.labels["material"] = material_label
         self.material_combo = wx.ComboBox(main_data_box, choices=material_options, value=material_options[0] if material_options else "", style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
         self.material_combo.SetFont(font)
-        material_sizer.AddStretchSpacer()
         material_sizer.Add(material_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        material_sizer.AddStretchSpacer()
         material_sizer.Add(self.material_combo, 0, wx.ALL, 5)
         main_data_sizer.Add(material_sizer, 0, wx.ALL | wx.EXPAND, 5)
 
@@ -240,8 +240,8 @@ class PlateContentPanel(BaseContentPanel):
         self.labels["thickness"] = thickness_label
         self.thickness_combo = wx.ComboBox(main_data_box, choices=thickness_options, value=default_thickness, style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
         self.thickness_combo.SetFont(font)
-        thickness_sizer.AddStretchSpacer()
         thickness_sizer.Add(thickness_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        thickness_sizer.AddStretchSpacer()
         thickness_sizer.Add(self.thickness_combo, 0, wx.ALL, 5)
         main_data_sizer.Add(thickness_sizer, 0, wx.ALL | wx.EXPAND, 5)
 
@@ -252,8 +252,8 @@ class PlateContentPanel(BaseContentPanel):
         self.labels["melt_no"] = melt_no_label
         self.melt_no_input = wx.TextCtrl(main_data_box, value="", size=INPUT_FIELD_SIZE)
         self.melt_no_input.SetFont(font)
-        melt_no_sizer.AddStretchSpacer()
         melt_no_sizer.Add(melt_no_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        melt_no_sizer.AddStretchSpacer()
         melt_no_sizer.Add(self.melt_no_input, 0, wx.ALL, 5)
         main_data_sizer.Add(melt_no_sizer, 0, wx.ALL | wx.EXPAND, 5)
 
@@ -280,8 +280,8 @@ class PlateContentPanel(BaseContentPanel):
         self.labels["size"] = size_label
         self.size_combo = wx.ComboBox(dimensions_box, choices=size_options, value=loc.get("manual_input_label", "Ручной ввод"), style=wx.CB_READONLY, size=INPUT_FIELD_SIZE)
         self.size_combo.SetFont(font)
-        size_sizer.AddStretchSpacer()
         size_sizer.Add(size_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        size_sizer.AddStretchSpacer()
         size_sizer.Add(self.size_combo, 0, wx.ALL, 5)
         dimensions_sizer.Add(size_sizer, 0, wx.ALL | wx.EXPAND, 5)
 
@@ -320,8 +320,8 @@ class PlateContentPanel(BaseContentPanel):
         self.labels["allowance"] = allowance_label
         self.allowance_input = wx.TextCtrl(dimensions_box, value="10", size=INPUT_FIELD_SIZE)
         self.allowance_input.SetFont(font)
-        allowance_sizer.AddStretchSpacer()
         allowance_sizer.Add(allowance_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        allowance_sizer.AddStretchSpacer()
         allowance_sizer.Add(self.allowance_input, 0, wx.ALL, 5)
         dimensions_sizer.Add(allowance_sizer, 0, wx.ALL | wx.EXPAND, 5)
 
