@@ -283,7 +283,9 @@ class ConeContentPanel(BaseContentPanel):
     def setup_ui(self) -> None:
         """
         Настраивает элементы интерфейса, создавая компоновку с левой (изображение, кнопки)
-        и правой (поля ввода) частями.
+        и правой (поля ввода) частями. Все поля ввода (TextCtrl, ComboBox, Choice) имеют
+        одинаковую ширину и выровнены по правому краю с использованием wx.StretchSpacer()
+        между метками и полями.
         """
         if self.GetSizer():
             self.GetSizer().Clear(True)
@@ -291,7 +293,7 @@ class ConeContentPanel(BaseContentPanel):
         self.static_boxes.clear()
         self.buttons.clear()
 
-        INPUT_FIELD_SIZE = (120, -1)
+        field_size = (150, -1)  # Единая ширина для всех полей ввода
         main_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.left_sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -323,7 +325,8 @@ class ConeContentPanel(BaseContentPanel):
         common_data = load_common_data()
         material_options = [mat["name"] for mat in common_data.get("material", []) if mat["name"]]
         thickness_options = common_data.get("thicknesses", [])
-        default_thickness = "4" if "4" in thickness_options or "4.0" in thickness_options else thickness_options[0] if thickness_options else ""
+        default_thickness = "4" if "4" in thickness_options or "4.0" in thickness_options else thickness_options[
+            0] if thickness_options else ""
 
         # Группа "Основные данные"
         main_data_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, loc.get("main_data_label", "Основные данные"))
@@ -336,15 +339,15 @@ class ConeContentPanel(BaseContentPanel):
         order_label = wx.StaticText(main_data_box, label=loc.get("order_label", "К-№"))
         order_label.SetFont(font)
         self.labels["order"] = order_label
-        self.order_input = wx.TextCtrl(main_data_box, value="", size=INPUT_FIELD_SIZE)
+        self.order_input = wx.TextCtrl(main_data_box, value="", size=field_size)
         self.order_input.SetFont(font)
-        order_sizer.AddStretchSpacer()
-        order_sizer.Add(order_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        order_sizer.Add(self.order_input, 0, wx.RIGHT, 10)
-        self.detail_input = wx.TextCtrl(main_data_box, value="", size=INPUT_FIELD_SIZE)
+        self.detail_input = wx.TextCtrl(main_data_box, value="", size=field_size)
         self.detail_input.SetFont(font)
-        order_sizer.Add(self.detail_input, 0, wx.RIGHT, 5)
-        main_data_sizer.Add(order_sizer, 0, wx.ALL | wx.EXPAND, 5)
+        order_sizer.Add(order_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
+        order_sizer.AddStretchSpacer()
+        order_sizer.Add(self.order_input, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
+        order_sizer.Add(self.detail_input, 0, wx.ALIGN_CENTER_VERTICAL)
+        main_data_sizer.Add(order_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         # Материал
         material_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -352,13 +355,13 @@ class ConeContentPanel(BaseContentPanel):
         material_label.SetFont(font)
         self.labels["material"] = material_label
         self.material_combo = wx.ComboBox(main_data_box, choices=material_options,
-                                         value=material_options[0] if material_options else "", style=wx.CB_DROPDOWN,
-                                         size=INPUT_FIELD_SIZE)
+                                          value=material_options[0] if material_options else "", style=wx.CB_DROPDOWN,
+                                          size=field_size)
         self.material_combo.SetFont(font)
+        material_sizer.Add(material_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         material_sizer.AddStretchSpacer()
-        material_sizer.Add(material_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        material_sizer.Add(self.material_combo, 0, wx.ALL, 5)
-        main_data_sizer.Add(material_sizer, 0, wx.ALL | wx.EXPAND, 5)
+        material_sizer.Add(self.material_combo, 0, wx.ALIGN_CENTER_VERTICAL)
+        main_data_sizer.Add(material_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         # Толщина
         thickness_sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -366,12 +369,12 @@ class ConeContentPanel(BaseContentPanel):
         thickness_label.SetFont(font)
         self.labels["thickness"] = thickness_label
         self.thickness_combo = wx.ComboBox(main_data_box, choices=thickness_options, value=default_thickness,
-                                          style=wx.CB_DROPDOWN, size=INPUT_FIELD_SIZE)
+                                           style=wx.CB_DROPDOWN, size=field_size)
         self.thickness_combo.SetFont(font)
+        thickness_sizer.Add(thickness_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         thickness_sizer.AddStretchSpacer()
-        thickness_sizer.Add(thickness_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        thickness_sizer.Add(self.thickness_combo, 0, wx.ALL, 5)
-        main_data_sizer.Add(thickness_sizer, 0, wx.ALL | wx.EXPAND, 5)
+        thickness_sizer.Add(self.thickness_combo, 0, wx.ALIGN_CENTER_VERTICAL)
+        main_data_sizer.Add(thickness_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         self.right_sizer.Add(main_data_sizer, 0, wx.EXPAND | wx.ALL, 10)
 
@@ -386,7 +389,7 @@ class ConeContentPanel(BaseContentPanel):
         d_label = wx.StaticText(diameter_box, label=loc.get("d_label", "d, мм"))
         d_label.SetFont(font)
         self.labels["d"] = d_label
-        self.d_input = wx.TextCtrl(diameter_box, value="", size=INPUT_FIELD_SIZE)
+        self.d_input = wx.TextCtrl(diameter_box, value="", size=field_size)
         self.d_input.SetFont(font)
         self.d_type_choice = wx.Choice(
             diameter_box,
@@ -395,14 +398,14 @@ class ConeContentPanel(BaseContentPanel):
                 loc.get("middle_label", "Средний"),
                 loc.get("outer_label", "Внешний")
             ],
-            size=(100, -1)  # Устанавливаем ширину для единообразия
+            size=field_size
         )
         self.d_type_choice.SetFont(font)
         self.d_type_choice.SetSelection(0)  # Внутренний по умолчанию
+        d_sizer.Add(d_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         d_sizer.AddStretchSpacer()
-        d_sizer.Add(d_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
         d_sizer.Add(self.d_input, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        d_sizer.Add(self.d_type_choice, 0, wx.ALIGN_CENTER_VERTICAL, 5)
+        d_sizer.Add(self.d_type_choice, 0, wx.ALIGN_CENTER_VERTICAL)
         diameter_sizer.Add(d_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         # Диаметр основания (D)
@@ -410,7 +413,7 @@ class ConeContentPanel(BaseContentPanel):
         D_label = wx.StaticText(diameter_box, label=loc.get("D_label", "D, мм"))
         D_label.SetFont(font)
         self.labels["D"] = D_label
-        self.D_input = wx.TextCtrl(diameter_box, value="", size=INPUT_FIELD_SIZE)
+        self.D_input = wx.TextCtrl(diameter_box, value="", size=field_size)
         self.D_input.SetFont(font)
         self.D_type_choice = wx.Choice(
             diameter_box,
@@ -419,14 +422,14 @@ class ConeContentPanel(BaseContentPanel):
                 loc.get("middle_label", "Средний"),
                 loc.get("outer_label", "Внешний")
             ],
-            size=(100, -1)  # Устанавливаем ширину для единообразия
+            size=field_size
         )
         self.D_type_choice.SetFont(font)
         self.D_type_choice.SetSelection(0)  # Внутренний по умолчанию
+        D_sizer.Add(D_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         D_sizer.AddStretchSpacer()
-        D_sizer.Add(D_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
         D_sizer.Add(self.D_input, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        D_sizer.Add(self.D_type_choice, 0, wx.ALIGN_CENTER_VERTICAL, 5)
+        D_sizer.Add(self.D_type_choice, 0, wx.ALIGN_CENTER_VERTICAL)
         diameter_sizer.Add(D_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         # Коррекция диаметра D
@@ -435,11 +438,11 @@ class ConeContentPanel(BaseContentPanel):
                                            label=loc.get("diameter_adjustment_label", "Коррекция диаметра D, мм"))
         D_adjustment_label.SetFont(font)
         self.labels["D_adjustment"] = D_adjustment_label
-        self.D_adjustment_input = wx.TextCtrl(diameter_box, value="0", size=INPUT_FIELD_SIZE)
+        self.D_adjustment_input = wx.TextCtrl(diameter_box, value="0", size=field_size)
         self.D_adjustment_input.SetFont(font)
+        D_adjustment_sizer.Add(D_adjustment_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         D_adjustment_sizer.AddStretchSpacer()
-        D_adjustment_sizer.Add(D_adjustment_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        D_adjustment_sizer.Add(self.D_adjustment_input, 0, wx.ALIGN_CENTER_VERTICAL, 5)
+        D_adjustment_sizer.Add(self.D_adjustment_input, 0, wx.ALIGN_CENTER_VERTICAL)
         diameter_sizer.Add(D_adjustment_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         self.right_sizer.Add(diameter_sizer, 0, wx.EXPAND | wx.ALL, 10)
@@ -455,11 +458,11 @@ class ConeContentPanel(BaseContentPanel):
         height_label = wx.StaticText(height_box, label=loc.get("height_label_mm", "H, мм"))
         height_label.SetFont(font)
         self.labels["height"] = height_label
-        self.height_input = wx.TextCtrl(height_box, value="", size=INPUT_FIELD_SIZE)
+        self.height_input = wx.TextCtrl(height_box, value="", size=field_size)
         self.height_input.SetFont(font)
+        height_input_sizer.Add(height_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         height_input_sizer.AddStretchSpacer()
-        height_input_sizer.Add(height_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        height_input_sizer.Add(self.height_input, 0, wx.ALL, 5)
+        height_input_sizer.Add(self.height_input, 0, wx.ALIGN_CENTER_VERTICAL)
         height_sizer.Add(height_input_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         # Наклон
@@ -467,11 +470,11 @@ class ConeContentPanel(BaseContentPanel):
         steigung_label = wx.StaticText(height_box, label=loc.get("steigung_label", "Наклон"))
         steigung_label.SetFont(font)
         self.labels["steigung"] = steigung_label
-        self.steigung_input = wx.TextCtrl(height_box, value="", size=INPUT_FIELD_SIZE)
+        self.steigung_input = wx.TextCtrl(height_box, value="", size=field_size)
         self.steigung_input.SetFont(font)
+        steigung_sizer.Add(steigung_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         steigung_sizer.AddStretchSpacer()
-        steigung_sizer.Add(steigung_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        steigung_sizer.Add(self.steigung_input, 0, wx.ALL, 5)
+        steigung_sizer.Add(self.steigung_input, 0, wx.ALIGN_CENTER_VERTICAL)
         height_sizer.Add(steigung_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         # Угол
@@ -479,30 +482,31 @@ class ConeContentPanel(BaseContentPanel):
         angle_label = wx.StaticText(height_box, label=loc.get("angle_label", "α°"))
         angle_label.SetFont(font)
         self.labels["angle"] = angle_label
-        self.angle_input = wx.TextCtrl(height_box, value="", size=INPUT_FIELD_SIZE)
+        self.angle_input = wx.TextCtrl(height_box, value="", size=field_size)
         self.angle_input.SetFont(font)
+        angle_sizer.Add(angle_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         angle_sizer.AddStretchSpacer()
-        angle_sizer.Add(angle_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        angle_sizer.Add(self.angle_input, 0, wx.ALL, 5)
+        angle_sizer.Add(self.angle_input, 0, wx.ALIGN_CENTER_VERTICAL)
         height_sizer.Add(angle_sizer, 0, wx.EXPAND | wx.ALL, 5)
+
+        # Припуск на сварку
+        allowance_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        allowance_label = wx.StaticText(height_box, label=loc.get("weld_allowance_label", "Припуск на сварку, мм"))
+        allowance_label.SetFont(font)
+        self.labels["allowance"] = allowance_label
+        self.allowance_combo = wx.ComboBox(height_box, choices=[str(i) for i in range(11)], value="3",
+                                           style=wx.CB_READONLY,
+                                           size=field_size)
+        self.allowance_combo.SetFont(font)
+        allowance_sizer.Add(allowance_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
+        allowance_sizer.AddStretchSpacer()
+        allowance_sizer.Add(self.allowance_combo, 0, wx.ALIGN_CENTER_VERTICAL)
+        height_sizer.Add(allowance_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         self.height_input.Bind(wx.EVT_TEXT, self.on_height_text)
         self.steigung_input.Bind(wx.EVT_TEXT, self.on_steigung_text)
         self.angle_input.Bind(wx.EVT_TEXT, self.on_angle_text)
         self.right_sizer.Add(height_sizer, 0, wx.EXPAND | wx.ALL, 10)
-
-        # Припуск на сварку
-        allowance_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        allowance_label = wx.StaticText(self, label=loc.get("weld_allowance_label", "Припуск на сварку, мм"))
-        allowance_label.SetFont(font)
-        self.labels["allowance"] = allowance_label
-        self.allowance_combo = wx.ComboBox(self, choices=[str(i) for i in range(11)], value="3", style=wx.CB_READONLY,
-                                          size=INPUT_FIELD_SIZE)
-        self.allowance_combo.SetFont(font)
-        allowance_sizer.AddStretchSpacer()
-        allowance_sizer.Add(allowance_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        allowance_sizer.Add(self.allowance_combo, 0, wx.ALL, 5)
-        self.right_sizer.Add(allowance_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
         main_sizer.Add(self.right_sizer, 0, wx.EXPAND | wx.ALL, 10)

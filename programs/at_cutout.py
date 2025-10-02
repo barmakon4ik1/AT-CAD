@@ -24,12 +24,12 @@ from programs.at_construction import (
     add_polyline,
     add_dimension,
     add_line,
-    add_spline,
+    add_spline, add_text,
 )
 from programs.at_geometry import (
     ensure_point_variant,
     convert_to_variant_points,
-    circle_center_from_points,
+    circle_center_from_points, offset_point,
 )
 from programs.at_input import at_point_input
 from windows.at_gui_utils import show_popup
@@ -64,6 +64,8 @@ TRANSLATIONS = {
 }
 loc.register_translations(TRANSLATIONS)
 
+def main(data):
+    return at_cutout(data)
 
 def compute_cyl_cyl_intersection_unwrap(
     R: float,
@@ -236,8 +238,8 @@ def at_cutout(data: Dict[str, Any]) -> bool:
         diameter_main = float(data.get("diameter_main", 0.0))
         offset = float(data.get("offset", 0.0))
         steps = int(data.get("steps", 2048))
-        layer_name = data.get("layer_name", "0")
         mode = data.get("mode", "bulge").lower()
+        text = data.get("text", "")
 
         r = diameter / 2.0
         R = diameter_main / 2.0
@@ -253,6 +255,10 @@ def at_cutout(data: Dict[str, Any]) -> bool:
         add_line(model, p_bottom, p_top, layer_name="AM_7")
         add_line(model, p_left, p_right, layer_name="AM_7")
 
+        # Сопроводительный текст
+        point_text = ensure_point_variant(offset_point(insert_point, 20, 20))
+        add_text(model, point_text, text, layer_name="AM_5", text_height=30)
+
         polylines = compute_cyl_cyl_intersection_unwrap(R, r, offset, steps)
         if not polylines:
             show_popup(loc.get("contour_not_built"), popup_type="error")
@@ -263,13 +269,14 @@ def at_cutout(data: Dict[str, Any]) -> bool:
             if mode == "polyline":
                 points_xy = [[x0 + s, y0 + z] for s, z, _ in poly]
                 pts_variant = convert_to_variant_points(points_xy)
-                add_polyline(model, pts_variant, layer_name=layer_name, closed=True)
+                add_polyline(model, pts_variant, layer_name="0", closed=True)
             elif mode == "bulge":
                 pts = [(x0 + s, y0 + z, b) for s, z, b in poly]
-                add_polyline(model, pts, layer_name=layer_name)
+                add_polyline(model, pts, layer_name="0", closed=True)
             elif mode == "spline":
                 points_xy = [[x0 + s, y0 + z] for s, z, _ in poly]
-                add_spline(model, points_xy, layer_name=layer_name, closed=True)
+                pts_variant = convert_to_variant_points(points_xy)
+                add_spline(model, pts_variant, layer_name="0", closed=True)
             else:
                 show_popup(loc.get("unknown_mode").format(mode), popup_type="info")
                 return False
@@ -293,7 +300,7 @@ if __name__ == "__main__":
         "diameter_main": 219.1,
         "offset": 0,
         "steps": 180,
-        "layer_name": "0",
-        "mode": "bulge"
+        "mode": "bulge",
+        "text": "N1"
     }
     at_cutout(data)

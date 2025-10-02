@@ -60,6 +60,11 @@ TRANSLATIONS = {
         "ru": "Лист",
         "de": "Platte",
         "en": "Plate"
+    },
+    "at_run_cutout": {
+        "ru": "Вырез",
+        "de": "Ausschnitt",
+        "en": "Cutout"
     }
 }
 
@@ -102,6 +107,11 @@ CONTENT_REGISTRY = {
         "module": "windows.content_nozzle",
         "label": "at_run_nozzle",
         "build_module": "programs.at_nozzle"
+    },
+    "cutout": {
+        "module": "windows.content_cutout",
+        "label": "at_run_cutout",
+        "build_module": "programs.at_cutout"
     }
 }
 

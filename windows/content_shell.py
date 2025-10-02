@@ -3,10 +3,8 @@
 Модуль содержит панель ShellContentPanel для настройки параметров оболочки
 в приложении AT-CAD. Панель собирает данные и передает их через callback в at_shell.
 """
-
 import wx
 from typing import Optional, Dict
-
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programs.at_construction import at_diameter
@@ -18,7 +16,6 @@ from windows.at_window_utils import (
     style_combobox, style_radiobutton, style_staticbox, update_status_bar_point_selected
 )
 from config.at_config import SHELL_IMAGE_PATH
-from windows.at_content_registry import run_build
 
 # -----------------------------
 # Локальные переводы модуля
@@ -31,18 +28,19 @@ TRANSLATIONS = {
     "thickness_label": {"ru": "Толщина, S", "de": "Dicke, S", "en": "Thickness, S"},
     "shell_params_label": {"ru": "Параметры оболочки", "de": "Schalendaten", "en": "Shell Params"},
     "diameter_label": {"ru": "Диаметр, D", "de": "Durchmesser, D", "en": "Diameter, D"},
-    "inner_label": {"ru": "Внутренний", "de": "Innen", "en": "Inner"},
-    "middle_label": {"ru": "Средний", "de": "Mittel", "en": "Middle"},
-    "outer_label": {"ru": "Внешний", "de": "Außen", "en": "Outer"},
+    "diameter_type_inner": {"ru": "Внутренний", "de": "Innen", "en": "Inner"},
+    "diameter_type_middle": {"ru": "Средний", "de": "Mittel", "en": "Middle"},
+    "diameter_type_outer": {"ru": "Внешний", "de": "Außen", "en": "Outer"},
     "length_label": {"ru": "Длина, L", "de": "Länge, L", "en": "Length, L"},
-    "angle_label": {"ru": "Положение шва (°)", "de": "Nahtposition (°)", "en": "Seam angle (°)"},
-    "clockwise_label": {"ru": "Развертка по часовой стрелке", "de": "Abwicklung im Uhrzeigersinn", "en": "Clockwise development"},
-    "additional_label": {"ru": "Доп. условия", "de": "Zusatzbedingungen", "en": "Additional"},
-    "axis_checkbox": {"ru": "Отрисовка осей", "de": "Achsen zeichnen", "en": "Draw axes"},
-    "axis_marks_label": {"ru": "Метки осей", "de": "Achsenmarken", "en": "Axis marks"},
-    "weld_allowance_label": {"ru": "Припуск на сварку", "de": "Schweißnahtzugabe", "en": "Weld Allowance"},
-    "allowance_top_label": {"ru": "Сверху Lt", "de": "Oben Lt", "en": "Top Lt"},
-    "allowance_bottom_label": {"ru": "Снизу Lb", "de": "Unten Lb", "en": "Bottom Lb"},
+    "angle_label": {"ru": "Положение шва, A°", "de": "Nahtposition, A°", "en": "Seam angle, A°"},
+    "clockwise_clockwise": {"ru": "По часовой", "de": "Im Uhrzeigersinn", "en": "Clockwise"},
+    "clockwise_counterclockwise": {"ru": "Против часовой", "de": "Gegen Uhrzeigersinn", "en": "Counterclockwise"},
+    "additional_label": {"ru": "Дополнительные условия", "de": "Zusatzbedingungen", "en": "Additional"},
+    "axis_yes": {"ru": "Да", "de": "Ja", "en": "Yes"},
+    "axis_no": {"ru": "Нет", "de": "Nein", "en": "No"},
+    "axis_marks_label": {"ru": "Метки осей, мм", "de": "Achsenmarken, mm", "en": "Axis marks, mm"},
+    "allowance_top_label": {"ru": "Припуск на сварку сверху, Lt", "de": "Schweißnahtzugabe oben, Lt", "en": "Weld Allowance Top, Lt"},
+    "allowance_bottom_label": {"ru": "Припуск на сварку снизу, Lb", "de": "Schweißnahtzugabe unten, Lb", "en": "Weld Allowance Bottom, Lb"},
     "ok_button": {"ru": "ОК", "de": "OK", "en": "OK"},
     "clear_button": {"ru": "Очистить", "de": "Zurücksetzen", "en": "Clear"},
     "cancel_button": {"ru": "Возврат", "de": "Zurück", "en": "Return"},
@@ -54,15 +52,14 @@ loc.register_translations(TRANSLATIONS)
 # Фабричная функция для создания панели
 def create_window(parent: wx.Window) -> wx.Panel:
     """
-    Фабричная функция для создания панели ShellContentPanel.
+    Фабричная функция для создания панели ShellContentPanel.Args:
+    parent (wx.Window): Родительская панель (обычно content_panel в ATMainWindow).
 
-    Args:
-        parent (wx.Window): Родительская панель (обычно content_panel в ATMainWindow).
-
-    Returns:
-        wx.Panel: Инициализированный экземпляр ShellContentPanel.
-    """
+Returns:
+    wx.Panel: Инициализированный экземпляр ShellContentPanel.
+"""
     return ShellContentPanel(parent)
+
 
 # Значения по умолчанию
 default_allowances = ["0", "1", "2", "3", "4", "5", "10", "20"]
@@ -91,6 +88,21 @@ class ShellContentPanel(BaseContentPanel):
         self.buttons = []
         self.insert_point = None
 
+        # Виджеты
+        self.order_input: Optional[wx.TextCtrl] = None
+        self.detail_input: Optional[wx.TextCtrl] = None
+        self.material_combo: Optional[wx.ComboBox] = None
+        self.thickness_combo: Optional[wx.ComboBox] = None
+        self.diameter_input: Optional[wx.TextCtrl] = None
+        self.diameter_type_choice: Optional[wx.Choice] = None
+        self.length_input: Optional[wx.TextCtrl] = None
+        self.angle_input: Optional[wx.TextCtrl] = None
+        self.clockwise_choice: Optional[wx.Choice] = None
+        self.axis_choice: Optional[wx.Choice] = None
+        self.axis_marks_combo: Optional[wx.ComboBox] = None
+        self.allowance_top: Optional[wx.ComboBox] = None
+        self.allowance_bottom: Optional[wx.ComboBox] = None
+
         self.setup_ui()
         self.order_input.SetFocus()
 
@@ -98,8 +110,8 @@ class ShellContentPanel(BaseContentPanel):
         """
         Настраивает пользовательский интерфейс панели ShellContentPanel.
         Создает левый сайзер с изображением и кнопками и правый сайзер с полями ввода.
-        Все поля ввода (TextCtrl, ComboBox) имеют одинаковую ширину и выровнены по правому краю
-        с использованием wx.StretchSpacer(). Стилизация выполняется через функции из at_window_utils.
+        Все поля ввода (TextCtrl, ComboBox, Choice) имеют одинаковую ширину и выровнены по правому краю
+        с использованием wx.StretchSpacer() между метками и полями. Стилизация выполняется через функции из at_window_utils.
         """
         if self.GetSizer():
             self.GetSizer().Clear(True)
@@ -145,9 +157,9 @@ class ShellContentPanel(BaseContentPanel):
         self.detail_input = wx.TextCtrl(main_data_box, value="", size=field_size)
         style_textctrl(self.detail_input)
         row1.Add(self.labels["order"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-        row1.Add(self.order_input, 0, wx.RIGHT, 10)
         row1.AddStretchSpacer()
-        row1.Add(self.detail_input, 0)
+        row1.Add(self.order_input, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
+        row1.Add(self.detail_input, 0, wx.ALIGN_CENTER_VERTICAL)
         main_data_sizer.Add(row1, 0, wx.EXPAND | wx.ALL, 5)
 
         # Загрузка общих данных
@@ -170,7 +182,7 @@ class ShellContentPanel(BaseContentPanel):
         style_combobox(self.material_combo)
         row2.Add(self.labels["material"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         row2.AddStretchSpacer()
-        row2.Add(self.material_combo, 0)
+        row2.Add(self.material_combo, 0, wx.ALIGN_CENTER_VERTICAL)
         main_data_sizer.Add(row2, 0, wx.EXPAND | wx.ALL, 5)
 
         # Третья строка: Толщина
@@ -187,7 +199,7 @@ class ShellContentPanel(BaseContentPanel):
         style_combobox(self.thickness_combo)
         row3.Add(self.labels["thickness"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         row3.AddStretchSpacer()
-        row3.Add(self.thickness_combo, 0)
+        row3.Add(self.thickness_combo, 0, wx.ALIGN_CENTER_VERTICAL)
         main_data_sizer.Add(row3, 0, wx.EXPAND | wx.ALL, 5)
 
         self.right_sizer.Add(main_data_sizer, 0, wx.EXPAND | wx.ALL, 10)
@@ -204,25 +216,22 @@ class ShellContentPanel(BaseContentPanel):
         style_label(self.labels["diameter"])
         self.diameter_input = wx.TextCtrl(shell_box, value="", size=field_size)
         style_textctrl(self.diameter_input)
+        self.diameter_type_choice = wx.Choice(
+            shell_box,
+            choices=[
+                loc.get("diameter_type_inner", "Внутренний"),
+                loc.get("diameter_type_middle", "Средний"),
+                loc.get("diameter_type_outer", "Внешний")
+            ],
+            size=field_size
+        )
+        self.diameter_type_choice.SetFont(font)
+        self.diameter_type_choice.SetSelection(2)  # Внешний по умолчанию
         row4.Add(self.labels["diameter"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         row4.AddStretchSpacer()
-        row4.Add(self.diameter_input, 0)
+        row4.Add(self.diameter_input, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        row4.Add(self.diameter_type_choice, 0, wx.ALIGN_CENTER_VERTICAL)
         shell_sizer.Add(row4, 0, wx.EXPAND | wx.ALL, 5)
-
-        # Радиокнопки
-        rb_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.d_inner = wx.RadioButton(shell_box, label=loc.get("inner_label", "Внутренний"), style=wx.RB_GROUP)
-        self.d_middle = wx.RadioButton(shell_box, label=loc.get("middle_label", "Средний"))
-        self.d_outer = wx.RadioButton(shell_box, label=loc.get("outer_label", "Внешний"))
-        self.d_outer.SetValue(True)
-        for rb in [self.d_inner, self.d_middle, self.d_outer]:
-            rb.SetFont(font)
-            style_radiobutton(rb)
-        rb_sizer.AddStretchSpacer()
-        rb_sizer.Add(self.d_inner, 0, wx.RIGHT, 10)
-        rb_sizer.Add(self.d_middle, 0, wx.RIGHT, 10)
-        rb_sizer.Add(self.d_outer, 0)
-        shell_sizer.Add(rb_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         # Длина
         row5 = wx.BoxSizer(wx.HORIZONTAL)
@@ -232,7 +241,7 @@ class ShellContentPanel(BaseContentPanel):
         style_textctrl(self.length_input)
         row5.Add(self.labels["length"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         row5.AddStretchSpacer()
-        row5.Add(self.length_input, 0)
+        row5.Add(self.length_input, 0, wx.ALIGN_CENTER_VERTICAL)
         shell_sizer.Add(row5, 0, wx.EXPAND | wx.ALL, 5)
 
         # Угол шва
@@ -243,13 +252,27 @@ class ShellContentPanel(BaseContentPanel):
         style_textctrl(self.angle_input)
         row6.Add(self.labels["angle"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         row6.AddStretchSpacer()
-        row6.Add(self.angle_input, 0)
+        row6.Add(self.angle_input, 0, wx.ALIGN_CENTER_VERTICAL)
         shell_sizer.Add(row6, 0, wx.EXPAND | wx.ALL, 5)
 
-        # Чекбокс развертки
-        self.clockwise_checkbox = wx.CheckBox(shell_box, label=loc.get("clockwise_label", "Развертка по часовой"))
-        self.clockwise_checkbox.SetFont(font_big)
-        shell_sizer.Add(self.clockwise_checkbox, 0, wx.ALL | wx.ALIGN_RIGHT, 5)
+        # Развертка
+        clockwise_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.labels["clockwise"] = wx.StaticText(shell_box, label=loc.get("clockwise_label", "Развертка"))
+        style_label(self.labels["clockwise"])
+        self.clockwise_choice = wx.Choice(
+            shell_box,
+            choices=[
+                loc.get("clockwise_clockwise", "По часовой"),
+                loc.get("clockwise_counterclockwise", "Против часовой")
+            ],
+            size=field_size
+        )
+        self.clockwise_choice.SetFont(font)
+        self.clockwise_choice.SetSelection(0)  # По часовой по умолчанию
+        clockwise_sizer.Add(self.labels["clockwise"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
+        clockwise_sizer.AddStretchSpacer()
+        clockwise_sizer.Add(self.clockwise_choice, 0, wx.ALIGN_CENTER_VERTICAL)
+        shell_sizer.Add(clockwise_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         self.right_sizer.Add(shell_sizer, 0, wx.EXPAND | wx.ALL, 10)
 
@@ -259,19 +282,28 @@ class ShellContentPanel(BaseContentPanel):
         self.static_boxes["additional"] = additional_box
         additional_sizer = wx.StaticBoxSizer(additional_box, wx.VERTICAL)
 
-        self.axis_checkbox = wx.CheckBox(
+        # Отрисовка осей
+        axis_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.labels["axis"] = wx.StaticText(additional_box, label=loc.get("axis_label", "Отрисовка осей"))
+        style_label(self.labels["axis"])
+        self.axis_choice = wx.Choice(
             additional_box,
-            label=loc.get("axis_checkbox", "Маркировать оси гравировкой?")
+            choices=[
+                loc.get("axis_yes", "Да"),
+                loc.get("axis_no", "Нет")
+            ],
+            size=field_size
         )
-        self.axis_checkbox.SetFont(font_big)
-        self.axis_checkbox.SetValue(True)
-        additional_sizer.Add(self.axis_checkbox, 0, wx.ALL | wx.ALIGN_RIGHT, 5)
+        self.axis_choice.SetFont(font)
+        self.axis_choice.SetSelection(0)  # Да по умолчанию
+        axis_sizer.Add(self.labels["axis"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
+        axis_sizer.AddStretchSpacer()
+        axis_sizer.Add(self.axis_choice, 0, wx.ALIGN_CENTER_VERTICAL)
+        additional_sizer.Add(axis_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         # Метки осей
         row7 = wx.BoxSizer(wx.HORIZONTAL)
-        self.labels["axis_marks"] = wx.StaticText(
-            additional_box, label=loc.get("axis_marks_label", "Шаг меток (мм)")
-        )
+        self.labels["axis_marks"] = wx.StaticText(additional_box, label=loc.get("axis_marks_label", "Метки осей"))
         style_label(self.labels["axis_marks"])
         self.axis_marks_combo = wx.ComboBox(
             additional_box,
@@ -283,35 +315,32 @@ class ShellContentPanel(BaseContentPanel):
         style_combobox(self.axis_marks_combo)
         row7.Add(self.labels["axis_marks"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         row7.AddStretchSpacer()
-        row7.Add(self.axis_marks_combo, 0)
+        row7.Add(self.axis_marks_combo, 0, wx.ALIGN_CENTER_VERTICAL)
         additional_sizer.Add(row7, 0, wx.EXPAND | wx.ALL, 5)
 
-        self.right_sizer.Add(additional_sizer, 0, wx.EXPAND | wx.ALL, 10)
-
-        # --- Припуск на сварку ---
-        allowance_box = wx.StaticBox(self, label=loc.get("weld_allowance_label", "Припуск на сварку"))
-        style_staticbox(allowance_box)
-        self.static_boxes["allowance"] = allowance_box
-        allowance_sizer = wx.StaticBoxSizer(allowance_box, wx.VERTICAL)
-
-        # Припуски сверху и снизу
+        # Припуск на сварку сверху
         row8 = wx.BoxSizer(wx.HORIZONTAL)
-        self.labels["allowance_top"] = wx.StaticText(allowance_box, label=loc.get("allowance_top_label", "Сверху Lt"))
+        self.labels["allowance_top"] = wx.StaticText(additional_box, label=loc.get("allowance_top_label", "Припуск на сварку сверху, Lt"))
         style_label(self.labels["allowance_top"])
-        self.allowance_top = wx.ComboBox(allowance_box, choices=default_allowances, value="0", style=wx.CB_DROPDOWN, size=field_size)
+        self.allowance_top = wx.ComboBox(additional_box, choices=default_allowances, value="0", style=wx.CB_DROPDOWN, size=field_size)
         style_combobox(self.allowance_top)
-        self.labels["allowance_bottom"] = wx.StaticText(allowance_box, label=loc.get("allowance_bottom_label", "Снизу Lb"))
-        style_label(self.labels["allowance_bottom"])
-        self.allowance_bottom = wx.ComboBox(allowance_box, choices=default_allowances, value="0", style=wx.CB_DROPDOWN, size=field_size)
-        style_combobox(self.allowance_bottom)
         row8.Add(self.labels["allowance_top"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-        row8.Add(self.allowance_top, 0, wx.RIGHT, 10)
         row8.AddStretchSpacer()
-        row8.Add(self.labels["allowance_bottom"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-        row8.Add(self.allowance_bottom, 0)
-        allowance_sizer.Add(row8, 0, wx.EXPAND | wx.ALL, 5)
+        row8.Add(self.allowance_top, 0, wx.ALIGN_CENTER_VERTICAL)
+        additional_sizer.Add(row8, 0, wx.EXPAND | wx.ALL, 5)
 
-        self.right_sizer.Add(allowance_sizer, 0, wx.EXPAND | wx.ALL, 10)
+        # Припуск на сварку снизу
+        row9 = wx.BoxSizer(wx.HORIZONTAL)
+        self.labels["allowance_bottom"] = wx.StaticText(additional_box, label=loc.get("allowance_bottom_label", "Припуск на сварку снизу, Lb"))
+        style_label(self.labels["allowance_bottom"])
+        self.allowance_bottom = wx.ComboBox(additional_box, choices=default_allowances, value="0", style=wx.CB_DROPDOWN, size=field_size)
+        style_combobox(self.allowance_bottom)
+        row9.Add(self.labels["allowance_bottom"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
+        row9.AddStretchSpacer()
+        row9.Add(self.allowance_bottom, 0, wx.ALIGN_CENTER_VERTICAL)
+        additional_sizer.Add(row9, 0, wx.EXPAND | wx.ALL, 5)
+
+        self.right_sizer.Add(additional_sizer, 0, wx.EXPAND | wx.ALL, 10)
 
         # Собираем общий макет
         main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
@@ -330,7 +359,7 @@ class ShellContentPanel(BaseContentPanel):
         try:
             diameter = parse_float(self.diameter_input.GetValue())
             thickness = parse_float(self.thickness_combo.GetValue())
-            diameter_type = "inner" if self.d_inner.GetValue() else "middle" if self.d_middle.GetValue() else "outer"
+            diameter_type = ["inner", "middle", "outer"][self.diameter_type_choice.GetSelection()]
             diameter = at_diameter(diameter, thickness, diameter_type)
 
             data = {
@@ -341,8 +370,8 @@ class ShellContentPanel(BaseContentPanel):
                 "diameter": diameter,
                 "length": parse_float(self.length_input.GetValue()),
                 "angle": parse_float(self.angle_input.GetValue()) or 0.0,
-                "clockwise": self.clockwise_checkbox.GetValue(),
-                "axis": self.axis_checkbox.GetValue(),
+                "clockwise": self.clockwise_choice.GetSelection() == 0,  # True для "По часовой", False для "Против часовой"
+                "axis": self.axis_choice.GetSelection() == 0,  # True для "Да", False для "Нет"
                 "axis_marks": parse_float(self.axis_marks_combo.GetValue()) or 0,
                 "weld_allowance_top": parse_float(self.allowance_top.GetValue()) or 0,
                 "weld_allowance_bottom": parse_float(self.allowance_bottom.GetValue()) or 0,
@@ -408,13 +437,11 @@ class ShellContentPanel(BaseContentPanel):
         self.material_combo.SetSelection(wx.NOT_FOUND)
         self.thickness_combo.SetSelection(wx.NOT_FOUND)
         self.diameter_input.SetValue("")
-        self.d_inner.SetValue(False)
-        self.d_middle.SetValue(False)
-        self.d_outer.SetValue(True)
+        self.diameter_type_choice.SetSelection(2)  # Внешний по умолчанию
         self.length_input.SetValue("")
         self.angle_input.SetValue("")
-        self.clockwise_checkbox.SetValue(True)
-        self.axis_checkbox.SetValue(True)
+        self.clockwise_choice.SetSelection(0)  # По часовой по умолчанию
+        self.axis_choice.SetSelection(0)  # Да по умолчанию
         self.axis_marks_combo.SetValue("10")
         self.allowance_top.SetValue("0")
         self.allowance_bottom.SetValue("0")
@@ -451,7 +478,6 @@ class ShellContentPanel(BaseContentPanel):
             main_window.SetFocus()
 
             if not pt:
-                logging.warning("Точка не выбрана")
                 return
 
             # Сохраняем точку и обновляем словарь
@@ -463,7 +489,7 @@ class ShellContentPanel(BaseContentPanel):
                 wx.CallAfter(self.process_input, data)
 
         except Exception as e:
-            logging.error(f"Ошибка в on_ok: {e}")
+            print(f"Ошибка в on_ok: {e}")
 
     def update_ui_language(self):
         """
@@ -474,7 +500,6 @@ class ShellContentPanel(BaseContentPanel):
             self.static_boxes["main_data"].SetLabel(loc.get("main_data_label", "Основные данные"))
             self.static_boxes["shell_params"].SetLabel(loc.get("shell_params_label", "Параметры оболочки"))
             self.static_boxes["additional"].SetLabel(loc.get("additional_label", "Доп. условия"))
-            self.static_boxes["allowance"].SetLabel(loc.get("weld_allowance_label", "Припуск на сварку"))
 
             # Метки полей
             self.labels["order"].SetLabel(loc.get("order_label", "К-№"))
@@ -483,17 +508,33 @@ class ShellContentPanel(BaseContentPanel):
             self.labels["diameter"].SetLabel(loc.get("diameter_label", "Диаметр, D"))
             self.labels["length"].SetLabel(loc.get("length_label", "Длина, L"))
             self.labels["angle"].SetLabel(loc.get("angle_label", "Положение шва (°)"))
-            self.labels["allowance_top"].SetLabel(loc.get("allowance_top_label", "Сверху Lt"))
-            self.labels["allowance_bottom"].SetLabel(loc.get("allowance_bottom_label", "Снизу Lb"))
+            self.labels["clockwise"].SetLabel(loc.get("clockwise_label", "Развертка"))
+            self.labels["axis"].SetLabel(loc.get("axis_label", "Отрисовка осей"))
+            self.labels["axis_marks"].SetLabel(loc.get("axis_marks_label", "Метки осей"))
+            self.labels["allowance_top"].SetLabel(loc.get("allowance_top_label", "Припуск на сварку сверху, Lt"))
+            self.labels["allowance_bottom"].SetLabel(loc.get("allowance_bottom_label", "Припуск на сварку снизу, Lb"))
 
-            # Радиокнопки
-            self.d_inner.SetLabel(loc.get("inner_label", "Внутренний"))
-            self.d_middle.SetLabel(loc.get("middle_label", "Средний"))
-            self.d_outer.SetLabel(loc.get("outer_label", "Внешний"))
+            # Поле выбора типа диаметра
+            self.diameter_type_choice.SetItems([
+                loc.get("diameter_type_inner", "Внутренний"),
+                loc.get("diameter_type_middle", "Средний"),
+                loc.get("diameter_type_outer", "Внешний")
+            ])
+            self.diameter_type_choice.SetSelection(2)  # Внешний по умолчанию
 
-            # Чекбоксы
-            self.clockwise_checkbox.SetLabel(loc.get("clockwise_label", "Развертка по часовой стрелке"))
-            self.axis_checkbox.SetLabel(loc.get("axis_checkbox", "Маркировать оси гравировкой?"))
+            # Поле выбора направления развертки
+            self.clockwise_choice.SetItems([
+                loc.get("clockwise_clockwise", "По часовой"),
+                loc.get("clockwise_counterclockwise", "Против часовой")
+            ])
+            self.clockwise_choice.SetSelection(0)  # По часовой по умолчанию
+
+            # Поле выбора отрисовки осей
+            self.axis_choice.SetItems([
+                loc.get("axis_yes", "Да"),
+                loc.get("axis_no", "Нет")
+            ])
+            self.axis_choice.SetSelection(0)  # Да по умолчанию
 
             # Кнопки
             self.buttons[0].SetLabel(loc.get("ok_button", "ОК"))
@@ -514,13 +555,6 @@ if __name__ == "__main__":
     Тестовый вызов окна для проверки интерфейса, поведения кнопок и формирования словаря данных.
     Выполняет явный вызов at_point_input для выбора точки в AutoCAD и выводит словарь данных в исходном виде.
     """
-    import logging
-    logging.basicConfig(
-        level=logging.INFO,
-        filename="at_cad.log",
-        format="%(asctime)s - %(levelname)s - %(message)s",
-    )
-
     app = wx.App(False)
     frame = wx.Frame(None, title="Тест ShellContentPanel", size=(1000, 700))
     panel = ShellContentPanel(frame)
@@ -532,16 +566,15 @@ if __name__ == "__main__":
         """
         try:
             print("Собранные данные:", data)
-            logging.info(f"Тестовый callback вызван с данными: {data}")
             # Симулируем задержку, как в реальной обработке
             wx.MilliSleep(100)
             if panel.IsBeingDeleted():
-                logging.warning("Окно уничтожено в тестовом callback")
+                print("Окно уничтожено в тестовом callback")
             else:
-                logging.info("Окно всё ещё существует после тестового callback")
+                print("Окно всё ещё существует после тестового callback")
         except Exception as e:
             print(f"Ошибка в тестовом callback: {e}")
-            logging.error(f"Ошибка в тестовом callback: {e}")
+            show_popup(loc.get("error", f"Ошибка в тестовом callback: {str(e)}"), popup_type="error")
 
     def on_ok_event(event):
         """
@@ -552,7 +585,6 @@ if __name__ == "__main__":
         try:
             if panel.IsBeingDeleted():
                 print("Окно уничтожено перед обработкой ОК")
-                logging.warning("Окно уничтожено перед обработкой ОК")
                 return
 
             from programs.at_input import at_point_input
@@ -568,7 +600,6 @@ if __name__ == "__main__":
             try:
                 pt = at_point_input(cad.document, prompt=loc.get("point_prompt", "Введите точку вставки оболочки"), as_variant=False)
             except Exception as e:
-                logging.error(f"Ошибка при вызове at_point_input: {str(e)}")
                 show_popup(loc.get("point_selection_error", f"Ошибка выбора точки: {str(e)}"), popup_type="error")
                 pt = None
 
@@ -577,7 +608,6 @@ if __name__ == "__main__":
             frame.SetFocus()
 
             if not pt:
-                logging.error("Точка не выбрана")
                 show_popup(loc.get("point_selection_error", "Точка не выбрана"), popup_type="error")
                 return
 
@@ -589,26 +619,23 @@ if __name__ == "__main__":
             # Проверяем валидность данных
             if not panel.validate_input(data):
                 print("Валидация не пройдена")
-                logging.info("Валидация данных не пройдена")
                 return
 
             # Передаем данные в callback
             panel.on_submit_callback = on_ok_test
             if not panel.IsBeingDeleted():
                 wx.CallAfter(panel.process_input, data)  # Отложенный вызов callback
-                logging.info("Данные переданы в callback отложенно")
+                print("Данные переданы в callback отложенно")
             else:
                 print("Окно уничтожено после нажатия ОК")
-                logging.warning("Окно уничтожено в тестовом режиме")
         except Exception as e:
             print(f"Ошибка в тестовом запуске: {e}")
-            logging.error(f"Ошибка в тестовом запуске: {e}")
+            show_popup(loc.get("error", f"Ошибка в тестовом запуске: {str(e)}"), popup_type="error")
         finally:
             if not frame.IsBeingDeleted():
                 frame.Iconize(False)
                 frame.Raise()
                 frame.SetFocus()
-            logging.getLogger().handlers[0].flush()
 
     panel.buttons[0].Bind(wx.EVT_BUTTON, on_ok_event)
 
