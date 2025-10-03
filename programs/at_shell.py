@@ -263,7 +263,32 @@ def at_shell(data: Dict[str, any]) -> bool:
 
         # --- Обновляем документ ---
         regen(adoc)
-        return True
+        return {
+            "success": True,
+            "outline": [
+                [insert_point[0], insert_point[1]],
+                [insert_point[0] + width, insert_point[1]],
+                [insert_point[0] + width, insert_point[1] + length_full],
+                [insert_point[0], insert_point[1] + length_full],
+                [insert_point[0], insert_point[1]],
+            ],
+            "metadata": {
+                "insert_point": insert_point,
+                "diameter": diameter,
+                "length": length,
+                "width": width,                  # развернутая окружность (π·D)
+                "height": length_full,           # с учётом припусков
+                "angle_ref": a_deg,              # угол разреза (где нулевая точка развёртки)
+                "unroll_dir": "CW" if clockwise else "CCW",  # направление развёртки
+                "weld_allowance_top": weld_allowance_top,
+                "weld_allowance_bottom": weld_allowance_bottom,
+                "order_number": order_number,
+                "detail_number": detail_number,
+                "material": material,
+                "thickness": thickness
+            }
+        }
+
 
     except Exception as e:
         show_popup(

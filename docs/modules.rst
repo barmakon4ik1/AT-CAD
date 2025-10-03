@@ -160,6 +160,12 @@
     :show-inheritance:
 
 
+.. automodule:: programs.at_unwrapper
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
 .. automodule:: programs.at_utils
     :members:
     :undoc-members:
@@ -233,6 +239,12 @@
 
 
 .. automodule:: windows.content_cone
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+.. automodule:: windows.content_cutout
     :members:
     :undoc-members:
     :show-inheritance:

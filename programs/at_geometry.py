@@ -53,6 +53,20 @@ TRANSLATIONS = {
 # Регистрируем переводы сразу при загрузке модуля
 loc.register_translations(TRANSLATIONS)
 
+
+def safe_div(a: float, b: float, default: float = 0.0) -> float:
+    """
+    Безопасное деление, чтобы избежать ZeroDivisionError.
+    Возвращает default, если делитель близок к нулю.
+    """
+    try:
+        if abs(b) < 1e-12:
+            return default
+        return a / b
+    except Exception:
+        return default
+
+
 def ensure_point_variant(point: Union[List[float], Tuple[float, ...], VARIANT]) -> VARIANT:
     """
     Приводит любую точку к COM VARIANT (VT_ARRAY | VT_R8) в формате [x, y, z].
@@ -72,6 +86,7 @@ def ensure_point_variant(point: Union[List[float], Tuple[float, ...], VARIANT]) 
     if isinstance(point, VARIANT):
         return point
     return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, tuple(map(float, (list(point) + [0, 0, 0])[:3])))
+
 
 def calculate_angles(angle: int, unit: int, A: Tuple[float, float], B: Tuple[float, float],
                     C: Tuple[float, float]) -> Union[float, Tuple[float, float, float]]:
@@ -102,12 +117,22 @@ def calculate_angles(angle: int, unit: int, A: Tuple[float, float], B: Tuple[flo
     def vector_length(v):
         return math.sqrt(v[0] ** 2 + v[1] ** 2)
 
-    cos_A = dot_product(AB, AC) / (vector_length(AB) * vector_length(AC))
-    cos_B = dot_product(BA, BC) / (vector_length(BA) * vector_length(BC))
-    cos_C = dot_product(CA, CB) / (vector_length(CA) * vector_length(CB))
-    angle_A = math.acos(max(min(cos_A, 1), -1))
-    angle_B = math.acos(max(min(cos_B, 1), -1))
-    angle_C = math.acos(max(min(cos_C, 1), -1))
+    denom_A = vector_length(AB) * vector_length(AC)
+    denom_B = vector_length(BA) * vector_length(BC)
+    denom_C = vector_length(CA) * vector_length(CB)
+
+    cos_A = safe_div(dot_product(AB, AC), denom_A, 0.0)
+    cos_B = safe_div(dot_product(BA, BC), denom_B, 0.0)
+    cos_C = safe_div(dot_product(CA, CB), denom_C, 0.0)
+
+    # clamp to [-1,1]
+    cos_A = max(min(cos_A, 1.0), -1.0)
+    cos_B = max(min(cos_B, 1.0), -1.0)
+    cos_C = max(min(cos_C, 1.0), -1.0)
+
+    angle_A = math.acos(cos_A)
+    angle_B = math.acos(cos_B)
+    angle_C = math.acos(cos_C)
     if unit == 0:
         angle_A, angle_B, angle_C = map(math.degrees, [angle_A, angle_B, angle_C])
     return (angle_A, angle_B, angle_C) if angle == 0 else [angle_A, angle_B, angle_C][angle - 1]
@@ -142,7 +167,7 @@ def circle_center_from_points(A: Tuple[float, float],
 
     # Определяем знаменатель
     d = 2 * (x1*(y2 - y3) + x2*(y3 - y1) + x3*(y1 - y2))
-    if abs(d) < 1e-6:
+    if abs(d) < 1e-12:
         return None  # точки на одной прямой
 
     ux = ((x1**2 + y1**2)*(y2 - y3) +
@@ -242,9 +267,9 @@ def bulge_from_three_points(start: Tuple[float, float],
 
     # Вычисление центра описанной окружности (формула через определитель)
     d = 2.0 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
-    # if abs(d) < 1e-12:
-    #     # Точки почти коллинеарны — дуга вырождается в хорду
-    #     return 0.0
+    if abs(d) < 1e-12:
+        # Точки почти коллинеарны — вернём 0.0 как безопасный bulge
+        return 0.0
 
     a2 = ax * ax + ay * ay
     b2 = bx * bx + by * by
@@ -255,8 +280,6 @@ def bulge_from_three_points(start: Tuple[float, float],
     center = (ux, uy)
 
     # углы относительно центра
-    ang_start = math.atan2(ax - uy + 0.0, ax - ux + 0.0)  # NOTE: will be overwritten below (keeps consistent types)
-    # safer compute:
     ang_start = math.atan2(start[1] - center[1], start[0] - center[0])
     ang_mid = math.atan2(mid[1] - center[1], mid[0] - center[0])
     ang_end = math.atan2(end[1] - center[1], end[0] - center[0])
@@ -306,13 +329,13 @@ def find_intersection_points(pt1: Tuple[float, float], r1: float,
     d = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
     if d > r1 + r2 or d < abs(r1 - r2) or (d == 0 and r1 == r2):
         return None
-    x = (d ** 2 + r1 ** 2 - r2 ** 2) / (2 * d)
+    x = safe_div((d ** 2 + r1 ** 2 - r2 ** 2), (2 * d), 0.0)
     discriminant = r1 ** 2 - x ** 2
     if discriminant < 0:
         return None
     y = math.sqrt(discriminant)
-    cos_theta = (x2 - x1) / d if d != 0 else 1
-    sin_theta = (y2 - y1) / d if d != 0 else 0
+    cos_theta = safe_div((x2 - x1), d, 1.0)
+    sin_theta = safe_div((y2 - y1), d, 0.0)
     if abs(discriminant) < 1e-10:
         px = x1 + x * cos_theta
         py = y1 + x * sin_theta
@@ -563,9 +586,66 @@ def get_unwrapped_points(D, L, A_deg, clockwise=True):
 
     return points
 
+def get_insert_point_on_shell(
+    insert_point: Tuple[float, float, float],
+    diameter: float,
+    length: float,
+    angle_deg: float,
+    offset_axial: float = 0.0,
+    axial_shift: float = 0.0,
+    weld_allowance_top: float = 0.0,
+    weld_allowance_bottom: float = 0.0
+) -> Tuple[float, float, float]:
+    """
+    Возвращает точку вставки выреза на развертке цилиндра.
+
+    :param insert_point: базовая точка вставки прямоугольника оболочки [x, y, z]
+    :param diameter: диаметр цилиндра (D)
+    :param length: длина цилиндра (L)
+    :param angle_deg: угол поворота (0° = X=0 на развёртке)
+    :param offset_axial: осевой отступ (мм) от нижнего края цилиндра
+    :param axial_shift: дополнительное смещение вдоль оси (мм)
+    :param weld_allowance_top: припуск сверху (мм)
+    :param weld_allowance_bottom: припуск снизу (мм)
+    :return: координаты точки вставки [X, Y, Z]
+    """
+    # базовая точка развёртки
+    x0, y0, z0 = insert_point
+
+    # ширина развёртки (длина окружности)
+    width = math.pi * diameter
+
+    # координата по окружности (X)
+    X = (angle_deg % 360.0) / 360.0 * width
+
+    # координата по оси (Y)
+    Y = weld_allowance_bottom + offset_axial + axial_shift
+
+    return [x0 + X, y0 + Y, z0]
 
 
+def angle_to_unroll_x(angle_deg, diameter, cut_angle_ref=0.0, unroll_dir="CW"):
+    """
+    Перевод угла окружности цилиндра в координату X на развёртке.
+
+    :param angle_deg: исходный угол (в системе цилиндра)
+    :param diameter: диаметр цилиндра
+    :param cut_angle_ref: угол, по которому сделан разрез (левый край развёртки)
+    :param unroll_dir: направление разворота: "CW" или "CCW"
+    :return: координата X (мм)
+    """
+    W = math.pi * diameter
+
+    # 1. относительный угол
+    alpha_rel = (angle_deg - cut_angle_ref) % 360
+
+    # 2. направление
+    if unroll_dir.upper() == "CCW":
+        alpha_rel = (360 - alpha_rel) % 360
+
+    # 3. преобразуем в мм
+    X = alpha_rel / 360.0 * W
+    return X
 
 
-
-
+# Конец модуля
