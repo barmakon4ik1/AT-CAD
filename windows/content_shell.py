@@ -1,10 +1,12 @@
 # Filename: shell_content_panel.py
 """
 Модуль содержит панель ShellContentPanel для настройки параметров оболочки
-в приложении AT-CAD. Панель собирает данные и передает их через callback в at_shell.
+и модальное окно BranchWindow для настройки параметров отвода в приложении AT-CAD.
 """
 import wx
-from typing import Optional, Dict
+import wx.grid
+from typing import Optional, Dict, List
+from pathlib import Path
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programs.at_construction import at_diameter
@@ -15,7 +17,7 @@ from windows.at_window_utils import (
     parse_float, load_common_data, style_label, style_textctrl,
     style_combobox, style_radiobutton, style_staticbox, update_status_bar_point_selected
 )
-from config.at_config import SHELL_IMAGE_PATH
+from config.at_config import SHELL_IMAGE_PATH, UNWRAPPER_PATH, DEFAULT_SETTINGS, get_setting
 
 # -----------------------------
 # Локальные переводы модуля
@@ -45,9 +47,38 @@ TRANSLATIONS = {
     "clear_button": {"ru": "Очистить", "de": "Zurücksetzen", "en": "Clear"},
     "cancel_button": {"ru": "Возврат", "de": "Zurück", "en": "Return"},
     "branch_button": {"ru": "Наличие отвода", "de": "Abzweig", "en": "Branch"},
+    "branch_window_title": {"ru": "Параметры отвода", "de": "Abzweigparameter", "en": "Branch Parameters"},
+    "branch_params_label": {"ru": "Параметры отвода", "de": "Abzweigparameter", "en": "Branch Parameters"},
+    "name_label": {"ru": "Имя", "de": "Name", "en": "Name"},
+    "diameter_branch_label": {"ru": "d", "de": "d", "en": "d"},
+    "offset_axial_label": {"ru": "L", "de": "L", "en": "L"},
+    "height_label": {"ru": "H", "de": "H", "en": "H"},
+    "axial_shift_label": {"ru": "B", "de": "B", "en": "B"},
+    "thickness_branch_label": {"ru": "S", "de": "S", "en": "S"},
+    "angle_branch_label": {"ru": "A°", "de": "A°", "en": "A°"},
+    "contact_type_label": {"ru": "Тип", "de": "Typ", "en": "Type"},
+    "unroll_branch_label": {"ru": "развернуть", "de": "abwickeln", "en": "unwind"},
+    "flange_label": {"ru": "Фланец?", "de": "Flansch?", "en": "Flange?"},
+    "weld_allowance_label": {"ru": "Припуск", "de": "Schw.zug.", "en": "W.allow."},
+    "yes": {"ru": "Да", "de": "Ja", "en": "Yes"},
+    "no": {"ru": "Нет", "de": "Nein", "en": "No"},
+    "error_invalid_diameter": {"ru": "Диаметр отвода (d) обязателен и должен быть больше 0",
+                               "de": "Durchmesser (d) ist erforderlich und muss größer als 0 sein",
+                               "en": "Branch diameter (d) is required and must be greater than 0"},
+    "error_invalid_offset": {"ru": "Расстояние (L) обязательно и не может быть 0",
+                             "de": "Abstand (L) ist erforderlich und darf nicht 0 sein",
+                             "en": "Offset (L) is required and cannot be 0"},
+    "error_invalid_angle": {"ru": "Угол (A) обязателен при наличии диаметра",
+                            "de": "Winkel (A) ist erforderlich, wenn Durchmesser angegeben ist",
+                            "en": "Angle (A) is required when diameter is specified"},
 }
 
 loc.register_translations(TRANSLATIONS)
+
+# Значения по умолчанию
+default_allowances = ["0", "1", "2", "3", "4", "5", "10", "20"]
+default_axis_marks = ["0", "10", "20"]
+default_weld_allowance = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
 
 # Фабричная функция для создания панели
 def create_window(parent: wx.Window) -> wx.Panel:
@@ -60,10 +91,272 @@ Returns:
 """
     return ShellContentPanel(parent)
 
+class BranchWindow(wx.Dialog):
+    """
+    Модальное окно для настройки параметров отвода.
+    Содержит изображение слева, три стандартные кнопки (ОК, Очистить, Возврат) и таблицу справа для ввода параметров.
+    """
+    def __init__(self, parent):
+        """
+        Инициализация окна BranchWindow.
 
-# Значения по умолчанию
-default_allowances = ["0", "1", "2", "3", "4", "5", "10", "20"]
-default_axis_marks = ["0", "10", "20"]
+        Args:
+            parent: Родительское окно (обычно ShellContentPanel).
+        """
+        super().__init__(parent, title=loc.get("branch_window_title", "Параметры отвода"), size=(1600, 600))
+        self.SetMinSize((1600, 600))
+        self.SetBackgroundColour(wx.Colour(get_setting("BACKGROUND_COLOR")))
+        self.parent = parent
+        self.labels = {}
+        self.static_boxes = {}
+        self.buttons = []
+        self.table = None
+        self.setup_ui()
+        self.CenterOnParent()
+        self.Bind(wx.EVT_CLOSE, self.on_cancel)
+
+    def setup_ui(self):
+        """
+        Настраивает пользовательский интерфейс окна BranchWindow.
+        Слева размещается изображение и стандартные кнопки, справа - таблица для параметров отвода.
+        """
+        main_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.left_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # Левый блок: изображение и кнопки
+        image_path = str(UNWRAPPER_PATH)
+        self.canvas = CanvasPanel(self, image_path, size=(400, 300))
+        self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
+
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.buttons = create_standard_buttons(self, self.on_ok, self.on_cancel, self.on_clear)
+        for button in self.buttons:
+            button_sizer.Add(button, 0, wx.RIGHT, 5)
+        adjust_button_widths(self.buttons)
+        self.left_sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
+
+        # Правый блок: таблица с параметрами
+        self.right_sizer = wx.BoxSizer(wx.VERTICAL)
+        branch_box = wx.StaticBox(self, label=loc.get("branch_params_label", "Параметры отвода"))
+        style_staticbox(branch_box)
+        self.static_boxes["branch_params"] = branch_box
+        branch_sizer = wx.StaticBoxSizer(branch_box, wx.VERTICAL)
+
+        # Таблица с параметрами отвода
+        self.table = wx.grid.Grid(branch_box)
+        self.table.CreateGrid(5, 11)  # Начально 5 строк, 11 столбцов
+
+        # Установка шрифта для заголовков столбцов
+        label_font = wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+        self.table.SetLabelFont(label_font)
+
+        # Установка заголовков столбцов с переносом на две строки
+        self.table.SetColLabelValue(0, loc.get("name_label", "Имя"))
+        self.table.SetColLabelValue(1, loc.get("diameter_branch_label", "d"))
+        self.table.SetColLabelValue(2, loc.get("offset_axial_label", "L"))
+        self.table.SetColLabelValue(3, loc.get("height_label", "H"))
+        self.table.SetColLabelValue(4, loc.get("axial_shift_label", "B"))
+        self.table.SetColLabelValue(5, loc.get("thickness_branch_label", "S"))
+        self.table.SetColLabelValue(6, loc.get("angle_branch_label", "A°"))
+        self.table.SetColLabelValue(7, loc.get("contact_type_label", "Тип"))
+        self.table.SetColLabelValue(8, loc.get("unroll_branch_label", "развернуть"))
+        self.table.SetColLabelValue(9, loc.get("flange_label", "Фланец"))
+        self.table.SetColLabelValue(10, loc.get("weld_allowance_label", "Припуск"))
+
+        # Установка высоты заголовков столбцов
+        self.table.SetColLabelSize(40)  # Высота заголовков 40 пикселей
+
+        # Установка фиксированной ширины столбцов (в пикселях)
+        table_width = 80
+        self.table.SetColSize(0, table_width)  # Имя
+        self.table.SetColSize(1, table_width)  # Диаметр, d
+        self.table.SetColSize(2, table_width)  # Расстояние, L
+        self.table.SetColSize(3, table_width)  # Высота, H
+        self.table.SetColSize(4, table_width)  # Смещение, B
+        self.table.SetColSize(5, table_width)  # Толщина, S
+        self.table.SetColSize(6, table_width)  # Угол, A°
+        self.table.SetColSize(7, table_width)  # Тип контакта
+        self.table.SetColSize(8, table_width)  # Развертка отвода
+        self.table.SetColSize(9, table_width)  # Наличие фланца
+        self.table.SetColSize(10, table_width)  # Припуск на сварку
+
+        # Установка начальных значений и типов данных
+        for row in range(self.table.GetNumberRows()):
+            self.table.SetRowLabelValue(row, str(row + 1))
+            self.table.SetCellValue(row, 3, "0")  # H по умолчанию
+            self.table.SetCellValue(row, 4, "0")  # B по умолчанию
+            self.table.SetCellValue(row, 5, "0")  # S по умолчанию
+            self.table.SetCellValue(row, 7, "A")  # Тип контакта по умолчанию
+            self.table.SetCellValue(row, 8, loc.get("no", "Нет"))  # Развертка по умолчанию
+            self.table.SetCellValue(row, 9, loc.get("no", "Нет"))  # Фланец по умолчанию
+            self.table.SetCellValue(row, 10, "3")  # Припуск на сварку по умолчанию
+
+        # Установка редакторов для выпадающих списков
+        contact_types = ["A", "D", "M", "T"]
+        unroll_choices = [loc.get("yes", "Да"), loc.get("no", "Нет")]
+        for row in range(self.table.GetNumberRows()):
+            self.table.SetCellEditor(row, 7, wx.grid.GridCellChoiceEditor(contact_types, allowOthers=False))
+            self.table.SetCellEditor(row, 8, wx.grid.GridCellChoiceEditor(unroll_choices, allowOthers=False))
+            self.table.SetCellEditor(row, 9, wx.grid.GridCellChoiceEditor(unroll_choices, allowOthers=False))
+            self.table.SetCellEditor(row, 10, wx.grid.GridCellChoiceEditor(default_weld_allowance, allowOthers=True))
+
+        self.table.SetDefaultCellAlignment(wx.ALIGN_CENTRE, wx.ALIGN_CENTRE)
+        self.table.EnableDragRowSize(False)
+        branch_sizer.Add(self.table, 1, wx.EXPAND | wx.ALL, 5)
+
+        # Кнопка для добавления строки
+        add_row_button = wx.Button(branch_box, label=loc.get("add_row", "Добавить строку"))
+        add_row_button.SetFont(get_standard_font())
+        add_row_button.Bind(wx.EVT_BUTTON, self.on_add_row)
+        branch_sizer.Add(add_row_button, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
+
+        self.right_sizer.Add(branch_sizer, 1, wx.EXPAND | wx.ALL, 10)
+
+        # Собираем общий макет
+        main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
+        main_sizer.Add(self.right_sizer, 1, wx.EXPAND | wx.ALL, 10)
+        self.SetSizer(main_sizer)
+        apply_styles_to_panel(self)
+        self.Layout()
+
+    def on_add_row(self, event: wx.Event):
+        """
+        Добавляет новую строку в таблицу.
+
+        Args:
+            event (wx.Event): Событие нажатия кнопки "Добавить строку".
+        """
+        self.table.AppendRows(1)
+        row = self.table.GetNumberRows() - 1
+        self.table.SetRowLabelValue(row, str(row + 1))
+        self.table.SetCellValue(row, 3, "0")  # H
+        self.table.SetCellValue(row, 4, "0")  # B
+        self.table.SetCellValue(row, 5, "0")  # S
+        self.table.SetCellValue(row, 7, "A")  # Тип контакта
+        self.table.SetCellValue(row, 8, loc.get("no", "Нет"))  # Развертка
+        self.table.SetCellValue(row, 9, loc.get("no", "Нет"))  # Фланец
+        self.table.SetCellValue(row, 10, "3")  # Припуск на сварку
+
+        # Установка редакторов для новой строки
+        contact_types = ["A", "D", "M", "T"]
+        unroll_choices = [loc.get("yes", "Да"), loc.get("no", "Нет")]
+        self.table.SetCellEditor(row, 7, wx.grid.GridCellChoiceEditor(contact_types, allowOthers=False))
+        self.table.SetCellEditor(row, 8, wx.grid.GridCellChoiceEditor(unroll_choices, allowOthers=False))
+        self.table.SetCellEditor(row, 9, wx.grid.GridCellChoiceEditor(unroll_choices, allowOthers=False))
+        self.table.SetCellEditor(row, 10, wx.grid.GridCellChoiceEditor(default_weld_allowance, allowOthers=True))
+
+        # Установка фиксированной ширины столбцов для согласованности
+        self.table.SetColSize(0, 150)  # Наименование
+        self.table.SetColSize(1, 100)  # Диаметр, d
+        self.table.SetColSize(2, 100)  # Расстояние, L
+        self.table.SetColSize(3, 100)  # Высота, H
+        self.table.SetColSize(4, 100)  # Смещение, B
+        self.table.SetColSize(5, 100)  # Толщина, S
+        self.table.SetColSize(6, 100)  # Угол, A°
+        self.table.SetColSize(7, 100)  # Тип контакта
+        self.table.SetColSize(8, 120)  # Развертка отвода
+        self.table.SetColSize(9, 120)  # Наличие фланца
+        self.table.SetColSize(10, 120)  # Припуск на сварку
+
+        self.Layout()
+
+    def collect_input_data(self) -> Optional[List[Dict]]:
+        """
+        Собирает данные из таблицы параметров отвода.
+
+        Returns:
+            Optional[List[Dict]]: Список словарей с данными отводов или None, если данные невалидны или таблица пуста.
+        """
+        cutouts = []
+        for row in range(self.table.GetNumberRows()):
+            diameter = parse_float(self.table.GetCellValue(row, 1))
+            if diameter is None or diameter <= 0:
+                continue  # Пропускаем строки с невалидным диаметром
+
+            offset_axial = parse_float(self.table.GetCellValue(row, 2))
+            if offset_axial is None or offset_axial == 0:
+                show_popup(loc.get("error_invalid_offset", "Расстояние (L) обязательно и не может быть 0"), popup_type="error")
+                return None
+
+            angle = parse_float(self.table.GetCellValue(row, 6))
+            if angle is None:
+                show_popup(loc.get("error_invalid_angle", "Угол (A) обязателен при наличии диаметра"), popup_type="error")
+                return None
+
+            cutout = {
+                "angle_deg": angle,
+                "offset_axial": offset_axial,
+                "axial_shift": parse_float(self.table.GetCellValue(row, 4)) or 0.0,
+                "params": {
+                    "diameter": diameter,
+                    "diameter_main": parse_float(self.parent.diameter_input.GetValue()) or 0.0,  # Диаметр обечайки
+                    "mode": self.table.GetCellValue(row, 7).lower(),  # Тип контакта (A, D, M, T)
+                    "text": self.table.GetCellValue(row, 0) or f"N{row + 1}",  # Наименование, по умолчанию N1, N2...
+                    "steps": 180,  # Фиксированное значение
+                    "layer_name": "0",  # Жестко заданный слой
+                    "thickness": parse_float(self.table.GetCellValue(row, 5)) or 0.0,  # Толщина отвода
+                    "height": parse_float(self.table.GetCellValue(row, 3)) or 0.0,  # Высота отвода
+                    "unroll_branch": self.table.GetCellValue(row, 8) == loc.get("yes", "Да"),  # Флаг развертки
+                    "flange_present": self.table.GetCellValue(row, 9) == loc.get("yes", "Да"),  # Флаг фланца
+                    "weld_allowance": parse_float(self.table.GetCellValue(row, 10)) or 3.0,  # Припуск на сварку
+                }
+            }
+            cutouts.append(cutout)
+
+        return cutouts if cutouts else None
+
+    def clear_input_fields(self):
+        """
+        Очищает поля таблицы параметров отвода, сбрасывая их на значения по умолчанию.
+        """
+        for row in range(self.table.GetNumberRows()):
+            self.table.SetCellValue(row, 0, "")  # Name
+            self.table.SetCellValue(row, 1, "")  # d
+            self.table.SetCellValue(row, 2, "")  # L
+            self.table.SetCellValue(row, 3, "0")  # H
+            self.table.SetCellValue(row, 4, "0")  # B
+            self.table.SetCellValue(row, 5, "0")  # S
+            self.table.SetCellValue(row, 6, "")  # A
+            self.table.SetCellValue(row, 7, "A")  # Тип контакта
+            self.table.SetCellValue(row, 8, loc.get("no", "Нет"))  # Развертка
+            self.table.SetCellValue(row, 9, loc.get("no", "Нет"))  # Фланец
+            self.table.SetCellValue(row, 10, "3")  # Припуск на сварку
+
+    def on_ok(self, event: wx.Event):
+        """
+        Обрабатывает нажатие кнопки "ОК".
+        Собирает данные из таблицы и закрывает окно с результатом wx.ID_OK.
+
+        Args:
+            event (wx.Event): Событие нажатия кнопки.
+        """
+        data = self.collect_input_data()
+        if data is None and any(self.table.GetCellValue(row, 1) for row in range(self.table.GetNumberRows())):
+            show_popup(loc.get("error_invalid_diameter", "Диаметр отвода (d) обязателен и должен быть больше 0"), popup_type="error")
+            return
+        self.parent.branch_data = data  # Сохраняем данные в родительской панели
+        self.EndModal(wx.ID_OK)
+
+    def on_clear(self, event: wx.Event):
+        """
+        Обрабатывает нажатие кнопки "Очистить".
+        Сбрасывает значения полей таблицы.
+
+        Args:
+            event (wx.Event): Событие нажатия кнопки.
+        """
+        self.clear_input_fields()
+
+    def on_cancel(self, event: wx.Event):
+        """
+        Обрабатывает нажатие кнопки "Возврат" или закрытие окна.
+        Закрывает окно с результатом wx.ID_CANCEL.
+
+        Args:
+            event (wx.Event): Событие нажатия кнопки или закрытия окна.
+        """
+        self.EndModal(wx.ID_CANCEL)
+
 
 class ShellContentPanel(BaseContentPanel):
     """
@@ -87,6 +380,7 @@ class ShellContentPanel(BaseContentPanel):
         self.static_boxes = {}
         self.buttons = []
         self.insert_point = None
+        self.branch_data = None  # Для хранения данных отводов из BranchWindow
 
         # Виджеты
         self.order_input: Optional[wx.TextCtrl] = None
@@ -105,6 +399,7 @@ class ShellContentPanel(BaseContentPanel):
 
         self.setup_ui()
         self.order_input.SetFocus()
+        self.Bind(wx.EVT_BUTTON, self.on_branch, self.branch_button)
 
     def setup_ui(self):
         """
@@ -349,12 +644,24 @@ class ShellContentPanel(BaseContentPanel):
         apply_styles_to_panel(self)  # Применяем стили ко всем элементам
         self.Layout()
 
+    def on_branch(self, event: wx.Event):
+        """
+        Обрабатывает нажатие кнопки "Наличие отвода".
+        Создает и отображает модальное окно BranchWindow для ввода параметров отвода.
+
+        Args:
+            event (wx.Event): Событие нажатия кнопки.
+        """
+        dialog = BranchWindow(self)
+        dialog.ShowModal()
+        dialog.Destroy()
+
     def collect_input_data(self) -> Dict:
         """
         Собирает данные из полей ввода панели в словарь для передачи в другую программу.
 
-        Возвращает:
-            Dict: Словарь с данными из полей ввода.
+        Returns:
+            Dict: Словарь с данными из полей ввода, включая данные отводов.
         """
         try:
             diameter = parse_float(self.diameter_input.GetValue())
@@ -366,17 +673,19 @@ class ShellContentPanel(BaseContentPanel):
                 "order_number": self.order_input.GetValue(),
                 "detail_number": self.detail_input.GetValue(),
                 "material": self.material_combo.GetValue(),
-                "thickness": self.thickness_combo.GetValue(),
+                "thickness": thickness,
                 "diameter": diameter,
                 "length": parse_float(self.length_input.GetValue()),
                 "angle": parse_float(self.angle_input.GetValue()) or 0.0,
-                "clockwise": self.clockwise_choice.GetSelection() == 0,  # True для "По часовой", False для "Против часовой"
+                "clockwise": self.clockwise_choice.GetSelection() == 0,
+                # True для "По часовой", False для "Против часовой"
                 "axis": self.axis_choice.GetSelection() == 0,  # True для "Да", False для "Нет"
                 "axis_marks": parse_float(self.axis_marks_combo.GetValue()) or 0,
                 "weld_allowance_top": parse_float(self.allowance_top.GetValue()) or 0,
                 "weld_allowance_bottom": parse_float(self.allowance_bottom.GetValue()) or 0,
                 "layer_name": "0",
-                "insert_point": self.insert_point
+                "insert_point": self.insert_point,
+                "cutouts": self.branch_data  # Добавляем данные отводов
             }
             return data
         except Exception as e:

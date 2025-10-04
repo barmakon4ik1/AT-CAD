@@ -36,6 +36,7 @@ DONE_ICON_PATH: Path = IMAGES_DIR / "done-icon.png"
 SHELL_IMAGE_PATH: Path = IMAGES_DIR / "shell_image.png"
 NOZZLE_IMAGE_PATH: Path = IMAGES_DIR / "nozzle_image.png"
 CUTOUT_IMAGE_PATH: Path = IMAGES_DIR / "cutout_image.png"
+UNWRAPPER_PATH: Path = IMAGES_DIR / "unwrapper_image.png"
 
 # --- Иконки языков ---
 LANGUAGE_ICONS: dict[str, Path] = {
