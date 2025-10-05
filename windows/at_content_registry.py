@@ -101,7 +101,7 @@ CONTENT_REGISTRY = {
     "shell": {
         "module": "windows.content_shell",
         "label": "at_run_shell",
-        "build_module": "programs.at_shell"
+        "build_module": "programs.at_cylinder"
     },
     "nozzle": {
         "module": "windows.content_nozzle",

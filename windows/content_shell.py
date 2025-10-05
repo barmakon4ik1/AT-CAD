@@ -282,15 +282,13 @@ class BranchWindow(wx.Dialog):
             if angle is None:
                 show_popup(loc.get("error_invalid_angle", "Угол (A) обязателен при наличии диаметра"), popup_type="error")
                 return None
-
             cutout = {
                 "angle_deg": angle,
                 "offset_axial": offset_axial,
                 "axial_shift": parse_float(self.table.GetCellValue(row, 4)) or 0.0,
                 "params": {
                     "diameter": diameter,
-                    "diameter_main": parse_float(self.parent.diameter_input.GetValue()) or 0.0,  # Диаметр обечайки
-                    "mode": self.table.GetCellValue(row, 7).lower(),  # Тип контакта (A, D, M, T)
+                    "mode": self.table.GetCellValue(row, 7).upper(),  # Тип контакта (A, D, M, T)
                     "text": self.table.GetCellValue(row, 0) or f"N{row + 1}",  # Наименование, по умолчанию N1, N2...
                     "steps": 180,  # Фиксированное значение
                     "layer_name": "0",  # Жестко заданный слой
