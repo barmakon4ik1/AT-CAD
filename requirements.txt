@@ -5,3 +5,4 @@ wxPython
 pywin32
 
 sphinx_rtd_theme
+peewee

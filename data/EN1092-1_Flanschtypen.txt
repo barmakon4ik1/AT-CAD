@@ -1,0 +1,15 @@
+Typ Bezeichnung
+01 glatter Flansch zum Schweißen
+02 loser Flansch für glatten Bund oder für Vorschweißbördel
+04 loser Flansch für Vorschweißbund
+05 Blindflansch
+11 Vorschweißflansch
+12 Überschieb-Schweißflansch mit Ansatz
+13 Gewindeflansch mit Ansatz
+21 Integralflansch
+32 glatter Bund
+33 gebördeltes Rohrende
+34 Vorschweißbund
+35 Vorschweißring
+36 Pressbördel mit langem Ansatz
+37 Pressbörde

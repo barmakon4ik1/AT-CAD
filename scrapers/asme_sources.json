@@ -1,0 +1,63 @@
+[
+  {
+    "url": "https://www.engineeringtoolbox.com/flanges-bolts-dimensions-d_464.html",
+    "standard": "ASME_B16.5",
+    "type": "WN",
+    "class": "150"
+  },
+  {
+    "url": "https://www.engineeringtoolbox.com/flanges-bolts-dimensions-d_464.html",
+    "standard": "ASME_B16.5",
+    "type": "WN",
+    "class": "300"
+  },
+  {
+    "url": "https://www.engineeringtoolbox.com/flanges-bolts-dimensions-d_464.html",
+    "standard": "ASME_B16.5",
+    "type": "SO",
+    "class": "150"
+  },
+  {
+    "url": "https://sketchup.engineeringtoolbox.com/slip-on-150-lbs-flanges-c_91.html",
+    "standard": "ASME_B16.5",
+    "type": "SO",
+    "class": "150"
+  },
+  {
+    "url": "https://sketchup.engineeringtoolbox.com/blind-flanges-asme-b16-5-150-lbs-c_84.html",
+    "standard": "ASME_B16.5",
+    "type": "Blind",
+    "class": "150"
+  },
+  {
+    "url": "https://www.wermac.org/flanges/dimensions_welding-neck-flanges_asme-b16-5.html",
+    "standard": "ASME_B16.5",
+    "type": "WN",
+    "class": "150"
+  },
+  {
+  "url": "https://www.wermac.org/flanges/dimensions_blind-flanges_asme-b16-5.html",
+  "standard": "ASME_B16.5",
+  "type": "Blind",
+  "class": "150"
+},
+{
+  "url": "https://www.wermac.org/flanges/dimensions_blind-flanges_asme-b16-5.html",
+  "standard": "ASME_B16.5",
+  "type": "Blind",
+  "class": "300"
+},
+{
+  "url": "https://hardhatengineer.com/lap-joint-flange-dimensions/",
+  "standard": "ASME_B16.5",
+  "type": "LJ",
+  "class": "150"
+},
+{
+  "url": "https://hardhatengineer.com/lap-joint-flange-dimensions/",
+  "standard": "ASME_B16.5",
+  "type": "LJ",
+  "class": "300"
+}
+
+]
