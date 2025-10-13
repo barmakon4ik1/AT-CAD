@@ -180,6 +180,7 @@ class ATCadInit:
             self.adoc.ActiveLayer = self.original_layer
             logging.info(f"Восстановлен первоначальный слой: {self.original_layer.Name}")
 
+
     # -----------------------------
     # Основная инициализация
     # -----------------------------
@@ -244,6 +245,30 @@ class ATCadInit:
         return self.acad is not None and self.adoc is not None and self.model is not None
 
     # -----------------------------
+    # Обновление активного документа
+    # -----------------------------
+    def refresh_active_document(self) -> bool:
+        """
+        Обновляет ссылки на активный документ и пространство модели.
+        Автоматически вызывается при обращении к model_space, если документ сменился.
+        """
+        try:
+            pythoncom.PumpWaitingMessages()
+            if not self.acad:
+                self.acad = win32com.client.GetActiveObject("AutoCAD.Application")
+
+            current_doc = self.acad.ActiveDocument
+            if not self.adoc or current_doc.FullName != self.adoc.FullName:
+                self.adoc = current_doc
+                self.model = self.adoc.ModelSpace
+                self.original_layer = self.adoc.ActiveLayer
+                logging.info(f"Обновлён активный документ: {self.adoc.Name}")
+            return True
+        except Exception as e:
+            logging.error(f"Не удалось обновить активный документ: {e}")
+            return False
+
+    # -----------------------------
     # Публичный API
     # -----------------------------
     @property
@@ -258,7 +283,18 @@ class ATCadInit:
 
     @property
     def model_space(self) -> Optional[win32com.client.Dispatch]:
-        """Возвращает объект ModelSpace, если инициализирован."""
+        """
+        Возвращает объект ModelSpace для текущего активного документа.
+        Если пользователь переключил вкладку — автоматически обновляет ссылки.
+        """
+        try:
+            if not self.acad:
+                return None
+            current_doc = self.acad.ActiveDocument
+            if not self.adoc or current_doc.FullName != self.adoc.FullName:
+                self.refresh_active_document()
+        except Exception:
+            pass
         return self.model if self.is_initialized() else None
 
 

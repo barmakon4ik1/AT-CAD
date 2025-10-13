@@ -64,36 +64,53 @@ def main(data):
 
 def get_insert_point_unwrap(shell_data: Dict, cut: Dict) -> List[float]:
     """
-    Рассчитывает точку вставки выреза на развёртке.
-
-    Args:
-        shell_data: Словарь с данными оболочки.
-        cut: Словарь с данными отвода.
-
-    Returns:
-        List[float]: Точка вставки [x, y, 0].
+    Рассчитывает точку вставки выреза на развёртке так:
+      - Линия шва shell_data['angle'] считается нулевой линией развёртки (X = 0).
+      - Для каждого выреза берём его абсолютный угол cut['angle_deg'] (в градусах,
+        в той же системе, что и shell_data['angle'] — обычно от +X против часовой).
+      - Вычисляем угол от шва до выреза в диапазоне [0, 360) по направлению,
+        заданному shell_data['clockwise'].
+      - X = R * radians(angle_from_seam), Y = axial offset.
+    Возвращает [X, Y, 0].
     """
     R = shell_data["diameter"] / 2.0
     X0, Y0, Z0 = shell_data["insert_point"]
-    cut_angle_ref = shell_data.get("angle", 0.0)
-    clockwise = shell_data.get("clockwise", True)
+    seam_angle = float(shell_data.get("angle", 0.0))    # угол шва в градусах (абсолютный)
+    clockwise = bool(shell_data.get("clockwise", True)) # True = идти по часовой вдоль развёртки
 
-    # Относительный угол выреза
-    angle_rel = cut["angle_deg"] - cut_angle_ref
-    theta_rad = math.radians(angle_rel)
+    # Абсолютный угол выреза (в градусах)
+    cut_angle = float(cut.get("angle_deg", 0.0))
 
-    # Координаты на развёртке
-    X_unwrap = R * theta_rad
-    Y_unwrap = cut["offset_axial"]
+    # Разность (cut_angle - seam_angle) в диапазоне [0, 360)
+    # Это угол от шва до выреза, считая в направлении "по возрастанию" угла.
+    angle_from_seam = (cut_angle - seam_angle) % 360.0
 
-    # Нормализация X_unwrap
-    circumference = 2 * math.pi * R
-    X_unwrap = X_unwrap % circumference
-    if X_unwrap < 0:
-        X_unwrap += circumference
+    # В большинстве математических систем угол растёт против часовой (CCW).
+    # Нам нужно, чтобы направление развёртки соответствовало флагу `clockwise`.
+    # Интерпретация:
+    #  - если clockwise == False  (развёртка против часовой), то angle_from_seam оставляем как есть;
+    #  - если clockwise == True   (развёртка по часовой), то направление вдоль развёртки
+    #    соответствует уменьшению (в математическом смысле) — поэтому зеркалим:
+    if clockwise:
+        # Превращаем угол в величину, отсчитываемую **по направлению развёртки**
+        # (т.е. если по часовой — берём "обратный" ход)
+        angle_from_seam = (-angle_from_seam) % 360.0
 
-    insert_point = [X_unwrap + X0, Y_unwrap + Y0, 0.0]
-    print(f"Cut: angle_deg={cut['angle_deg']}, offset_axial={cut['offset_axial']}, axial_shift={cut.get('axial_shift', 0)}, insert_unwrap={insert_point}")
+    # Теперь angle_from_seam в [0, 360) — это угол вдоль развёртки от шва.
+    # Длина дуги:
+    theta_rad = math.radians(angle_from_seam)
+    arc_length = R * theta_rad  # единицы длины = те же, что и R
+
+    # Координаты развёртки: X вдоль развёртки (от шва), Y — осевой (offset_axial)
+    X_unwrap = X0 + arc_length
+    Y_unwrap = Y0 + cut.get("offset_axial", 0.0)
+
+    insert_point = [X_unwrap, Y_unwrap, 0.0]
+
+    # Отладочный вывод (удобно для тестов)
+    print(f"[unwrap] seam={seam_angle:.1f}°, cut={cut_angle:.1f}°, "
+          f"angle_from_seam={angle_from_seam:.1f}°, arc={arc_length:.3f}, insert={insert_point}")
+
     return insert_point
 
 
