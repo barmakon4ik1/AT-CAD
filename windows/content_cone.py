@@ -916,7 +916,7 @@ class ConeContentPanel(BaseContentPanel):
             main_window.Iconize(True)
             cad = ATCadInit()
 
-            if cad.adoc is None:
+            if cad.document is None:
                 logging.error("Не удалось инициализировать AutoCAD")
                 show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
                 main_window.Iconize(False)
@@ -927,7 +927,7 @@ class ConeContentPanel(BaseContentPanel):
 
             point = None
             try:
-                point = at_point_input(cad.adoc, as_variant=False,
+                point = at_point_input(cad.document, as_variant=False,
                                        prompt=loc.get("point_prompt", "Введите точку вставки конуса"))
                 if point is None or not (isinstance(point, list) and len(point) == 3):
                     logging.error("Ошибка выбора точки")

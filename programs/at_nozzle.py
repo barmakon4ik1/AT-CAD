@@ -314,7 +314,7 @@ def at_nozzle(data: Dict[str, Any]) -> bool:
     try:
         cad = ATCadInit()
         adoc = cad.document
-        model = cad.model
+        model = cad.model_space
 
         if not data:
             show_popup(loc.get("no_data_error"), popup_type="error")

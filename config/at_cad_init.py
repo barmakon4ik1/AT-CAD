@@ -250,19 +250,49 @@ class ATCadInit:
     def refresh_active_document(self) -> bool:
         """
         Обновляет ссылки на активный документ и пространство модели.
-        Автоматически вызывается при обращении к model_space, если документ сменился.
+        Надёжно работает при переключении вкладок (включая несохранённые документы).
         """
         try:
+            # Прогон событий COM/UI, чтобы AutoCAD успел обработать переключение
             pythoncom.PumpWaitingMessages()
-            if not self.acad:
-                self.acad = win32com.client.GetActiveObject("AutoCAD.Application")
 
-            current_doc = self.acad.ActiveDocument
-            if not self.adoc or current_doc.FullName != self.adoc.FullName:
+            # Всегда заново получаем экземпляр AutoCAD.Application — чтобы получить свежий прокси
+            try:
+                self.acad = win32com.client.GetActiveObject("AutoCAD.Application")
+            except Exception as e:
+                logging.error(f"Не удалось получить AutoCAD.Application: {e}")
+                return False
+
+            # Прогоняем сообщения снова и читаем ActiveDocument
+            pythoncom.PumpWaitingMessages()
+            current_doc = None
+            try:
+                current_doc = self.acad.ActiveDocument
+            except Exception as e:
+                logging.error(f"Не удалось прочитать ActiveDocument: {e}")
+                return False
+
+            # Получим надёжный идентификатор документа: сначала Name (например 'Drawing1.dwg'), затем объектную ссылку
+            current_name = getattr(current_doc, "Name", None)
+            prev_name = getattr(self.adoc, "Name", None) if self.adoc else None
+
+            # Если self.adoc не установлен или объект/имя отличаются — обновляем
+            if (self.adoc is None) or (current_doc != self.adoc) or (current_name != prev_name):
                 self.adoc = current_doc
-                self.model = self.adoc.ModelSpace
-                self.original_layer = self.adoc.ActiveLayer
-                logging.info(f"Обновлён активный документ: {self.adoc.Name}")
+                try:
+                    self.model = self.adoc.ModelSpace
+                except Exception as e:
+                    # Если ModelSpace недоступен — логируем, но оставляем adoc
+                    logging.error(f"Не удалось получить ModelSpace для документа {current_name}: {e}")
+                    self.model = None
+                try:
+                    self.original_layer = self.adoc.ActiveLayer
+                except Exception:
+                    self.original_layer = None
+                logging.info(f"Обновлён активный документ: name={current_name}, obj={repr(current_doc)}")
+            else:
+                logging.debug(f"Документ не изменился: {current_name}")
+
             return True
         except Exception as e:
             logging.error(f"Не удалось обновить активный документ: {e}")
@@ -290,9 +320,7 @@ class ATCadInit:
         try:
             if not self.acad:
                 return None
-            current_doc = self.acad.ActiveDocument
-            if not self.adoc or current_doc.FullName != self.adoc.FullName:
-                self.refresh_active_document()
+            self.refresh_active_document()
         except Exception:
             pass
         return self.model if self.is_initialized() else None

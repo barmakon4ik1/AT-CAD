@@ -93,7 +93,7 @@ def at_shell(data: Dict[str, any]) -> bool:
         # --- Инициализация AutoCAD ---
         cad = ATCadInit()
         adoc = cad.document
-        model = cad.model
+        model = cad.model_space
 
         # --- Проверка входных данных ---
         if not data:

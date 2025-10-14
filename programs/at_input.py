@@ -4,11 +4,16 @@
 
 Описание:
 Модуль для обработки пользовательского ввода точек в AutoCAD через COM-интерфейс.
-Предоставляет функцию для запроса точки с возможностью повторного ввода при ошибке и выхода при отмене или неактивном окне AutoCAD.
+Предоставляет функцию для запроса точки с возможностью повторного ввода при ошибке
+и автоматическим восстановлением COM-сессии при её потере.
 """
 
+import logging
+import pythoncom
+import win32com.client
 from typing import Optional, List, Union
 from win32com.client import VARIANT
+
 from config.at_cad_init import ATCadInit
 from locales.at_localization_class import loc
 from programs.at_com_utils import safe_utility_call
@@ -16,38 +21,54 @@ from programs.at_com_utils import safe_utility_call
 
 def at_point_input(adoc: object = None, as_variant: bool = True, prompt: str = None) -> Optional[Union[List[float], VARIANT]]:
     """
-    Запрашивает у пользователя выбор точки в AutoCAD с повторным вводом при ошибке.
+    Запрашивает у пользователя выбор точки в AutoCAD с защитой от потери COM-сессии.
 
     Args:
         adoc: Объект активного документа AutoCAD (ActiveDocument).
-              Если None, инициализируется автоматически.
-        as_variant: Если True — возвращает готовый COM VARIANT (VT_ARRAY | VT_R8).
-                    Если False — возвращает обычный список [x, y, z].
+        as_variant: Если True — возвращает COM VARIANT (VT_ARRAY | VT_R8),
+                    иначе список координат [x, y, z].
+        prompt: Текст приглашения (опционально).
 
     Returns:
         Optional[Union[List[float], VARIANT]]:
-            - Готовый COM VARIANT (VT_ARRAY | VT_R8) в формате [x, y, z], если as_variant=True.
-            - Список [x, y, z], если as_variant=False.
-            None — в случае отмены или неактивного окна AutoCAD.
-
-            Как работает нормализация точки:
-            list(point_data) — превращает вход в список, даже если был кортеж или генератор.
-            + [0, 0, 0] — добавляет запасные нули, если координат меньше трёх.
-            [:3] — обрезает, если вдруг дали больше трёх координат.
-            map(float, ...) — всё превращает в float, даже если были строки.
+            - Точка в виде VARIANT или списка.
+            - None, если выбор отменён или COM потерян окончательно.
     """
-    if adoc is None:
+    try:
         cad = ATCadInit()
-        adoc = cad.adoc
+        cad.refresh_active_document()
 
-    # Печатаем приглашение, затем безопасно запрашиваем точку.
-    if prompt is None:
-        prompt = loc.get("prompt_select_point", "Выберите точку: ") + "\n"
-    adoc.Utility.Prompt(prompt)
+        adoc = cad.document
+        if not adoc:
+            logging.error("AutoCAD документ не найден или не инициализирован.")
+            return None
 
-    # ВАЖНО: передаём ЛЯМБДА-ВЫЗОВ, а не метод как объект.
-    # Так мы всегда вызываем метод правильно, и анализаторы не ругаются, что "ожидался возвращаемый объект".
-    return safe_utility_call(lambda: adoc.Utility.GetPoint(), as_variant=as_variant)
+        if prompt is None:
+            prompt = loc.get("prompt_select_point", "Выберите точку: ") + "\n"
+
+        adoc.Utility.Prompt(prompt)
+        return safe_utility_call(lambda: adoc.Utility.GetPoint(), as_variant=as_variant)
+
+    except Exception as e:
+        logging.error(f"Ошибка при получении точки: {e}")
+
+        # Попытка восстановить COM-подключение
+        try:
+            pythoncom.CoInitialize()
+            acad = win32com.client.GetActiveObject("AutoCAD.Application")
+            adoc = acad.ActiveDocument
+            model = adoc.ModelSpace
+            logging.info(f"COM-сессия восстановлена, активный документ: {adoc.Name}")
+
+            if prompt is None:
+                prompt = loc.get("prompt_select_point", "Выберите точку: ") + "\n"
+            adoc.Utility.Prompt(prompt)
+
+            return safe_utility_call(lambda: adoc.Utility.GetPoint(), as_variant=as_variant)
+
+        except Exception as e2:
+            logging.error(f"Не удалось восстановить COM после потери соединения: {e2}")
+            return None
 
 
 if __name__ == "__main__":
@@ -55,12 +76,13 @@ if __name__ == "__main__":
     Тестирование получения точки при прямом запуске модуля.
     """
     cad = ATCadInit()
+
     # Пример теста с возвратом VARIANT
     prompt1 = "Введите точку для вариантной точки"
-    input_point_variant = at_point_input(cad.adoc, as_variant=True, prompt=prompt1)
-    print("VARIANT:", input_point_variant)
+    point_variant = at_point_input(cad.document, as_variant=True, prompt=prompt1)
+    print("VARIANT:", point_variant)
 
-    # Пример теста с возвратом обычного списка
-    prompt2 = "А это для точки с возвратом списка координат"
-    input_point_list = at_point_input(cad.adoc, as_variant=False, prompt=prompt2)
-    print("List:", input_point_list)
+    # Пример теста с возвратом списка
+    prompt2 = "Введите точку для списка координат"
+    point_list = at_point_input(cad.document, as_variant=False, prompt=prompt2)
+    print("List:", point_list)

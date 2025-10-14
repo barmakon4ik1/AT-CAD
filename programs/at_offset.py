@@ -46,9 +46,9 @@ def at_offset(polyline: Any, offset_distance: float, doc: Any, model: Any) -> li
 if __name__ == "__main__":
     try:
         cad = ATCadInit()
-        adoc, model, original_layer = cad.adoc, cad.model, cad.original_layer
+        adoc, model, original_layer = cad.document, cad.model_space, cad.original_layer
         # Запрашиваем точку у пользователя (at_point_input уже возвращает готовый VARIANT)
-        input_point = at_point_input(cad.adoc, prompt="Укажите левый нижний угол")
+        input_point = at_point_input(cad.document, prompt="Укажите левый нижний угол")
 
         # Вычисляем дополнительные точки с помощью полярных координат
         point2 = polar_point(input_point, distance=3000, alpha=0)

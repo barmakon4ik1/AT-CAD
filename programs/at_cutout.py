@@ -207,7 +207,7 @@ def at_cutout(data: Dict[str, Any]) -> Dict[str, Any]:
     try:
         cad = ATCadInit()
         adoc = cad.document
-        model = cad.model
+        model = cad.model_space
 
         insert_point = data.get("insert_point")
         if not isinstance(insert_point, (list, tuple)) or len(insert_point) < 3:
@@ -308,11 +308,11 @@ if __name__ == "__main__":
 
     data = {
         "insert_point": at_point_input(adoc, prompt=loc.get("select_point", "Укажите центр отвода"), as_variant=False),
-        "diameter": 162.3,
-        "diameter_main": 219.1,
-        "offset": 0,
-        "steps": 180,
+        "diameter": 80.9,
+        "diameter_main": 406.4,
+        "offset": -146,
+        "steps": 360,
         "mode": "bulge",
-        "text": "N1"
+        "text": "N6"
     }
     print(at_cutout(data))

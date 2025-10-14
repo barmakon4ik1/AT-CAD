@@ -473,7 +473,7 @@ class HeadContentPanel(BaseContentPanel):
             # Запрашиваем точку вставки, повторяя, пока не получим корректную
             point = None
             while not (isinstance(point, list) and len(point) == 3):
-                point = at_point_input(cad.adoc, as_variant=False, prompt=loc.get("point_prompt", "Введите точку вставки днища"))
+                point = at_point_input(cad.document, as_variant=False, prompt=loc.get("point_prompt", "Введите точку вставки днища"))
 
             main_window.Iconize(False)
             main_window.Raise()
