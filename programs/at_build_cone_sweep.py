@@ -133,9 +133,9 @@ def build_cone_sweep(D: float, H: float, alpha: float, N: int = 12) -> Tuple[flo
 if __name__ == "__main__":
     try:
         # Параметры
-        D = 10
-        H = 8
-        alpha = 53.13  # Фиксированное значение alpha
+        D = 794
+        H = 1378.58
+        alpha = 16.12305026  # Фиксированное значение alpha
 
         # Построить развёртку
         theta, generatrix_lengths, L_min, L_max = build_cone_sweep(D=D, H=H, alpha=alpha, N=12)

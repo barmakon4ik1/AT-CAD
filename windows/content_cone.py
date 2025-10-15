@@ -43,176 +43,43 @@ from windows.at_window_utils import (
 # Локальные переводы модуля
 # -----------------------------
 TRANSLATIONS = {
-    "error": {
-        "ru": "Ошибка",
-        "de": "Fehler",
-        "en": "Error"
-    },
-    "main_data_label": {
-        "ru": "Основные данные",
-        "de": "Hauptdaten",
-        "en": "Main Data"
-    },
-    "diameter_label": {
-        "ru": "Диаметры",
-        "de": "Durchmesser",
-        "en": "Diameters"
-    },
-    "height_label": {
-        "ru": "Высота",
-        "de": "Höhe",
-        "en": "Height"
-    },
-    "order_label": {
-        "ru": "К-№",
-        "de": "Auftragsnummer",
-        "en": "Order No."
-    },
-    "material_label": {
-        "ru": "Материал",
-        "de": "Material",
-        "en": "Material"
-    },
-    "thickness_label": {
-        "ru": "Толщина",
-        "de": "Dicke",
-        "en": "Thickness"
-    },
-    "d_label": {
-        "ru": "d, мм",
-        "de": "d, mm",
-        "en": "d, mm"
-    },
-    "D_label": {
-        "ru": "D, мм",
-        "de": "D, mm",
-        "en": "D, mm"
-    },
-    "inner_label": {
-        "ru": "Внутренний",
-        "de": "Innen",
-        "en": "Inner"
-    },
-    "middle_label": {
-        "ru": "Средний",
-        "de": "Mittel",
-        "en": "Middle"
-    },
-    "outer_label": {
-        "ru": "Внешний",
-        "de": "Außen",
-        "en": "Outer"
-    },
-    "height_label_mm": {
-        "ru": "H, мм",
-        "de": "H, mm",
-        "en": "H, mm"
-    },
-    "steigung_label": {
-        "ru": "Наклон",
-        "de": "Neigung",
-        "en": "Slope"
-    },
-    "angle_label": {
-        "ru": "α°",
-        "de": "α°",
-        "en": "α°"
-    },
-    "weld_allowance_label": {
-        "ru": "Припуск на сварку, мм",
-        "de": "Schweißnahtzugabe, mm",
-        "en": "Weld Allowance, mm"
-    },
-    "diameter_adjustment_label": {
-        "ru": "Коррекция диаметра D, мм",
-        "de": "Durchmesseranpassung D, mm",
-        "en": "Diameter Adjustment D, mm"
-    },
-    "ok_button": {
-        "ru": "ОК",
-        "de": "OK",
-        "en": "OK"
-    },
-    "clear_button": {
-        "ru": "Очистить",
-        "de": "Zurücksetzen",
-        "en": "Clear"
-    },
-    "cancel_button": {
-        "ru": "Возврат",
-        "de": "Zurück",
-        "en": "Return"
-    },
-    "no_data_error": {
-        "ru": "Необходимо заполнить все обязательные поля",
-        "de": "Alle Pflichtfelder müssen ausgefüllt werden",
-        "en": "All mandatory fields must be filled"
-    },
-    "invalid_number_format_error": {
-        "ru": "Неверный формат числа",
-        "de": "Ungültiges Zahlenformat",
-        "en": "Invalid number format"
-    },
-    "diameter_positive_error": {
-        "ru": "Диаметры должны быть положительными",
-        "de": "Durchmesser müssen positiv sein",
-        "en": "Diameters must be positive"
-    },
-    "thickness_positive_error": {
-        "ru": "Толщина должна быть положительной",
-        "de": "Dicke muss positiv sein",
-        "en": "Thickness must be positive"
-    },
-    "height_positive_error": {
-        "ru": "Высота должна быть положительной",
-        "de": "Höhe muss positiv sein",
-        "en": "Height must be positive"
-    },
-    "weld_allowance_non_negative_error": {
-        "ru": "Припуск на сварку не может быть отрицательным",
-        "de": "Schweißnahtzugabe darf nicht negativ sein",
-        "en": "Weld allowance cannot be negative"
-    },
-    "angle_range_error": {
-        "ru": "Угол должен быть в диапазоне 0–180°",
-        "de": "Winkel muss im Bereich 0–180° liegen",
-        "en": "Angle must be in the range 0–180°"
-    },
-    "steigung_positive_error": {
-        "ru": "Наклон должен быть положительным",
-        "de": "Neigung muss positiv sein",
-        "en": "Slope must be positive"
-    },
-    "point_selection_error": {
-        "ru": "Ошибка выбора точки",
-        "de": "Fehler bei der Punktauswahl",
-        "en": "Point selection error"
-    },
-    "cad_init_error": {
-        "ru": "Ошибка инициализации AutoCAD",
-        "de": "Fehler bei der Initialisierung von AutoCAD",
-        "en": "AutoCAD initialization error"
-    },
-    "diameter_adjusted_negative_error": {
-        "ru": "Скорректированный диаметр не может быть отрицательным",
-        "de": "Der angepasste Durchmesser darf nicht negativ sein",
-        "en": "Adjusted diameter cannot be negative"
-    },
-    "window_destroyed_error": {
-        "ru": "Окно было закрыто во время обработки",
-        "de": "Das Fenster wurde während der Verarbeitung geschlossen",
-        "en": "The window was closed during processing"
-    }
+    "error": {"ru": "Ошибка", "de": "Fehler", "en": "Error"},
+    "main_data_label": {"ru": "Основные данные", "de": "Hauptdaten", "en": "Main Data"},
+    "diameter_label": {"ru": "Диаметры", "de": "Durchmesser", "en": "Diameters"},
+    "height_label": {"ru": "Высота", "de": "Höhe", "en": "Height"},
+    "order_label": {"ru": "К-№", "de": "Auftragsnummer", "en": "Order No."},
+    "material_label": {"ru": "Материал", "de": "Material", "en": "Material"},
+    "thickness_label": {"ru": "Толщина", "de": "Dicke", "en": "Thickness"},
+    "d_label": {"ru": "d, мм", "de": "d, mm", "en": "d, mm"},
+    "D_label": {"ru": "D, мм", "de": "D, mm", "en": "D, mm"},
+    "inner_label": {"ru": "Внутренний", "de": "Innen", "en": "Inner"},
+    "middle_label": {"ru": "Средний", "de": "Mittel", "en": "Middle"},
+    "outer_label": {"ru": "Внешний", "de": "Außen", "en": "Outer"},
+    "height_label_mm": {"ru": "H, мм", "de": "H, mm", "en": "H, mm"},
+    "steigung_label": {"ru": "Наклон", "de": "Neigung", "en": "Slope"},
+    "angle_label": {"ru": "α°", "de": "α°", "en": "α°"},
+    "weld_allowance_label": {"ru": "Припуск на сварку, мм", "de": "Schweißnahtzugabe, mm", "en": "Weld Allowance, mm"},
+    "diameter_adjustment_label": {"ru": "Коррекция диаметра D, мм", "de": "Durchmesseranpassung D, mm", "en": "Diameter Adjustment D, mm"},
+    "ok_button": {"ru": "ОК", "de": "OK", "en": "OK"},
+    "clear_button": {"ru": "Очистить", "de": "Zurücksetzen", "en": "Clear"},
+    "cancel_button": {"ru": "Возврат", "de": "Zurück", "en": "Return"},
+    "no_data_error": {"ru": "Необходимо заполнить все обязательные поля", "de": "Alle Pflichtfelder müssen ausgefüllt werden", "en": "All mandatory fields must be filled"},
+    "invalid_number_format_error": {"ru": "Неверный формат числа", "de": "Ungültiges Zahlenformat", "en": "Invalid number format"},
+    "diameter_positive_error": {"ru": "Диаметры должны быть положительными", "de": "Durchmesser müssen positiv sein", "en": "Diameters must be positive"},
+    "thickness_positive_error": {"ru": "Толщина должна быть положительной", "de": "Dicke muss positiv sein", "en": "Thickness must be positive"},
+    "height_positive_error": {"ru": "Высота должна быть положительной", "de": "Höhe muss positiv sein", "en": "Height must be positive"},
+    "weld_allowance_non_negative_error": {"ru": "Припуск на сварку не может быть отрицательным", "de": "Schweißnahtzugabe darf nicht negativ sein", "en": "Weld allowance cannot be negative"},
+    "angle_range_error": {"ru": "Угол должен быть в диапазоне 0–180°", "de": "Winkel muss im Bereich 0–180° liegen", "en": "Angle must be in the range 0–180°"},
+    "steigung_positive_error": {"ru": "Наклон должен быть положительным", "de": "Neigung muss positiv sein", "en": "Slope must be positive"},
+    "point_selection_error": {"ru": "Ошибка выбора точки", "de": "Fehler bei der Punktauswahl", "en": "Point selection error"},
+    "cad_init_error": {"ru": "Ошибка инициализации AutoCAD", "de": "Fehler bei der Initialisierung von AutoCAD", "en": "AutoCAD initialization error"},
+    "diameter_adjusted_negative_error": {"ru": "Скорректированный диаметр не может быть отрицательным", "de": "Der angepasste Durchmesser darf nicht negativ sein", "en": "Adjusted diameter cannot be negative"},
+    "window_destroyed_error": {"ru": "Окно было закрыто во время обработки", "de": "Das Fenster wurde während der Verarbeitung geschlossen", "en": "The window was closed during processing"},
+    "point_prompt": {"ru": "Введите точку вставки конуса", "de": "Geben Sie den Einfügepunkt des Kegels ein", "en": "Enter the cone insertion point"},
+    "mm": {"ru": "мм", "de": "mm", "en": "mm"}
 }
 # Регистрируем переводы сразу при загрузке модуля
 loc.register_translations(TRANSLATIONS)
-
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,  # Изменено на INFO для более подробной отладки
-    filename="at_cad.log",
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
 
 
 def create_window(parent: wx.Window) -> wx.Panel:
@@ -227,10 +94,8 @@ def create_window(parent: wx.Window) -> wx.Panel:
     """
     try:
         panel = ConeContentPanel(parent)
-        logging.info("Панель ConeContentPanel создана")
         return panel
     except Exception as e:
-        logging.error(f"Ошибка создания ConeContentPanel: {e}")
         show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
         return None
 
@@ -278,7 +143,6 @@ class ConeContentPanel(BaseContentPanel):
         self.setup_ui()
         self.load_last_input()
         self.order_input.SetFocus()
-        logging.info("ConeContentPanel инициализирована")
 
     def setup_ui(self) -> None:
         """
@@ -297,15 +161,8 @@ class ConeContentPanel(BaseContentPanel):
         main_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.left_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        # Проверка изображения
-        image_path = str(CONE_IMAGE_PATH)
-        if not image_path:
-            show_popup(
-                loc.get("error", "Ошибка") + f": Путь к изображению не указан",
-                popup_type="error"
-            )
-
         # Изображение конуса
+        image_path = str(CONE_IMAGE_PATH)
         self.canvas = CanvasPanel(self, image_file=image_path, size=(600, 400))
         self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
 
@@ -759,7 +616,6 @@ class ConeContentPanel(BaseContentPanel):
                 self.steigung_input.SetValue("")
                 self.angle_input.SetValue("")
         except Exception as e:
-            logging.error(f"Ошибка в расчётах параметров конуса: {e}")
             show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
         finally:
             self._updating = False
@@ -819,7 +675,6 @@ class ConeContentPanel(BaseContentPanel):
                 data["diameter_top"] = at_diameter(data["diameter_top"], data["thickness"], data["d_type"])
                 data["diameter_base"] = at_diameter(data["diameter_base"], data["thickness"], data["D_type"])
             except ValueError as e:
-                logging.error(f"Ошибка корректировки диаметров: {str(e)}")
                 show_popup(str(e), popup_type="error")
                 return None
 
@@ -833,11 +688,9 @@ class ConeContentPanel(BaseContentPanel):
 
             return data
         except ValueError as e:
-            logging.error(f"Ошибка получения данных: {e}")
             show_popup(loc.get("invalid_number_format_error", "Неверный формат числа"), popup_type="error")
             return None
         except Exception as e:
-            logging.error(f"Ошибка в collect_input_data: {e}")
             show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
             return None
 
@@ -892,7 +745,6 @@ class ConeContentPanel(BaseContentPanel):
 
             return True
         except Exception as e:
-            logging.error(f"Ошибка валидации данных: {e}")
             show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
             return False
 
@@ -906,10 +758,8 @@ class ConeContentPanel(BaseContentPanel):
         """
         try:
             if self.IsBeingDeleted():
-                logging.warning("Попытка обработки ОК в уничтожаемом окне")
                 show_popup(loc.get("window_destroyed_error", "Окно было закрыто во время обработки"),
                            popup_type="error")
-                logging.getLogger().handlers[0].flush()  # Принудительная запись лога
                 return
 
             main_window = wx.GetTopLevelParent(self)
@@ -917,33 +767,26 @@ class ConeContentPanel(BaseContentPanel):
             cad = ATCadInit()
 
             if cad.document is None:
-                logging.error("Не удалось инициализировать AutoCAD")
                 show_popup(loc.get("cad_init_error", "Ошибка инициализации AutoCAD"), popup_type="error")
                 main_window.Iconize(False)
                 main_window.Raise()
                 main_window.SetFocus()
-                logging.getLogger().handlers[0].flush()
                 return
 
-            point = None
             try:
                 point = at_point_input(cad.document, as_variant=False,
                                        prompt=loc.get("point_prompt", "Введите точку вставки конуса"))
                 if point is None or not (isinstance(point, list) and len(point) == 3):
-                    logging.error("Ошибка выбора точки")
                     show_popup(loc.get("point_selection_error", "Ошибка выбора точки"), popup_type="error")
                     main_window.Iconize(False)
                     main_window.Raise()
                     main_window.SetFocus()
-                    logging.getLogger().handlers[0].flush()
                     return
             except Exception as e:
-                logging.error(f"Ошибка при выборе точки: {e}")
                 show_popup(loc.get("point_selection_error", "Ошибка выбора точки") + f": {str(e)}", popup_type="error")
                 main_window.Iconize(False)
                 main_window.Raise()
                 main_window.SetFocus()
-                logging.getLogger().handlers[0].flush()
                 return
 
             main_window.Iconize(False)
@@ -968,44 +811,28 @@ class ConeContentPanel(BaseContentPanel):
 
                 # Проверяем, что окно всё ещё существует перед вызовом callback
                 if self.IsBeingDeleted():
-                    logging.warning("Окно уничтожено перед вызовом on_submit_callback")
                     show_popup(loc.get("window_destroyed_error", "Окно было закрыто во время обработки"),
                                popup_type="error")
-                    logging.getLogger().handlers[0].flush()
                     return
 
                 # Вызываем callback в безопасном контексте
                 if self.on_submit_callback:
-                    logging.info("Перед вызовом on_submit_callback")
                     try:
                         wx.CallAfter(self.on_submit_callback, data)  # Отложенный вызов callback
-                        logging.info("on_submit_callback вызван отложенно")
                     except Exception as e:
-                        logging.error(f"Ошибка при вызове on_submit_callback: {e}")
                         show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
-                        logging.getLogger().handlers[0].flush()
                         return
 
                 # Отложенная очистка полей
                 if not self.IsBeingDeleted():
                     wx.CallAfter(self.clear_input_fields)
-                    logging.info("Окно конуса остаётся открытым, несохранённые поля будут очищены отложенно")
-                else:
-                    logging.warning("Окно уничтожено перед очисткой полей")
-                logging.getLogger().handlers[0].flush()
-            else:
-                logging.info("Данные не прошли валидацию, очистка полей не выполняется")
-                logging.getLogger().handlers[0].flush()
         except Exception as e:
-            logging.error(f"Ошибка в on_ok: {e}")
             show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
-            logging.getLogger().handlers[0].flush()
         finally:
             if not main_window.IsBeingDeleted():
                 main_window.Iconize(False)
                 main_window.Raise()
                 main_window.SetFocus()
-            logging.getLogger().handlers[0].flush()
 
     def on_clear(self, event: wx.Event) -> None:
         """
@@ -1016,9 +843,7 @@ class ConeContentPanel(BaseContentPanel):
         """
         try:
             self.clear_input_fields()
-            logging.info("Поля ввода очищены")
         except Exception as e:
-            logging.error(f"Ошибка при очистке полей: {e}")
             show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
 
     def on_cancel(self, event: wx.Event, switch_content: Optional[str] = "content_apps") -> None:
@@ -1031,9 +856,7 @@ class ConeContentPanel(BaseContentPanel):
         """
         try:
             self.switch_content_panel(switch_content)
-            logging.info(f"Переключение на панель {switch_content}")
         except Exception as e:
-            logging.error(f"Ошибка при отмене: {e}")
             show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
 
 
@@ -1052,16 +875,10 @@ if __name__ == "__main__":
         """
         try:
             print("Собранные данные:", data)
-            logging.info("Тестовый callback вызван с данными")
             # Симулируем задержку, как в реальной отрисовке
             wx.MilliSleep(100)
-            if panel.IsBeingDeleted():
-                logging.warning("Окно уничтожено в тестовом callback")
-            else:
-                logging.info("Окно всё ещё существует после тестового callback")
         except Exception as e:
             print(f"Ошибка в тестовом callback: {e}")
-            logging.error(f"Ошибка в тестовом callback: {e}")
 
     def on_ok_event(event):
         """
@@ -1085,10 +902,8 @@ if __name__ == "__main__":
                 print("Окно должно остаться открытым")
             else:
                 print("Окно уничтожено после нажатия ОК")
-                logging.warning("Окно уничтожено в тестовом режиме")
         except Exception as e:
             print(f"Ошибка в тестовом запуске: {e}")
-            logging.error(f"Ошибка в тестовом запуске: {e}")
 
     panel.buttons[0].Bind(wx.EVT_BUTTON, on_ok_event)
 
