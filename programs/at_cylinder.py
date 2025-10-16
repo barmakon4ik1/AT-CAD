@@ -173,13 +173,14 @@ class CylinderBuilder:
         if mode == "A":
             adjusted_d = d - 2 * s  # Внутренний диаметр
         elif mode == "D":
-            adjusted_d = math.ceil(d)  # Округление вверх
-            if d % 10 > 5:
-                adjusted_d += 1
+            adjusted_d = math.ceil(d)
+            adjusted_d += 1 if adjusted_d - d < 0.5 else 0
         elif mode == "M":
             adjusted_d = d - s
         elif mode == "T":
             adjusted_d = d + 1
+        else:
+            adjusted_d = d
 
         if adjusted_d <= 0:
             raise ValueError(loc.get("invalid_cutout_data", "Скорректированный диаметр <= 0: {0}").format(adjusted_d, cutout_index))

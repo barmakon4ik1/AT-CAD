@@ -308,11 +308,11 @@ if __name__ == "__main__":
 
     data = {
         "insert_point": at_point_input(adoc, prompt=loc.get("select_point", "Укажите центр отвода"), as_variant=False),
-        "diameter": 80.9,
-        "diameter_main": 406.4,
-        "offset": -146,
+        "diameter": 35,
+        "diameter_main": 794,
+        "offset": 300,
         "steps": 360,
-        "mode": "bulge",
-        "text": "N6"
+        "mode": "polyline",
+        "text": ""
     }
     print(at_cutout(data))
