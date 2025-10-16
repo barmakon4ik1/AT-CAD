@@ -82,115 +82,117 @@ def build_truncated_cone_from_halves(
     h: float,
     n: int,
     curve_mode: str = "lines"
-) -> Tuple[List[Tuple[float, float]], List[float]]:
-    """
-    Строит развертку с правильным соединением краев (min/max x).
-    """
+):
     if d2 <= d1:
         raise ValueError(loc.get("invalid_dimensions"))
 
     h_full = h * d2 / (d2 - d1)
 
-    # --- Верхний сегмент
+    # --- Верхний и нижний сегменты
     upper_half = build_half_cone_unfold(d1, h_full - h, n)
     upper_mirror = [(-x, y) for x, y in upper_half[::-1]]
-    upper_curve = upper_mirror + upper_half  # min_x (left) -> ... -> max_x (right)
+    upper_curve = upper_mirror + upper_half
 
-    # --- Нижний сегмент
     lower_half = build_half_cone_unfold(d2, h_full, n)
     lower_mirror = [(-x, y) for x, y in lower_half[::-1]]
-    lower_curve = lower_mirror + lower_half  # min_x -> ... -> max_x
+    lower_curve = lower_mirror + lower_half
 
-    # --- Находим края по x (левая: min x, правая: max x)
+    # --- Краевые точки
     upper_left = min(upper_curve, key=lambda p: p[0])
     upper_right = max(upper_curve, key=lambda p: p[0])
     lower_left = min(lower_curve, key=lambda p: p[0])
     lower_right = max(lower_curve, key=lambda p: p[0])
 
-    # Индексы для слайсинга (чтобы пройти along curve от left to right)
-    idx_upper_left = upper_curve.index(upper_left)
-    idx_upper_right = upper_curve.index(upper_right)
-    idx_lower_left = lower_curve.index(lower_left)
-    idx_lower_right = lower_curve.index(lower_right)
+    upper_path = upper_curve
+    lower_path = lower_curve
 
-    # Путь по upper от left to right (может быть не 0 to -1 если асимметрия, но в строении да)
-    upper_path = upper_curve[idx_upper_left : idx_upper_right + 1] if idx_upper_left < idx_upper_right else list(reversed(upper_curve))[::-1]  # На всякий
-
-    lower_path = lower_curve[idx_lower_left : idx_lower_right + 1]
-
-    # --- Bulge для полных кривых
+    # --- Bulge (для дуг)
     apex = (0.0, 0.0)
-    upper_bulge_full = [0.0] * (len(upper_curve) - 1)
-    lower_bulge_full = [0.0] * (len(lower_curve) - 1)
+    bulge_lower = [0.0] * (len(lower_path) - 1)
+    bulge_upper = [0.0] * (len(upper_path) - 1)
+
     if curve_mode == "bulge":
-        for i in range(len(upper_curve) - 1):
-            upper_bulge_full[i] = bulge_from_center(upper_curve[i], upper_curve[i + 1], apex, clockwise=False)
-        for i in range(len(lower_curve) - 1):
-            lower_bulge_full[i] = bulge_from_center(lower_curve[i], lower_curve[i + 1], apex, clockwise=False)
+        for i in range(len(lower_path) - 1):
+            bulge_lower[i] = bulge_from_center(lower_path[i], lower_path[i + 1], apex, clockwise=False)
+        for i in range(len(upper_path) - 1):
+            bulge_upper[i] = bulge_from_center(upper_path[i], upper_path[i + 1], apex, clockwise=False)
 
-    # Bulge для путей (слайс от left to right)
-    bulge_lower = lower_bulge_full[idx_lower_left : idx_lower_right]
-    bulge_upper = upper_bulge_full[idx_upper_left : idx_upper_right]
-    bulge_upper_reversed = [-b for b in reversed(bulge_upper)]  # Реверс пути + смена знака bulge
+    # --- Концевые точки (прямые образующие)
+    left_line = [lower_left, upper_left]
+    right_line = [lower_right, upper_right]
 
-    # --- Финальный контур: lower_left -> lower_path to lower_right -> upper_right -> reversed upper_path to upper_left -> lower_left
-    # Чтобы избежать дублирования краев в пути:
+    # --- Общий контур
     contour = (
-        lower_path[:-1] +  # lower_left -> ... (без right)
-        [lower_right, upper_right] +  # right_connect
-        list(reversed(upper_path))[1:-1] +  # reversed от right к left, без дублирования краев
-        [upper_left, lower_left]   # left_connect (замыкает к старту)
+        lower_path[:-1]
+        + [lower_right, upper_right]
+        + list(reversed(upper_path))[1:-1]
+        + [upper_left, lower_left]
     )
+    bulge_list = [0.0] * (len(contour) - 1)
 
-    # Bulge соответственно: для lower_path (без последней), 0 для right_connect, для reversed upper (без краев), 0 для left_connect
-    bulge_list = (
-        bulge_lower[:-1 if len(bulge_lower) > 0 else 0] +
-        [0.0] +  # right
-        bulge_upper_reversed[1:-1 if len(bulge_upper_reversed) > 1 else 0] +
-        [0.0]   # left
-    )
-
-    # Корректировка длины bulge к кол-ву сегментов в contour
-    num_segments = len(contour) - 1
-    if len(bulge_list) < num_segments:
-        bulge_list += [0.0] * (num_segments - len(bulge_list))
-    elif len(bulge_list) > num_segments:
-        bulge_list = bulge_list[:num_segments]
-
-    return contour, bulge_list
+    return contour, bulge_list, lower_path, upper_path, bulge_lower, bulge_upper
 
 
 # -------------------------------------------------------------
 # Основная точка входа
 # -------------------------------------------------------------
 if __name__ == "__main__":
-    # --- параметры конуса
-    d2 = 794.0  # нижний диаметр
-    d1 = 267.0  # верхний диаметр
-    h = 918.0   # высота
-    n = 72      # сегменты дуги
-    curve_mode = "lines"  # "lines", "bulge", "spline"# --- подключение к AutoCAD
+    d2 = 794.0
+    d1 = 267.0
+    h = 918.0
+    n = 72
+    curve_mode = "spline"  # "lines", "bulge", "spline"
+
     acad = ATCadInit()
     adoc, model = acad.document, acad.model_space
 
-    # --- построение контура
-    contour_local, bulge_list = build_truncated_cone_from_halves(d1, d2, h, n, curve_mode)
+    contour_local, bulge_list, lower_path, upper_path, bulge_lower, bulge_upper = \
+        build_truncated_cone_from_halves(d1, d2, h, n, curve_mode)
 
-    # --- ввод точки вставки
     input_point = at_point_input(adoc, prompt="Укажите вершину развертки", as_variant=False)
     X0, Y0 = input_point[0], input_point[1]
-    contour = [(x + X0, y + Y0) for x, y in contour_local]
 
-    # --- построение в AutoCAD
+    shift = lambda path: [(x + X0, y + Y0) for x, y in path]
+    lower_path = shift(lower_path)
+    upper_path = shift(upper_path)
+
     if curve_mode == "spline":
-        add_spline(model, contour, layer_name="0")
+        # Две кривые отдельно, без замыкания
+        add_spline(model, lower_path, layer_name="0")
+        add_spline(model, upper_path, layer_name="0")
+        # Прямые образующие
+        add_polyline(model, [lower_path[0], upper_path[0]], layer_name="0")
+        add_polyline(model, [lower_path[-1], upper_path[-1]], layer_name="0")
+
     elif curve_mode == "bulge":
-        add_polyline(model, contour, layer_name="0", bulges=bulge_list)
+        # Исправление направления bulge: у зеркальных половин нужно инвертировать знак
+        bulge_lower_corr = [b if not math.isnan(b) else 0.0 for b in bulge_lower]
+        bulge_upper_corr = [-b if not math.isnan(b) else 0.0 for b in bulge_upper]
+
+        # Нижняя дуга
+        if len(bulge_lower_corr) == len(lower_path) - 1:
+            add_polyline(model, lower_path, layer_name="0", bulges=bulge_lower_corr)
+        else:
+            add_polyline(model, lower_path, layer_name="0")
+
+        # Верхняя дуга
+        if len(bulge_upper_corr) == len(upper_path) - 1:
+            add_polyline(model, upper_path, layer_name="0", bulges=bulge_upper_corr)
+        else:
+            add_polyline(model, upper_path, layer_name="0")
+
+        # Прямые образующие
+        add_polyline(model, [lower_path[0], upper_path[0]], layer_name="0")
+        add_polyline(model, [lower_path[-1], upper_path[-1]], layer_name="0")
+
     else:
+        # Линейный режим
+        contour = shift(contour_local)
         add_polyline(model, contour, layer_name="0")
 
-    # --- обновление документа
     regen(adoc)
+
+
 
     # --- графический вывод (опционально)
     # xs, ys = zip(*contour_local)
