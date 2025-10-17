@@ -82,20 +82,30 @@ def build_truncated_cone_from_halves(
     h: float,
     n: int,
     curve_mode: str = "lines"
-):
+) -> Tuple[
+    List[Tuple[float, float]],   # contour (общий)
+    List[float],                 # bulge_list (общий)
+    List[Tuple[float, float]],   # lower_path
+    List[Tuple[float, float]],   # upper_path
+    List[float],                 # bulge_lower
+    List[float]                  # bulge_upper
+]:
     if d2 <= d1:
         raise ValueError(loc.get("invalid_dimensions"))
 
+    # Полная высота гипотетического конуса
     h_full = h * d2 / (d2 - d1)
 
-    # --- Верхний и нижний сегменты
+    # --- Верхний сегмент
     upper_half = build_half_cone_unfold(d1, h_full - h, n)
     upper_mirror = [(-x, y) for x, y in upper_half[::-1]]
-    upper_curve = upper_mirror + upper_half
+    # убираем дублированные крайние точки
+    upper_curve = upper_mirror[:-1] + upper_half
 
+    # --- Нижний сегмент
     lower_half = build_half_cone_unfold(d2, h_full, n)
     lower_mirror = [(-x, y) for x, y in lower_half[::-1]]
-    lower_curve = lower_mirror + lower_half
+    lower_curve = lower_mirror[:-1] + lower_half
 
     # --- Краевые точки
     upper_left = min(upper_curve, key=lambda p: p[0])
@@ -103,95 +113,126 @@ def build_truncated_cone_from_halves(
     lower_left = min(lower_curve, key=lambda p: p[0])
     lower_right = max(lower_curve, key=lambda p: p[0])
 
-    upper_path = upper_curve
-    lower_path = lower_curve
-
-    # --- Bulge (для дуг)
+    # --- Bulge (реальные дуги)
     apex = (0.0, 0.0)
-    bulge_lower = [0.0] * (len(lower_path) - 1)
-    bulge_upper = [0.0] * (len(upper_path) - 1)
+    bulge_lower = []
+    bulge_upper = []
 
     if curve_mode == "bulge":
-        for i in range(len(lower_path) - 1):
-            bulge_lower[i] = bulge_from_center(lower_path[i], lower_path[i + 1], apex, clockwise=False)
-        for i in range(len(upper_path) - 1):
-            bulge_upper[i] = bulge_from_center(upper_path[i], upper_path[i + 1], apex, clockwise=False)
+        # нижний и верхний радиусы (длины образующих)
+        R_lower = math.sqrt(h_full ** 2 + (d2 / 2) ** 2)
+        R_upper = math.sqrt((h_full - h) ** 2 + (d1 / 2) ** 2)
 
-    # --- Концевые точки (прямые образующие)
-    left_line = [lower_left, upper_left]
-    right_line = [lower_right, upper_right]
+        # шаг по углу для половины развёртки
+        phi_step_lower = math.pi / (len(lower_half) - 1)
+        phi_step_upper = math.pi / (len(upper_half) - 1)
 
-    # --- Общий контур
+        bulge_lower = [math.tan(phi_step_lower / 4.0)] * len(lower_curve)
+        bulge_upper = [math.tan(phi_step_upper / 4.0)] * len(upper_curve)
+
+    # --- Общий контур: низ → правая образующая → верх → левая образующая
     contour = (
-        lower_path[:-1]
-        + [lower_right, upper_right]
-        + list(reversed(upper_path))[1:-1]
-        + [upper_left, lower_left]
+        lower_curve +
+        [lower_right, upper_right] +
+        list(reversed(upper_curve)) +
+        [upper_left, lower_left]
     )
     bulge_list = [0.0] * (len(contour) - 1)
 
-    return contour, bulge_list, lower_path, upper_path, bulge_lower, bulge_upper
+    return contour, bulge_list, lower_curve, upper_curve, bulge_lower, bulge_upper
+
 
 
 # -------------------------------------------------------------
 # Основная точка входа
 # -------------------------------------------------------------
 if __name__ == "__main__":
+    # --- параметры конуса
     d2 = 794.0
     d1 = 267.0
     h = 918.0
-    n = 72
-    curve_mode = "spline"  # "lines", "bulge", "spline"
+    n = 36
+    curve_mode = "bulge"  # "lines", "bulge", "spline"
 
+    # --- подключение к AutoCAD
     acad = ATCadInit()
     adoc, model = acad.document, acad.model_space
 
+    # --- построение контура
     contour_local, bulge_list, lower_path, upper_path, bulge_lower, bulge_upper = \
         build_truncated_cone_from_halves(d1, d2, h, n, curve_mode)
 
+    # --- ввод точки вставки
     input_point = at_point_input(adoc, prompt="Укажите вершину развертки", as_variant=False)
     X0, Y0 = input_point[0], input_point[1]
 
+    # --- сдвиг координат
     shift = lambda path: [(x + X0, y + Y0) for x, y in path]
     lower_path = shift(lower_path)
     upper_path = shift(upper_path)
+    contour = shift(contour_local)
 
+    # --- построение в AutoCAD
     if curve_mode == "spline":
-        # Две кривые отдельно, без замыкания
-        add_spline(model, lower_path, layer_name="0")
-        add_spline(model, upper_path, layer_name="0")
-        # Прямые образующие
+        # Верхняя и нижняя кривые – отдельные открытые сплайны
+        add_spline(model, lower_path, layer_name="0", closed=False)
+        add_spline(model, upper_path, layer_name="0", closed=False)
+        # Образующие
         add_polyline(model, [lower_path[0], upper_path[0]], layer_name="0")
         add_polyline(model, [lower_path[-1], upper_path[-1]], layer_name="0")
 
     elif curve_mode == "bulge":
-        # Исправление направления bulge: у зеркальных половин нужно инвертировать знак
-        bulge_lower_corr = [b if not math.isnan(b) else 0.0 for b in bulge_lower]
-        bulge_upper_corr = [-b if not math.isnan(b) else 0.0 for b in bulge_upper]
+        # --- проверяем bulge на всякий случай
+        if len(bulge_lower) != len(lower_path):
+            bulge_lower = [0.0] * len(lower_path)
+        if len(bulge_upper) != len(upper_path):
+            bulge_upper = [0.0] * len(upper_path)
 
-        # Нижняя дуга
-        if len(bulge_lower_corr) == len(lower_path) - 1:
-            add_polyline(model, lower_path, layer_name="0", bulges=bulge_lower_corr)
-        else:
-            add_polyline(model, lower_path, layer_name="0")
+        # --- точки и bulge для замкнутой полилинии
+        # порядок обхода: нижняя -> правая образующая -> верхняя (обратная) -> левая образующая
+        all_points = (
+                lower_path +  # нижняя
+                [lower_path[-1], upper_path[-1]] +  # правая вертикальная
+                upper_path[::-1] +  # верхняя в обратном порядке
+                [upper_path[0], lower_path[0]]  # левая вертикальная
+        )
 
-        # Верхняя дуга
-        if len(bulge_upper_corr) == len(upper_path) - 1:
-            add_polyline(model, upper_path, layer_name="0", bulges=bulge_upper_corr)
-        else:
-            add_polyline(model, upper_path, layer_name="0")
+        # --- bulge: нижняя + 0 для вертикали + верхняя обратная + 0 для вертикали
+        all_bulges = (
+                bulge_lower +
+                [0.0, 0.0] +
+                list(reversed(bulge_upper)) +
+                [0.0, 0.0]
+        )
 
-        # Прямые образующие
-        add_polyline(model, [lower_path[0], upper_path[0]], layer_name="0")
-        add_polyline(model, [lower_path[-1], upper_path[-1]], layer_name="0")
+        # --- строим замкнутую полилинию
+        add_polyline(model, all_points, layer_name="0", bulges=all_bulges, closed=True)
 
     else:
-        # Линейный режим
-        contour = shift(contour_local)
-        add_polyline(model, contour, layer_name="0")
+        # Прямая полилиния (для режима lines)
+        add_polyline(model, contour, layer_name="0", closed=True)
 
+        # --- объединение в замкнутый контур (join) после построения
+        if curve_mode in ["bulge", "spline"]:
+            try:
+                # Получаем последние 4 созданные объекта (нижняя, верхняя, левая, правая)
+                # В ModelSpace Count - общее, Item(Count - 1) - последний
+                entities_to_join = []
+                for i in range(1, 5):
+                    ent = model.Item(model.Count - i)
+                    entities_to_join.append(ent)
+
+                # JoinEntities требует массива объектов и базового (первого в массиве)
+                # Выберем нижнюю как базу (или любую)
+                base_ent = entities_to_join[0]
+                others = entities_to_join[1:]
+                base_ent.JoinEntities(others)
+                base_ent.Closed = True
+            except Exception as e:
+                print(f"Join failed: {e}")
+
+    # --- обновление документа
     regen(adoc)
-
 
 
     # --- графический вывод (опционально)

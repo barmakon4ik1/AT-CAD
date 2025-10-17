@@ -3,7 +3,7 @@
     "FONT_TYPE": "normal",
     "FONT_SIZE": 16,
     "STATUS_FONT_SIZE": 8,
-    "STATUS_TEXT_COLOR": "white",
+    "STATUS_TEXT_COLOR": "#000000",
     "BANNER_FONT_SIZE": 24,
     "LABEL_FONT_SIZE": 24,
     "LABEL_FONT_NAME": "Times New Roman",
