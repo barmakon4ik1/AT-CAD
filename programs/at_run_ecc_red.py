@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Модуль: at_cone_unfold.py
-Путь: programs/at_cone_unfold.pyПостроение развертки усечённого конуса с одной вертикальной образующей.
+Модуль: at_run_ecc_red.py
+Путь: programs/at_run_ecc_red.py
+Построение развертки усечённого конуса с одной вертикальной образующей.
 Поддерживаются линии, дуги (bulge) и сплайны.Использует функции из at_geometry.py для расчёта координат и bulge дуг.Автор: Alexander Tutubalin
 Дата: 16.10.2025
 """
@@ -34,12 +35,16 @@ TRANSLATIONS = {
         "de": "Der untere Durchmesser muss größer als der obere sein."
     }
 }
-loc.register_translations(TRANSLATIONS)# -------------------------------------------------------------
+loc.register_translations(TRANSLATIONS)
+
+# -------------------------------------------------------------
 # Вспомогательные функции
 # -------------------------------------------------------------
 def safe_div(a: float, b: float, default: float = 0.0) -> float:
     """Безопасное деление для предотвращения деления на ноль."""
-    return a / b if abs(b) > 1e-12 else default# -------------------------------------------------------------
+    return a / b if abs(b) > 1e-12 else default
+
+# -------------------------------------------------------------
 # Построение половины развертки (одна сторона вертикальна)
 # -------------------------------------------------------------
 def build_half_cone_unfold(D: float, H: float, n: int) -> List[Tuple[float, float]]:
@@ -142,11 +147,26 @@ def build_truncated_cone_from_halves(
     return contour, bulge_list, lower_curve, upper_curve, bulge_lower, bulge_upper
 
 
-
 # -------------------------------------------------------------
 # Основная точка входа
 # -------------------------------------------------------------
-if __name__ == "__main__":
+def main(data):
+    return at_eccentric_reducer(data)
+
+
+def at_eccentric_reducer(data: Dict[str, any]) -> bool:
+    """
+    Основная функция для построения развертки конуса в AutoCAD.
+
+    Args:
+        data: Словарь с данными конуса, полученными из окна content_cone.py
+              (order_number, detail_number, material, thickness, diameter_top,
+              diameter_base, d_type, D_type, height, steigung, angle, weld_allowance,
+              insert_point, thickness_text).
+
+    Returns:
+        bool: True при успешном выполнении, None при прерывании (отмена) или ошибке.
+    """
     # --- параметры конуса
     d2 = 794.0
     d1 = 267.0
@@ -248,3 +268,19 @@ if __name__ == "__main__":
     # plt.grid(True)
     # plt.show()
 
+
+if __name__ == "__main__":
+    # Пример данных для тестирования
+    input_data = {
+        "insert_point": [0.0, 0.0, 0.0],
+        "diameter_base": 1000.0,
+        "diameter_top": 500.0,
+        "height": 800.0,
+        "material": "1.4301",
+        "thickness": 4.0,
+        "order_number": "12345",
+        "detail_number": "01",
+        "layer_name": "0",
+        "weld_allowance": 3.0
+    }
+    at_eccentric_reducer(input_data)

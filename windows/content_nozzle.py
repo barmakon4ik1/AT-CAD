@@ -93,7 +93,7 @@ default_modes = ["mode_bulge", "mode_polyline", "mode_spline"]
 # Рекомендуемые наборы значений accuracy по режимам
 ACCURACY_OPTIONS = {
     "bulge": ["18", "24", "30", "36"],          # баланс точности/производительности
-    "polyline": ["360", "480", "600", "720"],   # поли-линия — много точек
+    "polyline": ["360", "480", "600", "720"],   # полилиния — много точек
     "spline": ["24", "36", "48", "72"],         # сплайн — умеренно
 }
 
@@ -107,6 +107,7 @@ class NozzleContentPanel(BaseContentPanel):
     Панель для настройки параметров одиночного отвода.
     """
     def __init__(self, parent, callback=None):
+
         super().__init__(parent)
         self.on_submit_callback = callback
         self.parent = parent

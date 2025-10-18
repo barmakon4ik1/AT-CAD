@@ -865,7 +865,7 @@ if __name__ == "__main__":
     Тестовый вызов окна для проверки интерфейса и поведения кнопок.
     """
     app = wx.App(False)
-    frame = wx.Frame(None, title="Тест ConeContentPanel", size=(800, 600))
+    frame = wx.Frame(None, title="Тест ConeContentPanel", size=(1000, 700))
     panel = ConeContentPanel(frame)
 
     def on_ok_test(data):

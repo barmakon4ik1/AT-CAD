@@ -83,9 +83,9 @@ default_weld_allowance = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"
 # Фабричная функция для создания панели
 def create_window(parent: wx.Window) -> wx.Panel:
     """
-    Фабричная функция для создания панели ShellContentPanel.Args:
+    Фабричная функция для создания панели ShellContentPanel.
+Args:
     parent (wx.Window): Родительская панель (обычно content_panel в ATMainWindow).
-
 Returns:
     wx.Panel: Инициализированный экземпляр ShellContentPanel.
 """
