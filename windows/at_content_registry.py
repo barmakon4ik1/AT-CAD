@@ -65,6 +65,11 @@ TRANSLATIONS = {
         "ru": "Вырез",
         "de": "Ausschnitt",
         "en": "Cutout"
+    },
+    "at_run_eccentric": {
+        "ru": "Эксцентричный конус",
+        "de": "Exzentrischer Kegel",
+        "en": "Eccentric Cone"
     }
 }
 
@@ -112,6 +117,11 @@ CONTENT_REGISTRY = {
         "module": "windows.content_cutout",
         "label": "at_run_cutout",
         "build_module": "programs.at_cutout"
+    },
+    "eccentric_reducer": {
+        "module": "windows.content_eccentric",
+        "label": "at_run_eccentric",
+        "build_module": "programs.at_run_ecc_red"
     }
 }
 

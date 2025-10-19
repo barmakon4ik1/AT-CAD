@@ -11,10 +11,12 @@
 from contextlib import contextmanager
 from config.at_cad_init import ATCadInit
 from locales.at_localization_class import loc
+from programs.at_geometry import ensure_point_variant
 from windows.at_gui_utils import show_popup
 import importlib
 import logging
-from typing import Any
+from typing import Any, List
+
 
 def run_program(module_name: str, data: Any = None) -> Any:
     """
@@ -151,6 +153,7 @@ def layer_context(adoc: object, layer_name: str):
         )
     finally:
         restore_layer(adoc, original_layer)
+
 
 
 if __name__ == "__main__":

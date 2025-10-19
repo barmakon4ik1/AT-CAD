@@ -57,6 +57,7 @@ TRANSLATIONS = {
     "no_data_error": {"ru": "Необходимо заполнить все обязательные поля", "de": "Alle Pflichtfelder müssen ausgefüllt werden", "en": "All mandatory fields must be filled"},
     "invalid_number_format_error": {"ru": "Неверный формат числа", "de": "Ungültiges Zahlenformat", "en": "Invalid number format"},
     "diameter_positive_error": {"ru": "Диаметры должны быть положительными", "de": "Durchmesser müssen positiv sein", "en": "Diameters must be positive"},
+    "diameter_not_equal": {"ru": "Диаметры не должны быть равными", "de": "Durchmesser müssen nicht gleich sein", "en": "Diameters do not have to be equal"},
     "thickness_positive_error": {"ru": "Толщина должна быть положительной", "de": "Dicke muss positiv sein", "en": "Thickness must be positive"},
     "height_positive_error": {"ru": "Высота должна быть положительной", "de": "Höhe muss positiv sein", "en": "Height must be positive"},
     "weld_allowance_non_negative_error": {"ru": "Припуск на сварку не может быть отрицательным", "de": "Schweißnahtzugabe darf nicht negativ sein", "en": "Weld allowance cannot be negative"},
@@ -68,6 +69,7 @@ TRANSLATIONS = {
    "axis_yes": {"ru": "Да", "de": "Ja", "en": "Yes"},
     "axis_no": {"ru": "Нет", "de": "Nein", "en": "No"},
     "axis_marks_label": {"ru": "Метки осей, мм", "de": "Achsenmarken, mm", "en": "Axis marks, mm"},
+    "mode": {"ru": "Режим построения", "de": "Konstruktionsmodus", "en": "Build Mode"},
     "mode_label": {"ru": "Режим построения", "de": "Konstruktionsmodus", "en": "Build Mode"},
     "mode_bulge": {"ru": "Дуги", "de": "Bogen", "en": "Bulge"},
     "mode_polyline": {"ru": "Полилиния", "de": "Polylinie", "en": "Polyline"},
@@ -75,6 +77,14 @@ TRANSLATIONS = {
     "accuracy_label": {"ru": "Точность (точек)", "de": "Genauigkeit (Punkte)", "en": "Accuracy (points)"},
     "additional_label": {"ru": "Доп. условия", "de": "Zusatzbedingungen", "en": "Additional"},
     "build_conditions_label": {"ru": "Условия построения", "de": "Bau-Bedingungen", "en": "Build Conditions"},
+    "axis_label": {"ru": "Оси", "de": "Achsen", "en": "Axes"},
+    "build_side_label": {"ru": "Сторона построения", "de": "Konstruktionsseite", "en": "Build Side"},
+    "build_side_left": {"ru": "Левая", "de": "Links", "en": "Left"},
+    "build_side_right": {"ru": "Правая", "de": "Rechts", "en": "Right"},
+    "projection_label": {"ru": "Проекция", "de": "Projektion", "en": "Projection"},
+    "projection_front": {"ru": "Фронтальная", "de": "Frontal", "en": "Front"},
+    "projection_top": {"ru": "Верхняя", "de": "Oben", "en": "Top"},
+    "projection_side": {"ru": "Боковая", "de": "Seitenansicht", "en": "Side"},
 }
 # Регистрируем переводы сразу при загрузке модуля
 loc.register_translations(TRANSLATIONS)
@@ -248,14 +258,14 @@ class ReducerContentPanel(BaseContentPanel):
         self.d_type_choice = wx.Choice(
             diameter_box,
             choices=[
-                loc.get("outer_label", "Внешний"),
+                loc.get("inner_label", "Внутренний"),
                 loc.get("middle_label", "Средний"),
-                loc.get("inner_label", "Внутренний")
+                loc.get("outer_label", "Внешний")
             ],
             size=field_size
         )
         self.d_type_choice.SetFont(font)
-        self.d_type_choice.SetSelection(0)  # Внутренний по умолчанию
+        self.d_type_choice.SetSelection(2)  # Внешний по умолчанию
         d_sizer.Add(d_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         d_sizer.AddStretchSpacer()
         d_sizer.Add(self.d_input, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
@@ -272,14 +282,14 @@ class ReducerContentPanel(BaseContentPanel):
         self.D_type_choice = wx.Choice(
             diameter_box,
             choices=[
-                loc.get("outer_label", "Внешний"),
+                loc.get("inner_label", "Внутренний"),
                 loc.get("middle_label", "Средний"),
-                loc.get("inner_label", "Внутренний")
+                loc.get("outer_label", "Внешний")
             ],
             size=field_size
         )
         self.D_type_choice.SetFont(font)
-        self.D_type_choice.SetSelection(0)  # Внутренний по умолчанию
+        self.D_type_choice.SetSelection(2)  # Внешний по умолчанию
         D_sizer.Add(D_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         D_sizer.AddStretchSpacer()
         D_sizer.Add(self.D_input, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
@@ -335,7 +345,7 @@ class ReducerContentPanel(BaseContentPanel):
         self.mode_combo = wx.ComboBox(
             build_box,
             choices=[loc.get(mode, mode) for mode in default_modes],
-            value=loc.get("mode_bulge", "Bulge"),
+            value=loc.get("mode_polyline", "Polyline"),
             style=wx.CB_READONLY,
             size=field_size
         )
@@ -352,8 +362,8 @@ class ReducerContentPanel(BaseContentPanel):
         style_label(self.labels["accuracy"])
         self.accuracy_combo = wx.ComboBox(
             build_box,
-            choices=ACCURACY_OPTIONS["bulge"],
-            value="24",
+            choices=ACCURACY_OPTIONS["polyline"],
+            value="360",
             style=wx.CB_DROPDOWN,
             size=field_size
         )
@@ -382,8 +392,8 @@ class ReducerContentPanel(BaseContentPanel):
             loc.get("mode_polyline", "Polyline"): "polyline",
             loc.get("mode_spline", "Spline"): "spline",
         }
-        selected_mode = mode_map.get(self.mode_combo.GetValue(), "bulge")
-        options = ACCURACY_OPTIONS.get(selected_mode, ACCURACY_OPTIONS["bulge"])
+        selected_mode = mode_map.get(self.mode_combo.GetValue(), "polyline")
+        options = ACCURACY_OPTIONS.get(selected_mode, ACCURACY_OPTIONS["polyline"])
         self.accuracy_combo.SetItems(options)
         self.accuracy_combo.SetValue(options[0])
 
@@ -436,7 +446,6 @@ class ReducerContentPanel(BaseContentPanel):
         except Exception as e:
             show_popup(f"Ошибка: {e}", popup_type="error")
 
-
     def on_clear(self, event: wx.Event) -> None:
         """
         Очищает поля ввода.
@@ -454,8 +463,8 @@ class ReducerContentPanel(BaseContentPanel):
         self.D_type_choice.SetSelection(0)
         self.height_input.SetValue("")
         self.height_input.Enable(True)
-        self.mode_combo.SetValue(loc.get("mode_bulge", "Bulge"))
-        self.accuracy_combo.SetValue("24")
+        self.mode_combo.SetValue(loc.get("mode_polyline", "Polyline"))
+        self.accuracy_combo.SetValue("360")
 
     def on_cancel(self, event: wx.Event, switch_content: Optional[str] = "content_apps") -> None:
         """
@@ -507,6 +516,9 @@ class ReducerContentPanel(BaseContentPanel):
                 return None
             if d_val <= 0 or D_val <= 0:
                 show_popup(loc.get("diameter_positive_error", "Диаметры должны быть положительными"), popup_type="error")
+                return None
+            if d_val == D_val:
+                show_popup(loc.get("diameter_not_equal", "Диаметры не должны быть равными"), popup_type="error")
                 return None
             if thickness <= 0:
                 show_popup(loc.get("thickness_positive_error", "Толщина должна быть положительной"), popup_type="error")
@@ -573,12 +585,14 @@ class ReducerContentPanel(BaseContentPanel):
             if self.IsBeingDeleted():
                 return
 
-            # StaticBox labels
+            # --- StaticBox labels ---
             self.static_boxes["main_data"].SetLabel(loc.get("main_data_label", "Основные данные"))
             self.static_boxes["diameter"].SetLabel(loc.get("diameter_label", "Диаметры"))
             self.static_boxes["height"].SetLabel(loc.get("height_label", "Высота"))
+            self.static_boxes["build_conditions"].SetLabel(loc.get("build_conditions_label", "Условия построения"))
 
-            # Прочие метки
+
+            # --- Метки ---
             self.labels["order"].SetLabel(loc.get("order_label", "К-№"))
             self.labels["material"].SetLabel(loc.get("material_label", "Материал"))
             self.labels["thickness"].SetLabel(loc.get("thickness_label", "Толщина"))
@@ -586,29 +600,37 @@ class ReducerContentPanel(BaseContentPanel):
             self.labels["D"].SetLabel(loc.get("D_label", "D, мм"))
             self.labels["height"].SetLabel(loc.get("height_label_mm", "H, мм"))
             self.labels["allowance"].SetLabel(loc.get("weld_allowance_label", "Припуск на сварку, мм"))
+            self.labels["mode"].SetLabel(loc.get("mode_label", "Режим"))
+            self.labels["accuracy"].SetLabel(loc.get("accuracy_label", "Точность"))
 
-            # Обновление списков типов диаметров
-            self.d_type_choice.SetItems([
-                loc.get("inner_label", "Внутренний"),
-                loc.get("middle_label", "Средний"),
-                loc.get("outer_label", "Внешний")
-            ])
-            self.d_type_choice.SetSelection(0)
+            # --- Списки типов диаметров ---
+            if hasattr(self, "d_type_choice") and self.d_type_choice:
+                self.d_type_choice.SetItems([
+                    loc.get("inner_label", "Внутренний"),
+                    loc.get("middle_label", "Средний"),
+                    loc.get("outer_label", "Внешний"),
+                ])
+                self.d_type_choice.SetSelection(2)
 
-            self.D_type_choice.SetItems([
-                loc.get("inner_label", "Внутренний"),
-                loc.get("middle_label", "Средний"),
-                loc.get("outer_label", "Внешний")
-            ])
-            self.D_type_choice.SetSelection(0)
+            if hasattr(self, "D_type_choice") and self.D_type_choice:
+                self.D_type_choice.SetItems([
+                    loc.get("inner_label", "Внутренний"),
+                    loc.get("middle_label", "Средний"),
+                    loc.get("outer_label", "Внешний"),
+                ])
+                self.D_type_choice.SetSelection(2)
 
-            # Кнопки
+            # Обновление списка режимов построения
+            self.mode_combo.SetItems([loc.get(mode, mode) for mode in default_modes])
+            self.mode_combo.SetValue(loc.get("mode_polyline", "Polyline"))
+
+            # --- Кнопки ---
             for i, key in enumerate(["ok_button", "clear_button", "cancel_button"]):
                 if i < len(self.buttons) and not self.buttons[i].IsBeingDeleted():
                     self.buttons[i].SetLabel(loc.get(key, ["ОК", "Очистить", "Возврат"][i]))
             adjust_button_widths(self.buttons)
 
-            # Форсируем перерисовку staticbox'ов и панели
+            # --- Перерисовка элементов ---
             for sb in self.static_boxes.values():
                 try:
                     sb.Refresh()
@@ -622,6 +644,7 @@ class ReducerContentPanel(BaseContentPanel):
             self.Layout()
             self.Refresh()
             self.Update()
+
         except Exception as e:
             show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
 
