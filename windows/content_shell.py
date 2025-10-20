@@ -289,7 +289,7 @@ class BranchWindow(wx.Dialog):
                 "params": {
                     "diameter": diameter,
                     "mode": self.table.GetCellValue(row, 7).upper(),  # Тип контакта (A, D, M, T)
-                    "text": self.table.GetCellValue(row, 0) or f"N{row + 1}",  # Наименование, по умолчанию N1, N2...
+                    "text": self.table.GetCellValue(row, 0),
                     "steps": 180,  # Фиксированное значение
                     "layer_name": "0",  # Жестко заданный слой
                     "thickness": parse_float(self.table.GetCellValue(row, 5)) or 0.0,  # Толщина отвода
