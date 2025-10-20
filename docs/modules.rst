@@ -94,12 +94,6 @@
     :show-inheritance:
 
 
-.. automodule:: programs.at_build_cone_sweep
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-
 .. automodule:: programs.at_calculation
     :members:
     :undoc-members:
@@ -178,6 +172,12 @@
     :show-inheritance:
 
 
+.. automodule:: programs.at_run_ecc_red
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
 .. automodule:: programs.at_run_plate
     :members:
     :undoc-members:
@@ -191,30 +191,6 @@
 
 
 .. automodule:: programs.at_utils
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-
-.. automodule:: programs.flange_models
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-
-.. automodule:: programs.flange_utils
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-
-.. automodule:: programs.import_flanges
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-
-.. automodule:: programs.main
     :members:
     :undoc-members:
     :show-inheritance:
@@ -293,6 +269,12 @@
 
 
 .. automodule:: windows.content_cutout
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+.. automodule:: windows.content_eccentric
     :members:
     :undoc-members:
     :show-inheritance:
