@@ -282,9 +282,11 @@ class BranchWindow(wx.Dialog):
             if angle is None:
                 show_popup(loc.get("error_invalid_angle", "Угол (A) обязателен при наличии диаметра"), popup_type="error")
                 return None
+
+            weld_allowance_bottom = parse_float(self.parent.allowance_bottom.GetValue()) or 0
             cutout = {
                 "angle_deg": angle,
-                "offset_axial": offset_axial,
+                "offset_axial": offset_axial + weld_allowance_bottom,
                 "axial_shift": parse_float(self.table.GetCellValue(row, 4)) or 0.0,
                 "params": {
                     "diameter": diameter,
