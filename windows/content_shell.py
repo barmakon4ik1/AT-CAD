@@ -71,6 +71,11 @@ TRANSLATIONS = {
     "error_invalid_angle": {"ru": "Угол (A) обязателен при наличии диаметра",
                             "de": "Winkel (A) ist erforderlich, wenn Durchmesser angegeben ist",
                             "en": "Angle (A) is required when diameter is specified"},
+    "mode_label": {"ru": "Режим построения", "de": "Konstruktionsmodus", "en": "Build Mode"},
+    "mode_bulge": {"ru": "Дуги", "de": "Bogen", "en": "Bulge"},
+    "mode_polyline": {"ru": "Полилиния", "de": "Polylinie", "en": "Polyline"},
+    "mode_spline": {"ru": "Сплайн", "de": "Spline", "en": "Spline"},
+    "steps_label": {"ru": "Точность (точек)", "de": "Genauigkeit (Punkte)", "en": "Steps (points)"}
 }
 
 loc.register_translations(TRANSLATIONS)
@@ -79,6 +84,16 @@ loc.register_translations(TRANSLATIONS)
 default_allowances = ["0", "1", "2", "3", "4", "5", "10", "20"]
 default_axis_marks = ["0", "10", "20"]
 default_weld_allowance = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
+default_modes = ["mode_bulge", "mode_polyline", "mode_spline"]
+default_steps = ["180", "360", "720"]  # Значения для steps по умолчанию
+
+# Рекомендуемые наборы значений steps по режимам
+STEPS_OPTIONS = {
+    "bulge": ["90", "180", "360"],          # Баланс точности/производительности
+    "polyline": ["360", "720", "1080"],     # Полилиния — больше точек
+    "spline": ["90", "180", "360"],         # Сплайн — умеренно
+}
+
 
 # Фабричная функция для создания панели
 def create_window(parent: wx.Window) -> wx.Panel:
@@ -103,7 +118,13 @@ class BranchWindow(wx.Dialog):
         Args:
             parent: Родительское окно (обычно ShellContentPanel).
         """
-        super().__init__(parent, title=loc.get("branch_window_title", "Параметры отвода"), size=(1600, 600))
+        super().__init__(
+            parent,
+            title=loc.get("branch_window_title", "Параметры отвода"),
+            size=(1600, 600),
+            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER
+        )
+
         self.SetMinSize((1600, 600))
         self.SetBackgroundColour(wx.Colour(get_setting("BACKGROUND_COLOR")))
         self.parent = parent
@@ -118,31 +139,50 @@ class BranchWindow(wx.Dialog):
     def setup_ui(self):
         """
         Настраивает пользовательский интерфейс окна BranchWindow.
-        Слева размещается изображение и стандартные кнопки, справа - таблица для параметров отвода.
+        Левая панель (рисунок + кнопки) создаётся внутри left_panel_container,
+        правая (таблица и контролы) — внутри right_panel_container.
         """
         main_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.left_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        # Левый блок: изображение и кнопки
+        # --- Контейнеры — создаём их СРАЗУ, чтобы дети имели правильный parent ---
+        left_panel_container = wx.Panel(self)
+        left_panel_sizer = wx.BoxSizer(wx.VERTICAL)
+        left_panel_container.SetSizer(left_panel_sizer)
+        left_panel_container.SetMinSize((400, -1))
+        left_panel_container.SetMaxSize((400, -1))  # фиксированная ширина для левой панели
+
+        right_panel_container = wx.Panel(self)
+        right_panel_sizer = wx.BoxSizer(wx.VERTICAL)
+        right_panel_container.SetSizer(right_panel_sizer)
+
+        # ------------------ Левая панель (canvas + кнопки + branch_button) ------------------
         image_path = str(UNWRAPPER_PATH)
-        self.canvas = CanvasPanel(self, image_path, size=(400, 300))
-        self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
+        # CanvasPanel создаём как дочерний элемент left_panel_container
+        self.canvas = CanvasPanel(left_panel_container, image_path, size=(400, 300))
+        left_panel_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
 
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.buttons = create_standard_buttons(self, self.on_ok, self.on_cancel, self.on_clear)
+        # Создаём кнопки тоже с родителем left_panel_container
+        self.buttons = create_standard_buttons(left_panel_container, self.on_ok, self.on_cancel, self.on_clear)
         for button in self.buttons:
             button_sizer.Add(button, 0, wx.RIGHT, 5)
         adjust_button_widths(self.buttons)
-        self.left_sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
+        left_panel_sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
 
-        # Правый блок: таблица с параметрами
-        self.right_sizer = wx.BoxSizer(wx.VERTICAL)
-        branch_box = wx.StaticBox(self, label=loc.get("branch_params_label", "Параметры отвода"))
+        # Кнопка "Наличие отвода" — тоже на левой панели
+        self.branch_button = wx.Button(left_panel_container, label=loc.get("branch_button", "Наличие отвода"))
+        self.branch_button.SetBackgroundColour(wx.Colour(0, 102, 204))
+        self.branch_button.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.branch_button.SetFont(get_standard_font())
+        left_panel_sizer.Add(self.branch_button, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
+
+        # ------------------ Правая панель (статик-бокс + таблица + контролы) ------------------
+        branch_box = wx.StaticBox(right_panel_container, label=loc.get("branch_params_label", "Параметры отвода"))
         style_staticbox(branch_box)
         self.static_boxes["branch_params"] = branch_box
         branch_sizer = wx.StaticBoxSizer(branch_box, wx.VERTICAL)
 
-        # Таблица с параметрами отвода
+        # Таблица с параметрами отвода (создаём внутри branch_box)
         self.table = wx.grid.Grid(branch_box)
         self.table.CreateGrid(5, 11)  # Начально 5 строк, 11 столбцов
 
@@ -150,7 +190,7 @@ class BranchWindow(wx.Dialog):
         label_font = wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
         self.table.SetLabelFont(label_font)
 
-        # Установка заголовков столбцов с переносом на две строки
+        # Заголовки столбцов
         self.table.SetColLabelValue(0, loc.get("name_label", "Имя"))
         self.table.SetColLabelValue(1, loc.get("diameter_branch_label", "d"))
         self.table.SetColLabelValue(2, loc.get("offset_axial_label", "L"))
@@ -163,35 +203,24 @@ class BranchWindow(wx.Dialog):
         self.table.SetColLabelValue(9, loc.get("flange_label", "Фланец"))
         self.table.SetColLabelValue(10, loc.get("weld_allowance_label", "Припуск"))
 
-        # Установка высоты заголовков столбцов
-        self.table.SetColLabelSize(40)  # Высота заголовков 40 пикселей
+        self.table.SetColLabelSize(40)
+        # Начальные размеры столбцов — небольшое значение, потом мы подгоним
+        initial_col_width = 60
+        for c in range(self.table.GetNumberCols()):
+            self.table.SetColSize(c, initial_col_width)
 
-        # Установка фиксированной ширины столбцов (в пикселях)
-        table_width = 80
-        self.table.SetColSize(0, table_width)  # Имя
-        self.table.SetColSize(1, table_width)  # Диаметр, d
-        self.table.SetColSize(2, table_width)  # Расстояние, L
-        self.table.SetColSize(3, table_width)  # Высота, H
-        self.table.SetColSize(4, table_width)  # Смещение, B
-        self.table.SetColSize(5, table_width)  # Толщина, S
-        self.table.SetColSize(6, table_width)  # Угол, A°
-        self.table.SetColSize(7, table_width)  # Тип контакта
-        self.table.SetColSize(8, table_width)  # Развертка отвода
-        self.table.SetColSize(9, table_width)  # Наличие фланца
-        self.table.SetColSize(10, table_width)  # Припуск на сварку
-
-        # Установка начальных значений и типов данных
+        # Начальные значения строк
         for row in range(self.table.GetNumberRows()):
             self.table.SetRowLabelValue(row, str(row + 1))
-            self.table.SetCellValue(row, 3, "0")  # H по умолчанию
-            self.table.SetCellValue(row, 4, "0")  # B по умолчанию
-            self.table.SetCellValue(row, 5, "0")  # S по умолчанию
-            self.table.SetCellValue(row, 7, "A")  # Тип контакта по умолчанию
-            self.table.SetCellValue(row, 8, loc.get("no", "Нет"))  # Развертка по умолчанию
-            self.table.SetCellValue(row, 9, loc.get("no", "Нет"))  # Фланец по умолчанию
-            self.table.SetCellValue(row, 10, "3")  # Припуск на сварку по умолчанию
+            self.table.SetCellValue(row, 3, "0")
+            self.table.SetCellValue(row, 4, "0")
+            self.table.SetCellValue(row, 5, "0")
+            self.table.SetCellValue(row, 7, "A")
+            self.table.SetCellValue(row, 8, loc.get("no", "Нет"))
+            self.table.SetCellValue(row, 9, loc.get("no", "Нет"))
+            self.table.SetCellValue(row, 10, "3")
 
-        # Установка редакторов для выпадающих списков
+        # Редакторы для choice-полей
         contact_types = ["A", "D", "M", "T"]
         unroll_choices = [loc.get("yes", "Да"), loc.get("no", "Нет")]
         for row in range(self.table.GetNumberRows()):
@@ -202,22 +231,98 @@ class BranchWindow(wx.Dialog):
 
         self.table.SetDefaultCellAlignment(wx.ALIGN_CENTRE, wx.ALIGN_CENTRE)
         self.table.EnableDragRowSize(False)
+
+        # Добавляем таблицу в branch_sizer
         branch_sizer.Add(self.table, 1, wx.EXPAND | wx.ALL, 5)
 
-        # Кнопка для добавления строки
+        # --- Строка с режимом, точностью и кнопкой добавления ---
+        field_size = (150, -1)
+        row_controls = wx.BoxSizer(wx.HORIZONTAL)
+
+        self.labels["mode"] = wx.StaticText(branch_box, label=loc.get("mode_label", "Режим построения"))
+        style_label(self.labels["mode"])
+        self.mode_combo = wx.ComboBox(
+            branch_box,
+            choices=[loc.get(m, m) for m in default_modes],
+            value=loc.get("mode_polyline", "Полилиния"),
+            style=wx.CB_READONLY,
+            size=field_size
+        )
+        style_combobox(self.mode_combo)
+        self.mode_combo.Bind(wx.EVT_COMBOBOX, self.on_mode_change)
+
+        self.labels["steps"] = wx.StaticText(branch_box, label=loc.get("steps_label", "Точность (точек)"))
+        style_label(self.labels["steps"])
+        self.steps_combo = wx.ComboBox(
+            branch_box,
+            choices=STEPS_OPTIONS["polyline"],
+            value="360",
+            style=wx.CB_DROPDOWN,
+            size=field_size
+        )
+        style_combobox(self.steps_combo)
+
         add_row_button = wx.Button(branch_box, label=loc.get("add_row", "Добавить строку"))
         add_row_button.SetFont(get_standard_font())
         add_row_button.Bind(wx.EVT_BUTTON, self.on_add_row)
-        branch_sizer.Add(add_row_button, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
 
-        self.right_sizer.Add(branch_sizer, 1, wx.EXPAND | wx.ALL, 10)
+        row_controls.Add(self.labels["mode"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        row_controls.Add(self.mode_combo, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 20)
+        row_controls.Add(self.labels["steps"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        row_controls.Add(self.steps_combo, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 20)
+        row_controls.AddStretchSpacer()
+        row_controls.Add(add_row_button, 0, wx.ALIGN_CENTER_VERTICAL)
 
-        # Собираем общий макет
-        main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
-        main_sizer.Add(self.right_sizer, 1, wx.EXPAND | wx.ALL, 10)
+        branch_sizer.Add(row_controls, 0, wx.EXPAND | wx.ALL, 5)
+
+        # Добавляем branch_sizer в правый контейнер
+        right_panel_sizer.Add(branch_sizer, 1, wx.EXPAND | wx.ALL, 10)
+
+        # Добавляем контейнеры в главный сайзер: левая фиксированная, правая растягивается
+        main_sizer.Add(left_panel_container, 0, wx.EXPAND | wx.ALL, 10)
+        main_sizer.Add(right_panel_container, 1, wx.EXPAND | wx.ALL, 10)
+
         self.SetSizer(main_sizer)
+
+        # --- Подгонка ширины столбцов: минимум — 10 цифр ---
+        dc = wx.ClientDC(self.table)
+        dc.SetFont(self.table.GetFont())
+        min_char_width = dc.GetTextExtent("0" * 10)[0] + 10  # запас
+
+        # Сначала подгоним по заголовкам/контенту, затем применим минимум
+        try:
+            self.table.AutoSizeColumns()
+        except Exception:
+            pass
+
+        for col in range(self.table.GetNumberCols()):
+            if self.table.GetColSize(col) < min_char_width:
+                self.table.SetColSize(col, min_char_width)
+
+        current_width, current_height = self.GetSize()
+        self.SetMinSize((current_width, current_height))
+        self.SetMaxSize((-1, current_height))
+
+        # Привязка обработчика изменения ячейки (если on_cell_changed реализован)
+        self.table.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.on_cell_changed)
+
         apply_styles_to_panel(self)
         self.Layout()
+
+        # Автоматическое перераспределение ширины столбцов при изменении окна
+        self.Bind(wx.EVT_SIZE, self.on_resize)
+
+    def on_mode_change(self, event):
+        """Меняет список значений steps при смене режима построения."""
+        mode_map = {
+            loc.get("mode_bulge", "Bulge"): "bulge",
+            loc.get("mode_polyline", "Polyline"): "polyline",
+            loc.get("mode_spline", "Spline"): "spline",
+        }
+        selected_mode = mode_map.get(self.mode_combo.GetValue(), "polyline")
+        options = STEPS_OPTIONS.get(selected_mode, STEPS_OPTIONS["polyline"])
+        self.steps_combo.SetItems(options)
+        self.steps_combo.SetValue(options[0])
 
     def on_add_row(self, event: wx.Event):
         """
@@ -259,6 +364,74 @@ class BranchWindow(wx.Dialog):
         self.table.SetColSize(10, 120)  # Припуск на сварку
 
         self.Layout()
+
+    def on_cell_changed(self, event):
+        """Автоматически подгоняет ширину столбца под содержимое (увеличивает и уменьшает)."""
+        col = event.GetCol()
+        row = event.GetRow()
+        value = self.table.GetCellValue(row, col).strip()
+
+        # Подготовим DC (для измерения ширины текста)
+        dc = wx.ClientDC(self.table)
+        dc.SetFont(self.table.GetFont())
+
+        # Минимальная ширина — чтобы помещалось хотя бы 10 символов
+        min_width = dc.GetTextExtent("0000000000")[0] + 10
+        # Текущая ширина
+        current_width = self.table.GetColSize(col)
+        # Требуемая ширина по тексту
+        text_width = dc.GetTextExtent(value)[0] + 20  # +20 на отступы
+
+        # Если текст длиннее текущего столбца — расширяем
+        if text_width > current_width:
+            self.table.SetColSize(col, text_width)
+        # Если текст стал короче — аккуратно сужаем, но не меньше минимума
+        elif text_width + 40 < current_width and current_width > min_width:
+            new_width = max(min_width, text_width + 20)
+            self.table.SetColSize(col, new_width)
+
+        event.Skip()
+
+    def on_resize(self, event):
+        """Обработчик изменения размера окна — вызывает перераспределение столбцов."""
+        event.Skip()
+        wx.CallAfter(self.adjust_table_columns)
+
+    def adjust_table_columns(self):
+        """Равномерно распределяет ширину всех столбцов, без горизонтального скролла и скрытия последнего."""
+        if not hasattr(self, "table") or not self.table:
+            return
+
+        total_width = max(1, self.table.GetClientSize().GetWidth())
+        cols = self.table.GetNumberCols()
+        if cols == 0 or total_width <= 1:
+            return
+
+        scale = self.GetContentScaleFactor() if hasattr(self, "GetContentScaleFactor") else 1
+        # wx.Grid добавляет внутренние отступы справа, компенсируем их
+        safety_margin = int(80 * scale)  # ← ключевой момент
+        available_width = max(1, total_width - safety_margin)
+
+        min_col_width = 80
+        even_width = max(min_col_width, available_width // cols)
+
+        # Ограничим, чтобы не вылезли за пределы
+        if even_width * cols > available_width:
+            even_width = max(40, available_width // cols)
+
+        # Устанавливаем ширину для всех столбцов
+        for col in range(cols):
+            self.table.SetColSize(col, even_width)
+
+        # Небольшая корректировка последнего столбца (чтобы занять остаток без выхода за границу)
+        used_width = even_width * cols
+        diff = available_width - used_width
+        if abs(diff) > 0:
+            last = cols - 1
+            new_last = max(40, self.table.GetColSize(last) + diff - 2)
+            self.table.SetColSize(last, new_last)
+
+        self.table.ForceRefresh()
 
     def collect_input_data(self) -> Optional[List[Dict]]:
         """
