@@ -1,259 +1,274 @@
 import comtypes.client
 import comtypes.automation
-from shapely.geometry import Polygon, Point
-from shapely.affinity import translate, rotate
-import numpy as np
-import ezdxf
+from shapely.geometry import Polygon
 import time
 import pythoncom
 from config.at_cad_init import ATCadInit
-from programs.at_construction import add_polyline, add_circle
+from locales.at_translations import loc
 
-# 1. Инициализация AutoCAD через ATCadInit (без создания слоев)
-cad = ATCadInit()
-acad = cad.application
-doc = cad.document
-model_space = cad.model_space
-utility = doc.Utility
+# -----------------------------
+# Локальные переводы модуля
+# -----------------------------
+TRANSLATIONS = {
+    "select_polyline_prompt": {
+        "ru": "Выберите полилинию(и) листа на слое 'SF-TEXT'. Нажмите Enter для завершения или Esc для выхода.",
+        "de": "Wählen Sie die Polylinie(n) des Blattes auf der Ebene 'SF-TEXT' aus. Drücken Sie Enter zum Abschließen oder Esc zum Beenden.",
+        "en": "Select polyline(s) of the sheet on layer 'SF-TEXT'. Press Enter to finish or Esc to exit."
+    },
+    "select_polyline_action": {
+        "ru": "Действие [0-Продолжить/1-Завершить/2-Прервать] <0>: ",
+        "de": "Aktion [0-Fortfahren/1-Beenden/2-Abbrechen] <0>: ",
+        "en": "Action [0-Continue/1-Finish/2-Abort] <0>: "
+    },
+    "select_completed_enter": {
+        "ru": "Выбор завершен (Enter).",
+        "de": "Auswahl abgeschlossen (Enter).",
+        "en": "Selection completed (Enter)."
+    },
+    "select_completed_user": {
+        "ru": "Выбор завершен (по выбору пользователя).",
+        "de": "Auswahl abgeschlossen (durch Benutzerwahl).",
+        "en": "Selection completed (by user choice)."
+    },
+    "no_polyline_selected": {
+        "ru": "Ошибка: Не выбрана полилиния (возможно, промах или нажат Esc).",
+        "de": "Fehler: Keine Polylinie ausgewählt (möglicherweise Fehlklick oder Esc gedrückt).",
+        "en": "Error: No polyline selected (possibly missed or Esc pressed)."
+    },
+    "invalid_polyline": {
+        "ru": "Ошибка: Выберите полилинию!",
+        "de": "Fehler: Wählen Sie eine Polylinie!",
+        "en": "Error: Select a polyline!"
+    },
+    "wrong_layer": {
+        "ru": "Ошибка: Выберите полилинию на слое 'SF-TEXT'!",
+        "de": "Fehler: Wählen Sie eine Polylinie auf der Ebene 'SF-TEXT'!",
+        "en": "Error: Select a polyline on layer 'SF-TEXT'!"
+    },
+    "not_closed_polyline": {
+        "ru": "Ошибка: Выберите замкнутую полилинию!",
+        "de": "Fehler: Wählen Sie eine geschlossene Polylinie!",
+        "en": "Error: Select a closed polyline!"
+    },
+    "invalid_working_area": {
+        "ru": "Ошибка: Рабочая область не создана (слишком большой отступ {} мм или некорректная геометрия)",
+        "de": "Fehler: Arbeitsbereich nicht erstellt (zu großer Abstand {} mm oder ungültige Geometrie)",
+        "en": "Error: Working area not created (margin {} mm too large or invalid geometry)"
+    },
+    "working_area_not_contained": {
+        "ru": "Ошибка: Рабочая область не помещается в лист (площадь {:.2f} мм²)",
+        "de": "Fehler: Arbeitsbereich passt nicht in das Blatt (Fläche {:.2f} mm²)",
+        "en": "Error: Working area does not fit in the sheet (area {:.2f} mm²)"
+    },
+    "invalid_area_size": {
+        "ru": "Ошибка: Площадь рабочей области ({:.2f} мм²) больше или равна площади листа ({:.2f} мм²)",
+        "de": "Fehler: Fläche des Arbeitsbereichs ({:.2f} mm²) ist größer oder gleich der Blattfläche ({:.2f} mm²)",
+        "en": "Error: Working area ({:.2f} mm²) is larger than or equal to sheet area ({:.2f} mm²)"
+    },
+    "action_selected": {
+        "ru": "Выбранное действие: '{}'",
+        "de": "Ausgewählte Aktion: '{}'",
+        "en": "Selected action: '{}'"
+    },
+    "action_input_error": {
+        "ru": "Ошибка ввода действия (возможно, нажат Esc). Считаем 'Прервать'.",
+        "de": "Fehler bei der Aktionseingabe (möglicherweise Esc gedrückt). Als 'Abbrechen' gewertet.",
+        "en": "Action input error (possibly Esc pressed). Considered as 'Abort'."
+    },
+    "selection_aborted": {
+        "ru": "Выбор прерван пользователем.",
+        "de": "Auswahl vom Benutzer abgebrochen.",
+        "en": "Selection aborted by user."
+    },
+    "selection_aborted_input_error": {
+        "ru": "Выбор прерван пользователем (ошибка ввода).",
+        "de": "Auswahl vom Benutzer abgebrochen (Eingabefehler).",
+        "en": "Selection aborted by user (input error)."
+    },
+    "critical_action_error": {
+        "ru": "Критическая ошибка при выборе действия: {}",
+        "de": "Kritischer Fehler bei der Auswahl der Aktion: {}",
+        "en": "Critical error during action selection: {}"
+    },
+    "critical_selection_error": {
+        "ru": "Критическая ошибка при выборе: {}",
+        "de": "Kritischer Fehler bei der Auswahl: {}",
+        "en": "Critical error during selection: {}"
+    },
+    "sheet_added": {
+        "ru": "Лист добавлен: {} листов выбрано.",
+        "de": "Blatt hinzugefügt: {} Blätter ausgewählt.",
+        "en": "Sheet added: {} sheets selected."
+    },
+    "no_sheets_selected": {
+        "ru": "Предупреждение: Не выбрано ни одного листа.",
+        "de": "Warnung: Kein Blatt ausgewählt.",
+        "en": "Warning: No sheets selected."
+    },
+    "sheet_info": {
+        "ru": "Лист {}:",
+        "de": "Blatt {}:",
+        "en": "Sheet {}:"
+    },
+    "sheet_points": {
+        "ru": "  Координаты углов: {}",
+        "de": "  Koordinaten der Ecken: {}",
+        "en": "  Corner coordinates: {}"
+    },
+    "sheet_working_area": {
+        "ru": "  Рабочая область: границы {}, размеры {:.2f}x{:.2f} мм, площадь {:.2f} мм²",
+        "de": "  Arbeitsbereich: Grenzen {}, Abmessungen {:.2f}x{:.2f} mm, Fläche {:.2f} mm²",
+        "en": "  Working area: bounds {}, dimensions {:.2f}x{:.2f} mm, area {:.2f} mm²"
+    },
+    "sheet_details": {
+        "ru": "Лист: границы {}, размеры {:.2f}x{:.2f} мм, площадь {:.2f} мм²",
+        "de": "Blatt: Grenzen {}, Abmessungen {:.2f}x{:.2f} mm, Fläche {:.2f} mm²",
+        "en": "Sheet: bounds {}, dimensions {:.2f}x{:.2f} mm, area {:.2f} mm²"
+    },
+    "active_layer_set": {
+        "ru": "Активный слой установлен: 0",
+        "de": "Aktiver Layer gesetzt: 0",
+        "en": "Active layer set: 0"
+    },
+    "layer_set_error": {
+        "ru": "Ошибка установки слоя '0': {}",
+        "de": "Fehler beim Setzen des Layers '0': {}",
+        "en": "Error setting layer '0': {}"
+    },
+    "autocad_version": {
+        "ru": "AutoCAD версия: {}",
+        "de": "AutoCAD-Version: {}",
+        "en": "AutoCAD version: {}"
+    },
+    "invalid_action": {
+        "ru": "Ошибка: Неверное действие '{}'. Доступные действия: 0, 1, 2.",
+        "de": "Fehler: Ungültige Aktion '{}'. Verfügbare Aktionen: 0, 1, 2.",
+        "en": "Error: Invalid action '{}'. Available actions: 0, 1, 2."
+    }
+}
+# Регистрируем переводы сразу при загрузке модуля
+loc.register_translations(TRANSLATIONS)
 
-print(f"AutoCAD версия: {acad.Version}")
-# Установка активного слоя "0"
-doc.ActiveLayer = doc.Layers.Item("0")
-print("Активный слой установлен: 0")
-
-# 2. Запрос выбора области в AutoCAD
-print("Выберите полилинию области выбора в AutoCAD...")
-selected_object = None
-max_attempts = 5
-attempt = 0
-while attempt < max_attempts:
+def get_user_action(utility):
+    """Запрашивает действие у пользователя через GetKeyword с безопасной обработкой Enter/Esc."""
     try:
-        time.sleep(0.2)  # Задержка для стабилизации AutoCAD
-        utility.Prompt("Выберите полилинию области: \n")
-        selected_object = utility.GetEntity()[0]  # Берем первый элемент (объект)
-        print(f"Выбран объект: {selected_object.ObjectName}, Слой: {selected_object.Layer}, Закрыт: {selected_object.Closed}")
-        if selected_object.ObjectName != "AcDbPolyline" or not selected_object.Closed:
-            print("Выберите замкнутую полилинию!")
-            attempt += 1
+        # Разрешаем только ключевые слова — Enter не считается пустым вводом
+        utility.InitializeUserInput(0, "Continue Finish Abort")
+        action = utility.GetKeyword("\nДействие [Продолжить/Завершить/Прервать] <Завершить>: ")
+
+        if not action:
+            # Если пользователь просто нажал Enter — считаем "Finish"
+            return "Finish"
+
+        return action
+
+    except Exception as e:
+        # Обработка кода ошибки COM (-2147352567)
+        if e.args and e.args[0] == -2147352567:
+            # Проверим состояние командной строки — если Esc, считаем Abort
+            print("Ошибка ввода действия (возможно, нажат Esc). Считаем 'Прервать'.")
+            return "Abort"
+
+        print(f"Неожиданная ошибка GetKeyword: {e}")
+        return "Abort"
+
+
+def get_sheets(utility, model_space, doc, margin=10.0):
+    sheets = []
+    print(loc.get("select_polyline_prompt"))
+
+    while True:
+        obj, ok, esc = get_entity_safe(utility, "\nВыберите полилинию листа: ")
+
+        if esc:
+            print(loc.get("select_completed_user"))
+            return sheets
+
+        if not ok or obj is None:
+            action = get_action(utility, loc)
+            if action == "Finish":
+                print(loc.get("select_completed_user"))
+                return sheets
+            elif action == "Abort":
+                raise Exception(loc.get("selection_aborted"))
             continue
-        break
-    except Exception as e:
-        print(f"Ошибка при выборе (попытка {attempt + 1}/{max_attempts}): {str(e)}")
-        attempt += 1
-        if attempt >= max_attempts:
-            raise Exception("Не удалось выбрать полилинию после максимального количества попыток")
-        continue
 
-if selected_object is None:
-    raise Exception("Полилиния области не выбрана")
+        # --- Проверки ---
+        if obj.ObjectName != "AcDbPolyline":
+            print(loc.get("invalid_polyline"))
+            if get_action(utility, loc) == "Abort":
+                raise Exception(loc.get("selection_aborted"))
+            continue
 
-# Извлечение координат области выбора
-selection_points = [(selected_object.Coordinates[i], selected_object.Coordinates[i+1]) for i in range(0, len(selected_object.Coordinates), 2)]
-selection_poly = Polygon(selection_points)
-print(f"Область выбора (SF-RAHMEN): границы {selection_poly.bounds}, площадь {selection_poly.area}")
+        if obj.Layer != "SF-TEXT":
+            print(loc.get("wrong_layer"))
+            if get_action(utility, loc) == "Abort":
+                raise Exception(loc.get("selection_aborted"))
+            continue
 
-# 3. Извлечение полилиний и окружностей
-polylines = []
-circles = []
-for item in model_space:
-    if item.ObjectName == "AcDbPolyline" and item.Closed:
-        points = [(item.Coordinates[i], item.Coordinates[i+1]) for i in range(0, len(item.Coordinates), 2)]
-        polylines.append({"points": points, "layer": item.Layer, "handle": item.ObjectID})
-    elif item.ObjectName == "AcDbCircle":
-        circles.append({"center": (item.Center[0], item.Center[1]), "radius": item.Radius, "layer": item.Layer, "handle": item.ObjectID})
+        if not obj.Closed:
+            print(loc.get("not_closed_polyline"))
+            if get_action(utility, loc) == "Abort":
+                raise Exception(loc.get("selection_aborted"))
+            continue
 
-# 4. Определение листа (слой "SF-TEXT")
-sheet = None
-for poly in polylines:
-    if poly["layer"] == "SF-TEXT":
-        sheet = Polygon(poly["points"])
-        polylines.remove(poly)
-        break
+        # --- Геометрия ---
+        coords = [(obj.Coordinates[i], obj.Coordinates[i+1])
+                  for i in range(0, len(obj.Coordinates), 2)]
+        poly = Polygon(coords)
+        inner = poly.buffer(-margin)
 
-if sheet is None:
-    raise ValueError("Лист не найден (слой SF-TEXT)")
-print(f"Лист (SF-TEXT): границы {sheet.bounds}, площадь {sheet.area}")
+        if not inner.is_valid or inner.is_empty:
+            print(loc.get("invalid_working_area").format(margin))
+            if get_action(utility, loc) == "Abort":
+                raise Exception(loc.get("selection_aborted"))
+            continue
 
-# Нормализация листа к (0, 0)
-sheet_centroid = sheet.centroid
-normalized_sheet = translate(sheet, xoff=-sheet_centroid.x, yoff=-sheet_centroid.y)
-sheet_bounds = normalized_sheet.bounds
-print(f"Нормализованные границы листа: {sheet_bounds}")
+        sheets.append({"points": coords, "working_area": inner})
+        print(loc.get("sheet_added").format(len(sheets)))
 
-# 5. Определение примитивов (слой "0")
-primitives = []
-for poly in polylines:
-    if poly["layer"] == "0":
-        shapely_poly = Polygon(poly["points"])
-        if selection_poly.contains(shapely_poly):
-            # Нормализация примитива относительно центроида листа
-            normalized_points = [(p[0] - sheet_centroid.x, p[1] - sheet_centroid.y) for p in poly["points"]]
-            normalized_poly = Polygon(normalized_points)
-            primitives.append({"exterior": normalized_poly, "holes": [], "dxf_entity": {"points": normalized_points}})
-            print(f"Примитив (полилиния): площадь {normalized_poly.area}, границы {normalized_poly.bounds}, точки {normalized_points}")
 
-for circle in circles:
-    if circle["layer"] == "0":
-        shapely_circle = Point(circle["center"]).buffer(circle["radius"])
-        if selection_poly.contains(shapely_circle):
-            # Нормализация центра окружности
-            normalized_center = (circle["center"][0] - sheet_centroid.x, circle["center"][1] - sheet_centroid.y)
-            normalized_circle = Point(normalized_center).buffer(circle["radius"])
-            primitives.append({"exterior": normalized_circle, "holes": [], "dxf_entity": {"center": normalized_center, "radius": circle["radius"]}})
-            print(f"Примитив (окружность): площадь {normalized_circle.area}, центр {normalized_center}, радиус {circle['radius']}")
 
-print(f"Найдено примитивов: {len(primitives)}")
+def main():
+    """
+    Основная функция для запуска процесса получения листов в AutoCAD.
+    """
+    # Инициализация AutoCAD
+    cad = ATCadInit()
+    acad = cad.application
+    doc = cad.document
+    model_space = cad.model_space
+    utility = doc.Utility
 
-# 6. Сортировка примитивов по площади
-primitives.sort(key=lambda p: p["exterior"].area, reverse=True)
-
-# 7. Тестовый вызов add_polyline с жесткими координатами
-try:
-    test_points = [(0.0, 0.0, 0.0), (10.0, 0.0, 0.0), (10.0, 10.0, 0.0), (0.0, 10.0, 0.0), (0.0, 0.0, 0.0)]
-    polyline = add_polyline(model_space, test_points, layer_name="0", closed=True)
-    if polyline:
-        print("Тестовая полилиния с жесткими координатами создана")
-    else:
-        print("Ошибка при создании тестовой полилинии. Проверьте logs/at_construction.log")
-except Exception as e:
-    print(f"Ошибка при тестовом создании полилинии: {str(e)}")
-
-# 8. Тестовое размещение первого примитива
-if primitives:
-    prim = primitives[0]
-    exterior = prim["exterior"]
-    print(f"Тестовое размещение первого примитива (площадь {exterior.area}) в (0, 0)")
+    print(loc.get("autocad_version").format(acad.Version))
+    # Установка активного слоя "0"
     try:
-        if prim["dxf_entity"].get("points"):  # Полилиния
-            points = prim["dxf_entity"]["points"]
-            print(f"Координаты полилинии: {points}")
-            if len(points) < 2:
-                raise ValueError("Полилиния должна содержать не менее 2 точек")
-            points_3d = [(p[0], p[1], 0.0) for p in points]
-            points_3d.append(points_3d[0])  # Замыкаем полилинию
-            print(f"Нормализованные 3D-координаты: {points_3d}")
-            polyline = add_polyline(model_space, points_3d, layer_name="0", closed=True)
-            if polyline:
-                print("Тестовая полилиния размещена в (0, 0)")
-            else:
-                print("Ошибка при создании тестовой полилинии. Проверьте logs/at_construction.log")
-                raise Exception("Failed to create test polyline")
-        elif prim["dxf_entity"].get("center"):  # Окружность
-            center = [prim["dxf_entity"]["center"][0], prim["dxf_entity"]["center"][1], 0.0]
-            radius = prim["dxf_entity"]["radius"]
-            circle = add_circle(model_space, center, radius, layer_name="0")
-            if circle:
-                print(f"Тестовая окружность размещена: центр={center}, радиус={radius}")
-            else:
-                print("Ошибка при создании тестовой окружности. Проверьте logs/at_construction.log")
-                raise Exception("Failed to create test circle")
+        doc.ActiveLayer = doc.Layers.Item("0")
+        print(loc.get("active_layer_set"))
     except Exception as e:
-        print(f"Ошибка при тестовом размещении: {str(e)}")
+        print(loc.get("layer_set_error").format(str(e)))
         raise
 
-# 9. Размещение примитивов
-offset = 0.01  # Минимальный отступ
-step = 10  # Шаг сетки (увеличен для оптимизации)
-placed_primitives = []
-print(f"Нормализованные границы листа для размещения: {sheet_bounds}")
-
-for prim in primitives:
-    placed = False
-    exterior = prim["exterior"]
-    prim_bounds = exterior.bounds
-    print(f"Попытка размещения примитива с площадью {exterior.area}, границы {prim_bounds}")
-    # Ограничиваем перебор с учетом размеров примитива
-    x_range = np.arange(0, sheet_bounds[2] - (prim_bounds[2] - prim_bounds[0]) + offset, step)
-    y_range = np.arange(0, sheet_bounds[3] - (prim_bounds[3] - prim_bounds[1]) + offset, step)
-    position_count = 0
-    for x in x_range:
-        for y in y_range:
-            for angle in [0, 90]:  # Ограничено до 0 и 90 градусов
-                position_count += 1
-                candidate = rotate(translate(exterior, x, y), angle, origin='centroid')
-                buffered = candidate.buffer(offset)
-                print(f"Проверка позиции #{position_count}: x={x}, y={y}, угол={angle}, границы кандидата {candidate.bounds}")
-                if not normalized_sheet.contains(buffered):
-                    print(f"Примитив не помещается при x={x}, y={y}, угол={angle}")
-                    continue
-                intersects = False
-                for placed_prim in placed_primitives:
-                    if buffered.intersects(placed_prim["exterior"].buffer(offset)):
-                        intersects = True
-                        print(f"Пересечение с размещенным примитивом при x={x}, y={y}, угол={angle}")
-                        break
-                if not intersects:
-                    # Прямое размещение в модельном пространстве (с возвращением к исходным координатам листа)
-                    if prim["dxf_entity"].get("points"):  # Полилиния
-                        points = prim["dxf_entity"]["points"]
-                        print(f"Координаты полилинии: {points}")
-                        if len(points) < 2:
-                            raise ValueError("Полилиния должна содержать не менее 2 точек")
-                        rotated_points = rotate(Polygon(points), angle, origin='centroid')
-                        translated_points = translate(rotated_points, x + sheet_centroid.x, y + sheet_centroid.y)
-                        coords = list(translated_points.exterior.coords)[:-1]
-                        coords_3d = [(p[0], p[1], 0.0) for p in coords]
-                        coords_3d.append(coords_3d[0])  # Замыкаем полилинию
-                        print(f"Размещенные 3D-координаты: {coords_3d}")
-                        polyline = add_polyline(model_space, coords_3d, layer_name="0", closed=True)
-                        if polyline:
-                            print(f"Полилиния размещена: x={x}, y={y}, угол={angle}")
-                        else:
-                            print("Ошибка при создании полилинии. Проверьте logs/at_construction.log")
-                            raise Exception("Failed to create polyline")
-                        # Добавление отверстий (если включено)
-                        for hole in prim["holes"]:
-                            hole_points = list(hole.exterior.coords)[:-1]
-                            hole_points_3d = [(p[0], p[1], 0.0) for p in hole_points]
-                            hole_points_3d.append(hole_points_3d[0])
-                            hole_polyline = add_polyline(model_space, hole_points_3d, layer_name="0", closed=True)
-                            if hole_polyline:
-                                print(f"Отверстие (полилиния) добавлено")
-                            else:
-                                print("Ошибка при создании отверстия. Проверьте logs/at_construction.log")
-                                raise Exception("Failed to create hole polyline")
-                    elif prim["dxf_entity"].get("center"):  # Окружность
-                        center = prim["dxf_entity"]["center"]
-                        new_center = [center[0] + x + sheet_centroid.x, center[1] + y + sheet_centroid.y, 0.0]
-                        radius = prim["dxf_entity"]["radius"]
-                        circle = add_circle(model_space, new_center, radius, layer_name="0")
-                        if circle:
-                            print(f"Окружность размещена: центр={new_center}, радиус={radius}")
-                        else:
-                            print("Ошибка при создании окружности. Проверьте logs/at_construction.log")
-                            raise Exception("Failed to create circle")
-                    placed_primitives.append({"exterior": candidate})
-                    placed = True
-                    break
-            if placed:
-                break
-        if placed:
-            break
-    if not placed:
-        print(f"Не удалось разместить примитив с площадью {exterior.area}")
+    # Получение листов с отступом 10 мм
+    sheets = get_sheets(utility, model_space, doc, margin=10.0)
+    if not sheets:
+        print(loc.get("no_sheets_selected"))
     else:
-        print(f"Примитив размещен после {position_count} проверок")
+        print(loc.get("sheet_added").format(len(sheets)))
+        for i, sheet in enumerate(sheets, 1):
+            print(loc.get("sheet_info").format(i))
+            print(loc.get("sheet_points").format(sheet['points']))
+            bounds = sheet['working_area'].bounds
+            width = bounds[2] - bounds[0]
+            height = bounds[3] - bounds[1]
+            print(loc.get("sheet_working_area").format(bounds, width, height, sheet['working_area'].area))
 
-# 10. Создание DXF для результата
-new_doc = ezdxf.new()
-new_msp = new_doc.modelspace()
-new_msp.add_lwpolyline(list(sheet.exterior.coords), dxfattribs={"layer": "SF-TEXT"})
+    # Восстановление исходного слоя
+    cad.restore_original_layer()
 
-# Добавление размещенных примитивов в DXF
-for prim in placed_primitives:
-    if prim["exterior"].type == "Polygon":
-        # Денормализация координат для DXF
-        denormalized_coords = [(p[0] + sheet_centroid.x, p[1] + sheet_centroid.y) for p in prim["exterior"].exterior.coords]
-        new_msp.add_lwpolyline(denormalized_coords, dxfattribs={"layer": "0"})
-    elif prim["exterior"].type == "Polygon" and prim["exterior"].buffer(0).type == "Polygon":  # Окружность как полигон
-        radius = (prim["exterior"].buffer(0).area / np.pi) ** 0.5
-        centroid = prim["exterior"].centroid.coords[0]
-        denormalized_center = (centroid[0] + sheet_centroid.x, centroid[1] + sheet_centroid.y)
-        new_msp.add_circle(denormalized_center, radius, dxfattribs={"layer": "0"})
 
-# Сохранение результата
-new_doc.saveas("d:\\a\\output.dxf")
-print(f"Сохранено {len(placed_primitives)} примитивов в d:\\a\\output.dxf")
-
-# Восстановление исходного слоя
-cad.restore_original_layer()
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        print(loc.get("critical_selection_error").format(str(e)))
