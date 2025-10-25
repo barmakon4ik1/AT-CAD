@@ -8,18 +8,13 @@
 Обеспечивает защиту от потери COM-сессии и поддержку локализации.
 """
 
-import logging
-import time
-
-import pythoncom
-import win32com.client
 from typing import Optional, List, Union, Tuple
 from win32com.client import VARIANT
 
 from config.at_cad_init import ATCadInit
 from programs.at_com_utils import safe_utility_call
 from locales.at_translations import loc
-
+from windows.at_gui_utils import show_popup
 
 # -----------------------------
 # Локальные переводы модуля
@@ -36,9 +31,9 @@ TRANSLATIONS = {
         "en": "Select an entity: ",
     },
     "prompt_select_action": {
-        "ru": "Действие [0-Далее/1-Назад/2-Завершить] <0>: ",
-        "de": "Aktion [0-Weiter/1-Zurück/2-Beenden] <0>: ",
-        "en": "Action [0-Next/1-Back/2-Finish] <0>: ",
+        "ru": "Действие [0-Продолжить/1-Отменить/2-Завершить] <0>: ",
+        "de": "Aktion [0-Weiter/1-Abbrechen/2-Beenden] <0>: ",
+        "en": "Action [0-Next/1-Cancel/2-Finish] <0>: ",
     },
     "error_point_input": {
         "ru": "Ошибка при получении точки",
@@ -55,29 +50,18 @@ TRANSLATIONS = {
         "de": "Fehler bei der Schlüsselwort-Eingabe",
         "en": "Error during keyword input",
     },
-    "com_restored": {
-        "ru": "COM-сессия восстановлена, активный документ: {0}",
-        "de": "COM-Sitzung wiederhergestellt, aktives Dokument: {0}",
-        "en": "COM session restored, active document: {0}",
+    "error_action_input": {
+        "ru": "Ошибка при выборе действия",
+        "de": "Fehler bei der Aktionseingabe",
+        "en": "Error during action input",
     },
-    "action_selected": {
-        "ru": "Выбранное действие: '{}'",
-        "de": "Ausgewählte Aktion: '{}'",
-        "en": "Selected action: '{}'"
-    },
-    "invalid_action": {
-        "ru": "Ошибка: Неверное действие '{}'. Доступные действия: 0, 1, 2.",
-        "de": "Fehler: Ungültige Aktion '{}'. Verfügbare Aktionen: 0, 1, 2.",
-        "en": "Error: Invalid action '{}'. Available actions: 0, 1, 2."
-    },
-    "action_input_error": {
-        "ru": "Ошибка ввода действия (возможно, нажат Esc). Считаем 'Прервать'.",
-        "de": "Fehler bei der Aktionseingabe (möglicherweise Esc gedrückt). Als 'Abbrechen' gewertet.",
-        "en": "Action input error (possibly Esc pressed). Considered as 'Abort'."
+    "com_failed": {
+        "ru": "Не удалось установить соединение с AutoCAD",
+        "de": "COM-Verbindung konnte nicht hergestellt werden",
+        "en": "Failed to establish COM connection",
     }
 }
 loc.register_translations(TRANSLATIONS)
-
 
 # -----------------------------
 # Функции ввода
@@ -95,16 +79,14 @@ def at_point_input(adoc: object = None, as_variant: bool = True, prompt: Optiona
     Returns:
         Optional[Union[List[float], VARIANT]]:
             - Точка в виде VARIANT или списка.
-            - None, если выбор отменён или COM потерян окончательно.
+            - None, если выбор отменён или COM потерян.
     """
     try:
         cad = ATCadInit()
-        cad.refresh_active_document()
-
-        adoc = cad.document
-        if not adoc:
-            logging.error("AutoCAD документ не найден или не инициализирован.")
+        if not cad.is_initialized():
+            show_popup(loc.get("error_point_input") + f": {loc.get('com_failed')}", popup_type="error")
             return None
+        adoc = adoc or cad.document
 
         if prompt is None:
             prompt = loc.get("prompt_select_point")
@@ -113,21 +95,8 @@ def at_point_input(adoc: object = None, as_variant: bool = True, prompt: Optiona
         return safe_utility_call(lambda: adoc.Utility.GetPoint(), as_variant=as_variant)
 
     except Exception as e:
-        logging.error(f"{loc.get('error_point_input')}: {e}")
-
-        # Попытка восстановить COM-подключение
-        try:
-            pythoncom.CoInitialize()
-            acad = win32com.client.GetActiveObject("AutoCAD.Application")
-            adoc = acad.ActiveDocument
-            logging.info(loc.get("com_restored").format(adoc.Name))
-
-            adoc.Utility.Prompt(prompt or loc.get("prompt_select_point") + "\n")
-            return safe_utility_call(lambda: adoc.Utility.GetPoint(), as_variant=as_variant)
-
-        except Exception as e2:
-            logging.error(f"Не удалось восстановить COM после потери соединения: {e2}")
-            return None
+        show_popup(loc.get("error_point_input") + f": {str(e)}", popup_type="error")
+        return None
 
 
 def at_entity_input(adoc: object = None, prompt: Optional[str] = None) -> Tuple[Optional[object], Optional[List[float]], bool, bool]:
@@ -147,56 +116,25 @@ def at_entity_input(adoc: object = None, prompt: Optional[str] = None) -> Tuple[
     """
     try:
         cad = ATCadInit()
-        cad.refresh_active_document()
-        adoc = cad.document
-
-        if not adoc:
-            logging.error("AutoCAD документ не найден или не инициализирован.")
+        if not cad.is_initialized():
+            show_popup(loc.get("error_entity_input") + f": {loc.get('com_failed')}", popup_type="error")
             return None, None, False, False
+        adoc = adoc or cad.document
 
         if prompt is None:
             prompt = loc.get("prompt_select_entity")
+
         adoc.Utility.Prompt(prompt + "\n")
-
-        # Непосредственный вызов COM-функции без safe_utility_call
-        try:
-            result = adoc.Utility.GetEntity()
-        except Exception as e:
-            if e.args and e.args[0] == -2147352567:  # ESC
-                return None, None, False, True
-            raise
-
+        result = safe_utility_call(lambda: adoc.Utility.GetEntity())
         if not result or len(result) < 2:
             return None, None, False, True
 
-        entity, picked_point = result
-        # picked_point может быть VARIANT (x, y, z)
-        point_list = list(picked_point) if picked_point is not None else None
-
+        entity, point_list = result
         return entity, point_list, True, False
 
     except Exception as e:
-        logging.error(f"{loc.get('error_entity_input')}: {e}")
-
-        # Попытка восстановления COM
-        try:
-            pythoncom.CoInitialize()
-            acad = win32com.client.GetActiveObject("AutoCAD.Application")
-            adoc = acad.ActiveDocument
-            logging.info(loc.get("com_restored").format(adoc.Name))
-
-            adoc.Utility.Prompt(prompt or loc.get("prompt_select_entity") + "\n")
-            result = adoc.Utility.GetEntity()
-            if not result or len(result) < 2:
-                return None, None, False, True
-
-            entity, picked_point = result
-            point_list = list(picked_point) if picked_point is not None else None
-            return entity, point_list, True, False
-
-        except Exception as e2:
-            logging.error(f"Не удалось восстановить COM после потери соединения: {e2}")
-            return None, None, False, True
+        show_popup(loc.get("error_entity_input") + f": {str(e)}", popup_type="error")
+        return None, None, False, True
 
 
 def at_keyword_input(adoc: object = None,
@@ -213,136 +151,100 @@ def at_keyword_input(adoc: object = None,
         default: Значение по умолчанию (если нажато Enter).
 
     Returns:
-        str: Выбранное ключевое слово, "Esc" — если нажато ESC.
+        str: Выбранное ключевое слово ("Продолжить", "Отменить", "Завершить" или "Esc").
     """
     try:
         cad = ATCadInit()
-        cad.refresh_active_document()
-        adoc = cad.document
-
-        if not adoc:
-            logging.error("AutoCAD документ не найден или не инициализирован.")
+        if not cad.is_initialized():
+            show_popup(loc.get("error_keyword_input") + f": {loc.get('com_failed')}", popup_type="error")
             return "Esc"
+        adoc = adoc or cad.document
 
         if not keywords:
-            keywords = ["Continue", "Finish", "Abort"]
+            keywords = ["Продолжить", "Отменить", "Завершить"] if loc.language == "ru" else ["Next", "Cancel", "Finish"]
         if default is None:
-            default = "Finish"
+            default = keywords[0]  # "Продолжить" или "Next"
 
-        prompt = prompt or f"\n[{ '/'.join(keywords) }] <{default}>: "
+        prompt = prompt or loc.get("prompt_select_action").format(keywords[0], keywords[1], keywords[2])
 
-        adoc.Utility.InitializeUserInput(0, " ".join(keywords))
-        kw = safe_utility_call(lambda: adoc.Utility.GetKeyword(prompt))
-        if not kw:
-            return default
-        return kw
+        adoc.Utility.Prompt(prompt + "\n")
+        response = safe_utility_call(lambda: adoc.Utility.GetString(0, prompt))
+
+        if response is None:
+            return "Esc"
+
+        response = response.strip()
+        try:
+            if response and response[0] in ('0', '1', '2'):
+                response = int(response[0])
+            else:
+                response = int(response) if response else 0
+        except ValueError:
+            if response.lower() in ("", "enter", "cancel"):
+                response = 0
+            else:
+                response = -1
+
+        if response in (0, 1, 2):
+            return keywords[response]
+        return "Esc"
 
     except Exception as e:
-        if e.args and e.args[0] == -2147352567:
-            return "Esc"
-        logging.error(f"{loc.get('error_keyword_input')}: {e}")
-
-        # Попытка восстановления COM
-        try:
-            pythoncom.CoInitialize()
-            acad = win32com.client.GetActiveObject("AutoCAD.Application")
-            adoc = acad.ActiveDocument
-            logging.info(loc.get("com_restored").format(adoc.Name))
-
-            adoc.Utility.InitializeUserInput(0, " ".join(keywords))
-            kw = safe_utility_call(lambda: adoc.Utility.GetKeyword(prompt))
-            if not kw:
-                return default
-            return kw
-
-        except Exception as e2:
-            logging.error(f"Не удалось восстановить COM после потери соединения: {e2}")
-            return "Esc"
+        show_popup(loc.get("error_keyword_input") + f": {str(e)}", popup_type="error")
+        return "Esc"
 
 
 def at_action_input(adoc: object = None, actions: Optional[List[str]] = None) -> Tuple[str, bool, bool]:
     """
     Позволяет пользователю выбрать одно из действий из списка (через GetString с числовым вводом).
-    Работает с поддержкой ESC, ENTER и локализованных подсказок.
 
     Args:
         adoc: Активный документ AutoCAD.
-        actions: Список возможных действий (например: ["Далее", "Назад", "Завершить"] для ru).
+        actions: Список возможных действий (например: ["Продолжить", "Отменить", "Завершить"]).
 
     Returns:
         Tuple[str, bool, bool]:
-            - keyword: выбранное действие ("0", "1", "2" или "" при ESC/Enter),
+            - keyword: выбранное действие ("0", "1", "2" или ""),
             - ok: True если выбор сделан корректно,
             - esc: True если отменено (ESC).
     """
     try:
         cad = ATCadInit()
-        cad.refresh_active_document()
-        adoc = cad.document
-        if not adoc:
-            print("AutoCAD документ не найден или не инициализирован.")
+        if not cad.is_initialized():
+            show_popup(loc.get("error_action_input") + f": {loc.get('com_failed')}", popup_type="error")
             return "", False, True
+        adoc = adoc or cad.document
 
         if not actions:
-            actions = ["Далее", "Назад", "Завершить"] if loc.language == "ru" else ["Next", "Back", "Finish"]
+            actions = ["Продолжить", "Отменить", "Завершить"] if loc.language == "ru" else ["Next", "Cancel", "Finish"]
 
-        # Формируем локализованную подсказку с числами
         prompt = loc.get("prompt_select_action").format(actions[0], actions[1], actions[2])
 
-        # Сбрасываем командную строку
-        adoc.SendCommand("._\n")
-        time.sleep(0.2)  # Задержка для стабилизации
-
-        # Выводим подсказку
         adoc.Utility.Prompt(prompt + "\n")
+        response = safe_utility_call(lambda: adoc.Utility.GetString(0, prompt))
 
-        # Запрашиваем строку и преобразуем в число
-        response = adoc.Utility.GetString(1, prompt).strip()
+        if response is None:
+            return "", False, True
+
+        response = response.strip()
         try:
-            response = int(response) if response else 0
+            if response and response[0] in ('0', '1', '2'):
+                response = int(response[0])
+            else:
+                response = int(response) if response else 0
         except ValueError:
-            response = -1
-        print(loc.get("action_selected").format(response if response != -1 else "<Неверный ввод>"))
+            if response.lower() in ("", "enter", "cancel"):
+                response = 0
+            else:
+                response = -1
 
         if response in (0, 1, 2):
             return str(response), True, False
-        else:
-            print(loc.get("invalid_action").format(response if response != -1 else "<Неверный ввод>"))
-            return "", False, False
+        return "", False, False
 
     except Exception as e:
-        error_code = e.args[0] if e.args else None
-        if error_code == -2147352567:  # ESC
-            print(loc.get("action_input_error"))
-            return "", False, True
-        print(f"Ошибка в at_action_input: {e}")
-
-        # Попытка восстановления COM
-        try:
-            pythoncom.CoInitialize()
-            acad = win32com.client.GetActiveObject("AutoCAD.Application")
-            adoc = acad.ActiveDocument
-            print(loc.get("com_restored").format(adoc.Name))
-
-            adoc.SendCommand("._\n")
-            time.sleep(0.2)
-            adoc.Utility.Prompt(prompt + "\n")
-            response = adoc.Utility.GetString(1, prompt).strip()
-            try:
-                response = int(response) if response else 0
-            except ValueError:
-                response = -1
-            print(loc.get("action_selected").format(response if response != -1 else "<Неверный ввод>"))
-
-            if response in (0, 1, 2):
-                return str(response), True, False
-            else:
-                print(loc.get("invalid_action").format(response if response != -1 else "<Неверный ввод>"))
-                return "", False, False
-
-        except Exception as e2:
-            print(f"Не удалось восстановить COM после потери соединения: {e2}")
-            return "", False, True
+        show_popup(loc.get("error_action_input") + f": {str(e)}", popup_type="error")
+        return "", False, True
 
 
 # -----------------------------
@@ -353,18 +255,17 @@ if __name__ == "__main__":
     doc = cad.document
 
     # Тест запроса точки
-    # point = at_point_input(doc, as_variant=False)
-    # print("Point:", point)
+    point = at_point_input(doc, as_variant=False)
+    print("Point:", point if point else "Failed")
 
     # Тест выбора объекта
-    # entity, point, ok, esc = at_entity_input(doc)
-    # print("Entity:", entity, "Point:", point, "ok:", ok, "esc:", esc)
+    entity, point, ok, esc = at_entity_input(doc)
+    print("Entity:", entity, "Point:", point, "ok:", ok, "esc:", esc)
 
     # Тест ключевого слова
-    # kw = at_keyword_input(doc, "Тест ключевого слова [Yes/No] <Yes>: ", ["Yes", "No"], "Yes")
-    # print("Keyword:", kw)
+    kw = at_keyword_input(doc, keywords=["Продолжить", "Отменить", "Завершить"], default="Продолжить")
+    print("Keyword:", kw)
 
     # Тест выбора действия
-    print("=== Тест выбора действия ===")
-    action, ok, esc = at_action_input(doc, ["Next", "Back", "Finish"])
+    action, ok, esc = at_action_input(doc, ["Продолжить", "Отменить", "Завершить"])
     print("Action:", action, "ok:", ok, "esc:", esc)

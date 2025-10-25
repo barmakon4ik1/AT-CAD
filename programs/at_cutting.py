@@ -1,10 +1,19 @@
-import comtypes.client
-import comtypes.automation
+"""
+Файл: at_cutting.py
+Путь: programs/at_cutting.py
+
+Описание:
+Модуль для выбора полилиний листов в AutoCAD на слое 'SF-TEXT' с созданием рабочей области
+с отступом (margin). Использует shapely для геометрических вычислений и интегрируется с ATCadInit
+для COM-взаимодействия. Поддерживает выбор мышкой и обработку ошибок через show_popup.
+"""
+
+from typing import List, Dict, Any
 from shapely.geometry import Polygon
-import time
-import pythoncom
 from config.at_cad_init import ATCadInit
+from programs.at_input import at_entity_input, at_action_input
 from locales.at_translations import loc
+from windows.at_gui_utils import show_popup
 
 # -----------------------------
 # Локальные переводы модуля
@@ -21,12 +30,12 @@ TRANSLATIONS = {
         "en": "Action [0-Continue/1-Finish/2-Abort] <0>: "
     },
     "select_completed_enter": {
-        "ru": "Выбор завершен (Enter).",
+        "ru": "Выбор завершён (Enter).",
         "de": "Auswahl abgeschlossen (Enter).",
         "en": "Selection completed (Enter)."
     },
     "select_completed_user": {
-        "ru": "Выбор завершен (по выбору пользователя).",
+        "ru": "Выбор завершён (по выбору пользователя).",
         "de": "Auswahl abgeschlossen (durch Benutzerwahl).",
         "en": "Selection completed (by user choice)."
     },
@@ -146,124 +155,134 @@ TRANSLATIONS = {
         "en": "Error: Invalid action '{}'. Available actions: 0, 1, 2."
     }
 }
-# Регистрируем переводы сразу при загрузке модуля
 loc.register_translations(TRANSLATIONS)
 
-def get_user_action(utility):
-    """Запрашивает действие у пользователя через GetKeyword с безопасной обработкой Enter/Esc."""
-    try:
-        # Разрешаем только ключевые слова — Enter не считается пустым вводом
-        utility.InitializeUserInput(0, "Continue Finish Abort")
-        action = utility.GetKeyword("\nДействие [Продолжить/Завершить/Прервать] <Завершить>: ")
+def get_sheets(doc: object, margin: float = 10.0) -> List[Dict[str, Any]]:
+    """
+    Запрашивает у пользователя выбор полилиний на слое 'SF-TEXT' и создаёт рабочие области
+    с отступом margin. Использует at_entity_input и at_action_input для стабильного ввода.
 
-        if not action:
-            # Если пользователь просто нажал Enter — считаем "Finish"
-            return "Finish"
+    Args:
+        doc: Объект активного документа AutoCAD (ActiveDocument).
+        margin: Отступ от краёв полилинии (мм).
 
-        return action
-
-    except Exception as e:
-        # Обработка кода ошибки COM (-2147352567)
-        if e.args and e.args[0] == -2147352567:
-            # Проверим состояние командной строки — если Esc, считаем Abort
-            print("Ошибка ввода действия (возможно, нажат Esc). Считаем 'Прервать'.")
-            return "Abort"
-
-        print(f"Неожиданная ошибка GetKeyword: {e}")
-        return "Abort"
-
-
-def get_sheets(utility, model_space, doc, margin=10.0):
+    Returns:
+        List[Dict[str, Any]]: Список словарей с координатами полилиний и их рабочими областями.
+    """
     sheets = []
-    print(loc.get("select_polyline_prompt"))
-
-    while True:
-        obj, ok, esc = get_entity_safe(utility, "\nВыберите полилинию листа: ")
-
-        if esc:
-            print(loc.get("select_completed_user"))
+    try:
+        if not doc:
+            show_popup(loc.get("critical_selection_error").format("No active document"), popup_type="error")
             return sheets
 
-        if not ok or obj is None:
-            action = get_action(utility, loc)
-            if action == "Finish":
-                print(loc.get("select_completed_user"))
+        utility = doc.Utility
+        show_popup(loc.get("select_polyline_prompt"), popup_type="info")
+
+        while True:
+            entity, _, ok, esc = at_entity_input(doc, prompt=loc.get("select_polyline_prompt"))
+
+            if esc:
+                show_popup(loc.get("select_completed_enter"), popup_type="info")
                 return sheets
-            elif action == "Abort":
-                raise Exception(loc.get("selection_aborted"))
-            continue
 
-        # --- Проверки ---
-        if obj.ObjectName != "AcDbPolyline":
-            print(loc.get("invalid_polyline"))
-            if get_action(utility, loc) == "Abort":
-                raise Exception(loc.get("selection_aborted"))
-            continue
+            if not ok or entity is None:
+                show_popup(loc.get("no_polyline_selected"), popup_type="error")
+                action, ok, esc = at_action_input(doc, actions=["Продолжить", "Завершить", "Прервать"])
+                if not ok or esc:
+                    show_popup(loc.get("action_input_error"), popup_type="error")
+                    return sheets
+                elif action == "1":  # Finish
+                    show_popup(loc.get("select_completed_user"), popup_type="info")
+                    return sheets
+                elif action == "2":  # Abort
+                    show_popup(loc.get("selection_aborted"), popup_type="error")
+                    return sheets
+                continue
 
-        if obj.Layer != "SF-TEXT":
-            print(loc.get("wrong_layer"))
-            if get_action(utility, loc) == "Abort":
-                raise Exception(loc.get("selection_aborted"))
-            continue
+            # Проверки
+            if entity.ObjectName != "AcDbPolyline":
+                show_popup(loc.get("invalid_polyline"), popup_type="error")
+                action, ok, esc = at_action_input(doc, actions=["Продолжить", "Завершить", "Прервать"])
+                if not ok or esc or action == "2":
+                    show_popup(loc.get("selection_aborted"), popup_type="error")
+                    return sheets
+                continue
 
-        if not obj.Closed:
-            print(loc.get("not_closed_polyline"))
-            if get_action(utility, loc) == "Abort":
-                raise Exception(loc.get("selection_aborted"))
-            continue
+            if entity.Layer != "SF-TEXT":
+                show_popup(loc.get("wrong_layer"), popup_type="error")
+                action, ok, esc = at_action_input(doc, actions=["Продолжить", "Завершить", "Прервать"])
+                if not ok or esc or action == "2":
+                    show_popup(loc.get("selection_aborted"), popup_type="error")
+                    return sheets
+                continue
 
-        # --- Геометрия ---
-        coords = [(obj.Coordinates[i], obj.Coordinates[i+1])
-                  for i in range(0, len(obj.Coordinates), 2)]
-        poly = Polygon(coords)
-        inner = poly.buffer(-margin)
+            if not entity.Closed:
+                show_popup(loc.get("not_closed_polyline"), popup_type="error")
+                action, ok, esc = at_action_input(doc, actions=["Продолжить", "Завершить", "Прервать"])
+                if not ok or esc or action == "2":
+                    show_popup(loc.get("selection_aborted"), popup_type="error")
+                    return sheets
+                continue
 
-        if not inner.is_valid or inner.is_empty:
-            print(loc.get("invalid_working_area").format(margin))
-            if get_action(utility, loc) == "Abort":
-                raise Exception(loc.get("selection_aborted"))
-            continue
+            # Геометрия
+            coords = [(entity.Coordinates[i], entity.Coordinates[i + 1])
+                      for i in range(0, len(entity.Coordinates), 2)]
+            poly = Polygon(coords)
+            inner = poly.buffer(-margin)
 
-        sheets.append({"points": coords, "working_area": inner})
-        print(loc.get("sheet_added").format(len(sheets)))
+            if not inner.is_valid or inner.is_empty:
+                show_popup(loc.get("invalid_working_area").format(margin), popup_type="error")
+                action, ok, esc = at_action_input(doc, actions=["Продолжить", "Завершить", "Прервать"])
+                if not ok or esc or action == "2":
+                    show_popup(loc.get("selection_aborted"), popup_type="error")
+                    return sheets
+                continue
 
+            sheets.append({"points": coords, "working_area": inner})
+            show_popup(loc.get("sheet_added").format(len(sheets)), popup_type="info")
 
+    except Exception as e:
+        show_popup(loc.get("critical_selection_error").format(str(e)), popup_type="error")
+        return sheets
 
 def main():
     """
     Основная функция для запуска процесса получения листов в AutoCAD.
     """
-    # Инициализация AutoCAD
     cad = ATCadInit()
     acad = cad.application
     doc = cad.document
     model_space = cad.model_space
-    utility = doc.Utility
 
-    print(loc.get("autocad_version").format(acad.Version))
-    # Установка активного слоя "0"
+    if not cad.is_initialized():
+        show_popup(loc.get("critical_selection_error").format("AutoCAD not initialized"), popup_type="error")
+        return
+
+    show_popup(loc.get("autocad_version").format(acad.Version), popup_type="info")
+
     try:
         doc.ActiveLayer = doc.Layers.Item("0")
-        print(loc.get("active_layer_set"))
+        show_popup(loc.get("active_layer_set"), popup_type="info")
     except Exception as e:
-        print(loc.get("layer_set_error").format(str(e)))
+        show_popup(loc.get("layer_set_error").format(str(e)), popup_type="error")
         raise
 
-    # Получение листов с отступом 10 мм
-    sheets = get_sheets(utility, model_space, doc, margin=10.0)
+    sheets = get_sheets(doc, margin=10.0)
     if not sheets:
-        print(loc.get("no_sheets_selected"))
+        show_popup(loc.get("no_sheets_selected"), popup_type="warning")
     else:
-        print(loc.get("sheet_added").format(len(sheets)))
+        show_popup(loc.get("sheet_added").format(len(sheets)), popup_type="info")
         for i, sheet in enumerate(sheets, 1):
-            print(loc.get("sheet_info").format(i))
-            print(loc.get("sheet_points").format(sheet['points']))
             bounds = sheet['working_area'].bounds
             width = bounds[2] - bounds[0]
             height = bounds[3] - bounds[1]
-            print(loc.get("sheet_working_area").format(bounds, width, height, sheet['working_area'].area))
+            show_popup(
+                loc.get("sheet_info").format(i) + "\n" +
+                loc.get("sheet_points").format(sheet['points']) + "\n" +
+                loc.get("sheet_working_area").format(bounds, width, height, sheet['working_area'].area),
+                popup_type="info"
+            )
 
-    # Восстановление исходного слоя
     cad.restore_original_layer()
 
 
@@ -271,4 +290,4 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        print(loc.get("critical_selection_error").format(str(e)))
+        show_popup(loc.get("critical_selection_error").format(str(e)), popup_type="error")

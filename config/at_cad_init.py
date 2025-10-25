@@ -79,8 +79,8 @@ logging.basicConfig(
     encoding="utf-8"
 )
 
-CAD_READY_TIMEOUT = 20
-CAD_READY_INTERVAL = 0.5
+CAD_READY_TIMEOUT = 5
+CAD_READY_INTERVAL = 0.2
 
 class ATCadInit:
     """
@@ -191,6 +191,7 @@ class ATCadInit:
         """
         try:
             # Пробуем подключиться к существующему процессу AutoCAD
+            # pythoncom.CoInitialize()
             try:
                 self.acad = win32com.client.GetActiveObject("AutoCAD.Application")
                 logging.info(f"AutoCAD версия: {self.acad.Version}")
@@ -236,6 +237,8 @@ class ATCadInit:
             self.adoc = None
             self.model = None
             self.original_layer = None
+        # finally:
+        #     pythoncom.CoUninitialize()
 
     # -----------------------------
     # Служебные методы
