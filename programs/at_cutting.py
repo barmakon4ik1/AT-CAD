@@ -5,11 +5,13 @@
 Описание:
 Модуль для выбора полилиний листов в AutoCAD на слое 'SF-TEXT' с созданием рабочей области
 с отступом (margin). Использует shapely для геометрических вычислений и интегрируется с ATCadInit
-для COM-взаимодействия. Поддерживает выбор мышкой и обработку ошибок через show_popup.
+для COM-взаимодействия. Поддерживает выбор мышкой, проверку замкнутости и обработку ошибок
+через show_popup. Также содержит функцию выбора примитива на слое "0" и поиска объектов
+внутри него без изменения их положения.
 """
 
 from typing import List, Dict, Any
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, Point
 from config.at_cad_init import ATCadInit
 from programs.at_input import at_entity_input, at_action_input
 from locales.at_translations import loc
@@ -19,20 +21,21 @@ from windows.at_gui_utils import show_popup
 # Локальные переводы модуля
 # -----------------------------
 TRANSLATIONS = {
+    "polyline_auto_closed": {
+        "ru": "Полилиния была открыта — замкнута автоматически.",
+        "de": "Polyline war offen – automatisch geschlossen.",
+        "en": "Polyline was open — closed automatically."
+    },
+    "action_continue_word": {"ru": "Продолжить", "de": "Fortfahren", "en": "Continue"},
+    "action_finish_word": {"ru": "Завершить", "de": "Beenden", "en": "Finish"},
+    "action_abort_word": {"ru": "Прервать", "de": "Abbrechen", "en": "Abort"},
     "select_polyline_prompt": {
         "ru": "Выберите полилинию(и) листа на слое 'SF-TEXT'. Нажмите Enter для завершения или Esc для выхода.",
         "de": "Wählen Sie die Polylinie(n) des Blattes auf der Ebene 'SF-TEXT' aus. Drücken Sie Enter zum Abschließen oder Esc zum Beenden.",
         "en": "Select polyline(s) of the sheet on layer 'SF-TEXT'. Press Enter to finish or Esc to exit."
     },
-    "select_polyline_action": {
-        "ru": "Действие [0-Продолжить/1-Завершить/2-Прервать] <0>: ",
-        "de": "Aktion [0-Fortfahren/1-Beenden/2-Abbrechen] <0>: ",
-        "en": "Action [0-Continue/1-Finish/2-Abort] <0>: "
-    },
     "select_completed_enter": {
-        "ru": "Выбор завершён (Enter).",
-        "de": "Auswahl abgeschlossen (Enter).",
-        "en": "Selection completed (Enter)."
+        "ru": "Выбор завершён (Enter).", "de": "Auswahl abgeschlossen (Enter).", "en": "Selection completed (Enter)."
     },
     "select_completed_user": {
         "ru": "Выбор завершён (по выбору пользователя).",
@@ -55,34 +58,19 @@ TRANSLATIONS = {
         "en": "Error: Select a polyline on layer 'SF-TEXT'!"
     },
     "not_closed_polyline": {
-        "ru": "Ошибка: Выберите замкнутую полилинию!",
-        "de": "Fehler: Wählen Sie eine geschlossene Polylinie!",
-        "en": "Error: Select a closed polyline!"
+        "ru": "Ошибка: Полилиния не замкнута!",
+        "de": "Fehler: Polyline ist nicht geschlossen!",
+        "en": "Error: Polyline is not closed!"
     },
     "invalid_working_area": {
-        "ru": "Ошибка: Рабочая область не создана (слишком большой отступ {} мм или некорректная геометрия)",
-        "de": "Fehler: Arbeitsbereich nicht erstellt (zu großer Abstand {} mm oder ungültige Geometrie)",
-        "en": "Error: Working area not created (margin {} mm too large or invalid geometry)"
+        "ru": "Ошибка: Рабочая область не создана (слишком большой отступ {} мм или некорректная геометрия).",
+        "de": "Fehler: Arbeitsbereich nicht erstellt (zu großer Abstand {} mm oder ungültige Geometrie).",
+        "en": "Error: Working area not created (margin {} mm too large or invalid geometry)."
     },
-    "working_area_not_contained": {
-        "ru": "Ошибка: Рабочая область не помещается в лист (площадь {:.2f} мм²)",
-        "de": "Fehler: Arbeitsbereich passt nicht in das Blatt (Fläche {:.2f} mm²)",
-        "en": "Error: Working area does not fit in the sheet (area {:.2f} mm²)"
-    },
-    "invalid_area_size": {
-        "ru": "Ошибка: Площадь рабочей области ({:.2f} мм²) больше или равна площади листа ({:.2f} мм²)",
-        "de": "Fehler: Fläche des Arbeitsbereichs ({:.2f} mm²) ist größer oder gleich der Blattfläche ({:.2f} mm²)",
-        "en": "Error: Working area ({:.2f} mm²) is larger than or equal to sheet area ({:.2f} mm²)"
-    },
-    "action_selected": {
-        "ru": "Выбранное действие: '{}'",
-        "de": "Ausgewählte Aktion: '{}'",
-        "en": "Selected action: '{}'"
-    },
-    "action_input_error": {
-        "ru": "Ошибка ввода действия (возможно, нажат Esc). Считаем 'Прервать'.",
-        "de": "Fehler bei der Aktionseingabe (möglicherweise Esc gedrückt). Als 'Abbrechen' gewertet.",
-        "en": "Action input error (possibly Esc pressed). Considered as 'Abort'."
+    "sheet_added": {
+        "ru": "Лист добавлен: {} лист(ов) выбрано.",
+        "de": "{} Blatt/Blätter hinzugefügt.",
+        "en": "Sheet added: {} selected."
     },
     "selection_aborted": {
         "ru": "Выбор прерван пользователем.",
@@ -94,137 +82,88 @@ TRANSLATIONS = {
         "de": "Auswahl vom Benutzer abgebrochen (Eingabefehler).",
         "en": "Selection aborted by user (input error)."
     },
-    "critical_action_error": {
-        "ru": "Критическая ошибка при выборе действия: {}",
-        "de": "Kritischer Fehler bei der Auswahl der Aktion: {}",
-        "en": "Critical error during action selection: {}"
-    },
     "critical_selection_error": {
         "ru": "Критическая ошибка при выборе: {}",
         "de": "Kritischer Fehler bei der Auswahl: {}",
         "en": "Critical error during selection: {}"
     },
-    "sheet_added": {
-        "ru": "Лист добавлен: {} листов выбрано.",
-        "de": "Blatt hinzugefügt: {} Blätter ausgewählt.",
-        "en": "Sheet added: {} sheets selected."
+    # Примитивы
+    "primitive_prompt": {
+        "ru": "Выберите примитив на слое '{}'. Нажмите Enter для завершения или Esc для выхода.",
+        "de": "Wählen Sie ein Objekt auf Layer '{}' aus. Enter = Fertig, Esc = Abbrechen.",
+        "en": "Select a primitive on layer '{}'. Press Enter to finish or Esc to exit."
     },
-    "no_sheets_selected": {
-        "ru": "Предупреждение: Не выбрано ни одного листа.",
-        "de": "Warnung: Kein Blatt ausgewählt.",
-        "en": "Warning: No sheets selected."
+    "primitive_added": {
+        "ru": "Примитив №{} добавлен. Внутри найдено {} объектов.",
+        "de": "Objekt Nr. {} hinzugefügt. {} Elemente innen gefunden.",
+        "en": "Primitive #{} added. {} objects found inside."
     },
-    "sheet_info": {
-        "ru": "Лист {}:",
-        "de": "Blatt {}:",
-        "en": "Sheet {}:"
+    "primitive_cancelled_esc": {
+        "ru": "Выбор примитивов прерван пользователем (Esc).",
+        "de": "Objektauswahl durch Benutzer (Esc) abgebrochen.",
+        "en": "Primitive selection aborted by user (Esc)."
     },
-    "sheet_points": {
-        "ru": "  Координаты углов: {}",
-        "de": "  Koordinaten der Ecken: {}",
-        "en": "  Corner coordinates: {}"
+    "primitive_completed_enter": {
+        "ru": "Выбор примитивов завершён (Enter).",
+        "de": "Objektauswahl abgeschlossen (Enter).",
+        "en": "Primitive selection completed (Enter)."
     },
-    "sheet_working_area": {
-        "ru": "  Рабочая область: границы {}, размеры {:.2f}x{:.2f} мм, площадь {:.2f} мм²",
-        "de": "  Arbeitsbereich: Grenzen {}, Abmessungen {:.2f}x{:.2f} mm, Fläche {:.2f} mm²",
-        "en": "  Working area: bounds {}, dimensions {:.2f}x{:.2f} mm, area {:.2f} mm²"
+    "primitive_not_on_layer": {
+        "ru": "Ошибка: Примитив не на слое '{}'.",
+        "de": "Fehler: Objekt ist nicht auf Layer '{}'.",
+        "en": "Error: Primitive not on layer '{}'."
     },
-    "sheet_details": {
-        "ru": "Лист: границы {}, размеры {:.2f}x{:.2f} мм, площадь {:.2f} мм²",
-        "de": "Blatt: Grenzen {}, Abmessungen {:.2f}x{:.2f} mm, Fläche {:.2f} mm²",
-        "en": "Sheet: bounds {}, dimensions {:.2f}x{:.2f} mm, area {:.2f} mm²"
-    },
-    "active_layer_set": {
-        "ru": "Активный слой установлен: 0",
-        "de": "Aktiver Layer gesetzt: 0",
-        "en": "Active layer set: 0"
-    },
-    "layer_set_error": {
-        "ru": "Ошибка установки слоя '0': {}",
-        "de": "Fehler beim Setzen des Layers '0': {}",
-        "en": "Error setting layer '0': {}"
-    },
-    "autocad_version": {
-        "ru": "AutoCAD версия: {}",
-        "de": "AutoCAD-Version: {}",
-        "en": "AutoCAD version: {}"
-    },
-    "invalid_action": {
-        "ru": "Ошибка: Неверное действие '{}'. Доступные действия: 0, 1, 2.",
-        "de": "Fehler: Ungültige Aktion '{}'. Verfügbare Aktionen: 0, 1, 2.",
-        "en": "Error: Invalid action '{}'. Available actions: 0, 1, 2."
-    }
 }
 loc.register_translations(TRANSLATIONS)
+
 
 def get_sheets(doc: object, margin: float = 10.0) -> List[Dict[str, Any]]:
     """
     Запрашивает у пользователя выбор полилиний на слое 'SF-TEXT' и создаёт рабочие области
-    с отступом margin. Использует at_entity_input и at_action_input для стабильного ввода.
-
-    Args:
-        doc: Объект активного документа AutoCAD (ActiveDocument).
-        margin: Отступ от краёв полилинии (мм).
-
-    Returns:
-        List[Dict[str, Any]]: Список словарей с координатами полилиний и их рабочими областями.
+    с отступом margin. Автоматически замыкает открытые полилинии.
     """
     sheets = []
     try:
         if not doc:
-            show_popup(loc.get("critical_selection_error").format("No active document"), popup_type="error")
+            show_popup("Нет активного документа.", popup_type="error")
             return sheets
 
-        utility = doc.Utility
-        show_popup(loc.get("select_polyline_prompt"), popup_type="info")
+        # show_popup(loc.get("select_polyline_prompt"), popup_type="info")
 
         while True:
-            entity, _, ok, esc = at_entity_input(doc, prompt=loc.get("select_polyline_prompt"))
+            entity, _, ok, enter, esc = at_entity_input(doc, prompt=loc.get("select_polyline_prompt"))
 
             if esc:
-                show_popup(loc.get("select_completed_enter"), popup_type="info")
-                return sheets
+                show_popup(loc.get("selection_aborted"), popup_type="warning")
+                break
+
+            if enter:
+                if sheets:
+                    show_popup(loc.get("select_completed_enter"), popup_type="info")
+                else:
+                    show_popup(loc.get("no_polyline_selected"), popup_type="warning")
+                break
 
             if not ok or entity is None:
-                show_popup(loc.get("no_polyline_selected"), popup_type="error")
-                action, ok, esc = at_action_input(doc, actions=["Продолжить", "Завершить", "Прервать"])
-                if not ok or esc:
-                    show_popup(loc.get("action_input_error"), popup_type="error")
-                    return sheets
-                elif action == "1":  # Finish
-                    show_popup(loc.get("select_completed_user"), popup_type="info")
-                    return sheets
-                elif action == "2":  # Abort
-                    show_popup(loc.get("selection_aborted"), popup_type="error")
-                    return sheets
+                show_popup(loc.get("no_polyline_selected"), popup_type="warning")
                 continue
 
-            # Проверки
             if entity.ObjectName != "AcDbPolyline":
                 show_popup(loc.get("invalid_polyline"), popup_type="error")
-                action, ok, esc = at_action_input(doc, actions=["Продолжить", "Завершить", "Прервать"])
-                if not ok or esc or action == "2":
-                    show_popup(loc.get("selection_aborted"), popup_type="error")
-                    return sheets
                 continue
 
             if entity.Layer != "SF-TEXT":
                 show_popup(loc.get("wrong_layer"), popup_type="error")
-                action, ok, esc = at_action_input(doc, actions=["Продолжить", "Завершить", "Прервать"])
-                if not ok or esc or action == "2":
-                    show_popup(loc.get("selection_aborted"), popup_type="error")
-                    return sheets
                 continue
 
             if not entity.Closed:
-                show_popup(loc.get("not_closed_polyline"), popup_type="error")
-                action, ok, esc = at_action_input(doc, actions=["Продолжить", "Завершить", "Прервать"])
-                if not ok or esc or action == "2":
-                    show_popup(loc.get("selection_aborted"), popup_type="error")
-                    return sheets
-                continue
+                try:
+                    entity.Closed = True
+                    show_popup(loc.get("polyline_auto_closed"), popup_type="info")
+                except Exception:
+                    show_popup(loc.get("not_closed_polyline"), popup_type="error")
+                    continue
 
-            # Геометрия
             coords = [(entity.Coordinates[i], entity.Coordinates[i + 1])
                       for i in range(0, len(entity.Coordinates), 2)]
             poly = Polygon(coords)
@@ -232,58 +171,140 @@ def get_sheets(doc: object, margin: float = 10.0) -> List[Dict[str, Any]]:
 
             if not inner.is_valid or inner.is_empty:
                 show_popup(loc.get("invalid_working_area").format(margin), popup_type="error")
-                action, ok, esc = at_action_input(doc, actions=["Продолжить", "Завершить", "Прервать"])
-                if not ok or esc or action == "2":
-                    show_popup(loc.get("selection_aborted"), popup_type="error")
-                    return sheets
                 continue
 
             sheets.append({"points": coords, "working_area": inner})
             show_popup(loc.get("sheet_added").format(len(sheets)), popup_type="info")
 
+            # выбор действия
+            action, act_ok, act_esc = at_action_input(
+                doc,
+                actions=[
+                    loc.get("action_continue_word", "Продолжить"),
+                    loc.get("action_finish_word", "Завершить"),
+                    loc.get("action_abort_word", "Прервать"),
+                ],
+            )
+
+            if act_esc:
+                show_popup(loc.get("selection_aborted_input_error"), popup_type="warning")
+                break
+            if not act_ok:
+                show_popup(loc.get("selection_aborted_input_error"), popup_type="warning")
+                break
+
+            if action in (loc.get("action_finish_word"), "Finish", "1"):
+                show_popup(loc.get("select_completed_user"), popup_type="info")
+                break
+            if action in (loc.get("action_abort_word"), "Abort", "2"):
+                show_popup(loc.get("selection_aborted"), popup_type="warning")
+                break
+
+        return sheets
+
     except Exception as e:
         show_popup(loc.get("critical_selection_error").format(str(e)), popup_type="error")
         return sheets
 
-def main():
+
+def get_primitive_with_contents(doc: object, layer: str = "0") -> Dict[str, Any]:
     """
-    Основная функция для запуска процесса получения листов в AutoCAD.
+    Выбирает один или несколько примитивов (полилиния, окружность и т.п.) на указанном слое.
+    После выбора — собирает все объекты, полностью находящиеся внутри контура примитива.
     """
-    cad = ATCadInit()
-    acad = cad.application
-    doc = cad.document
-    model_space = cad.model_space
-
-    if not cad.is_initialized():
-        show_popup(loc.get("critical_selection_error").format("AutoCAD not initialized"), popup_type="error")
-        return
-
-    show_popup(loc.get("autocad_version").format(acad.Version), popup_type="info")
-
+    result = {}
     try:
-        doc.ActiveLayer = doc.Layers.Item("0")
-        show_popup(loc.get("active_layer_set"), popup_type="info")
+        if not doc:
+            show_popup("Нет активного документа.", popup_type="error")
+            return result
+
+        ms = doc.ModelSpace
+        count = 1
+        show_popup(loc.get("primitive_prompt").format(layer), popup_type="info")
+
+        while True:
+            entity, _, ok, enter, esc = at_entity_input(doc, prompt=f"Выберите примитив №{count}")
+
+            if esc:
+                show_popup(loc.get("primitive_cancelled_esc"), popup_type="warning")
+                break
+            if enter:
+                show_popup(loc.get("primitive_completed_enter"), popup_type="info")
+                break
+            if not ok or entity is None:
+                show_popup(loc.get("no_polyline_selected"), popup_type="warning")
+                continue
+
+            if entity.Layer != layer:
+                show_popup(loc.get("primitive_not_on_layer").format(layer), popup_type="error")
+                continue
+
+            if entity.ObjectName == "AcDbPolyline":
+                coords = [(entity.Coordinates[i], entity.Coordinates[i + 1])
+                          for i in range(0, len(entity.Coordinates), 2)]
+                poly = Polygon(coords)
+            elif entity.ObjectName == "AcDbCircle":
+                c = entity.Center
+                poly = Point(c[0], c[1]).buffer(entity.Radius)
+            else:
+                show_popup("Ошибка: выберите полилинию или окружность.", popup_type="error")
+                continue
+
+            inside_objects = []
+            for obj in ms:
+                try:
+                    if obj.ObjectID == entity.ObjectID:
+                        continue
+
+                    shp = None
+                    if hasattr(obj, "Coordinates"):
+                        pts = [(obj.Coordinates[i], obj.Coordinates[i + 1])
+                               for i in range(0, len(obj.Coordinates), 2)]
+                        if len(pts) >= 3:
+                            shp = Polygon(pts)
+                        elif len(pts) == 2:
+                            shp = Point(pts[0][0], pts[0][1]).buffer(0.1)
+                    elif hasattr(obj, "InsertionPoint"):
+                        ip = obj.InsertionPoint
+                        shp = Point(ip[0], ip[1])
+                    elif hasattr(obj, "Center") and hasattr(obj, "Radius"):
+                        c = obj.Center
+                        shp = Point(c[0], c[1]).buffer(obj.Radius)
+
+                    if shp and poly.contains(shp):
+                        inside_objects.append(obj)
+                except Exception:
+                    continue
+
+            result[f"primitive{count}"] = {
+                "primitive": entity,
+                "contents": inside_objects,
+                "bounds": poly.bounds,
+            }
+
+            show_popup(loc.get("primitive_added").format(count, len(inside_objects)), popup_type="info")
+            count += 1
+
+        return result
+
     except Exception as e:
-        show_popup(loc.get("layer_set_error").format(str(e)), popup_type="error")
-        raise
+        show_popup(f"Ошибка при обработке примитивов: {e}", popup_type="error")
+        return {}
+
+
+def main():
+    cad = ATCadInit()
+    doc = cad.document
 
     sheets = get_sheets(doc, margin=10.0)
-    if not sheets:
-        show_popup(loc.get("no_sheets_selected"), popup_type="warning")
-    else:
-        show_popup(loc.get("sheet_added").format(len(sheets)), popup_type="info")
-        for i, sheet in enumerate(sheets, 1):
-            bounds = sheet['working_area'].bounds
-            width = bounds[2] - bounds[0]
-            height = bounds[3] - bounds[1]
-            show_popup(
-                loc.get("sheet_info").format(i) + "\n" +
-                loc.get("sheet_points").format(sheet['points']) + "\n" +
-                loc.get("sheet_working_area").format(bounds, width, height, sheet['working_area'].area),
-                popup_type="info"
-            )
+    print(f"Листы: {sheets}")
 
-    cad.restore_original_layer()
+    primitives = get_primitive_with_contents(doc, layer="0")
+    for name, data in primitives.items():
+        prim = data["primitive"]
+        inside = data["contents"]
+        show_popup(f"{name}: {prim.ObjectName}, внутри {len(inside)} объектов.", popup_type="info")
+        print(prim)
 
 
 if __name__ == "__main__":

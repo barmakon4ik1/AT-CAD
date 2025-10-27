@@ -7,8 +7,11 @@
 Содержит функции для безопасного запроса точки, выбора объекта и выбора ключевых слов.
 Обеспечивает защиту от потери COM-сессии и поддержку локализации.
 """
-
+import logging
 from typing import Optional, List, Union, Tuple
+
+import pythoncom
+import win32com
 from win32com.client import VARIANT
 
 from config.at_cad_init import ATCadInit
@@ -99,42 +102,86 @@ def at_point_input(adoc: object = None, as_variant: bool = True, prompt: Optiona
         return None
 
 
-def at_entity_input(adoc: object = None, prompt: Optional[str] = None) -> Tuple[Optional[object], Optional[List[float]], bool, bool]:
+def at_entity_input(adoc: object = None, prompt: Optional[str] = None) -> Tuple[Optional[object], Optional[List[float]], bool, bool, bool]:
     """
     Безопасно запрашивает у пользователя выбор объекта в AutoCAD через COM-интерфейс.
 
-    Args:
-        adoc: Объект активного документа AutoCAD (ActiveDocument).
-        prompt: Текст приглашения (опционально).
-
     Returns:
-        Tuple[Optional[object], Optional[List[float]], bool, bool]:
-            - Первый элемент: выбранный объект (или None).
-            - Второй элемент: координаты точки выбора [x, y, z] (или None).
-            - Третий элемент: True, если выбор выполнен успешно.
-            - Четвёртый элемент: True, если пользователь нажал ESC или Enter без выбора.
+        Tuple[Optional[object], Optional[List[float]], bool, bool, bool]:
+            - entity: выбранный объект (или None)
+            - point: координаты места щелчка [x,y,z] (или None)
+            - ok: True, если объект выбран корректно
+            - enter: True, если пользователь нажал Enter (без выбора) — это сигнал "завершить выбор"
+            - esc: True, если пользователь нажал Esc (отмена)
     """
     try:
         cad = ATCadInit()
-        if not cad.is_initialized():
-            show_popup(loc.get("error_entity_input") + f": {loc.get('com_failed')}", popup_type="error")
-            return None, None, False, False
-        adoc = adoc or cad.document
+        cad.refresh_active_document()
+        adoc = cad.document
+
+        if not adoc:
+            logging.error("AutoCAD документ не найден или не инициализирован.")
+            return None, None, False, False, False
 
         if prompt is None:
             prompt = loc.get("prompt_select_entity")
-
         adoc.Utility.Prompt(prompt + "\n")
-        result = safe_utility_call(lambda: adoc.Utility.GetEntity())
-        if not result or len(result) < 2:
-            return None, None, False, True
 
-        entity, point_list = result
-        return entity, point_list, True, False
+        # Прямой вызов GetEntity — safe_utility_call универсален, но GetEntity возвращает (entity, point)
+        try:
+            res = adoc.Utility.GetEntity()
+        except Exception as e:
+            hr = getattr(e, "hresult", None)
+            # -2147352567 обычно означает операция отменена (Esc) при COM-вызове
+            if hr == -2147352567:
+                return None, None, False, False, True
+            # другие исключения — логируем и пробуем восстановление ниже
+            logging.warning(f"GetEntity exception: {e}")
+            res = None
+
+        # Если метод вернул значение
+        if res:
+            # Ожидаем кортеж (entity, pickpoint)
+            if isinstance(res, tuple) and len(res) >= 2:
+                entity = res[0]
+                pick = res[1]
+                try:
+                    point = list(pick) if pick is not None else None
+                except Exception:
+                    point = None
+                return entity, point, True, False, False
+            # Если вернули одиночный объект (маловероятно) — считаем выбранным
+            return res, None, True, False, False
+
+        # Если res is None — значит Enter (пользователь нажал Enter без выбора) или метод вернул None
+        # Различим Enter от Esc уже выше по исключению; здесь — считаем Enter.
+        return None, None, False, True, False
 
     except Exception as e:
-        show_popup(loc.get("error_entity_input") + f": {str(e)}", popup_type="error")
-        return None, None, False, True
+        logging.error(f"{loc.get('error_entity_input')}: {e}")
+
+        # Попытка восстановления COM
+        try:
+            pythoncom.CoInitialize()
+            acad = win32com.client.GetActiveObject("AutoCAD.Application")
+            adoc = acad.ActiveDocument
+            logging.info(loc.get("com_restored").format(adoc.Name))
+
+            adoc.Utility.Prompt(prompt or loc.get("prompt_select_entity") + "\n")
+            res = adoc.Utility.GetEntity()
+            if res and isinstance(res, tuple) and len(res) >= 2:
+                entity = res[0]
+                pick = res[1]
+                try:
+                    point = list(pick) if pick is not None else None
+                except Exception:
+                    point = None
+                return entity, point, True, False, False
+            return None, None, False, True, False
+
+        except Exception as e2:
+            logging.error(f"Не удалось восстановить COM после потери соединения: {e2}")
+            return None, None, False, False, True
 
 
 def at_keyword_input(adoc: object = None,
@@ -259,7 +306,7 @@ if __name__ == "__main__":
     print("Point:", point if point else "Failed")
 
     # Тест выбора объекта
-    entity, point, ok, esc = at_entity_input(doc)
+    entity, point, ok, enter, esc = at_entity_input(doc)
     print("Entity:", entity, "Point:", point, "ok:", ok, "esc:", esc)
 
     # Тест ключевого слова
