@@ -83,6 +83,10 @@ DEFAULT_SETTINGS: dict[str, object] = {
     "BUTTON_FONT_COLOR": "white",
 }
 
+# --- Режим взаимодействия с AutoCAD ---
+# Возможные значения: "COM" (через win32com) или "LISP" (через мост bridge.lsp)
+DEFAULT_AUTOCAD_MODE: str = "LISP"
+
 # --- Предопределённые слои AutoCAD ---
 LAYER_DATA: list[dict[str, object]] = [
     {"name": "0", "color": 7, "linetype": "CONTINUOUS", "lineweight": 0.25},
@@ -124,6 +128,31 @@ ERROR_MARK: str = "⚠️"
 # --- Кэш настроек пользователя ---
 _cached_settings: dict[str, object] | None = None
 
+def get_autocad_mode() -> str:
+    """
+    Возвращает текущий режим взаимодействия с AutoCAD: 'COM' или 'LISP'.
+    Значение берётся из user_settings.json, при отсутствии — используется DEFAULT_AUTOCAD_MODE.
+    """
+    try:
+        settings = load_user_settings()
+        mode = settings.get("AUTOCAD_INTERFACE_MODE", DEFAULT_AUTOCAD_MODE)
+        if mode not in ("COM", "LISP"):
+            mode = DEFAULT_AUTOCAD_MODE
+        return mode
+    except Exception:
+        return DEFAULT_AUTOCAD_MODE
+
+
+def set_autocad_mode(mode: str) -> None:
+    """
+    Устанавливает режим взаимодействия с AutoCAD ('COM' или 'LISP')
+    и сохраняет его в user_settings.json.
+    """
+    if mode not in ("COM", "LISP"):
+        return
+    settings = load_user_settings()
+    settings["AUTOCAD_INTERFACE_MODE"] = mode
+    save_user_settings(settings)
 
 def load_user_settings() -> dict[str, object]:
     """
