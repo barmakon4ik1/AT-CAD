@@ -9,7 +9,7 @@ import wx
 import win32com.client
 from config.at_config import *
 from locales.at_translations import loc
-from programs.at_input import at_point_input
+from programs.at_input import at_get_point
 from windows.at_window_utils import (
     CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel,
     create_standard_buttons, adjust_button_widths, update_status_bar_point_selected,
@@ -254,7 +254,7 @@ class RingsContentPanel(BaseContentPanel):
             # Запрос точки через AutoCAD
             main_window = wx.GetTopLevelParent(self)
             main_window.Iconize(True)
-            self.input_point = at_point_input(as_variant=False)  # Возвращаем список [x, y, z]
+            self.input_point = at_get_point(as_variant=False)  # Возвращаем список [x, y, z]
             main_window.Iconize(False)
             main_window.Raise()
             main_window.SetFocus()

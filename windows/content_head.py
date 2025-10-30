@@ -17,7 +17,7 @@ from windows.at_window_utils import (
     create_standard_buttons, adjust_button_widths, update_status_bar_point_selected,
     BaseContentPanel, load_user_settings, load_common_data
 )
-from programs.at_input import at_point_input
+from programs.at_input import at_get_point
 
 # Настройка логирования только для критических ошибок
 logging.basicConfig(
@@ -473,7 +473,7 @@ class HeadContentPanel(BaseContentPanel):
             # Запрашиваем точку вставки, повторяя, пока не получим корректную
             point = None
             while not (isinstance(point, list) and len(point) == 3):
-                point = at_point_input(cad.document, as_variant=False, prompt=loc.get("point_prompt", "Введите точку вставки днища"))
+                point = at_get_point(cad.document, as_variant=False, prompt=loc.get("point_prompt", "Введите точку вставки днища"))
 
             main_window.Iconize(False)
             main_window.Raise()

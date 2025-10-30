@@ -28,7 +28,7 @@ from config.at_config import DEFAULT_TEXT_LAYER, DEFAULT_DIM_OFFSET
 from programs.at_base import regen
 from programs.at_dimension import add_dimension
 from programs.at_geometry import add_rectangle_points, offset_point, polar_point, ensure_point_variant
-from programs.at_input import at_point_input
+from programs.at_input import at_get_point
 from windows.at_gui_utils import show_popup
 from locales.at_translations import loc
 
@@ -700,7 +700,7 @@ def add_text(
 if __name__ == "__main__":
     """
     Тестирование создания текста, окружности, линии, полилинии и прямоугольника
-    с использованием точки, полученной через at_point_input().
+    с использованием точки, полученной через at_get_point().
 
     Порядок:
       1) Проверяется инициализация AutoCAD (должен быть уже запущен).
@@ -715,7 +715,7 @@ if __name__ == "__main__":
         model = cad.model_space
 
         # Запрашиваем точку у пользователя
-        input_point = at_point_input(adoc, prompt=loc.get("select_point", "Укажите центр окружности"))
+        input_point = at_get_point(adoc, prompt=loc.get("select_point", "Укажите центр окружности"))
 
         if input_point:
             try:

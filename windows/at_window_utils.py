@@ -15,7 +15,7 @@ import wx
 from typing import Tuple, Dict, Optional, List
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
-from programs.at_input import at_point_input
+from programs.at_input import at_get_point
 from windows.at_style import style_textctrl, style_combobox, style_radiobutton, style_staticbox, style_label
 from config.at_config import load_user_settings, DEFAULT_SETTINGS, get_setting, ICON_PATH, RESOURCE_DIR
 from config.at_last_input import save_last_input
@@ -678,7 +678,7 @@ class BaseInputWindow(wx.Frame):
         """
         try:
             self.Iconize(True)
-            self.insert_point = at_point_input(self.adoc)
+            self.insert_point = at_get_point(self.adoc)
             update_status_bar_point_selected(self, self.insert_point)
         except Exception as e:
             show_popup(loc.get("point_selection_error", str(e)), popup_type="error")

@@ -32,7 +32,7 @@ from config.at_config import *
 from config.at_last_input import save_last_input
 from locales.at_translations import loc
 from programs.at_construction import at_diameter, at_cone_height, at_steigung
-from programs.at_input import at_point_input
+from programs.at_input import at_get_point
 from windows.at_window_utils import (
     CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel,
     create_standard_buttons, adjust_button_widths, update_status_bar_point_selected,
@@ -774,7 +774,7 @@ class ConeContentPanel(BaseContentPanel):
                 return
 
             try:
-                point = at_point_input(cad.document, as_variant=False,
+                point = at_get_point(cad.document, as_variant=False,
                                        prompt=loc.get("point_prompt", "Введите точку вставки конуса"))
                 if point is None or not (isinstance(point, list) and len(point) == 3):
                     show_popup(loc.get("point_selection_error", "Ошибка выбора точки"), popup_type="error")

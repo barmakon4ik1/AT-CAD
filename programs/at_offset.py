@@ -12,7 +12,7 @@ from programs.at_base import regen
 from programs.at_dimension import add_dimension
 from programs.at_construction import add_text, add_polyline
 from programs.at_geometry import polar_point, offset_point
-from programs.at_input import at_point_input
+from programs.at_input import at_get_point
 
 
 def at_offset(polyline: Any, offset_distance: float, doc: Any, model: Any) -> list[Any] | None:
@@ -47,8 +47,8 @@ if __name__ == "__main__":
     try:
         cad = ATCadInit()
         adoc, model, original_layer = cad.document, cad.model_space, cad.original_layer
-        # Запрашиваем точку у пользователя (at_point_input уже возвращает готовый VARIANT)
-        input_point = at_point_input(cad.document, prompt="Укажите левый нижний угол")
+        # Запрашиваем точку у пользователя (at_get_point уже возвращает готовый VARIANT)
+        input_point = at_get_point(cad.document, prompt="Укажите левый нижний угол")
 
         # Вычисляем дополнительные точки с помощью полярных координат
         point2 = polar_point(input_point, distance=3000, alpha=0)

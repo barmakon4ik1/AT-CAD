@@ -18,7 +18,7 @@ from programs.at_base import regen
 from programs.at_construction import add_text, add_polyline, add_spline
 from programs.at_geometry import ensure_point_variant, polar_point, convert_to_variant_points, circle_center_from_points
 from programs.at_construction import add_line, add_dimension
-from programs.at_input import at_point_input
+from programs.at_input import at_get_point
 from windows.at_gui_utils import show_popup
 from config.at_config import TEXT_HEIGHT_SMALL, DEFAULT_DIM_OFFSET
 
@@ -443,7 +443,7 @@ if __name__ == "__main__":
     model = cad.model_space
 
     input_data = {
-        "insert_point": at_point_input(adoc, prompt=loc.get("select_point", "Укажите центр отвода"), as_variant=False),
+        "insert_point": at_get_point(adoc, prompt=loc.get("select_point", "Укажите центр отвода"), as_variant=False),
         "diameter": 163.3,
         "diameter_main": 800.0,
         "length": 495.0,

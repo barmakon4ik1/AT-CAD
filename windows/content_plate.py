@@ -15,7 +15,7 @@ from windows.at_window_utils import (
     create_standard_buttons, adjust_button_widths, update_status_bar_point_selected,
     BaseContentPanel, load_user_settings, load_common_data
 )
-from programs.at_input import at_point_input
+from programs.at_input import at_get_point
 
 # -----------------------------
 # Локальные переводы модуля
@@ -532,7 +532,7 @@ class PlateContentPanel(BaseContentPanel):
             main_window = wx.GetTopLevelParent(self)
             main_window.Iconize(True)
             cad = ATCadInit()
-            point = at_point_input(cad.document, as_variant=False, prompt="Введите левый нижний угол листа")
+            point = at_get_point(cad.document, as_variant=False, prompt="Введите левый нижний угол листа")
             main_window.Iconize(False)
             main_window.Raise()
             main_window.SetFocus()
@@ -569,7 +569,7 @@ if __name__ == "__main__":
         try:
             # Тестовая точка для имитации ввода
             cad = ATCadInit()
-            point = at_point_input(cad.document, as_variant=False, prompt="Введите левый нижний угол листа")
+            point = at_get_point(cad.document, as_variant=False, prompt="Введите левый нижний угол листа")
             panel.insert_point = point  # Сохраняем точку как список [x, z, y]
             update_status_bar_point_selected(panel, point)
 

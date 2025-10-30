@@ -25,7 +25,7 @@ from config.at_config import *
 from config.at_last_input import save_last_input
 from locales.at_translations import loc
 from programs.at_construction import at_diameter, at_cone_height, at_steigung
-from programs.at_input import at_point_input
+from programs.at_input import at_get_point
 from windows.at_style import style_staticbox, style_combobox, style_label
 from windows.at_window_utils import (
     CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel,
@@ -415,7 +415,7 @@ class ReducerContentPanel(BaseContentPanel):
             cad = ATCadInit()
 
             # 2️⃣ Запрос точки в AutoCAD
-            point = at_point_input(
+            point = at_get_point(
                 cad.document,
                 as_variant=False,
                 prompt=loc.get("point_prompt", "Укажите точку вставки детали")

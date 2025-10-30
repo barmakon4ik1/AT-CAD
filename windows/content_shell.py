@@ -10,7 +10,7 @@ from pathlib import Path
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programs.at_construction import at_diameter
-from programs.at_input import at_point_input
+from programs.at_input import at_get_point
 from windows.at_window_utils import (
     CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel,
     create_standard_buttons, adjust_button_widths, BaseContentPanel,
@@ -948,7 +948,7 @@ class ShellContentPanel(BaseContentPanel):
 
             # Инициализация CAD и выбор точки
             cad = ATCadInit()
-            pt = at_point_input(
+            pt = at_get_point(
                 cad.document,
                 prompt=loc.get("point_prompt", "Введите точку вставки оболочки"),
                 as_variant=False
@@ -1035,7 +1035,7 @@ class ShellContentPanel(BaseContentPanel):
 if __name__ == "__main__":
     """
     Тестовый вызов окна для проверки интерфейса, поведения кнопок и формирования словаря данных.
-    Выполняет явный вызов at_point_input для выбора точки в AutoCAD и выводит словарь данных в исходном виде.
+    Выполняет явный вызов at_get_point для выбора точки в AutoCAD и выводит словарь данных в исходном виде.
     """
     app = wx.App(False)
     frame = wx.Frame(None, title="Тест ShellContentPanel", size=(1000, 700))
@@ -1061,7 +1061,7 @@ if __name__ == "__main__":
     def on_ok_event(event):
         """
         Тестовая функция для обработки нажатия 'ОК'.
-        Выполняет выбор точки через at_point_input, проверяет валидацию данных,
+        Выполняет выбор точки через at_get_point, проверяет валидацию данных,
         вызывает callback и выводит словарь данных.
         """
         try:
@@ -1069,7 +1069,7 @@ if __name__ == "__main__":
                 print("Окно уничтожено перед обработкой ОК")
                 return
 
-            from programs.at_input import at_point_input
+            from programs.at_input import at_get_point
             from config.at_cad_init import ATCadInit
             from windows.at_window_utils import update_status_bar_point_selected
 
@@ -1080,7 +1080,7 @@ if __name__ == "__main__":
             cad = ATCadInit()
             frame.Iconize(True)
             try:
-                pt = at_point_input(cad.document, prompt=loc.get("point_prompt", "Введите точку вставки оболочки"), as_variant=False)
+                pt = at_get_point(cad.document, prompt=loc.get("point_prompt", "Введите точку вставки оболочки"), as_variant=False)
             except Exception as e:
                 show_popup(loc.get("point_selection_error", f"Ошибка выбора точки: {str(e)}"), popup_type="error")
                 pt = None

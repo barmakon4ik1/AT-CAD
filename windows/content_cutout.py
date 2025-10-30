@@ -26,7 +26,7 @@ from pathlib import Path
 
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
-from programs.at_input import at_point_input
+from programs.at_input import at_get_point
 from windows.at_window_utils import (
     CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel,
     create_standard_buttons, adjust_button_widths, BaseContentPanel,
@@ -264,7 +264,7 @@ class CutoutContentPanel(BaseContentPanel):
 
             # Инициализация CAD и выбор точки (гарантированно возвращает точку)
             cad = ATCadInit()
-            pt = at_point_input(
+            pt = at_get_point(
                 cad.document,
                 prompt=loc.get("point_prompt", "Укажите центр выреза"),
                 as_variant=False

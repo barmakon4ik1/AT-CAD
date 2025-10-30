@@ -23,7 +23,7 @@ from programs.at_geometry import (
     circle_center_from_points,
     offset_point,
 )
-from programs.at_input import at_point_input
+from programs.at_input import at_get_point
 from windows.at_gui_utils import show_popup
 
 # Переводы сообщений
@@ -307,7 +307,7 @@ if __name__ == "__main__":
     model = cad.model_space
 
     data = {
-        "insert_point": at_point_input(adoc, prompt=loc.get("select_point", "Укажите центр отвода"), as_variant=False),
+        "insert_point": at_get_point(adoc, prompt=loc.get("select_point", "Укажите центр отвода"), as_variant=False),
         "diameter": 35,
         "diameter_main": 794,
         "offset": 300,

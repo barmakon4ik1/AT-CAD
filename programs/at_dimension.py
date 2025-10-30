@@ -13,7 +13,7 @@
 Зависимости:
     - config.at_cad_init.ATCadInit — инициализация AutoCAD COM API
     - programs.at_base.regen — регенерация чертежа
-    - programs.at_input.at_point_input — запрос точки у пользователя
+    - programs.at_input.at_get_point — запрос точки у пользователя
     - config.at_config — значения по умолчанию (масштаб, отступ, стиль, слой)
     - locales.at_localization_class.loc — локализация
 
@@ -34,7 +34,7 @@ from win32com.client import VARIANT
 
 from config.at_cad_init import ATCadInit
 from programs.at_base import regen
-from programs.at_input import at_point_input
+from programs.at_input import at_get_point
 from config.at_config import (
     DEFAULT_DIM_SCALE,
     DEFAULT_DIM_OFFSET,
@@ -193,9 +193,9 @@ def add_dimension(
     # --- Горизонтальный, вертикальный, линейный ---
     if dim_type in ("H", "V", "L"):
         if start_point is None:
-            start_point = at_point_input(adoc, as_variant=True, prompt=PROMPTS[f"{dim_type}_start"])
+            start_point = at_get_point(adoc, as_variant=True, prompt=PROMPTS[f"{dim_type}_start"])
         if end_point is None:
-            end_point = at_point_input(adoc, as_variant=True, prompt=PROMPTS[f"{dim_type}_end"])
+            end_point = at_get_point(adoc, as_variant=True, prompt=PROMPTS[f"{dim_type}_end"])
         dim_pt = _dim_mid_offset(dim_type, start_point, end_point, offset)
         if dim_type == "L":
             dim_ent = model.AddDimAligned(start_point, end_point, dim_pt)
@@ -206,29 +206,29 @@ def add_dimension(
     # --- Радиус ---
     elif dim_type == "R":
         if start_point is None:
-            start_point = at_point_input(adoc, as_variant=True, prompt=PROMPTS["R_center"])
+            start_point = at_get_point(adoc, as_variant=True, prompt=PROMPTS["R_center"])
         if end_point is None:
-            end_point = at_point_input(adoc, as_variant=True, prompt=PROMPTS["R_point"])
+            end_point = at_get_point(adoc, as_variant=True, prompt=PROMPTS["R_point"])
         dim_ent = model.AddDimRadial(start_point, end_point, _safe_leader_len(leader_len))
 
     # --- Диаметр ---
     elif dim_type == "D":
         if start_point is None:
-            start_point = at_point_input(adoc, as_variant=True, prompt=PROMPTS["D_p1"])
+            start_point = at_get_point(adoc, as_variant=True, prompt=PROMPTS["D_p1"])
         if end_point is None:
-            end_point = at_point_input(adoc, as_variant=True, prompt=PROMPTS["D_p2"])
+            end_point = at_get_point(adoc, as_variant=True, prompt=PROMPTS["D_p2"])
         dim_ent = model.AddDimDiametric(start_point, end_point, _safe_leader_len(leader_len))
 
     # --- Угловой ---
     elif dim_type == "A":
         if start_point is None:
-            start_point = at_point_input(adoc, as_variant=True, prompt=PROMPTS["A_vertex"])
+            start_point = at_get_point(adoc, as_variant=True, prompt=PROMPTS["A_vertex"])
         if end_point is None:
-            end_point = at_point_input(adoc, as_variant=True, prompt=PROMPTS["A_side1"])
+            end_point = at_get_point(adoc, as_variant=True, prompt=PROMPTS["A_side1"])
         if point3 is None:
-            point3 = at_point_input(adoc, as_variant=True, prompt=PROMPTS["A_side2"])
+            point3 = at_get_point(adoc, as_variant=True, prompt=PROMPTS["A_side2"])
         if point4 is None:
-            point4 = at_point_input(adoc, as_variant=True, prompt=PROMPTS["A_arc"])
+            point4 = at_get_point(adoc, as_variant=True, prompt=PROMPTS["A_arc"])
         dim_ent = model.AddDimAngular(start_point, end_point, point3, point4)
 
     else:
