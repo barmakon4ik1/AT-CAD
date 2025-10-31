@@ -196,8 +196,7 @@ class ATCadInit:
                 self.acad = win32com.client.GetActiveObject("AutoCAD.Application")
                 logging.info(f"AutoCAD версия: {self.acad.Version}")
             except Exception:
-                show_popup(loc.get("cad_not_ready"), popup_type="error")
-                logging.info("Автокад не запущен. Сначала запустите Автокад.")
+                logging.info(loc.get("cad_not_ready"))
                 self.acad = None
                 self.adoc = None
                 self.model = None
@@ -206,8 +205,7 @@ class ATCadInit:
 
             # Проверяем готовность объектной модели
             if not self.wait_for_autocad_ready():
-                show_popup(loc.get("cad_not_ready"), popup_type="error")
-                logging.warning("Автокад не готов. Объектная модель недоступна.")
+                logging.warning(loc.get("cad_not_ready"))
                 self.acad = None
                 self.adoc = None
                 self.model = None

@@ -80,7 +80,8 @@ loc.register_translations(_translations)
 def at_get_point(adoc: object = None,
                  as_variant: bool = True,
                  prompt: Optional[str] = None,
-                 use_bridge: bool = False) -> Optional[Union[List[float], VARIANT]]:
+                 use_bridge: bool = False,
+                 suppress_popups: bool = False) -> Optional[Union[List[float], VARIANT]]:
     """
     Запрашивает точку у пользователя.
     Если use_bridge=True — через LISP мост (интерактивный ввод в AutoCAD),
@@ -95,7 +96,8 @@ def at_get_point(adoc: object = None,
         try:
             result = lisp_bridge.send_lisp_command("get_point")
             if not result or "point" not in result:
-                print(loc.get("bridge_error_point"))
+                if not suppress_popups:
+                    print(loc.get("bridge_error_point"))
                 return None
             return result["point"]
         except Exception as e:
@@ -106,12 +108,14 @@ def at_get_point(adoc: object = None,
     try:
         cad = ATCadInit()
         if not cad.is_initialized():
-            show_popup(loc.get("com_failed"), popup_type="error")
+            if not suppress_popups:
+                show_popup(loc.get("com_failed"), popup_type="error")
             return None
 
         adoc = adoc or cad.document
         if not adoc:
-            show_popup(loc.get("com_failed"), popup_type="error")
+            if not suppress_popups:
+                show_popup(loc.get("com_failed"), popup_type="error")
             return None
 
         if prompt is None:
@@ -125,13 +129,15 @@ def at_get_point(adoc: object = None,
 
     except Exception as e:
         logging.error(f"Ошибка COM-ввода точки: {e}")
-        show_popup(f"{loc.get('bridge_error_point')}: {e}", popup_type="error")
+        if not suppress_popups:
+            show_popup(f"{loc.get('bridge_error_point')}: {e}", popup_type="error")
         return None
 
 
 def at_get_entity(adoc: object = None,
                   prompt: Optional[str] = None,
-                  use_bridge: bool = True) -> Tuple[Optional[object], Optional[List[float]], bool, bool, bool]:
+                  use_bridge: bool = True,
+                  suppress_popups: bool = False) -> Tuple[Optional[object], Optional[List[float]], bool, bool, bool]:
     """
     Запрашивает объект у пользователя.
     Если use_bridge=True — через LISP мост (интерактивный ввод в AutoCAD),
@@ -156,7 +162,8 @@ def at_get_entity(adoc: object = None,
             cad.refresh_active_document()
             adoc = cad.document
             if not adoc:
-                show_popup(loc.get("com_failed"), popup_type="error")
+                if not suppress_popups:
+                    show_popup(loc.get("com_failed"), popup_type="error")
                 return None, None, False, False, True
 
             if prompt is None:
