@@ -169,13 +169,6 @@ class BranchWindow(wx.Dialog):
         adjust_button_widths(self.buttons)
         left_panel_sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
 
-        # Кнопка "Наличие отвода" — тоже на левой панели
-        self.branch_button = wx.Button(left_panel_container, label=loc.get("branch_button", "Наличие отвода"))
-        self.branch_button.SetBackgroundColour(wx.Colour(0, 102, 204))
-        self.branch_button.SetForegroundColour(wx.Colour(255, 255, 255))
-        self.branch_button.SetFont(get_standard_font())
-        left_panel_sizer.Add(self.branch_button, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
-
         # ------------------ Правая панель (статик-бокс + таблица + контролы) ------------------
         branch_box = wx.StaticBox(right_panel_container, label=loc.get("branch_params_label", "Параметры отвода"))
         style_staticbox(branch_box)
