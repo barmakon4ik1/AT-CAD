@@ -417,13 +417,13 @@ def at_nozzle(data: Dict[str, Any]) -> bool:
                 )
                 return False
 
-        # _, top_quarter_variant, (x_quarter, y_quarter) = get_profile_point(
-        #     insert_point, width, generatrix_length, accuracy, 1 / 4
-        # )
-        # mat_point = polar_point(insert_point, distance=(y_quarter + 30), alpha=90, as_variant=False)
-        # mat_point = ensure_point_variant(mat_point)
-        # mat_text = loc.get("material_text").format(thickness, material)
-        # add_text(model, mat_point, mat_text, layer_name="AM_5", text_alignment=0)
+        _, top_quarter_variant, (x_quarter, y_quarter) = get_profile_point(
+            insert_point, width, generatrix_length, accuracy, 1 / 4
+        )
+        mat_point = polar_point(insert_point, distance=(y_quarter + 30), alpha=90, as_variant=False)
+        mat_point = ensure_point_variant(mat_point)
+        mat_text = loc.get("material_text").format(thickness, material)
+        add_text(model, mat_point, mat_text, layer_name="AM_5", text_alignment=0)
 
 
         regen(adoc)

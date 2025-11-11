@@ -75,6 +75,11 @@ TRANSLATIONS = {
     "mode_bulge": {"ru": "Дуги", "de": "Bogen", "en": "Bulge"},
     "mode_polyline": {"ru": "Полилиния", "de": "Polylinie", "en": "Polyline"},
     "mode_spline": {"ru": "Сплайн", "de": "Spline", "en": "Spline"},
+    "confirm_cancel_message": {
+        "ru": "Вы действительно хотите отменить? Данные не сохранятся!",
+        "en": "Are you sure you want to cancel? Unsaved data will be lost!",
+        "de": "Möchten Sie wirklich abbrechen? Nicht gespeicherte Daten gehen verloren!"
+    },
     "steps_label": {"ru": "Точность (точек)", "de": "Genauigkeit (Punkte)", "en": "Steps (points)"}
 }
 
@@ -516,12 +521,33 @@ class BranchWindow(wx.Dialog):
     def on_cancel(self, event: wx.Event):
         """
         Обрабатывает нажатие кнопки "Возврат" или закрытие окна.
-        Закрывает окно с результатом wx.ID_CANCEL.
-
-        Args:
-            event (wx.Event): Событие нажатия кнопки или закрытия окна.
+        Перед закрытием спрашивает подтверждение, чтобы избежать потери несохранённых данных.
         """
-        self.EndModal(wx.ID_CANCEL)
+        confirm_message = loc.get(
+            "confirm_cancel_message",
+            "Вы действительно хотите отменить? Данные не сохранятся!"
+        )
+        confirm_title = loc.get("cancel_button", "Отмена")
+
+        dlg = wx.MessageDialog(
+            self,
+            confirm_message,
+            confirm_title,
+            style=wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING
+        )
+
+        try:
+            result = dlg.ShowModal()
+        finally:
+            dlg.Destroy()
+
+        # Разрешаем закрытие только если пользователь подтвердил
+        if result in (wx.ID_YES, wx.ID_OK):
+            self.EndModal(wx.ID_CANCEL)
+        else:
+            # Пользователь отказался — просто остаёмся в окне
+            return
+
 
 
 class ShellContentPanel(BaseContentPanel):

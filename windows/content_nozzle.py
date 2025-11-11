@@ -59,6 +59,7 @@ TRANSLATIONS = {
     "thickness_label": {"ru": "Толщина, S", "de": "Dicke, S", "en": "Thickness, S"},
     "nozzle_params_label": {"ru": "Параметры отвода", "de": "Stutzenparameter", "en": "Nozzle Params"},
     "diameter_label": {"ru": "Диаметр, d", "de": "Durchmesser, d", "en": "Diameter, d"},
+    "diameter": {"ru": "Диаметр, d", "de": "Durchmesser, d", "en": "Diameter, d"},
     "diameter_main_label": {"ru": "Диаметр магистрали, D", "de": "Main Durchmesser, D", "en": "Main Diameter, D"},
     "length_label": {"ru": "Длина, L", "de": "Länge, L", "en": "Length, L"},
     "weld_allowance_label": {"ru": "Припуск на сварку", "de": "Schweißnahtzugabe", "en": "Weld Allowance"},

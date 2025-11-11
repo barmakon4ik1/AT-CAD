@@ -16,6 +16,7 @@ from typing import Tuple, Dict, Optional, List
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programs.at_input import at_get_point
+from windows.at_gui_utils import show_popup
 from windows.at_style import style_textctrl, style_combobox, style_radiobutton, style_staticbox, style_label
 from config.at_config import load_user_settings, DEFAULT_SETTINGS, get_setting, ICON_PATH, RESOURCE_DIR
 from config.at_last_input import save_last_input
@@ -94,6 +95,11 @@ TRANSLATIONS = {
         "ru": "Тестовый текст",
         "de": "Beispieltext",
         "en": "Test text"
+    },
+    "confirm_cancel_message": {
+        "ru": "Вы действительно хотите отменить? Данные не сохранятся!",
+        "en": "Are you sure you want to cancel? Unsaved data will be lost!",
+        "de": "Möchten Sie wirklich abbrechen? Nicht gespeicherte Daten gehen verloren!"
     },
     "test_window": {
         "ru": "Тестовое окно",
@@ -183,13 +189,38 @@ class BaseContentPanel(wx.Panel):
 
     def on_cancel(self, event: wx.Event, switch_content: Optional[str] = "content_apps") -> None:
         """
-        Переключает контент на указанную панель (по умолчанию content_apps).
-
+        Переключает контент на указанную панель с подтверждением (если отказ — остаёмся).
         Args:
             event: Событие wxPython.
             switch_content: Имя контента для переключения.
         """
-        self.switch_content_panel(switch_content)
+        confirm_message = loc.get(
+            "confirm_cancel_message",
+            "Вы действительно хотите отменить? Данные не сохранятся!"
+        )
+        confirm_title = loc.get("cancel_button", "Отмена")
+
+        dlg = wx.MessageDialog(
+            self,
+            confirm_message,
+            confirm_title,
+            style=wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING
+        )
+
+        try:
+            result = dlg.ShowModal()
+        finally:
+            dlg.Destroy()
+
+        if result in (wx.ID_YES, wx.ID_OK):
+            # Подтвердили — переключаем контент
+            try:
+                self.switch_content_panel(switch_content)
+            except Exception as e:
+                show_popup(loc.get("error", f"Ошибка переключения контента: {str(e)}"), popup_type="error")
+        else:
+            # Отказ пользователя — остаёмся на текущей панели
+            return
 
     def collect_input_data(self) -> Dict:
         """
@@ -359,17 +390,17 @@ def save_last_input(filename: str, data: Dict) -> None:
         logging.error(f"Ошибка сохранения {abs_path}: {e}")
 
 
-def show_popup(message: str, popup_type: str = "info") -> None:
-    """
-    Отображает всплывающее окно с сообщением.
-
-    Args:
-        message (str): Текст сообщения.
-        popup_type (str): Тип сообщения ("info" для информационного, "error" для ошибки).
-    """
-    title = loc.get(popup_type, popup_type.capitalize())
-    style = wx.OK | (wx.ICON_INFORMATION if popup_type == "info" else wx.ICON_ERROR)
-    wx.MessageBox(message, title, style)
+# def show_popup(message: str, popup_type: str = "info") -> None:
+#     """
+#     Отображает всплывающее окно с сообщением.
+#
+#     Args:
+#         message (str): Текст сообщения.
+#         popup_type (str): Тип сообщения ("info" для информационного, "error" для ошибки).
+#     """
+#     title = loc.get(popup_type, popup_type.capitalize())
+#     style = wx.OK | (wx.ICON_INFORMATION if popup_type == "info" else wx.ICON_ERROR)
+#     wx.MessageBox(message, title, style)
 
 
 def get_standard_font() -> wx.Font:
@@ -610,17 +641,48 @@ class BaseInputWindow(wx.Frame):
 
     def on_cancel(self, event: wx.Event) -> None:
         """
-        Отменяет ввод, закрывает окно и восстанавливает родительское окно.
+        Отменяет ввод с подтверждением. При подтверждении — закрывает окно и восстанавливает родительское окно.
 
         Args:
             event: Событие кнопки (wx.EVT_BUTTON).
         """
-        self.result = None
-        if self.GetParent():
-            self.GetParent().Iconize(False)
-            self.GetParent().Raise()
-            self.GetParent().SetFocus()
-        self.Close()
+        confirm_message = loc.get(
+            "confirm_cancel_message",
+            "Вы действительно хотите отменить? Данные не сохранятся!"
+        )
+        confirm_title = loc.get("cancel_button", "Отмена")
+
+        dlg = wx.MessageDialog(
+            self,
+            confirm_message,
+            confirm_title,
+            style=wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING
+        )
+
+        try:
+            result = dlg.ShowModal()
+        finally:
+            dlg.Destroy()
+
+        # Учитываем как wx.ID_YES, так и wx.ID_OK (безопасно для разных платформ/тем)
+        if result in (wx.ID_YES, wx.ID_OK):
+            self.result = None
+            parent = wx.GetTopLevelParent(self)
+            # Попробуем восстановить родительское окно, если это Frame
+            if parent and parent is not self:
+                try:
+                    if hasattr(parent, "Iconize"):
+                        parent.Iconize(False)
+                    parent.Raise()
+                    parent.SetFocus()
+                except Exception:
+                    # Игнорируем любые ошибки при попытке восстановить родителя
+                    pass
+            # Закрываем текущее окно (Frame)
+            self.Close()
+            return
+        # Пользователь отказался — просто возвращаемся, ничего не пропуская дальше
+        return
 
     def on_close(self, event: wx.Event) -> None:
         """
@@ -871,7 +933,7 @@ if __name__ == "__main__":
 
     # Тест кнопок
     def on_ok(event):
-        show_popup(loc.get("info", "Кнопка ОК нажата"), popup_type="info")
+        frame.on_ok(event)
 
 
     def on_cancel(event):
