@@ -1,13 +1,6 @@
 # ================================================================
-# Файл: programs/at_input.py
+# Файл: programs/at_input.py  (обновлённая версия)
 # Назначение: Прослойка для ввода данных из AutoCAD (точки, объекты, числа, действия)
-# Описание:
-#     Модуль объединяет функции ввода, которые могут работать
-#     либо через COM (основной способ), либо через мост AutoLISP
-#     (LISP Bridge), если COM недоступен или требуется интерактивный ввод.
-#
-#     Язык локализации читается из config/user_language.json.
-#     Локализация управляется через locales/at_translations.py.
 # ================================================================
 
 import logging
@@ -19,7 +12,6 @@ from locales.at_translations import loc
 from programs import lisp_bridge
 from programs.at_com_utils import safe_utility_call
 from windows.at_gui_utils import show_popup
-
 
 # ================================================================
 # Локальные переводы модуля
@@ -70,8 +62,51 @@ _translations = {
         "de": "Ungültige Eingabe.",
         "en": "Invalid input.",
     },
+    "bridge_load_failed": {
+        "ru": "Не удалось загрузить LISP-модуль моста.",
+        "de": "LISP-Bridge konnte nicht geladen werden.",
+        "en": "Failed to load LISP bridge module.",
+    },
 }
 loc.register_translations(_translations)
+
+# ================================================================
+# Вспомогательные функции
+# ================================================================
+def _ensure_lisp_loaded(suppress_logs: bool = False) -> bool:
+    """
+    Пытается убедиться, что LISP-функции моста загружены в AutoCAD.
+    Возвращает True, если, похоже, мост готов к использованию.
+    Поддерживает несколько контрактов для programs.lisp_bridge:
+      - lisp_bridge.ensure_lisp_loaded()
+      - lisp_bridge.load_lisp()
+      - lisp_bridge.send_lisp_command("load_lisp")
+    Если ничего не найдено — логируем и возвращаем False.
+    """
+    try:
+        if hasattr(lisp_bridge, "ensure_lisp_loaded") and callable(lisp_bridge.ensure_lisp_loaded):
+            return bool(lisp_bridge.ensure_lisp_loaded())
+        if hasattr(lisp_bridge, "load_lisp") and callable(lisp_bridge.load_lisp):
+            return bool(lisp_bridge.load_lisp())
+        # fallback: try to call a nominal command that мост может понимать
+        if hasattr(lisp_bridge, "send_lisp_command") and callable(lisp_bridge.send_lisp_command):
+            try:
+                # попытка вызвать специализированную команду "load_lisp" у моста
+                resp = lisp_bridge.send_lisp_command("load_lisp")
+                # ожидаем хоть какое-то подтверждение
+                return bool(resp)
+            except Exception:
+                # последний шанс: проверить есть ли уже функции (get_point)
+                try:
+                    test = lisp_bridge.send_lisp_command("ping")  # если мост умеет отвечать
+                    return True
+                except Exception:
+                    pass
+    except Exception as e:
+        if not suppress_logs:
+            logging.debug(f"_ensure_lisp_loaded exception: {e}")
+    # не смогли явно загрузить — возвращаем False
+    return False
 
 
 # ================================================================
@@ -94,14 +129,28 @@ def at_get_point(adoc: object = None,
     # --- Режим моста ---
     if use_bridge:
         try:
+            ok = _ensure_lisp_loaded()
+            if not ok:
+                logging.debug("LISP bridge не подтверждён как загруженный.")
             result = lisp_bridge.send_lisp_command("get_point")
-            if not result or "point" not in result:
+            if not result:
                 if not suppress_popups:
                     print(loc.get("bridge_error_point"))
                 return None
-            return result["point"]
+            # result может быть словарём с ключом 'point' или прямым списком
+            if isinstance(result, dict):
+                pt = result.get("point") or result.get("pick") or result.get("p")
+            else:
+                pt = result
+            if not pt:
+                if not suppress_popups:
+                    print(loc.get("bridge_error_point"))
+                return None
+            return list(pt) if isinstance(pt, (list, tuple)) else pt
         except Exception as e:
-            logging.error(f"Ошибка при получении точки (мост): {e}")
+            logging.error(f"Ошибка при получении точки (мост): {e}", exc_info=True)
+            if not suppress_popups:
+                show_popup(f"{loc.get('bridge_error_point')}\n{e}", popup_type="error")
             return None
 
     # --- Режим COM ---
@@ -121,14 +170,37 @@ def at_get_point(adoc: object = None,
         if prompt is None:
             prompt = loc.get("select_point_prompt")
 
-        adoc.Utility.Prompt(prompt + "\n")
+        # Вывод промпта и попытка фокусировки UI
+        try:
+            adoc.Utility.Prompt(prompt + "\n")
+        except Exception:
+            # не критично
+            pass
 
-        # Вызов безопасного COM-ввода
+        try:
+            app = adoc.Application
+            # явная попытка сделать приложение видимым и восстановить окно
+            try:
+                app.Visible = True
+                # окно: 1=min,2=max,3=normal — некоторым версиям нужен другой набор, поэтому в try
+                app.WindowState = 3
+            except Exception:
+                pass
+            # пробуем GetString для фокусировки командной строки (не критично)
+            try:
+                adoc.Utility.GetString("")
+            except Exception:
+                pass
+        except Exception:
+            # если нет Application — не фатально
+            pass
+
+        # безопасный вызов GetPoint через обёртку
         point = safe_utility_call(lambda: adoc.Utility.GetPoint(), as_variant=as_variant)
         return point
 
     except Exception as e:
-        logging.error(f"Ошибка COM-ввода точки: {e}")
+        logging.error(f"Ошибка COM-ввода точки: {e}", exc_info=True)
         if not suppress_popups:
             show_popup(f"{loc.get('bridge_error_point')}: {e}", popup_type="error")
         return None
@@ -146,42 +218,83 @@ def at_get_entity(adoc: object = None,
     Возвращает:
         (entity, pick_point, ok, cancelled, error)
     """
+    # --- режим LISP-моста ---
     if use_bridge:
         try:
+            ok = _ensure_lisp_loaded()
+            if not ok:
+                logging.debug("LISP bridge не подтверждён как загруженный перед get_entity.")
             result = lisp_bridge.send_lisp_command("get_entity")
-            if not result or "entity" not in result:
-                print(loc.get("bridge_error_entity"))
-                return None, None, False, False, True
-            return result["entity"], None, True, False, False
-        except Exception as e:
-            logging.error(f"Ошибка при получении объекта через мост: {e}")
-            return None, None, False, False, True
-    else:
-        try:
-            cad = ATCadInit()
-            cad.refresh_active_document()
-            adoc = cad.document
-            if not adoc:
+            if not result:
                 if not suppress_popups:
-                    show_popup(loc.get("com_failed"), popup_type="error")
+                    print(loc.get("bridge_error_entity"))
                 return None, None, False, False, True
 
-            if prompt is None:
-                prompt = loc.get("select_entity_prompt")
+            # Возможные форматы результата:
+            #  - dict: {'entity': <handle/oid/...>, 'pick': [x,y,z]}
+            #  - tuple/list: (entity, pick)
+            if isinstance(result, dict):
+                entity = result.get("entity") or result.get("ent") or result.get("handle")
+                pick = result.get("pick") or result.get("point") or result.get("p")
+            elif isinstance(result, (list, tuple)) and len(result) >= 1:
+                entity = result[0]
+                pick = result[1] if len(result) > 1 else None
+            else:
+                entity = result
+                pick = None
 
+            if not entity:
+                if not suppress_popups:
+                    print(loc.get("bridge_error_entity"))
+                return None, None, False, False, True
+
+            pick_point = list(pick) if isinstance(pick, (list, tuple)) else None
+            return entity, pick_point, True, False, False
+
+        except Exception as e:
+            logging.error(f"Ошибка при получении объекта через мост: {e}", exc_info=True)
+            if not suppress_popups:
+                show_popup(f"{loc.get('bridge_error_entity')}\n{e}", popup_type="error")
+            return None, None, False, False, True
+
+    # --- режим COM ---
+    try:
+        cad = ATCadInit()
+        cad.refresh_active_document()
+        adoc = adoc or cad.document
+        if not adoc:
+            if not suppress_popups:
+                show_popup(loc.get("com_failed"), popup_type="error")
+            return None, None, False, False, True
+
+        if prompt is None:
+            prompt = loc.get("select_entity_prompt")
+
+        try:
             adoc.Utility.Prompt(prompt + "\n")
+        except Exception:
+            pass
 
-            res = adoc.Utility.GetEntity()
-            if res and isinstance(res, tuple) and len(res) >= 2:
-                entity = res[0]
-                pick = res[1]
-                point = list(pick) if pick is not None else None
-                return entity, point, True, False, False
+        # безопасный вызов GetEntity
+        res = safe_utility_call(lambda: adoc.Utility.GetEntity(), as_variant=False)
+        # res может быть None, или кортеж (entity, pick), или объект/ошибка
+        if res and isinstance(res, tuple) and len(res) >= 2:
+            entity = res[0]
+            pick = res[1]
+            point = list(pick) if pick is not None else None
+            return entity, point, True, False, False
+        # если res == None — отмена
+        if res is None:
             return None, None, False, True, False
 
-        except Exception as e:
-            logging.error(f"Ошибка при выборе объекта через COM: {e}")
-            return None, None, False, False, True
+        # если вернулся один объект (редко) — считаем успехом без pick
+        return res, None, True, False, False
+
+    except Exception as e:
+        logging.error(f"Ошибка при выборе объекта через COM: {e}", exc_info=True)
+        if not suppress_popups:
+            show_popup(f"{loc.get('bridge_error_entity')}: {e}", popup_type="error")
+        return None, None, False, False, True
 
 
 # ================================================================

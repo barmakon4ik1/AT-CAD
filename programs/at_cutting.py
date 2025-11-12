@@ -13,7 +13,7 @@
 from typing import List, Dict, Any
 from shapely.geometry import Polygon, Point
 from config.at_cad_init import ATCadInit
-from programs.at_input import at_entity_input, at_action_input
+from programs.at_input import at_get_entity, action_input
 from locales.at_translations import loc
 from windows.at_gui_utils import show_popup
 
@@ -131,7 +131,7 @@ def get_sheets(doc: object, margin: float = 10.0) -> List[Dict[str, Any]]:
         # show_popup(loc.get("select_polyline_prompt"), popup_type="info")
 
         while True:
-            entity, _, ok, enter, esc = at_entity_input(doc, prompt=loc.get("select_polyline_prompt"))
+            entity, _, ok, enter, esc = at_get_entity(doc, prompt=loc.get("select_polyline_prompt"))
 
             if esc:
                 show_popup(loc.get("selection_aborted"), popup_type="warning")
@@ -177,7 +177,7 @@ def get_sheets(doc: object, margin: float = 10.0) -> List[Dict[str, Any]]:
             show_popup(loc.get("sheet_added").format(len(sheets)), popup_type="info")
 
             # выбор действия
-            action, act_ok, act_esc = at_action_input(
+            action, act_ok, act_esc = action_input(
                 doc,
                 actions=[
                     loc.get("action_continue_word", "Продолжить"),
@@ -223,7 +223,7 @@ def get_primitive_with_contents(doc: object, layer: str = "0") -> Dict[str, Any]
         show_popup(loc.get("primitive_prompt").format(layer), popup_type="info")
 
         while True:
-            entity, _, ok, enter, esc = at_entity_input(doc, prompt=f"Выберите примитив №{count}")
+            entity, _, ok, enter, esc = at_get_entity(doc, prompt=f"Выберите примитив №{count}")
 
             if esc:
                 show_popup(loc.get("primitive_cancelled_esc"), popup_type="warning")
