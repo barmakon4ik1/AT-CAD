@@ -16,6 +16,7 @@ from programs.at_construction import (
     add_line,
     add_spline,
     add_text,
+    add_circle,
 )
 from programs.at_geometry import (
     ensure_point_variant,
@@ -56,6 +57,9 @@ TRANSLATIONS = {
 }
 loc.register_translations(TRANSLATIONS)
 
+# Глобальные настройки
+DIAMETER_SMALL = 60.3 # Максимальный диаметр отвода, который будет еше отображаться окружностью, вместо полилинии
+RATIO = 5 # отношение диаметров для упрощения отображения отвода - окружность или полилиния
 
 def compute_cyl_cyl_intersection_unwrap(
     R: float,
@@ -200,9 +204,12 @@ def at_cutout(data: Dict[str, Any]) -> Dict[str, Any]:
       - diameter_main: диаметр основной трубы (R*2)
       - offset: смещение (по смыслу функции) — если не задано, 0
       - steps: число шагов дискретизации
-      - layer_name: имя слоя
+      - layer_name: имя слоя (используется для результата)
       - mode: 'polyline'|'bulge'|'spline'
       - text: подпись
+    Поведение:
+      - если diameter <= 60.3 или diameter_main / diameter >= 5.0 => рисуем окружность радиуса r
+      - иначе => вычисляем развёртку и рисуем полилинию/сплайн/с bulge
     """
     try:
         cad = ATCadInit()
@@ -221,6 +228,7 @@ def at_cutout(data: Dict[str, Any]) -> Dict[str, Any]:
         steps = int(data.get("steps", 2048))
         mode = data.get("mode", "bulge").lower()
         text = data.get("text", "")
+        layer_name = data.get("layer_name", "0")
 
         # Минимальная валидация
         if diameter <= 0 or diameter_main <= 0:
@@ -232,49 +240,83 @@ def at_cutout(data: Dict[str, Any]) -> Dict[str, Any]:
         R = diameter_main / 2.0
         x0, y0 = insert_point[0], insert_point[1]
 
-        # Контрольные линии (для наглядности в CAD)
-        center_s = R * math.asin(offset / R) if abs(offset / R) <= 1 else offset
-        p_top = ensure_point_variant([x0 + center_s, y0 + r, 0.0])
-        p_bottom = ensure_point_variant([x0 + center_s, y0 - r, 0.0])
-        p_left = ensure_point_variant([x0 + center_s - 1.3 * r, y0, 0.0])
-        p_right = ensure_point_variant([x0 + center_s + 1.3 * r, y0, 0.0])
+        # Контрольные линии (оставим — это не круги, они помогают понять ориентацию)
         try:
+            center_s = R * math.asin(offset / R) if abs(offset / R) <= 1 else offset
+            p_top = ensure_point_variant([x0 + center_s, y0 + r, 0.0])
+            p_bottom = ensure_point_variant([x0 + center_s, y0 - r, 0.0])
+            p_left = ensure_point_variant([x0 + center_s - 1.3 * r, y0, 0.0])
+            p_right = ensure_point_variant([x0 + center_s + 1.3 * r, y0, 0.0])
             add_dimension(adoc, "V", p_bottom, p_top, offset=r + 100)
             add_line(model, p_bottom, p_top, layer_name="AM_7")
             add_line(model, p_left, p_right, layer_name="AM_7")
         except Exception:
-            # не критично: если у пользователя нет интерфейса размеров — продолжаем
+            # не критично
             pass
 
-        # Сопроводительный текст
+        # Сопроводительный текст (по возможности)
         try:
             point_text = ensure_point_variant(offset_point(insert_point, 20, 20))
             add_text(model, point_text, text, layer_name="AM_5", text_height=30)
         except Exception:
             pass
 
-        # Основная геометрия
+        # --- Упрощённый режим: рисуем окружность, если маленький диаметр или большой разрыв ---
+        try:
+            ratio = float(diameter_main / diameter) if diameter != 0 else float('inf')
+        except Exception:
+            ratio = float('inf')
+
+        if offset == 0:
+            # Условия: диаметр отвода <= 60.3 мм ИЛИ отношение >= 5.0
+            if diameter <= DIAMETER_SMALL or ratio >= RATIO:
+                try:
+                    # Рисуем окружность радиуса r в месте вставки
+                    add_circle(model, insert_point, r, layer_name=layer_name)
+                    regen(adoc)
+                    # Возвращаем outline — указываем, что это круг
+                    return {
+                        "success": True,
+                        "outline": [
+                            {"type": "circle", "center": {"x": insert_point[0], "y": insert_point[1], "z": insert_point[2]}, "radius": r}
+                        ],
+                        "metadata": {
+                            "insert_point": insert_point,
+                            "diameter": diameter,
+                            "diameter_main": diameter_main,
+                            "offset": offset,
+                            "steps": steps,
+                            "mode": "circle",
+                            "text": text,
+                            "layer_name": layer_name,
+                            "rule": "diameter<=60.3 or diameter_main/diameter>=5.0"
+                        }
+                    }
+                except Exception as e:
+                    show_popup(loc.get("build_error").format(str(e)), popup_type="error")
+                    return {"success": False, "error": str(e)}
+
+        # --- Обычный режим: считаем развёртку и рисуем контур ---
         polylines = compute_cyl_cyl_intersection_unwrap(R, r, offset, steps)
         if not polylines:
             show_popup(loc.get("contour_not_built"), popup_type="error")
             return {"success": False, "error": loc.get("contour_not_built")}
 
-        # Рисуем и формируем outline в единообразном формате
         outlines = []
         for poly in polylines:
             if mode == "polyline":
                 points_xy = [[x0 + s, y0 + z] for s, z, _ in poly]
                 pts_variant = convert_to_variant_points(points_xy)
-                add_polyline(model, pts_variant, layer_name="0", closed=True)
+                add_polyline(model, pts_variant, layer_name=layer_name, closed=True)
                 outlines.extend([{"x": px, "y": py} for px, py in points_xy])
             elif mode == "bulge":
                 pts = [(x0 + s, y0 + z, b) for s, z, b in poly]
-                add_polyline(model, pts, layer_name="0", closed=True)
+                add_polyline(model, pts, layer_name=layer_name, closed=True)
                 outlines.extend([{"x": px, "y": py, "bulge": b} for px, py, b in pts])
             elif mode == "spline":
                 points_xy = [[x0 + s, y0 + z] for s, z, _ in poly]
                 pts_variant = convert_to_variant_points(points_xy)
-                add_spline(model, pts_variant, layer_name="0", closed=True)
+                add_spline(model, pts_variant, layer_name=layer_name, closed=True)
                 outlines.extend([{"x": px, "y": py} for px, py in points_xy])
             else:
                 msg = loc.get("unknown_mode").format(mode)
@@ -292,7 +334,8 @@ def at_cutout(data: Dict[str, Any]) -> Dict[str, Any]:
                 "offset": offset,
                 "steps": steps,
                 "mode": mode,
-                "text": text
+                "text": text,
+                "layer_name": layer_name
             }
         }
 
@@ -308,11 +351,12 @@ if __name__ == "__main__":
 
     data = {
         "insert_point": at_get_point(adoc, prompt=loc.get("select_point", "Укажите центр отвода"), as_variant=False),
-        "diameter": 35,
-        "diameter_main": 794,
-        "offset": 300,
+        "diameter": 60.3,
+        "diameter_main": 168.3,
+        "offset": 0,
         "steps": 360,
         "mode": "polyline",
+        "layer_name": "0",
         "text": ""
     }
     print(at_cutout(data))
