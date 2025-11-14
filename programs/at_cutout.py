@@ -359,4 +359,4 @@ if __name__ == "__main__":
         "layer_name": "0",
         "text": ""
     }
-    print(at_cutout(data))
+    # print(at_cutout(data))

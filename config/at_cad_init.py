@@ -1,4 +1,4 @@
-# config/at_cad_init.py
+# -*- coding: utf-8 -*-
 """
 Файл: at_cad_init.py
 Путь: config/at_cad_init.py
@@ -8,15 +8,17 @@
 ожидает готовность объектной модели (ActiveDocument/ModelSpace), автоматически создаёт
 предопределённые слои и задаёт стиль текста через SetFont().
 Реализует паттерн синглтон (однократная инициализация).
+Внедрена логика синхронизации (фокус, retry COM, реген) для стабильности операций.
 """
 
 import os
 import time
-import logging
-from typing import Optional
+import logging  # ← Уже есть
+from typing import Optional, Callable, Any  # ← Добавлено Any для retry
 
 import pythoncom
 import win32com.client
+import wx  # ← ДОБАВЛЕНО: для Yield в sync
 
 from locales.at_translations import loc
 from windows.at_gui_utils import show_popup
@@ -60,6 +62,21 @@ TRANSLATIONS = {
         "ru": "Ошибка установки шрифта: {error}",
         "en": "Error setting text font: {error}",
         "de": "Fehler beim Setzen der Schriftart: {error}"
+    },
+    "sync_success": {  # ← ДОБАВЛЕНО: для логов
+        "ru": "Синхронизация фокуса успешна",
+        "en": "Focus sync successful",
+        "de": "Fokus-Synchronisation erfolgreich"
+    },
+    "retry_success": {  # ← ДОБАВЛЕНО
+        "ru": "Retry успешен на попытке {0}",
+        "en": "Retry successful on attempt {0}",
+        "de": "Wiederholung erfolgreich beim Versuch {0}"
+    },
+    "retry_fail": {  # ← ДОБАВЛЕНО
+        "ru": "Retry провален после {0} попыток",
+        "en": "Retry failed after {0} attempts",
+        "de": "Wiederholung fehlgeschlagen nach {0} Versuchen"
     }
 }
 # Регистрируем переводы сразу при загрузке модуля (до любых вызовов loc.get)
@@ -81,6 +98,7 @@ logging.basicConfig(
 
 CAD_READY_TIMEOUT = 5
 CAD_READY_INTERVAL = 0.2
+
 
 class ATCadInit:
     """
@@ -180,9 +198,117 @@ class ATCadInit:
             self.adoc.ActiveLayer = self.original_layer
             logging.info(f"Восстановлен первоначальный слой: {self.original_layer.Name}")
 
+    # -----------------------------
+    # НОВЫЕ МЕТОДЫ: Синхронизация и retry (внедрено)
+    # -----------------------------
+    def sync_focus(self, delay: float = 0.1) -> bool:
+        """
+        Активирует фокус AutoCAD и документа для стабильных COM-вызовов.
+
+        Args:
+            delay (float): Задержка для sync (0.05-0.2 сек).
+
+        Returns:
+            bool: True при успехе (частично).
+        """
+        if not self.is_initialized():
+            logging.warning("AutoCAD не инициализирован — sync пропущен")
+            return False
+
+        success = True
+        try:
+            # Сделай AutoCAD видимым и активным
+            self.acad.Visible = True
+            try:
+                self.acad.WindowState = 0  # 0=normal
+            except Exception as ws_e:
+                logging.debug(f"WindowState fail (ignore): {ws_e}")  # Не критично
+                success = False  # Но продолжаем
+
+            # Активируй документ (fallback, если fail)
+            try:
+                self.adoc.Activate()
+            except Exception as act_e:
+                logging.debug(f"Activate fail (fallback): {act_e}")
+                try:
+                    # Fallback: Установи как ActiveDocument
+                    self.acad.ActiveDocument = self.adoc
+                except Exception:
+                    pass
+                success = False
+
+            # Пропусти события wx (если в event loop)
+            if wx.GetApp():
+                wx.Yield()
+
+            # Delay для COM-sync (уменьшено для 2026)
+            time.sleep(delay)
+
+            logging.info(loc.get("sync_success"))
+            return success
+        except Exception as e:
+            logging.error(f"Sync фокуса провален: {e}")
+            return False
+
+    def retry_com_call(self, func: Callable, *args, retries: int = 3, delay: float = 0.1) -> Any:
+        """
+        Обёртка для COM-вызовов (AddText, AddDim и т.д.) с retry на фокус/рассинхрон.
+
+        Args:
+            func: COM-метод (e.g., self.adoc.ModelSpace.AddText).
+            *args: Аргументы для func.
+            retries (int): Кол-во попыток (3-5).
+            delay (float): Задержка между (0.1 сек).
+
+        Returns:
+            Результат func или None при fail.
+        """
+        if not self.is_initialized():
+            logging.warning("AutoCAD не готов — retry пропущен")
+            return None
+
+        for attempt in range(retries):
+            try:
+                # Sync перед вызовом
+                self.sync_focus(delay=0.05)
+
+                result = func(*args)
+
+                # Реген после (для text/dim)
+                self.regen_doc()
+
+                logging.info(loc.get("retry_success").format(attempt + 1))
+                return result
+
+            except Exception as e:
+                logging.error(f"Retry ошибка {attempt + 1}/{retries}: {e}")
+                if attempt < retries - 1:
+                    time.sleep(delay)
+                    # Двойная sync на retry
+                    self.sync_focus(delay=0.2)
+                else:
+                    logging.error(loc.get("retry_fail").format(retries))
+                    return None
+
+    def regen_doc(self, mode: int = 0):
+        """
+        Принудительная регенерация документа.
+
+        Args:
+            mode (int): 0=AllViewports, 1=Current, etc.
+        """
+        if not self.is_initialized():
+            return
+
+        try:
+            self.sync_focus()
+            self.adoc.Regen(mode)
+            logging.info("Регенерация документа успешна")
+        except Exception as e:
+            logging.error(f"Регенерация провалена: {e}")
 
     # -----------------------------
-    # Основная инициализация
+    # Основная инициализация (ДОБАВЛЕНО: sync после создания doc)
     # -----------------------------
     def _initialize(self) -> None:
         """
@@ -217,6 +343,9 @@ class ATCadInit:
             self.model = self.adoc.ModelSpace
             self.original_layer = self.adoc.ActiveLayer
 
+            # ← ДОБАВЛЕНО: Sync фокуса после создания doc
+            self.sync_focus(delay=0.2)
+
             # Создание предопределённых слоёв
             self._create_layers()
 
@@ -239,14 +368,7 @@ class ATCadInit:
         #     pythoncom.CoUninitialize()
 
     # -----------------------------
-    # Служебные методы
-    # -----------------------------
-    def is_initialized(self) -> bool:
-        """Проверяет, успешно ли инициализирован AutoCAD."""
-        return self.acad is not None and self.adoc is not None and self.model is not None
-
-    # -----------------------------
-    # Обновление активного документа
+    # Обновление активного документа (ДОБАВЛЕНО: sync в refresh)
     # -----------------------------
     def refresh_active_document(self) -> bool:
         """
@@ -254,6 +376,9 @@ class ATCadInit:
         Надёжно работает при переключении вкладок (включая несохранённые документы).
         """
         try:
+            # ← ДОБАВЛЕНО: Sync перед обновлением
+            self.sync_focus(delay=0.1)
+
             # Прогон событий COM/UI, чтобы AutoCAD успел обработать переключение
             pythoncom.PumpWaitingMessages()
 
@@ -298,6 +423,13 @@ class ATCadInit:
         except Exception as e:
             logging.error(f"Не удалось обновить активный документ: {e}")
             return False
+
+    # -----------------------------
+    # Служебные методы
+    # -----------------------------
+    def is_initialized(self) -> bool:
+        """Проверяет, успешно ли инициализирован AutoCAD."""
+        return self.acad is not None and self.adoc is not None and self.model is not None
 
     # -----------------------------
     # Публичный API

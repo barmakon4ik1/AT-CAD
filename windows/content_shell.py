@@ -57,7 +57,7 @@ TRANSLATIONS = {
     "thickness_branch_label": {"ru": "S", "de": "S", "en": "S"},
     "angle_branch_label": {"ru": "A°", "de": "A°", "en": "A°"},
     "contact_type_label": {"ru": "Тип", "de": "Typ", "en": "Type"},
-    "unroll_branch_label": {"ru": "развернуть", "de": "abwickeln", "en": "unwind"},
+    "unroll_branch_label": {"ru": "Развернуть?", "de": "Abwickeln?", "en": "Unwind?"},
     "flange_label": {"ru": "Фланец?", "de": "Flansch?", "en": "Flange?"},
     "weld_allowance_label": {"ru": "Припуск", "de": "Schw.zug.", "en": "W.allow."},
     "yes": {"ru": "Да", "de": "Ja", "en": "Yes"},
@@ -207,25 +207,36 @@ class BranchWindow(wx.Dialog):
         for c in range(self.table.GetNumberCols()):
             self.table.SetColSize(c, initial_col_width)
 
-        # Начальные значения строк
+        # Начальные значения строк (ИЗМЕНЕНО: вместо loc.get("no") — "0" для False)
         for row in range(self.table.GetNumberRows()):
             self.table.SetRowLabelValue(row, str(row + 1))
             self.table.SetCellValue(row, 3, "0")
             self.table.SetCellValue(row, 4, "0")
             self.table.SetCellValue(row, 5, "0")
             self.table.SetCellValue(row, 7, "A")
-            self.table.SetCellValue(row, 8, loc.get("no", "Нет"))
-            self.table.SetCellValue(row, 9, loc.get("no", "Нет"))
+            self.table.SetCellValue(row, 8, "")
+            self.table.SetCellValue(row, 9, "")
             self.table.SetCellValue(row, 10, "3")
 
-        # Редакторы для choice-полей
+        # Редакторы для choice-полей (ИЗМЕНЕНО: для 8 и 9 — BoolEditor вместо ChoiceEditor)
         contact_types = ["A", "D", "M", "T"]
-        unroll_choices = [loc.get("yes", "Да"), loc.get("no", "Нет")]
+        # unroll_choices = ...  # ← УДАЛЕНО: больше не нужно
         for row in range(self.table.GetNumberRows()):
             self.table.SetCellEditor(row, 7, wx.grid.GridCellChoiceEditor(contact_types, allowOthers=False))
-            self.table.SetCellEditor(row, 8, wx.grid.GridCellChoiceEditor(unroll_choices, allowOthers=False))
-            self.table.SetCellEditor(row, 9, wx.grid.GridCellChoiceEditor(unroll_choices, allowOthers=False))
+            self.table.SetCellEditor(row, 8, wx.grid.GridCellBoolEditor())  # ← ИЗМЕНЕНО: Bool для "развернуть"
+            self.table.SetCellEditor(row, 9, wx.grid.GridCellBoolEditor())  # ← ИЗМЕНЕНО: Bool для "Фланец?"
             self.table.SetCellEditor(row, 10, wx.grid.GridCellChoiceEditor(default_weld_allowance, allowOthers=True))
+
+        # ДОБАВИТЬ: Рендереры для визуализации галочки (только для колонок 8 и 9, для всех строк)
+        for row in range(self.table.GetNumberRows()):
+            self.table.SetCellRenderer(row, 8, wx.grid.GridCellBoolRenderer())  # ← ДОБАВИТЬ: Галочка для "развернуть"
+            self.table.SetCellRenderer(row, 9, wx.grid.GridCellBoolRenderer())  # ← ДОБАВИТЬ: Галочка для "Фланец?"
+
+        # ДОБАВИТЬ: Центрирование чекбокса в ячейках колонок 8 и 9 (для всех строк)
+        for row in range(self.table.GetNumberRows()):
+            self.table.SetCellAlignment(row, 8, wx.ALIGN_CENTER,
+                                        wx.ALIGN_CENTER)  # ← ДОБАВИТЬ: Горизонтально/вертикально по центру для "развернуть"
+            self.table.SetCellAlignment(row, 9, wx.ALIGN_CENTER, wx.ALIGN_CENTER)  # ← ДОБАВИТЬ: Для "Фланец?"
 
         self.table.SetDefaultCellAlignment(wx.ALIGN_CENTRE, wx.ALIGN_CENTRE)
         self.table.EnableDragRowSize(False)
@@ -336,17 +347,25 @@ class BranchWindow(wx.Dialog):
         self.table.SetCellValue(row, 4, "0")  # B
         self.table.SetCellValue(row, 5, "0")  # S
         self.table.SetCellValue(row, 7, "A")  # Тип контакта
-        self.table.SetCellValue(row, 8, loc.get("no", "Нет"))  # Развертка
-        self.table.SetCellValue(row, 9, loc.get("no", "Нет"))  # Фланец
+        self.table.SetCellValue(row, 8, "")
+        self.table.SetCellValue(row, 9, "")
         self.table.SetCellValue(row, 10, "3")  # Припуск на сварку
 
-        # Установка редакторов для новой строки
+        # Установка редакторов для новой строки (ИЗМЕНЕНО: BoolEditor)
         contact_types = ["A", "D", "M", "T"]
-        unroll_choices = [loc.get("yes", "Да"), loc.get("no", "Нет")]
+        # unroll_choices = ...  # ← УДАЛЕНО
         self.table.SetCellEditor(row, 7, wx.grid.GridCellChoiceEditor(contact_types, allowOthers=False))
-        self.table.SetCellEditor(row, 8, wx.grid.GridCellChoiceEditor(unroll_choices, allowOthers=False))
-        self.table.SetCellEditor(row, 9, wx.grid.GridCellChoiceEditor(unroll_choices, allowOthers=False))
+        self.table.SetCellEditor(row, 8, wx.grid.GridCellBoolEditor())  # ← ИЗМЕНЕНО
+        self.table.SetCellEditor(row, 9, wx.grid.GridCellBoolEditor())  # ← ИЗМЕНЕНО
         self.table.SetCellEditor(row, 10, wx.grid.GridCellChoiceEditor(default_weld_allowance, allowOthers=True))
+
+        # ДОБАВИТЬ: Рендерер для новой строки
+        self.table.SetCellRenderer(row, 8, wx.grid.GridCellBoolRenderer())  # ← ДОБАВИТЬ
+        self.table.SetCellRenderer(row, 9, wx.grid.GridCellBoolRenderer())  # ← ДОБАВИТЬ
+
+        # ДОБАВИТЬ: Центрирование для новой строки
+        self.table.SetCellAlignment(row, 8, wx.ALIGN_CENTER, wx.ALIGN_CENTER)  # ← ДОБАВИТЬ
+        self.table.SetCellAlignment(row, 9, wx.ALIGN_CENTER, wx.ALIGN_CENTER)  # ← ДОБАВИТЬ
 
         # Установка фиксированной ширины столбцов для согласованности
         self.table.SetColSize(0, 150)  # Наименование
@@ -455,20 +474,21 @@ class BranchWindow(wx.Dialog):
                 return None
 
             weld_allowance_bottom = parse_float(self.parent.allowance_bottom.GetValue()) or 0
+
             cutout = {
                 "angle_deg": angle,
                 "offset_axial": offset_axial + weld_allowance_bottom,
                 "axial_shift": parse_float(self.table.GetCellValue(row, 4)) or 0.0,
                 "params": {
                     "diameter": diameter,
-                    "mode": self.table.GetCellValue(row, 7).upper(),  # Тип контакта (A, D, M, T)
+                    "contact_mode": self.table.GetCellValue(row, 7).upper(),  # Тип контакта (A, D, M, T)
                     "text": self.table.GetCellValue(row, 0),
                     "steps": 180,  # Фиксированное значение
                     "layer_name": "0",  # Жестко заданный слой
                     "thickness": parse_float(self.table.GetCellValue(row, 5)) or 0.0,  # Толщина отвода
                     "height": parse_float(self.table.GetCellValue(row, 3)) or 0.0,  # Высота отвода
-                    "unroll_branch": self.table.GetCellValue(row, 8) == loc.get("yes", "Да"),  # Флаг развертки
-                    "flange_present": self.table.GetCellValue(row, 9) == loc.get("yes", "Да"),  # Флаг фланца
+                    "unroll_branch": self.table.GetCellValue(row, 8) == "1", # "" == "1" → False; "1" == "1" → True
+                    "flange_present": self.table.GetCellValue(row, 9) == "1", # "" == "1" → False; "1" == "1" → True
                     "weld_allowance": parse_float(self.table.GetCellValue(row, 10)) or 3.0,  # Припуск на сварку
                 }
             }
@@ -489,9 +509,11 @@ class BranchWindow(wx.Dialog):
             self.table.SetCellValue(row, 5, "0")  # S
             self.table.SetCellValue(row, 6, "")  # A
             self.table.SetCellValue(row, 7, "A")  # Тип контакта
-            self.table.SetCellValue(row, 8, loc.get("no", "Нет"))  # Развертка
-            self.table.SetCellValue(row, 9, loc.get("no", "Нет"))  # Фланец
+            self.table.SetCellValue(row, 8, "")   # Развертка
+            self.table.SetCellValue(row, 9, "")  # Фланец
             self.table.SetCellValue(row, 10, "3")  # Припуск на сварку
+            self.table.SetCellAlignment(row, 8, wx.ALIGN_CENTER, wx.ALIGN_CENTER)
+            self.table.SetCellAlignment(row, 9, wx.ALIGN_CENTER, wx.ALIGN_CENTER)
 
     def on_ok(self, event: wx.Event):
         """
