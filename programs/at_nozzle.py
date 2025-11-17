@@ -445,20 +445,20 @@ if __name__ == "__main__":
 
     input_data = {
         "insert_point": at_get_point(adoc, prompt=loc.get("select_point", "Укажите центр отвода"), as_variant=False),
-        "diameter": 163.3,
-        "diameter_main": 800.0,
-        "length": 495.0,
-        "axis": False,
+        "diameter": 114.3,
+        "diameter_main": 114.3,
+        "length": 190,
+        "axis": True,
         "axis_marks": 0.0,
         "layer_name": "0",
-        "thickness": 5.0,
-        "order_number": "20202",
-        "detail_number": "17",
+        "thickness": 0,
+        "order_number": "20310",
+        "detail_number": "7",
         "material": "1.4301",
-        "weld_allowance": 3.0,
-        "accuracy": 16,
+        "weld_allowance": 0.0,
+        "accuracy": 320,
         "offset": 0.0,
         "thk_correction": False,
-        "mode": "bulge"
+        "mode": "polyline"
     }
     at_nozzle(input_data)

@@ -269,7 +269,7 @@ def at_cutout(data: Dict[str, Any]) -> Dict[str, Any]:
 
         if offset == 0:
             # Условия: диаметр отвода <= 60.3 мм ИЛИ отношение >= 5.0
-            if diameter <= DIAMETER_SMALL or ratio >= RATIO:
+            if diameter <= DIAMETER_SMALL and ratio >= RATIO:
                 try:
                     # Рисуем окружность радиуса r в месте вставки
                     add_circle(model, insert_point, r, layer_name=layer_name)
@@ -351,12 +351,12 @@ if __name__ == "__main__":
 
     data = {
         "insert_point": at_get_point(adoc, prompt=loc.get("select_point", "Укажите центр отвода"), as_variant=False),
-        "diameter": 60.3,
-        "diameter_main": 168.3,
+        "diameter": 168.3,
+        "diameter_main": 90,
         "offset": 0,
-        "steps": 360,
-        "mode": "polyline",
+        "steps": 72,
+        "mode": "bulge",
         "layer_name": "0",
         "text": ""
     }
-    # print(at_cutout(data))
+    at_cutout(data)
