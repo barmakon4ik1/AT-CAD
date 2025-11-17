@@ -4,10 +4,19 @@
 Путь: programs\at_cylinder.py
 
 Назначение:
-    Управляет построением развёртки цилиндра (обечайки) с возможными отводами (штуцерами).
-    Вызывает модули at_shell для развёртки цилиндра, at_cutout для вырезов и at_nozzle для отводов.
+    Построение развёртки цилиндра (обечайки) вместе с возможными вырезами
+    и развёртками ответвлений (отводов). Управляет вызовами:
+        - at_shell — развёртка цилиндра
+        - at_cutout — вырезы под отводы
+        - at_nozzle — развёртки самих отводов
 
 Возвращает единый результат с entities + metadata.
+
+Особенности реализации в этом файле (кратко):
+  - Полные комментарии логики расчётов на русском языке.
+  - Защита от некорректных типов, возвращаемых вложенными модулями.
+  - Автоматический вертикальный отступ между развёртками отводов (per_nozzle_gap).
+  - Точка входа main(data) для API и блок тестирования при запуске как скрипта.
 """
 
 from typing import Dict, List
@@ -15,13 +24,15 @@ import math
 from config.at_cad_init import ATCadInit
 from programs.at_shell import at_shell
 from programs.at_cutout import at_cutout
-from programs.at_nozzle import at_nozzle  # Заглушка для будущего модуля
+from programs.at_nozzle import at_nozzle  # at_nozzle должен возвращать dict {"success": True/False, ...}
 from locales.at_translations import loc
 import traceback
 
 from windows.at_gui_utils import show_popup
 
+# ------------------------------------------------------
 # Переводы сообщений
+# ------------------------------------------------------
 TRANSLATIONS = {
     "no_data_error": {
         "ru": "Данные не введены",
@@ -54,7 +65,7 @@ loc.register_translations(TRANSLATIONS)
 
 def main(data):
     """
-    Точка входа для вызова модуля.
+    Точка входа для вызова модуля из API.
 
     Args:
         data: Словарь с данными оболочки и отводов.
@@ -64,25 +75,43 @@ def main(data):
     """
     return at_cylinder(data)
 
+# ========================================================
+# Вспомогательные функции
+# ========================================================
 
 def get_insert_point_unwrap(shell_data: Dict, cut: Dict) -> List[float]:
     """
-    Рассчитывает точку вставки выреза на развёртке так:
-      - Линия шва shell_data['angle'] считается нулевой линией развёртки (X = 0).
-      - Для каждого выреза берём его абсолютный угол cut['angle_deg'] (в градусах,
-        в той же системе, что и shell_data['angle'] — обычно от +X против часовой).
-      - Вычисляем угол от шва до выреза в диапазоне [0, 360) по направлению,
-        заданному shell_data['clockwise'].
-      - X = R * radians(angle_from_seam), Y = axial offset.
-    Возвращает [X, Y, 0].
+    Рассчитывает точку вставки выреза на развёртке цилиндра.
+
+    Подробное пояснение логики:
+    ───────────────────────────
+    Развёртка цилиндра представляет собой прямоугольник:
+        • Ширина = длина окружности цилиндра = π * D
+        • Высота = длина цилиндра
+
+    Каждое отверстие (вырез под отвод) имеет своё положение на поверхности
+    цилиндра. Положение задаётся двумя параметрами:
+        1. cut['angle_deg'] — угловое положение отверстия на цилиндре.
+        2. cut['offset_axial'] — осевой сдвиг вдоль длины цилиндра.
+
+    Чтобы вычислить координаты отверстия на развёртке:
+        1) Определяем дуговое расстояние от линии шва до отверстия.
+        Линия шва имеет угол shell_data['angle'].
+        2) Вычисляем угол:
+        angle_from_seam = (cut_angle - seam_angle) mod 360
+        3) Если развёртка идёт по часовой стрелке, то направление дуги
+        инвертируется:
+        angle_from_seam = -angle_from_seam mod 360
+        4) Перевод угла в длину дуги:
+        arc_length = R * radians(angle_from_seam)
+        5) Добавляем X0 — глобальную точку вставки, чтобы привести координаты
+        в систему AutoCAD.
     """
     R = shell_data["diameter"] / 2.0
     X0, Y0, Z0 = shell_data["insert_point"]
     seam_angle = float(shell_data.get("angle", 0.0))    # угол шва в градусах (абсолютный)
     clockwise = bool(shell_data.get("clockwise", True)) # True = идти по часовой вдоль развёртки
-
-    # Абсолютный угол выреза (в градусах)
-    cut_angle = float(cut.get("angle_deg", 0.0))
+    cut_angle = float(cut.get("angle_deg", 0.0)) # Абсолютный угол выреза (в градусах)
 
     # Разность (cut_angle - seam_angle) в диапазоне [0, 360)
     # Это угол от шва до выреза, считая в направлении "по возрастанию" угла.
@@ -98,29 +127,27 @@ def get_insert_point_unwrap(shell_data: Dict, cut: Dict) -> List[float]:
         # Превращаем угол в величину, отсчитываемую **по направлению развёртки**
         # (т.е. если по часовой — берём "обратный" ход)
         angle_from_seam = (-angle_from_seam) % 360.0
+        # Теперь angle_from_seam в (0, 360) — это угол вдоль развёртки от шва.
 
-    # Теперь angle_from_seam в [0, 360) — это угол вдоль развёртки от шва.
     # Длина дуги:
-    theta_rad = math.radians(angle_from_seam)
-    arc_length = R * theta_rad  # единицы длины = те же, что и R
+    arc_length = R * math.radians(angle_from_seam)  # единицы длины = те же, что и R
 
     # Координаты развёртки: X вдоль развёртки (от шва), Y — осевой (offset_axial)
-    X_unwrap = X0 + arc_length
-    Y_unwrap = Y0 + cut.get("offset_axial", 0.0)
+    return [X0 + arc_length, Y0 + cut.get("offset_axial", 0.0), 0.0]
 
-    insert_point = [X_unwrap, Y_unwrap, 0.0]
-
-    # Отладочный вывод (удобно для тестов)
-    # print(f"[unwrap] seam={seam_angle:.1f}°, cut={cut_angle:.1f}°, "
-    #       f"angle_from_seam={angle_from_seam:.1f}°, arc={arc_length:.3f}, insert={insert_point}")
-
-    return insert_point
-
-
+# ========================================================
+# Основной класс построителя
+# ========================================================
 class CylinderBuilder:
     """
-    Класс для построения развёртки цилиндра с отводами.
-    Вызывает at_shell для цилиндра, at_cutout для вырезов и at_nozzle для отводов.
+    Управляет полной сборкой развёртки цилиндра с вырезами и отводами.
+
+    Логические этапы:
+    ──────────────────
+        1. Проверка входных данных
+        2. Построение развёртки цилиндра (at_shell)
+        3. Построение развёрток отверстий (at_cutout)
+        4. Построение развёрток отвода (at_nozzle)
     """
     def __init__(self, shell_data: Dict):
         """
@@ -134,13 +161,14 @@ class CylinderBuilder:
 
     def _validate_input(self) -> bool:
         """
-        Проверяет валидность входных данных.
+        Проверяет минимальные условия валидности входных данных.
 
         Returns:
             bool: True, если данные валидны, иначе вызывает исключение.
         """
         if not self.shell_data:
             raise ValueError(loc.get("no_data_error", "Данные не введены"))
+
         if not self.shell_data.get("diameter") or self.shell_data["diameter"] <= 0:
             raise ValueError(loc.get("invalid_shell_data", "Некорректные данные оболочки"))
         if not self.shell_data.get("length") or self.shell_data["length"] <= 0:
@@ -149,9 +177,22 @@ class CylinderBuilder:
             raise ValueError(loc.get("invalid_point_format", "Точка вставки должна быть [x, y, 0]"))
         return True
 
+    # --------------------------------------------
     def _adjust_cutout_diameter(self, cutout: Dict, cutout_index: int) -> float:
         """
-        Корректирует диаметр отвода в зависимости от типа соединения.
+        Коррекция диаметра отвода в зависимости от режима контактирования.
+
+        Углублённая логика режимов:
+        ──────────────────────────
+        A — d - 2s → вырез меньше на двойную толщину
+        D — округление вверх (если дробная часть < 0.5 → +1)
+        M — d - s → уменьшение диаметра на толщину
+        T — d + 1 → технологический припуск +1 мм
+
+
+        Проверки:
+            • диаметр и толщина должны быть > 0
+            • скорректированный диаметр > 0
 
         Args:
             cutout: Словарь с данными отвода.
@@ -170,12 +211,14 @@ class CylinderBuilder:
 
         if d <= 0 or s < 0:
             raise ValueError(loc.get("invalid_cutout_data", "Диаметр или толщина некорректны: d={0}, s={1}").format(d, s, cutout_index))
-        if contact_mode not in ["A", "D", "M", "T"]:
-            raise ValueError(loc.get("invalid_cutout_data", "Неизвестный тип соединения: {0}").format(contact_mode, cutout_index))
+        # if contact_mode not in ["A", "D", "M", "T"]:
+        #     raise ValueError(loc.get("invalid_cutout_data", "Неизвестный тип соединения: {0}").format(contact_mode, cutout_index))
+        # Здесь наверное эта проверка излишне. Потому как ниже: adjusted_d = d во всех остальных случаях
 
         if contact_mode == "A":
-            adjusted_d = d - 2 * s  # Внутренний диаметр
+            adjusted_d = d - 2 * s
         elif contact_mode == "D":
+            # логика округления/коррекции под фланец
             adjusted_d = math.ceil(d)
             adjusted_d += 1 if adjusted_d - d < 0.5 else 0
         elif contact_mode == "M":
@@ -189,30 +232,50 @@ class CylinderBuilder:
             raise ValueError(loc.get("invalid_cutout_data", "Скорректированный диаметр <= 0: {0}").format(adjusted_d, cutout_index))
         return adjusted_d
 
+    # --------------------------------------------
     def get_nozzle_insert_point(self, index: int, cut: Dict, params: Dict) -> List[float]:
         """
-        Точка вставки развёртки отвода.
-        Вычисляет generatrix_length[0] аналогично at_nozzle и ставит insert_point так,
-        чтобы верхняя точка развёртки отвода совпала с нижней границей цилиндра.
-        index — номер отвода (1,2,3...), cut и params нужны для доступа к offset/weld/etc.
+        Точка вставки развёртки отвода (за пределами развёртки цилиндра).
+
+        Подробности:
+          - Рассчитывается generatrix для базовой позиции (угол 0) аналогично at_nozzle.
+            gen0 = length_full - sqrt((0.5*diameter_main)^2 - offset^2)
+          - bottom_y = Y0 - nozzle_length (нижняя граница цилиндра на развёртке)
+          - insert_y = bottom_y - gen0 - (index-1) * per_nozzle_gap
+            где per_nozzle_gap — минимальный вертикальный отступ между развёртками,
+            может быть задан в shell_data как 'per_nozzle_gap' (в мм). По умолчанию 200.
+
+        Углублённая логика:
+        ───────────────────
+        Развёртка отвода располагается под обечайкой. Чтобы избежать
+        наложения нескольких отвода друг на друга, каждый следующий
+        сдвигается вниз на фиксированное расстояние gap.
+
+        Основной расчёт — определение генератрисы отвода:
+            half_Dm = Dm / 2
+            gen0 = L_full - sqrt(half_Dm² - offset²)
+        где:
+            • Dm — диаметр основного цилиндра
+            • offset — смещение оси отвода
+            • L_full — высота + припуск сварки
+
+        Полученная величина gen0 определяет вертикальное положение
+        начала развёртки.
         """
         X0, Y0, _ = self.shell_data["insert_point"]
 
         # Параметры для вычисления generatrix_length[0]
         diameter_main = float(self.shell_data.get("diameter", 0.0))
-        offset = float(cut.get("axial_shift", 0.0))  # или params.get("offset", 0.0)
+        offset = float(cut.get("axial_shift", 0.0))  # смещение отверстия относительно центральной плоскости
         weld_allowance = float(params.get("weld_allowance", 0.0))
         nozzle_length = float(params.get("height", params.get("length", 0.0)))  # height == length
         thk_correction = bool(params.get("thk_correction", False))
         thickness = float(params.get("thickness", 0.0))
-        accuracy = int(params.get("accuracy", 180))
-        bottom_y = Y0 - nozzle_length
 
-        # Радиус, используемый в at_nozzle
-        radius = (float(params.get("diameter", 0.0)) - thickness) / 2.0 if thk_correction else float(
-            params.get("diameter", 0.0)) / 2.0
+        # radius (может быть использован в дальнейших вычислениях)
+        radius = (float(params.get("diameter", 0.0)) - thickness) / 2.0 if thk_correction else float(params.get("diameter", 0.0)) / 2.0
 
-        # length_full как в at_nozzle
+        # length_full — высота развёртки с припуском
         length_full = nozzle_length + weld_allowance
 
         # Для первого угла w0 = 2*pi, sin(2*pi) = 0 => упрощённая формула:
@@ -225,17 +288,21 @@ class CylinderBuilder:
         if generatrix0 < 0:
             generatrix0 = 0.0
 
-        # Смещение для нескольких отводов: каждый следующий ниже на per_nozzle_gap
-        per_nozzle_gap = 200.0
+        # Нижняя граница цилиндра на развёртке (координата Y)
+        bottom_y = Y0 - nozzle_length
 
-        # Мы хотим: insert_y + generatrix0 == bottom_y  => insert_y = bottom_y - generatrix0
-        Y = bottom_y - (index - 1) * per_nozzle_gap
+        # Шаг между соседними развёртками отвода (можно задавать в shell_data)
+        per_nozzle_gap = float(self.shell_data.get("per_nozzle_gap", 200.0))
+
+        # insert_y так, чтобы верхняя точка развёртки отвода совпадала с нижней границей цилиндра
+        Y = bottom_y - generatrix0 - (index - 1) * per_nozzle_gap
 
         return [X0, Y, 0.0]
 
+    # --------------------------------------------
     def build(self) -> Dict:
         """
-        Строит развёртку цилиндра и отводов.
+        Собирает развёртку цилиндра с вырезами и развёртками отвода.
 
         Returns:
             Dict: Результат в формате {"entities": [...], "metadata": {...}}.
@@ -244,7 +311,9 @@ class CylinderBuilder:
             # Проверка входных данных
             self._validate_input()
 
-            # 1. Вызов at_shell для построения развёртки цилиндра
+            # ------------------------
+            # 1) Построение обечайки (at_shell)
+            # ------------------------
             shell_input = {
                 "insert_point": self.shell_data.get("insert_point"),
                 "diameter": self.shell_data.get("diameter"),
@@ -270,86 +339,85 @@ class CylinderBuilder:
             })
             self.result["metadata"].update(shell_info.get("metadata", {}))
 
-            # 2. Вызов at_cutout для вырезов, если есть cutouts
+            # ------------------------
+            # 2) Построение вырезов (at_cutout)
+            # ------------------------
             cutouts = self.shell_data.get("cutouts", [])
-            if cutouts:
-                for idx, cut in enumerate(cutouts, 1):
-                    # Валидация данных отвода
-                    params = cut.get("params", {})
-                    if not all(k in params for k in ["diameter", "thickness", "contact_mode"]):
-                        raise ValueError(loc.get("invalid_cutout_data", "Отсутствуют обязательные параметры отвода: {0}").format(params, idx))
-
-                    # Расчёт точки вставки
-                    insert_unwrap = get_insert_point_unwrap(self.shell_data, cut)
-                    # Корректировка диаметра
-                    cut_diameter = self._adjust_cutout_diameter(cut, idx)
-                    # Подготовка параметров для at_cutout
-                    cut_params = {
-                        "insert_point": insert_unwrap,
-                        "diameter": cut_diameter,
-                        "diameter_main": self.shell_data.get("diameter", 0.0),
-                        "offset": cut.get("axial_shift", 0.0),
-                        "steps": params.get("steps", 180),
-                        "mode": params.get("bulge_mode", "bulge"),  # Режим отрисовки
-                        "text": params.get("text", ""),
-                        "layer_name": params.get("layer_name", "0")
-                    }
-                    # Отладочный вывод
-                    # print(f"Cutout {idx}: params={cut_params}")
-
-                    # Проверка параметров для предотвращения math domain error
-                    R = cut_params["diameter_main"] / 2.0
-                    r = cut_params["diameter"] / 2.0
-                    offset = cut_params["offset"]
-                    if R <= 0:
-                        raise ValueError(loc.get("invalid_cutout_data", "Диаметр основной трубы <= 0: {0}").format(R, idx))
-                    if r <= 0:
-                        raise ValueError(loc.get("invalid_cutout_data", "Диаметр отвода <= 0: {0}").format(r, idx))
-                    if abs(offset / R) > 1:
-                        raise ValueError(loc.get("invalid_cutout_data", "Смещение слишком велико: offset={0}, R={1}").format(offset, R, idx))
-
-                    # Вызов at_cutout
-                    cut_info = at_cutout(cut_params)
-                    if not cut_info or not cut_info.get("success"):
-                        error_msg = cut_info.get("error") if isinstance(cut_info, dict) else "unknown"
-                        self.result["entities"].append({
-                            "type": "cutout",
-                            "outline": [],
-                            "metadata": {
-                                "error": error_msg,
-                                "input": cut_params,
-                                "cutout_index": idx
-                            }
-                        })
-                    else:
-                        self.result["entities"].append({
-                            "type": "cutout",
-                            "outline": cut_info.get("outline", []),
-                            "metadata": {**cut_info.get("metadata", {}), "cutout_index": idx}
-                        })
-
-            import traceback
-
-            # 3. Построение отвода (at_nozzle), если требуется развёртка отвода
             for idx, cut in enumerate(cutouts, 1):
                 params = cut.get("params", {})
 
-                # Условия вызова at_nozzle
+                # Базовая валидация параметров для выреза
+                if not all(k in params for k in ["diameter", "thickness", "contact_mode"]):
+                    raise ValueError(loc.get("invalid_cutout_data", "Отсутствуют обязательные параметры отвода: {0}").format(params, idx))
+
+                # Точка вставки на развёртке
+                insert_unwrap = get_insert_point_unwrap(self.shell_data, cut)
+
+                # Коррекция диаметра
+                cut_diameter = self._adjust_cutout_diameter(cut, idx)
+
+                # Быстрые проверки геометрии, чтобы избежать math errors
+                R = self.shell_data.get("diameter", 0.0) / 2.0
+                r = cut_diameter / 2.0
+                offset = cut.get("axial_shift", 0.0)
+                if R <= 0:
+                    raise ValueError(loc.get("invalid_cutout_data", "Диаметр основной трубы <= 0: {0}").format(R, idx))
+                if r <= 0:
+                    raise ValueError(loc.get("invalid_cutout_data", "Диаметр отвода <= 0: {0}").format(r, idx))
+                if abs(offset / R) > 1:
+                    raise ValueError(loc.get("invalid_cutout_data", "Смещение слишком велико: offset={0}, R={1}").format(offset, R, idx))
+
+                # Подготовка параметров для at_cutout
+                cut_params = {
+                    "insert_point": insert_unwrap,
+                    "diameter": cut_diameter,
+                    "diameter_main": self.shell_data.get("diameter", 0.0),
+                    "offset": cut.get("axial_shift", 0.0),
+                    "steps": params.get("steps", 180),
+                    "mode": params.get("bulge_mode", "bulge"),  # Режим отрисовки
+                    "text": params.get("text", ""),
+                    "layer_name": params.get("layer_name", "0")
+                }
+
+                # Вызов at_cutout
+                cut_info = at_cutout(cut_params)
+                if not cut_info or not cut_info.get("success"):
+                    self.result["entities"].append({
+                        "type": "cutout",
+                        "outline": [],
+                        "metadata": {
+                            "error": cut_info.get("error", "unknown") if isinstance(cut_info, dict) else "unknown",
+                            "input": cut_params,
+                            "cutout_index": idx
+                        }
+                    })
+                else:
+                    self.result["entities"].append({
+                        "type": "cutout",
+                        "outline": cut_info.get("outline", []),
+                        "metadata": {**cut_info.get("metadata", {}), "cutout_index": idx}
+                    })
+
+            # ------------------------
+            # 3) Построение развёрток отвода (at_nozzle)
+            # ------------------------
+            for idx, cut in enumerate(cutouts, 1):
+                params = cut.get("params", {})
+
+                # определяем, нужно ли строить развёртку отвода
                 try:
                     height = float(params.get("height", 0.0))
                     thickness = float(params.get("thickness", 0.0))
                 except Exception:
                     height = params.get("height", 0.0)
                     thickness = params.get("thickness", 0.0)
-
                 unroll_branch = bool(params.get("unroll_branch", False))
-                # yes_token = loc.get("yes", "Да").lower()
 
                 if not (height > 0 and thickness > 0 and unroll_branch):
-                    # пропускаем этот отвод — развёртка не требуется
+                    # развёртка данного отвода не требуется
                     continue
 
-                # вычисляем точку вставки для самой развёртки отвода (вне цилиндра)
+                # вычисление точки вставки развёртки отвода
                 try:
                     nozzle_insert = self.get_nozzle_insert_point(idx, cut, params)
                 except Exception as e:
@@ -360,7 +428,7 @@ class CylinderBuilder:
                     })
                     continue
 
-                # Скорректированный диаметр отвода
+                # корректировка диаметра отвода
                 try:
                     adj_diameter = float(self._adjust_cutout_diameter(cut, idx))
                 except Exception as e:
@@ -371,24 +439,27 @@ class CylinderBuilder:
                     })
                     continue
 
-                # Собираем параметры, которые at_nozzle ожидает (одни и те же называния, что в at_nozzle)
+                # подготовка параметров для at_nozzle
                 nozzle_params = {
                     "insert_point": nozzle_insert,
                     "diameter": adj_diameter,
                     "diameter_main": float(self.shell_data.get("diameter", 0.0)),
-                    "length": float(height),  # height == length
+                    "length": float(height),
                     "thickness": float(thickness),
                     "layer_name": params.get("layer_name", "0"),
                     "text": params.get("text", f"N{idx}"),
                     "weld_allowance": float(params.get("weld_allowance", 0.0)),
-                    "offset": float(cut.get("axial_shift", 0.0)),   # at_nozzle expects key "offset"
+                    "offset": float(cut.get("axial_shift", 0.0)),
                     "angle_deg": float(cut.get("angle_deg", 0.0)),
                     "accuracy": int(params.get("accuracy", 180)),
                     "thk_correction": bool(params.get("thk_correction", False)),
-                    "mode": params.get("mode", "bulge")
+                    "mode": params.get("mode", "bulge"),
+                    "order_number": self.shell_data.get("order_number", ""),
+                    "detail_number": params.get("detail_number", ""),
+                    "material": params.get("material", "")
                 }
 
-                # Быстрая валидация численных параметров, чтобы избежать math domain error
+                # быстрые проверки параметров (предотвращение тривиальных проблем)
                 if nozzle_params["diameter"] <= 0 or nozzle_params["diameter_main"] <= 0:
                     self.result["entities"].append({
                         "type": "nozzle",
@@ -405,7 +476,6 @@ class CylinderBuilder:
                                      "cutout_index": idx}
                     })
                     continue
-                # Защита от очевидно некорректных толщин
                 if nozzle_params["thickness"] * 2 >= nozzle_params["diameter"]:
                     self.result["entities"].append({
                         "type": "nozzle",
@@ -415,20 +485,17 @@ class CylinderBuilder:
                     })
                     continue
 
-                # Отладочный вывод
-                print(f"[NOZZLE] {idx}: params={nozzle_params}")
-
+                # защита по offset относительно R
                 R_nozzle = nozzle_params["diameter_main"] / 2.0
                 if abs(nozzle_params["offset"]) > R_nozzle:
                     self.result["entities"].append({
                         "type": "nozzle",
                         "outline": [],
-                        "metadata": {"error": f"Offset {nozzle_params['offset']} > R {R_nozzle} — invalid for unroll",
-                                     "cutout_index": idx}
+                        "metadata": {"error": f"Offset {nozzle_params['offset']} > R {R_nozzle} — invalid for unroll", "cutout_index": idx}
                     })
                     continue
 
-                # Собственно вызов at_nozzle с защитой и логированием traceback
+                # вызов at_nozzle с защитой от исключений и от не-dict результат
                 try:
                     nozzle_info = at_nozzle(nozzle_params)
                 except Exception as e:
@@ -445,30 +512,42 @@ class CylinderBuilder:
                             "cutout_index": idx
                         }
                     })
-                    # Показать всплывающее окно с краткой информацией
+                    # критическая ошибка — показываем всплывающее сообщение
                     show_popup(loc.get("build_error").format(str(e)), popup_type="error")
                     continue
 
-                # Обработка результата at_nozzle
-                if not nozzle_info or not nozzle_info.get("success"):
-                    error_msg = nozzle_info.get("error") if isinstance(nozzle_info, dict) else "unknown nozzle error"
+                # Если модуль вернул не dict — фиксируем и продолжаем
+                if not isinstance(nozzle_info, dict):
                     self.result["entities"].append({
                         "type": "nozzle",
                         "outline": [],
-                        "metadata": {"error": error_msg, "input": nozzle_params, "cutout_index": idx}
+                        "metadata": {"error": f"at_nozzle returned non-dict ({type(nozzle_info).__name__})", "value": nozzle_info, "input": nozzle_params, "cutout_index": idx}
                     })
-                else:
+                    continue
+
+                # Проверяем поле success
+                if not nozzle_info.get("success", False):
+                    err = nozzle_info.get("error", "unknown nozzle error")
                     self.result["entities"].append({
                         "type": "nozzle",
-                        "outline": nozzle_info.get("outline", []),
-                        "metadata": {**nozzle_info.get("metadata", {}), "cutout_index": idx}
+                        "outline": [],
+                        "metadata": {"error": err, "input": nozzle_params, "cutout_index": idx}
                     })
+                    continue
 
-            # Добавляем входные данные в metadata
-            self.result["metadata"].setdefault("input_data", self.shell_data)
-            return self.result
+                # Вставляем успешную развёртку отвода
+                self.result["entities"].append({
+                    "type": "nozzle",
+                    "outline": nozzle_info.get("outline", []),
+                    "metadata": {**nozzle_info.get("metadata", {}), "cutout_index": idx}
+                })
+
+                # Добавляем входные данные в metadata
+                self.result["metadata"].setdefault("input_data", self.shell_data)
+                return self.result
 
         except Exception as e:
+        # Внешняя ошибка: фиксируем и возвращаем результат с типом 'error'
             self.result["entities"].append({
                 "type": "error",
                 "outline": [],
@@ -476,7 +555,6 @@ class CylinderBuilder:
             })
             self.result["metadata"]["error"] = str(e)
             return self.result
-
 
 def at_cylinder(data: Dict) -> Dict:
     """
@@ -491,15 +569,11 @@ def at_cylinder(data: Dict) -> Dict:
     builder = CylinderBuilder(data)
     return builder.build()
 
-
 # -----------------------------
 # Пример использования
 # -----------------------------
 if __name__ == "__main__":
     cad = ATCadInit()
-    adoc = cad.document
-
-    # Пример входного словаря (на основе ShellContentPanel и BranchWindow)
     shell_data = {
         "diameter": 323.9,
         "length": 1000,
@@ -508,13 +582,15 @@ if __name__ == "__main__":
         "clockwise": True,
         "order_number": "ORD-001",
         "detail_number": "DET-01",
-        "material": "1.4301",
+        "material": "1.4571",
         "thickness": 5.0,
         "weld_allowance_top": 10,
         "weld_allowance_bottom": 10,
         "axis": True,
         "axis_marks": 0.0,
         "layer_name": "0",
+        # Можно задать per_nozzle_gap для изменения расстояния между развёртками
+        "per_nozzle_gap": 350.0,
         "cutouts": [
             {
                 "angle_deg": 90,
@@ -542,8 +618,8 @@ if __name__ == "__main__":
                 "axial_shift": 0.0,
                 "params": {
                     "diameter": 88.9,
-                    "height": 300.0,
                     "thickness": 3.0,
+                    "height": 300.0,
                     "angle_deg": 0.0,
                     "contact_mode": "D",
                     "text": "N2",
@@ -555,10 +631,29 @@ if __name__ == "__main__":
                     "mode": "polyline",
                     "material": "1.4301"
                 }
+            },
+            {
+                "angle_deg": 270,
+                "offset_axial": 300,
+                "axial_shift": 0.0,
+                "params": {
+                    "diameter": 60.3,
+                    "thickness": 3.0,
+                    "height": 250.0,
+                    "angle_deg": 0.0,
+                    "contact_mode": "D",
+                    "text": "N3",
+                    "steps": 180,
+                    "layer_name": "0",
+                    "unroll_branch": True,
+                    "flange_present": False,
+                    "weld_allowance": 3.0,
+                    "mode": "polyline",
+                    "material": "1.4404"
+                }
             }
         ]
     }
-
     # Тест для at_cylinder
     result = at_cylinder(shell_data)
-    # print("Результат:", result)
+
