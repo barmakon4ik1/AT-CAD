@@ -55,8 +55,11 @@ def load_content(content_name: str, parent: wx.Window) -> Union[List[Tuple[str, 
 
         # 🔑 Назначаем универсальный callback на submit (если панель его поддерживает)
         if hasattr(panel, "on_submit_callback"):
+            logging.info(f"[LOADER] Назначаю callback для {content_name}")
             panel.on_submit_callback = lambda data, name=content_name: run_build(name, data)
-            logging.info(f"[at_run_dialog_window] Назначен on_submit_callback для {content_name}")
+            logging.info(f"[LOADER] callback установлен: {panel.on_submit_callback}")
+        # else:
+        #     logging.error("[LOADER] У панели НЕТ атрибута on_submit_callback!")
 
         logging.info(f"[at_run_dialog_window] Успешно загружен контент {content_name}, "
                      f"тип: {panel.__class__.__name__}")

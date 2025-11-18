@@ -58,8 +58,8 @@ TRANSLATIONS = {
 loc.register_translations(TRANSLATIONS)
 
 # Глобальные настройки
-DIAMETER_SMALL = 60.3 # Максимальный диаметр отвода, который будет еше отображаться окружностью, вместо полилинии
-RATIO = 5 # отношение диаметров для упрощения отображения отвода - окружность или полилиния
+DIAMETER_SMALL = 92 # Максимальный диаметр отвода, который будет еше отображаться окружностью, вместо полилинии
+RATIO = 3 # отношение диаметров для упрощения отображения отвода - окружность или полилиния
 
 def compute_cyl_cyl_intersection_unwrap(
     R: float,
@@ -216,6 +216,9 @@ def at_cutout(data: Dict[str, Any]) -> Dict[str, Any]:
         adoc = cad.document
         model = cad.model_space
 
+        # Проверка для отладки
+        print(data)
+
         insert_point = data.get("insert_point")
         if not isinstance(insert_point, (list, tuple)) or len(insert_point) < 3:
             show_popup(loc.get("invalid_point_format"), popup_type="error")
@@ -351,10 +354,10 @@ if __name__ == "__main__":
 
     data = {
         "insert_point": at_get_point(adoc, prompt=loc.get("select_point", "Укажите центр отвода"), as_variant=False),
-        "diameter": 168.3,
-        "diameter_main": 90,
+        "diameter": 90,
+        "diameter_main": 168.3,
         "offset": 0,
-        "steps": 72,
+        "steps": 360,
         "mode": "bulge",
         "layer_name": "0",
         "text": ""

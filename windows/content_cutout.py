@@ -27,6 +27,7 @@ from pathlib import Path
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programs.at_input import at_get_point
+from windows.at_content_registry import run_build
 from windows.at_window_utils import (
     CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel,
     create_standard_buttons, adjust_button_widths, BaseContentPanel,
@@ -288,9 +289,7 @@ class CutoutContentPanel(BaseContentPanel):
             # print("Сформированный словарь данных выреза:")
             # print(data)
 
-            # Передаем данные через callback, если он задан (реальный режим)
-            if self.on_submit_callback:
-                self.on_submit_callback(data)
+            run_build("cutout", data)
 
         except Exception as e:
             show_popup(f"{loc.get('error', 'Ошибка')}: {e}", popup_type="error")

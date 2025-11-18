@@ -429,20 +429,12 @@ class CylinderBuilder:
                     continue
 
                 # корректировка диаметра отвода
-                try:
-                    adj_diameter = float(self._adjust_cutout_diameter(cut, idx))
-                except Exception as e:
-                    self.result["entities"].append({
-                        "type": "nozzle",
-                        "outline": [],
-                        "metadata": {"error": f"adjust diameter failed: {str(e)}", "cutout_index": idx}
-                    })
-                    continue
+                diameter = params.get("diameter") - params.get("thickness")
 
                 # подготовка параметров для at_nozzle
                 nozzle_params = {
                     "insert_point": nozzle_insert,
-                    "diameter": adj_diameter,
+                    "diameter": diameter,
                     "diameter_main": float(self.shell_data.get("diameter", 0.0)),
                     "length": float(height),
                     "thickness": float(thickness),
