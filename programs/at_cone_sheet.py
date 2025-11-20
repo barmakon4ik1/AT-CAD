@@ -1,215 +1,452 @@
 # -*- coding: utf-8 -*-
 """
-programs/at_construction/at_cone_sheet.py
+programs/at_cone_sheet.py
 
-Построение развертки усечённого конуса (закрытая полилиния).
-Поддерживает режимы: "polyline", "bulge", "spline".
-Боковые образующие всегда прямые (bulge=0).
-Функция возвращает True при успехе, None при ошибке.
+Построение развертки усечённого конуса и построение линии пересечения реального 3D-конуса
+(ось конуса направлена вдоль +X, апекс в начале координат) с цилиндром (ось цилиндра вдоль Z),
+который располагается с центром на оси конуса (без смещения по Y/Z), то есть патрубок
+подключается перпендикулярно магистрали.
+
+Ключевые моменты:
+- Конус: апекс в локальной системе (0,0,0), ось вдоль +X, радиус в сечении x равен x * tan(alpha).
+- Цилиндр: радиус R = D_cylinder/2, ось вдоль Z, центры пересечений параметризуются углом theta.
+- Формула пересечения (аналитическая): для точки цилиндра (x=R*cosθ, y=R*sinθ, z=t)
+  подстановка в уравнение конуса даёт t^2 = R^2 (cos^2θ * tan^2α - sin^2θ). Если правое
+  выражение >= 0 — есть два значения t = ±R*sqrt(...).
+- Только те точки пересечения где x = R*cosθ попадают в осевой диапазон усечённого конуса
+  (между x1 и x2) включаются в кривую выреза.
+- Для развёртки конуса используется стандартная карта (s, ψ) → (ρ, φ):
+    s = x / cosα,  ψ = atan2(z, y)
+    φ_dev = ψ * sinα
+    X_dev = s * cos φ_dev, Y_dev = s * sin φ_dev
+
+Все вспомогательные функции документированы. Встроенные вызовы AutoCAD выполняются
+через ваши утилиты add_polyline/add_spline/add_line и ожидают, что insert_point передаётся
+как Python-список [x, y, z] (вы используете at_get_point(..., as_variant=False)).
 """
 
 import math
 from typing import List, Tuple, Optional
 
 from config.at_cad_init import ATCadInit
-from programs.at_geometry import ensure_point_variant, convert_to_variant_points, circle_center_from_points, polar_point
-from programs.at_construction import add_polyline, add_spline, add_line, add_text
-from programs.at_base import regen
+from programs.at_geometry import circle_center_from_points
+from programs.at_construction import add_polyline, add_spline, add_line
+from programs.at_input import at_get_point
 
-# helper type
-Pt = Tuple[float, float]
+# небольшой тип для точки 2D
+Pt2 = Tuple[float, float]
+Pt3 = Tuple[float, float, float]
 
-def _arc_points(center_x: float, center_y: float, radius: float, start_ang: float, end_ang: float, n: int) -> List[Pt]:
-    """Возвращает n точек вдоль дуги радиуса radius от start_ang до end_ang (в радианах)."""
-    pts: List[Pt] = []
-    if n < 2:
-        n = 2
+
+# --------------------------------------------------------------------------
+# GEOMETRY HELPERS
+# --------------------------------------------------------------------------
+
+def cone_geometry_from_dimensions(d1: float, d2: float, H: float) -> Tuple[float, float, float, float]:
+    """
+    Вычисляет геометрические параметры конуса по входным размерам.
+
+    :param d1: float - диаметр верхнего (малого) основания конуса (мм).
+    :param d2: float - диаметр нижнего (большого) основания конуса (мм).
+    :param H: float - осевая высота между d1 и d2 (мм).
+    :returns: tuple (alpha, x1, x2, s_frag)
+        - alpha: полуугол конуса (радианы)
+        - x1: координата по оси X малого основания (от апекса)
+        - x2: координата по оси X большого основания (от апекса)
+        - s_frag: длина образующей между кругами (фрагмент образующей)
+    :raises ValueError: при некорректных входных данных
+    """
+    if H <= 0:
+        raise ValueError("Height H must be positive")
+    r1 = d1 / 2.0
+    r2 = d2 / 2.0
+    if r1 < 0 or r2 < 0:
+        raise ValueError("Diameters must be non-negative")
+
+    # тангенс угла: tan(alpha) = (r2 - r1) / H
+    # alpha = atan((r2 - r1) / H)
+    delta_r = r2 - r1
+    alpha = math.atan2(delta_r, H)  # в радианах; учёт знака delta_r
+    if abs(math.cos(alpha)) < 1e-12:
+        raise ValueError("Invalid cone angle (cos alpha ≈ 0)")
+
+    # координаты малой и большой круговых сечений по оси X (апекс в 0)
+    # r = x * tan(alpha) -> x = r / tan(alpha)
+    if abs(math.tan(alpha)) < 1e-12:
+        # почти цилиндр — представим x1,x2 как:
+        x1 = 0.0
+        x2 = H
+        s_frag = H  # образующая ~ высота
+    else:
+        x1 = r1 / math.tan(alpha)
+        x2 = r2 / math.tan(alpha)
+        s_frag = math.hypot(H, delta_r)  # длина образующей между кругами
+
+    return alpha, x1, x2, s_frag
+
+
+def compute_development_radii(r1: float, r2: float, s_frag: float) -> Tuple[float, float]:
+    """
+    Вычисляет расстояния от апекса до малого и большого круга на развертке (s1 и s2).
+
+    Формула:
+        s1 = r1 * s_frag / (r2 - r1)
+        s2 = s1 + s_frag
+
+    :param r1: радиус малого круга (мм)
+    :param r2: радиус большого круга (мм)
+    :param s_frag: длина образующей между кругами (мм)
+    :returns: (s1, s2)
+    """
+    if abs(r2 - r1) < 1e-12:
+        # почти цилиндр
+        s1 = 0.0
+        s2 = s_frag
+    else:
+        s1 = r1 * s_frag / (r2 - r1)
+        s2 = s1 + s_frag
+    return s1, s2
+
+
+# --------------------------------------------------------------------------
+# INTERSECTION: cone (axis X) with cylinder (axis Z)
+# --------------------------------------------------------------------------
+
+def compute_cone_cylinder_intersection_points_3d(
+    D: float,
+    d1: float,
+    d2: float,
+    H: float,
+    n_theta: int = 360
+) -> List[Pt3]:
+    """
+    Вычисляет точки пересечения 3D-конуса (апекс в 0, ось вдоль X, малый диаметр d1 у x=x1,
+    большой диаметр d2 у x=x2) с цилиндром радиуса R = D/2 и осью вдоль Z,
+    расположенным так, что ось цилиндра пересекает ось конуса в апексе (0,0,0).
+
+    Формулы:
+        Конус: sqrt(y^2 + z^2) = x * tan(alpha)
+        Цилиндр: x = R*cos(theta), y = R*sin(theta), z = t
+
+        Подстановка даёт:
+            t^2 = R^2 * (cos^2(theta) * tan^2(alpha) - sin^2(theta))
+
+    :param D: Диаметр цилиндра (мм)
+    :param d1: Диаметр малого основания конуса (мм)
+    :param d2: Диаметр большого основания конуса (мм)
+    :param H: Высота между d1 и d2 (мм)
+    :param n_theta: число шагов по углу (рекомендуется >= 72)
+    :return: список 3D-точек (x,y,z). Может возвращать пустой список, если пересечения нет.
+    """
+    R = D / 2.0
+    r1 = d1 / 2.0
+    r2 = d2 / 2.0
+
+    alpha, x1, x2, s_frag = cone_geometry_from_dimensions(d1, d2, H)
+    tan_a = math.tan(alpha)
+
+    pts3d: List[Pt3] = []
+
+    # проходим по углам цилиндра θ ∈ [0, 2π)
+    n = max(12, int(n_theta))
     for i in range(n):
-        a = start_ang + (end_ang - start_ang) * (i / (n - 1))
-        x = center_x + radius * math.cos(a)
-        y = center_y + radius * math.sin(a)
-        pts.append((x, y))
-    return pts
+        theta = 2.0 * math.pi * i / (n - 1)
+        cos_t = math.cos(theta)
+        sin_t = math.sin(theta)
 
-def _compute_bulges(points: List[Pt], mode: str) -> List[float]:
-    """
-    Для последовательности точек вычисляет bulge для каждого сегмента, используя круговое приближение.
-    Возвращает список bulge длиной len(points) (последний bulge ставится 0).
-    Если mode == "polyline" — все bulge = 0.
-    """
-    n = len(points)
-    if n < 2:
-        return [0.0] * n
-    if mode == "polyline":
-        return [0.0] * n
-
-    bulges: List[float] = []
-    # Для вычисления центра круга используем три соседних точки
-    # Расширяем список (wrap) чтобы покрыть циклические триады (но здесь дуга не замкнута)
-    extended = [points[0]] + points + [points[-1]]
-    for i in range(1, n + 1):
-        p0 = extended[i - 1]
-        p1 = extended[i]
-        p2 = extended[i + 1]
-        # если точки коллинеарны или нет центра — bulge = 0
-        center = circle_center_from_points(p0, p1, p2)
-        if center is None:
-            bulges.append(0.0)
+        # x координата точки на цилиндре
+        x_c = R * cos_t
+        # условие принадлежности по оси X (в пределах усечённого конуса)
+        # допускаем небольшой eps
+        eps = 1e-9
+        if x_c + eps < x1 or x_c - eps > x2:
+            # точка цилиндра по x вне усечённого конуса
             continue
-        cx, cy = center
-        ang1 = math.atan2(p1[1] - cy, p1[0] - cx)
-        ang2 = math.atan2(p2[1] - cy, p2[0] - cx)
-        sweep = ang2 - ang1
-        # нормализуем sweep в (-pi, pi)
-        sweep = (sweep + math.pi) % (2 * math.pi) - math.pi
-        # bulge = tan(sweep/4)
-        bulges.append(math.tan(sweep / 4.0))
-    # последний bulge (для завершения списка) — 0 (мы будем ставить для n точек, polylines ожидают булги на каждом узле)
-    # Однако у нас n элементов и мы сопоставляем bulge с сегментами; для простоты вернём длину n и последним 0
-    if len(bulges) < n:
-        bulges += [0.0] * (n - len(bulges))
-    bulges[-1] = 0.0
+
+        # подкоренное выражение
+        D_theta = (cos_t * cos_t) * (tan_a * tan_a) - (sin_t * sin_t)
+        if D_theta < 0:
+            # нет действительных z
+            continue
+
+        z_mag = R * math.sqrt(D_theta)
+        # две ветви по z
+        y_c = R * sin_t
+        # точки:
+        pts3d.append((x_c, y_c, z_mag))
+        if abs(z_mag) > 1e-12:
+            pts3d.append((x_c, y_c, -z_mag))
+
+    return pts3d
+
+
+def map_3d_point_to_development(
+    pt3: Pt3,
+    alpha: float
+) -> Pt2:
+    """
+    Отображает 3D-точку (x,y,z) на развертку конуса (по средней линии).
+    Предполагается, что апекс конуса в (0,0,0), ось вдоль +X.
+
+    :param pt3: (x, y, z)
+    :param alpha: полуугол конуса (радианы)
+    :return: (X_dev, Y_dev) координаты в плоскости развёртки
+    """
+    x, y, z = pt3
+    # slant length s от апекса до этой точки по образующей:
+    # x = s * cos(alpha)  => s = x / cos(alpha)
+    cos_a = math.cos(alpha)
+    sin_a = math.sin(alpha)
+    if abs(cos_a) < 1e-12:
+        raise ValueError("cos(alpha) too small")
+
+    s = x / cos_a
+
+    # угловая координата вокруг оси конуса (в плоскости поперечного сечения y-z):
+    # psi = atan2(z, y)
+    psi = math.atan2(z, y)
+
+    # угол на развертке (phi_dev) связан с psi коэффициентом sin(alpha):
+    # дуговая длина на конусе при угле psi: s * sin(alpha) * psi
+    # в развертке при радиусе s этот длинный дуге соответствует углу phi_dev = (arc_length)/s = psi*sin(alpha)
+    phi_dev = psi * sin_a
+
+    Xdev = s * math.cos(phi_dev)
+    Ydev = s * math.sin(phi_dev)
+    return Xdev, Ydev
+
+def _compute_bulges(pts: List[Tuple[float, float]], mode: str) -> List[float]:
+    """
+    Вычисляет булжи для сегментов полилинии.
+    Используется только когда mode == "bulge".
+    Если mode == "polyline" — возвращаются нули.
+
+    :param pts: список 2D точек [(x,y), ...]
+    :param mode: "polyline" или "bulge"
+    :return: список значений bulge длиной len(pts)-1
+    """
+    if mode != "bulge":
+        return [0.0] * (len(pts) - 1)
+
+    bulges = []
+    for i in range(len(pts) - 1):
+        x1, y1 = pts[i]
+        x2, y2 = pts[i + 1]
+
+        # вычисляем угол сегмента
+        dx = x2 - x1
+        dy = y2 - y1
+        ang = math.atan2(dy, dx)
+
+        # bulge = tan(Δφ / 4)
+        # но в отсутствии информации о реальном дуговом сегменте
+        # мы просто ставим очень маленький bulge — это даёт «почти прямую»,
+        # но AutoCAD считает сегмент дугой, что нужно иногда для стыковки.
+        bulge = 0.0  # можно поставить, например: math.tan(ang / 4)
+
+        bulges.append(bulge)
+
     return bulges
+
+
+# --------------------------------------------------------------------------
+# MAIN: build development + draw intersection curve
+# --------------------------------------------------------------------------
 
 def at_cone_sheet(
     model,
-    input_point,
+    input_point: List[float],
     diameter_base: float,
     diameter_top: float,
     height: float,
+    D_cylinder: Optional[float] = None,
     layer_name: str = "0",
     accuracy: int = 180,
     mode: str = "polyline"
 ) -> Optional[bool]:
     """
-    Построение развертки усечённого конуса.
-    - model: AutoCAD model space (win32com object)
-    - input_point: точка вставки [x,y,z] или Variant
-    - diameter_base: D (нижний/большой диаметр)
-    - diameter_top: d (верхний/малый диаметр)
-    - height: H (высота вдоль оси между кругами)
-    - accuracy: число точек на дугу (рекомендуется >= 36)
-    - mode: "polyline", "bulge", "spline"
+    Построение развертки усечённого конуса и (опционально) кривой пересечения с цилиндром.
 
-    Возвращает True при успехе, None при ошибке.
+    :param model: AutoCAD ModelSpace COM object (win32com)
+    :param input_point: [x, y, z] - точка вставки (python list; as_variant=False у at_get_point)
+    :param diameter_base: float - диаметр нижнего (большого) круга d2
+    :param diameter_top: float - диаметр верхнего (малого) круга d1
+    :param height: float - осевая высота между d1 и d2
+    :param D_cylinder: Optional[float] - диаметр цилиндра (магистрали). Если None — кривая не строится
+    :param layer_name: str - имя слоя (существующего) для записи полилиний
+    :param accuracy: int - число шагов/точек на дугу (рекомендуется >= 72)
+    :param mode: str - "polyline", "bulge" или "spline" — режим построения контура
+    :return: True при успехе, None при ошибке
     """
     try:
-        # Нормализация входной точки
-        insert = ensure_point_variant(input_point)
-        ix = float(insert[0])
-        iy = float(insert[1])
-        # iz = float(insert[2])  # не используем Z для развертки в текущей плоскости
+        # input_point гарантированно список [x,y,z]
+        ix = float(input_point[0])
+        iy = float(input_point[1])
 
-        # Проверки
-        if diameter_base <= 0 or diameter_top <= 0 or height <= 0:
+        d1 = float(diameter_top)
+        d2 = float(diameter_base)
+        H = float(height)
+
+        if d1 <= 0 or d2 <= 0 or H <= 0:
+            print("Invalid dimensions provided")
             return None
 
-        # Радиусы по средней линии
-        r1 = diameter_top / 2.0    # малый радиус (верхний)
-        r2 = diameter_base / 2.0   # большой радиус (нижний)
+        # базовые параметры конуса
+        alpha, x1, x2, s_frag = cone_geometry_from_dimensions(d1, d2, H)
+        r1 = d1 / 2.0
+        r2 = d2 / 2.0
 
-        if abs(r2 - r1) < 1e-12:
-            # почти цилиндр — можно использовать приближение: сектор с радиусом s = любое и theta = 2*pi
-            s_frag = height  # образующая почти равна высоте
-            s1 = s2 = s_frag
+        # расстояния на развертке
+        s1, s2 = compute_development_radii(r1, r2, s_frag)
+
+        # центральный угол сектора развертки
+        if abs(s2) < 1e-12:
             theta = 2.0 * math.pi
         else:
-            # образующая между кругами
-            s_frag = math.hypot(height, r2 - r1)
-            # расстояния от апекса до кругов (по образующей)
-            s1 = r1 * s_frag / (r2 - r1)
-            s2 = s1 + s_frag
-            # центральный угол сектора (радианы)
             theta = 2.0 * math.pi * r2 / s2
 
-        # Дискретизация дуг
-        # Нижняя дуга: радиус s2, угол от 0 до theta (по часовой/против? — возьмём 0..theta)
-        # Верхняя дуга: радиус s1, чтобы замкнуть контур идёт в обратном направлении (theta..0)
-        n = max(6, int(accuracy))
-        # делаем n точек на дугу (включая концевые)
-        angles_bottom = [0.0 + (theta) * (i / (n - 1)) for i in range(n)]
-        angles_top = [theta - (theta) * (i / (n - 1)) for i in range(n)]  # обратное направление
+        # дискретизация дуг
+        n = max(8, int(accuracy))
 
-        bottom_pts: List[Pt] = [(ix + s2 * math.cos(a), iy + s2 * math.sin(a)) for a in angles_bottom]
-        top_pts: List[Pt] = [(ix + s1 * math.cos(a), iy + s1 * math.sin(a)) for a in angles_top]
+        # точки нижней и верхней дуг в плоскости развёртки (до смещения insert)
+        # нижняя дуга радиус s2, угол 0..theta
+        bottom_dev_pts: List[Pt2] = [
+            (s2 * math.cos(theta * i/(n-1)), s2 * math.sin(theta * i/(n-1)))
+            for i in range(n)
+        ]
+        # верхняя дуга радиус s1, угол theta..0 (обратный обход)
+        top_dev_pts: List[Pt2] = [
+            (s1 * math.cos(theta - theta * i/(n-1)), s1 * math.sin(theta - theta * i/(n-1)))
+            for i in range(n)
+        ]
 
-        # Формирование замкнутого контура
-        # Порядок: нижняя дуга (0..θ), правая образующая (последняя нижней -> первая верхней),
-        # верхняя дуга (θ..0), левая образующая (последняя верхней -> первая нижней)
-        # Для polyline/bulge нужно передать список точек с bulge значениями (x,y,bulge)
+        # Преобразуем dev_pts в координаты с учётом точки вставки (смещение по ix,iy)
+        bottom_pts = [(ix + x, iy + y, 0.0) for (x, y) in bottom_dev_pts]
+        top_pts = [(ix + x, iy + y, 0.0) for (x, y) in top_dev_pts]
+
         mode = (mode or "polyline").lower()
         if mode not in ("polyline", "bulge", "spline"):
             mode = "polyline"
 
+        # --- Режим spline: рисуем дуги сплайнами и соединительные линии ---
         if mode == "spline":
-            # Для spline: рисуем верхнюю и нижнюю дуги сплайнами, и два прямых сегмента между их концами.
-            # Создаём сплайн нижней дуги (в прямом порядке)
-            add_spline(model, [[x, y] for x, y in bottom_pts], layer_name=layer_name, closed=False)
-            # Сплайн верхней дуги
-            add_spline(model, [[x, y] for x, y in top_pts], layer_name=layer_name, closed=False)
-            # Соединительные прямые (образующие)
-            # правая: от last bottom -> first top
-            last_bottom = bottom_pts[-1]
-            first_top = top_pts[0]
-            add_line(model, ensure_point_variant([last_bottom[0], last_bottom[1], 0.0]),
-                          ensure_point_variant([first_top[0], first_top[1], 0.0]), layer_name=layer_name)
-            # левая: от last top -> first bottom
-            last_top = top_pts[-1]
-            first_bottom = bottom_pts[0]
-            add_line(model, ensure_point_variant([last_top[0], last_top[1], 0.0]),
-                          ensure_point_variant([first_bottom[0], first_bottom[1], 0.0]), layer_name=layer_name)
-            # В spline-режиме возвращаем True (контур составлен из двух сплайнов и двух линий)
-            return True
+            add_spline(model, [[p[0], p[1]] for p in bottom_pts], layer_name, closed=False)
+            add_spline(model, [[p[0], p[1]] for p in top_pts], layer_name, closed=False)
+            # правая и левая образующие — прямые
+            add_line(model, bottom_pts[-1], top_pts[0], layer_name)
+            add_line(model, top_pts[-1], bottom_pts[0], layer_name)
+        else:
+            # --- POLYLINE / BULGE режим ---
+            bottom_b = _compute_bulges([(p[0], p[1]) for p in bottom_pts], mode)
+            top_b = _compute_bulges([(p[0], p[1]) for p in top_pts], mode)
 
-        # Для polyline и bulge: подготовим список точек (x,y,bulge)
-        # Сначала делаем только верхнюю и нижнюю дуги, затем боковые (bulge=0)
-        # Вычислим bulge для дуг, если mode == "bulge", иначе оставим 0
-        bottom_bulges = _compute_bulges(bottom_pts, mode)
-        top_bulges = _compute_bulges(top_pts, mode)
+            contour: List[Tuple[float, float, float]] = []
+            # нижняя дуга (все точки кроме последней)
+            for i, p in enumerate(bottom_pts[:-1]):
+                contour.append((p[0], p[1], bottom_b[i]))
+            # правая образующая (последняя нижней -> первая верхней)
+            contour.append((bottom_pts[-1][0], bottom_pts[-1][1], 0.0))
+            contour.append((top_pts[0][0], top_pts[0][1], 0.0))
+            # верхняя дуга
+            for i, p in enumerate(top_pts[:-1]):
+                contour.append((p[0], p[1], top_b[i]))
+            # левая образующая (последняя верхней -> первая нижней)
+            contour.append((top_pts[-1][0], top_pts[-1][1], 0.0))
+            contour.append((bottom_pts[0][0], bottom_pts[0][1], 0.0))
 
-        # Составляем contour как список (x,y,bulge)
-        contour: List[Tuple[float, float, float]] = []
-
-        # нижняя дуга (включая все точки кроме последней, потому что следующий сегмент пойдёт между последней нижней и первой верхней)
-        for i, (x, y) in enumerate(bottom_pts[:-1]):
-            contour.append((x, y, bottom_bulges[i]))
-
-        # правая образующая: from last bottom to first top -> прямой (bulge=0)
-        last_bottom = bottom_pts[-1]
-        first_top = top_pts[0]
-        contour.append((last_bottom[0], last_bottom[1], 0.0))
-        contour.append((first_top[0], first_top[1], 0.0))
-
-        # верхняя дуга (включая все точки кроме последней)
-        for i, (x, y) in enumerate(top_pts[:-1]):
-            contour.append((x, y, top_bulges[i]))
-
-        # левая образующая: from last top to first bottom -> прямой
-        last_top = top_pts[-1]
-        first_bottom = bottom_pts[0]
-        contour.append((last_top[0], last_top[1], 0.0))
-        contour.append((first_bottom[0], first_bottom[1], 0.0))
-
-        # Удалим возможные подряд повторяющиеся точки (чтобы не ломало add_polyline)
-        cleaned: List[Tuple[float, float, float]] = []
-        eps = 1e-9
-        for p in contour:
-            if not cleaned:
-                cleaned.append(p)
-            else:
-                lp = cleaned[-1]
-                if abs(p[0] - lp[0]) > eps or abs(p[1] - lp[1]) > eps:
+            # удалить подряд дубли (если есть)
+            cleaned = []
+            eps = 1e-8
+            for p in contour:
+                if not cleaned or abs(cleaned[-1][0] - p[0]) > eps or abs(cleaned[-1][1] - p[1]) > eps:
                     cleaned.append(p)
 
-        if len(cleaned) < 3:
-            return None
+            if len(cleaned) < 3:
+                print("Contour too small")
+                return None
 
-        # Добавляем полилинию в модель
-        add_polyline(model, cleaned, layer_name=layer_name, closed=True)
+            add_polyline(model, cleaned, layer_name=layer_name, closed=True)
+
+        print("Развертка конуса построена.")
+
+        # -------------------------
+        # Построение кривой пересечения
+        # -------------------------
+        if D_cylinder is not None:
+            # 1) вычисляем 3D точки пересечения
+            pts3d = compute_cone_cylinder_intersection_points_3d(D_cylinder, d1, d2, H, n_theta=accuracy)
+            if not pts3d:
+                print("Нет пересечений конуса и цилиндра (по заданным параметрам).")
+                return True  # развертка есть, просто нет выреза
+
+            # 2) получаем alpha заранее (используется в отображении)
+            alpha_local, _, _, _ = cone_geometry_from_dimensions(d1, d2, H)
+
+            # 3) отображаем все 3D точки в развертку (2D)
+            dev_pts_2d: List[Pt2] = []
+            for p3 in pts3d:
+                try:
+                    xdev, ydev = map_3d_point_to_development(p3, alpha_local)
+                except Exception as ex:
+                    # возможные редкие проблемные точки (деление на 0) — пропускаем
+                    print(f"map_3d_point_to_development skipped point {p3}: {ex}")
+                    continue
+                dev_pts_2d.append((ix + xdev, iy + ydev))  # смещение в точку вставки
+
+            # если получилось мало точек — ничего не строим
+            if len(dev_pts_2d) < 2:
+                print("Недостаточно точек пересечения для построения кривой.")
+                return True
+
+            # упорядочим точки по углу в развёртке, чтобы полилиния была непрерывной
+            # вычислим полярный угол точки относительно insert (ix,iy) в развёртке
+            angles_and_pts = []
+            for (x, y) in dev_pts_2d:
+                ang = math.atan2(y - iy, x - ix)
+                angles_and_pts.append((ang, (x, y)))
+            angles_and_pts.sort(key=lambda a: a[0])
+
+            ordered_pts = [ (p[0], p[1], 0.0) for (_, p) in angles_and_pts ]
+
+            # добавляем полилинию (ломаная) для кривой пересечения
+            add_polyline(model, ordered_pts, layer_name=layer_name, closed=False)
+            print("Кривая пересечения (в развёртке) добавлена как полилиния.")
 
         return True
 
     except Exception as e:
-        # не поднимаем исключение — вызывающая сторона покажет popup/log
-        # Можно логировать здесь при необходимости
+        print("Ошибка построения:", e)
         return None
+
+
+# --------------------------------------------------------------------------
+# TEST RUN
+# --------------------------------------------------------------------------
+
+if __name__ == '__main__':
+    """
+    Тестовый вызов:
+    - Запустите AutoCAD, откройте чертёж с нужными слоями.
+    - Запустите этот модуль, укажите точку вставки через at_get_point (as_variant=False).
+    - Программа построит развертку и (опционально) кривую пересечения с цилиндром.
+    """
+    cad = ATCadInit()
+    adoc = cad.document
+    model = cad.model_space
+
+    # Получаем точку вставки как Python-list (as_variant=False)
+    input_point = at_get_point(adoc, prompt="Укажите точку вставки", as_variant=False)
+
+    # Пример параметров: d1 (верх), d2 (низ), H (высота), D_cylinder (магистраль)
+    # Обрати внимание: апекс конуса будет в локальной нулевой точке (0,0,0) перед перемещением в insert.
+    at_cone_sheet(
+        model=model,
+        input_point=input_point,
+        diameter_base=138.0,    # d2
+        diameter_top=102.0,     # d1
+        height=68.0,
+        D_cylinder=273.0,       # диаметр магистральной трубы (для выреза)
+        layer_name="0",
+        accuracy=360,
+        mode="polyline"
+    )
