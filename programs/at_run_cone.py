@@ -65,8 +65,7 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
-
-def main(data: Dict[str, any]) -> bool:
+def main(data: Dict[str, any], return_development_data: bool = False) -> tuple | dict | None:
     """
     Основная функция для построения развертки конуса в AutoCAD.
 
@@ -135,6 +134,10 @@ def main(data: Dict[str, any]) -> bool:
             show_popup(loc.get("cone_sheet_error", "Ошибка построения развертки конуса"), popup_type="error")
             logging.error("Ошибка построения развертки конуса")
             return None
+
+        # --------------------------
+        # данные для дальнейших модулей
+        # --------------------------
 
         # Формирование текста для меток
         k_text = f"{order_number}"
@@ -251,7 +254,7 @@ def main(data: Dict[str, any]) -> bool:
 
         regen(adoc)
         logging.info("Развертка конуса успешно построена")
-        return True
+
     except Exception as e:
         show_popup(loc.get("build_error", f"Ошибка построения: {str(e)}").format(str(e)), popup_type="error")
         logging.error(f"Ошибка в main: {e}")
