@@ -118,6 +118,12 @@
     :show-inheritance:
 
 
+.. automodule:: programs.at_cutting
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
 .. automodule:: programs.at_cylinder
     :members:
     :undoc-members:
@@ -142,7 +148,19 @@
     :show-inheritance:
 
 
+.. automodule:: programs.at_highlight_utils
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
 .. automodule:: programs.at_input
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+.. automodule:: programs.at_input_lisp
     :members:
     :undoc-members:
     :show-inheritance:
@@ -154,7 +172,25 @@
     :show-inheritance:
 
 
+.. automodule:: programs.at_nozzle_cone
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
 .. automodule:: programs.at_offset
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+.. automodule:: programs.at_packer
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+.. automodule:: programs.at_packing
     :members:
     :undoc-members:
     :show-inheritance:
@@ -196,6 +232,24 @@
     :show-inheritance:
 
 
+.. automodule:: programs.lisp_bridge
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+.. automodule:: programs.test_entity_info
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+.. automodule:: programs.test_get
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
 .. automodule:: scrapers.scrape_asme_tables
     :members:
     :undoc-members:
@@ -221,6 +275,12 @@
 
 
 .. automodule:: windows.at_run_dialog_window
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+.. automodule:: windows.at_service_panel
     :members:
     :undoc-members:
     :show-inheritance:

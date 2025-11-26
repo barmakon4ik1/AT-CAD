@@ -1,161 +1,215 @@
 # programs/at_nozzle_cone.py
 import math
+from pprint import pprint
 from typing import Any, Optional, Tuple, Union, List
 from comtypes.automation import VARIANT
 
 from config.at_cad_init import ATCadInit
 from programs.at_construction import at_cone_sheet, add_polyline
-from programs.at_geometry import ensure_point_variant
+from programs.at_geometry import ensure_point_variant, find_intersection_points
 from programs.at_input import at_get_point
 from windows.at_gui_utils import show_popup
+
+
+# ─────────────────────────────────────────────────────────────
+#      ПОМОГАЮЩИЕ ФУНКЦИИ
+# ─────────────────────────────────────────────────────────────
+
+def dist2d(p1: Tuple[float, float], p2: Tuple[float, float]) -> float:
+    return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
+
+
+def point_on_arc(apex: Tuple[float, float], radius: float, angle: float) -> Tuple[float, float]:
+    """Возвращает координату точки на дуге развёртки (плоско)."""
+    return (
+        apex[0] + radius * math.cos(angle),
+        apex[1] + radius * math.sin(angle)
+    )
+
+
+def choose_candidate_right_of_prev(candidates: List[Tuple[float, float]],
+                                   prev_pt: Tuple[float, float]) -> Tuple[float, float]:
+    """
+    Выбор кандидата: сперва предпочитаем точку правее предыдущей по X.
+    Если обе правее — выбираем ту, что ближе по X к prev (меньшее приращение),
+    иначе выбираем максимальную по X (чтобы идти слева->справа).
+    В случае равенства X — выбираем ближе по евклидовой.
+    """
+    if not candidates:
+        raise ValueError("No candidates to choose from")
+
+    prev_x = prev_pt[0]
+
+    # Разделим кандидатов на правые и непр. правые
+    right = [c for c in candidates if c[0] > prev_x]
+    if right:
+        # среди правых выбрать тот, у которого |dx| минимально (не резкое скачкообразное перемещение)
+        best = min(right, key=lambda c: abs(c[0] - prev_x))
+        return best
+
+    # если нет правых — берем с наибольшим X (двигаемся максимально вправо)
+    best = max(candidates, key=lambda c: (c[0], -dist2d(c, prev_pt)))
+    return best
+
+
+# ─────────────────────────────────────────────────────────────
+#      ОСНОВНАЯ ФУНКЦИЯ
+# ─────────────────────────────────────────────────────────────
 
 def at_nozzle_cone_sheet(
     model: Any,
     input_point: Union[List[float], Tuple[float, float, float], VARIANT],
     d1: float,      # верхний диаметр
-    d2: float,      # максимальная хорда пересечения (задаётся по чертежу)
+    d2: float,      # диаметр нижнего основания (на сечении)
     D: float,       # диаметр цилиндра
     H: float,       # расстояние от торца до оси цилиндра
     layer_name: str = "0",
     layer_intersection: str = "LASER-TEXT"
 ) -> Optional[Tuple[Any, Any, List[Any]]]:
 
-    height_cone = H - math.sqrt((D**2 - d2**2) / 4)
+    # высота усечённого конуса (высота от апекса до уровня пересечения)
+    height_cone = H - math.sqrt((D * D - d2 * d2) / 4.0)
 
-    # === Строим развёртку конуса ===
-    result = at_cone_sheet(model, input_point, d1, d2, height_cone, layer_name="0")
+    # строим развёртку конуса (используем вашу функцию)
+    # at_cone_sheet возвращает (poly_cone, ..., apex)
+    poly_cone, _, apex = at_cone_sheet(
+        model, input_point, d1, d2, height_cone, layer_name=layer_name
+    )
 
-    poly_cone, _, apex = result  # apex — центр сектора (вершина конуса на развёртке)
-
-    # ───── реальная длина образующей из построенной развёртки ─────
-    # LightWeightPolyline → координаты через .Coordinates (массив float)
     coords = poly_cone.Coordinates
+    pprint(coords)
 
-    # берём вторую точку (индекс 2..3) — это точка на внешней дуге
-    x_outer = coords[2]
-    y_outer = coords[3]
-    generatrix = math.sqrt((x_outer - apex[0]) ** 2 + (y_outer - apex[1]) ** 2)
-
-    def generatrix_length(phi, h, R, a):
-        return math.sqrt(h * h + R * R + a * a - 2 * R * a * math.cos(phi))
-
-    # -------------------------------------------------------------
-    #            РЕАЛЬНАЯ ЛИНИЯ ПЕРЕСЕЧЕНИЯ (полилиния)
-    # -------------------------------------------------------------
-
-    # ------------------ Корректная генерация линии пересечения ------------------
-    R = d2 / 2            # радиус основания конуса (в 3D)
-    a = D / 2             # радиус цилиндра
-    h = height_cone       # высота конуса (апекс в z=0, основание z=h)
-    if h == 0:
-        show_popup("height_cone == 0 — некорректная геометрия.", popup_type="error")
-        return None
-
-    k = R / h             # масштабный коэффициент конуса (x^2+y^2 = (k*z)^2)
-    # slant (длина образующей в основании) — это ваша generatrix (g_max)
-    g_max = generatrix
-
-    # сетка по углу цилиндра
-    N_theta = 1440  # высокая дискретизация для гладкой линии, можно уменьшить до 360 при тесте
-    thetas = [2 * math.pi * i / N_theta for i in range(N_theta + 1)]
-
-    pts3d = []   # соберём 3D точки пересечения (x,y,z)
-    for theta in thetas:
-        y_c = a * math.cos(theta)   # y на цилиндре
-        z_c = a * math.sin(theta)   # z на цилиндре
-
-        # x^2 = (k*z_c)^2 - y_c^2
-        rhs = (k * z_c) ** 2 - (y_c ** 2)
-        if rhs < 0:
-            # нет пересечения для данного theta
-            continue
-        x_val = math.sqrt(max(0.0, rhs))
-        # обе ветви x = +x_val и x = -x_val
-        pts3d.append(( x_val, y_c, z_c ))
-        pts3d.append((-x_val, y_c, z_c ))
-
-    if not pts3d:
-        show_popup("Нет 3D точек пересечения (pts3d пуст). Проверьте размеры.", popup_type="error")
-        return None
-
-    # Для каждой 3D точки вычислим psi (азимут вокруг оси Z) и длину образующей g
-    psi_g_list = []
-    for (x3, y3, z3) in pts3d:
-        psi = math.atan2(y3, x3)             # азимут в плоскости XY
-        g = math.sqrt(x3 * x3 + y3 * y3 + z3 * z3)  # длина образующей от апекса
-        psi_g_list.append((psi, g, (x3, y3, z3)))
-
-    # Сортируем по psi (чтобы получить упорядоченную вокруг конуса кривую)
-    psi_g_list.sort(key=lambda e: e[0])
-
-    # Получаем стартовую точку на внешней дуге развертки (контроль)
-    coords = poly_cone.Coordinates
+    # Точки внешней дуги развёртки конуса (контрольные)
     start_pt = (coords[2], coords[3])
-    end_pt   = (coords[4], coords[5])
-    apex_xy = (apex[0], apex[1])
+    end_pt = (coords[4], coords[5])
 
-    # Преобразуем psi -> углы на развертке. Для выравнивания сделаем:
-    # ang_rel = (R * (psi - psi0)) / g_max, а абсолютный ang = ang0 + ang_rel,
-    # где psi0 — psi первой точки в упорядоченном списке, ang0 — угол на листе, соответствующий start_pt.
-    psi0 = psi_g_list[0][0]
-    ang0 = math.atan2(start_pt[1] - apex_xy[1], start_pt[0] - apex_xy[0])
+    # Максимальная образующая (радиус дуги развёртки от апекса до внешнего контура)
+    g_max = dist2d(apex, start_pt)
 
-    final_sheet_pts = []
-    for psi, g, _3d in psi_g_list:
-        # относительный угол вдоль дуги основания
-        ang_rel = (R * (psi - psi0)) / g_max
-        ang_on_sheet = ang0 + ang_rel
-        x_sheet = apex_xy[0] + g * math.cos(ang_on_sheet)
-        y_sheet = apex_xy[1] + g * math.sin(ang_on_sheet)
-        final_sheet_pts.append((x_sheet, y_sheet, psi, g))
+    # Длина дуги развёртки (расстояние по плоскости между start и end на развёртке)
+    L_unfold = dist2d(start_pt, end_pt)
 
-    # Теперь: нужно сделать сдвиг по кругу так, чтобы точка, наиболее близкая к start_pt, стала первой.
-    # Найдём индекс по минимальному расстоянию от start_pt.
-    def dist2(a, b):
-        return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2
-
-    best_idx = min(range(len(final_sheet_pts)), key=lambda i: dist2((final_sheet_pts[i][0], final_sheet_pts[i][1]), start_pt))
-    # повернём список так, чтобы best_idx стал 0
-    ordered = final_sheet_pts[best_idx:] + final_sheet_pts[:best_idx]
-
-    # Преобразуем в окончательный список (x,y)
-    ordered_xy = [(p[0], p[1]) for p in ordered]
-
-    # Уберём возможные близкие дубликаты (вдоль границы) — простая фильтрация по расстоянию
-    filtered = []
-    min_sq_dist = (1e-4) ** 2  # 0.0001 mm^2 порог
-    for pt in ordered_xy:
-        if not filtered or dist2(filtered[-1], pt) > min_sq_dist:
-            filtered.append(pt)
-
-    # Гарантируем, что первая и последняя точки совпадают с контрольными (устраняем численные погрешности)
-    if len(filtered) >= 2:
-        filtered[0] = (start_pt[0], start_pt[1])
-        filtered[-1] = (end_pt[0], end_pt[1])
-    # Вставим апекс+g_max в середину (контроль)
-    mid_index = len(filtered) // 2
-    if 0 <= mid_index < len(filtered):
-        filtered[mid_index] = (apex_xy[0], apex_xy[1] + g_max)
-
-    # Если слишком мало точек — сообщим
-    if len(filtered) < 3:
-        show_popup("Сгенерировано слишком мало точек пересечения.", popup_type="error")
+    # Полный угол дуги на развертке (phi_max)
+    # угол (в радианах) на развёртке = длина дуги / радиус
+    if g_max == 0:
+        show_popup("Ошибка: апекс совпадает с внешней точкой развёртки.", popup_type="error")
         return None
 
-    # Построим полилинию через вашу функцию add_polyline
+    phi_max = L_unfold / g_max
+
+    # Начальный угол на развертке (вокруг апекса) — чтобы класть точки вдоль дуги
+    phi0 = math.atan2(start_pt[1] - apex[1], start_pt[0] - apex[0])
+    # phi1 = phi0 + phi_max  # если понадобится
+
+    # Геометрические параметры 3D
+    R = d2 / 2.0
+    a = D / 2.0
+    h = height_cone
+
+    # Точная длина образующей в 3D для угла phi (на цилиндре)
+    def generatrix_length(phi: float, h_val: float, R_val: float, a_val: float) -> float:
+        return math.sqrt(h_val * h_val + R_val * R_val + a_val * a_val - 2.0 * R_val * a_val * math.cos(phi))
+
+    # Параметры дискретизации
+    N = 80  # можно уменьшить/увеличить; должно делиться на 4 по твоему требованию
+    if N % 4 != 0:
+        show_popup("N должно делиться на 4", popup_type="error")
+        return None
+
+    # Шаг угла по развёртке (плоский шаг)
+    dphi = phi_max / float(N)
+
+    # Подготовим список phi в 3D (соответствуют равномерным сегментам основания окружности)
+    # В 3D phi_cyl = 0..2pi. Берём N точек равномерно по окружности цилиндра.
+    phis_3d = [2.0 * math.pi * i / float(N) for i in range(N)]
+
+    # Длины всех образующих (для phi_i)
+    generatrices = [generatrix_length(phi, h, R, a) for phi in phis_3d]
+
+    # ─────────────────────────────────────────────────────────────
+    #     ОСНОВНОЙ АЛГОРИТМ: лучи от апекса к точкам дуги развёртки
+    #     и поиск реальной точки пересечения по длине образующей
+    # ─────────────────────────────────────────────────────────────
+
+    result_pts: List[Tuple[float, float]] = []
+    prev_pt = start_pt
+    result_pts.append(prev_pt)
+
+    # задаём очень маленький радиус для вызова find_intersection_points (мы будем искать пересечение
+    # окружности радиуса г_i вокруг апекса с "окружностью" малого радиуса вокруг target_pt).
+    # однако в этой реализации мы используем пересечение окружности (apex, g_i) с центром=target_pt радиус=eps,
+    # а затем из кандидатов выбираем ту, что правее prev_pt (см. логику выше).
+    # Это имитирует проекцию точки на луч, расположенную в направлении target_pt.
+    eps_base = max(0.001, g_max * 1e-6)
+
+    for i in range(1, N):
+        # угол на развертке в плоскости (от апекса), равномерно по дуге start->end
+        phi_flat = phi0 + i * dphi
+
+        # точка на дуге (плоско) — ожидаемая позиция (центр второго "маленького" круга)
+        target_pt = point_on_arc(apex, g_max, phi_flat)
+
+        # Радиус первой окружности — длина соответствующей образующей (берём i мод N для доступа)
+        # Соответствие i->phis_3d: хотим, чтобы i==0 соответствовало phi=0 в 3D, т.е. сдвигать индекс
+        idx_3d = i % N
+        g_i = generatrices[idx_3d]
+
+        # Попытаемся найти пересечение окружности (apex, g_i) и "маленькой" окружности (target_pt, eps)
+        eps = eps_base
+        inter = find_intersection_points((apex[0], apex[1]), g_i, (target_pt[0], target_pt[1]), eps)
+        # небольшая попытка по гибкости радиуса
+        if not inter:
+            inter = find_intersection_points((apex[0], apex[1]), g_i, (target_pt[0], target_pt[1]), eps * 5.0)
+        if not inter:
+            inter = find_intersection_points((apex[0], apex[1]), g_i, (target_pt[0], target_pt[1]), eps * 0.2)
+
+        if inter:
+            candidates = inter if isinstance(inter, list) else [inter]
+            # выбираем ту кандидат-точку, которая правее предыдущей (по X)
+            chosen = choose_candidate_right_of_prev(candidates, prev_pt)
+        else:
+            # fallback: если пересечение не найдено (численные/геометрич. причины),
+            # откладываем образующую g_i от апекса в направлении target_pt (по углу)
+            ang = math.atan2(target_pt[1] - apex[1], target_pt[0] - apex[0])
+            chosen = (apex[0] + g_i * math.cos(ang), apex[1] + g_i * math.sin(ang))
+            pprint({
+                "warning": "no intersection - fallback used",
+                "i": i,
+                "g_i": g_i,
+                "target_pt": target_pt,
+                "fallback_chosen": chosen
+            })
+
+        # Добавляем в результирующий список
+        result_pts.append(chosen)
+        prev_pt = chosen
+
+    # Устранение числового шума: последняя точка — точно end_pt
+    if result_pts:
+        result_pts[-1] = (end_pt[0], end_pt[1])
+
+    # Опционально: вставляем контрольную точку апекса + g_max в середину (как маркер)
+    mid_index = len(result_pts) // 2
+    if 0 <= mid_index < len(result_pts):
+        # не заменяем крайние контрольные точки
+        if mid_index != 0 and mid_index != len(result_pts) - 1:
+            result_pts[mid_index] = (apex[0], apex[1] + g_max)
+
+    pprint(result_pts)
+
+    # строим полилинию через твою функцию add_polyline
     poly_intersection = add_polyline(
         model=model,
-        points=filtered,
+        points=result_pts,
         layer_name=layer_intersection,
         closed=False
     )
 
-    if poly_intersection is None:
-        show_popup("Не удалось создать полилинию пересечения.", popup_type="error")
-        return None
+    # возвращаем развертку, апекс и список точек (можно использовать для сравнения/экспорта)
+    return poly_cone, apex, result_pts
 
 
-# === ТЕСТ — даёт h = 68.000 мм, линия реза идеальная ===
+# === ТЕСТ ===
 if __name__ == '__main__':
     cad = ATCadInit()
     adoc = cad.document

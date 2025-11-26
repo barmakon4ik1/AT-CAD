@@ -1,0 +1,6 @@
+{
+  "command": "get_entity",
+  "params": {
+    "prompt": "Выберите объект на чертеже:"
+  }
+}
