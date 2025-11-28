@@ -412,7 +412,7 @@ def at_cone_sheet(model: Any, input_point: Union[List[float], VARIANT], diameter
         polyline.SetBulge(3, -bulge)
         input_point_variant = ensure_point_variant(input_point)
 
-        return polyline, input_point_variant, center
+        return points_list, input_point, center, theta
     except Exception as e:
         show_popup(loc.get("cone_sheet_error", f"Ошибка построения развертки конуса: {str(e)}"), popup_type="error")
         logger.error(f"at_cone_sheet failed: {str(e)}")

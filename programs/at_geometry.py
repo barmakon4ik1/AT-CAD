@@ -647,5 +647,84 @@ def angle_to_unroll_x(angle_deg, diameter, cut_angle_ref=0.0, unroll_dir="CW"):
     X = alpha_rel / 360.0 * W
     return X
 
+def distance_2points(p1, p2):
+    """
+    Находит расстояние между двумя точками.
+    Поддерживаем форматы:
+      (x, y), [x, y], (x, y, z), [x, y, z]
+
+    Если z отсутствует — используется z=0.
+    """
+
+    # Приводим к списку
+    p1 = normalize_point(p1)
+    p2 = normalize_point(p2)
+
+    dx = p1[0] - p2[0]
+    dy = p1[1] - p2[1]
+    dz = p1[2] - p2[2]
+    return math.sqrt(dx*dx + dy*dy + dz*dz)
+
+def normalize_point(p):
+    """
+    Превращает p в точку (x, y, z), даже если p имеет лишние вложения.
+    Поддерживает форматы:
+    [x, y], (x, y), (x, y, z), [ [x, y] ], ( [x, y, z], ), etc.
+    """
+    # Распаковка вложенных структур пока не доберёмся до списка/кортежа из чисел
+    while isinstance(p, (list, tuple)) and len(p) == 1 and isinstance(p[0], (list, tuple)):
+        p = p[0]
+
+    # Теперь p должен быть списком или кортежем чисел
+    if len(p) == 2:
+        return (p[0], p[1], 0.0)
+    if len(p) == 3:
+        return (p[0], p[1], p[2])
+
+    raise ValueError(f"Bad point format: {p}")
+
+def make_cone_arc_points(
+    apex: Tuple[float, float],
+    R: float,
+    theta_rad: float,
+    N: int
+) -> List[Tuple[float, float]]:
+    """
+    Создаёт N+1 точек внешней дуги развертки конуса.
+
+    Дуга располагается так:
+        - апекс в точке (apex_x, apex_y)
+        - дуга симметрична относительно вертикальной оси, проходящей через апекс
+        - крайние точки: углы -theta_rad/2 и +theta_rad/2
+
+    Параметры:
+        apex       - координаты апекса (x, y)
+        R          - радиус внешней дуги (первая образующая)
+        theta_rad  - центральный угол развертки (в радианах)
+        N          - количество делений дуги
+
+    Возвращает:
+        Список из N+1 точек [(x0,y0), (x1,y1), ... , (xN,yN)]
+    """
+
+    ax, ay, az = apex
+
+    # начальный угол (левая точка)
+    angle_start = -theta_rad / 2
+
+    # шаг угла
+    angle_step = theta_rad / N
+
+    pts = []
+
+    for i in range(N + 1):
+        angle = angle_start + i * angle_step
+        # x = apex.x + R * sin(angle)
+        # y = apex.y + R * cos(angle)
+        x = ax + R * math.sin(angle)
+        y = ay + R * math.cos(angle)
+        pts.append((x, y))
+
+    return pts
 
 # Конец модуля

@@ -1,122 +1,134 @@
 """
-at_nozzle_cone.py
+programs/at_nozzle_cone.py
 
-Построение линии пересечения усечённого конуса и цилиндра
-с правильным расчётом длины образующих.
+Шаг 1: принимаем словарь параметров, извлекаем значения в переменные.
+Тестовая функция run_test() формирует примерный словарь (как из GUI) и вызывает main().
 """
-
 import math
 from pprint import pprint
-from typing import Any, Optional, Tuple, List, Union
-from comtypes.automation import VARIANT
+from typing import Any, Dict, Optional, Tuple
 
 from config.at_cad_init import ATCadInit
-from programs.at_construction import at_cone_sheet, add_polyline
-from programs.at_input import at_get_point
+from programs.at_construction import at_cone_sheet
+from programs.at_geometry import distance_2points, make_cone_arc_points
 
 
-def at_nozzle_cone_sheet(
-    model: Any,
-    pt: Union[List[float], VARIANT],
-    d1: float,               # диаметр верхнего основания конуса
-    d2: float,               # диаметр нижнего основания конуса (хорда на цилиндре)
-    D: float,                # диаметр цилиндра
-    H: float,                # расстояние от верхнего основания конуса до плоскости оси цилиндра
-    layer_name: str = "0",
-    layer_intersection: str = "LASER-TEXT",
-    N: int = 12
-) -> Tuple[Optional[Any], Tuple[float, float], List[Tuple[float, float]], List[float]]:
+def main(params: Dict[str, Any]) -> Tuple[Any, Any, float, float, float, float, str]:
+    """
+    Основная функция (шаг 1).
+    Принимает словарь params и извлекает в локальные переменные:
+        model, input_point, diameter_top, diameter_base, diameter_pipe, height_full, layout
 
-    # Высота усечённого конуса
-    h = H - math.sqrt(max(0.0, (D / 2)**2 - (d2 / 2)**2))
+    Возвращает кортеж (model, input_point, diameter_top, diameter_base, diameter_pipe, height_full, layout)
+    для удобства тестирования и последующей передачи в другие функции.
 
-    # 1) Берём развертку конуса
-    res = at_cone_sheet(
-        model=model,
-        input_point=pt,
-        diameter_base=d2,
-        diameter_top=d1,
-        height=h,
-        layer_name=layer_name
-    )
-    print(res)
-    cone_poly, input_point_variant, apex_res = res
-    apex = (apex_res[0], apex_res[1])
+    Ожидаемые ключи в params:
+        - "model"            : объект model space (любой тип)
+        - "input_point"      : точка вставки (список/кортеж или VARIANT)
+        - "diameter_top"     : float (d1)
+        - "diameter_base"    : float (d2)
+        - "diameter_pipe"    : float (D)
+        - "height_full"      : float  (H)
+        - "layout"           : str (необязательно, по умолчанию "LASER-TEXT")
+        - N                  : int количество точек разбиения дуги
+    """
 
-    # 2) Определяем радиус дуги нижнего основания развертки
-    center = (input_point_variant[0], input_point_variant[1])
-    R = math.hypot(center[0] - apex[0], center[1] - apex[1])
+    # Считываем и проверяем параметры (простейшая валидация)
+    # model и input_point могут быть любого типа, оставляем как есть
+    try:
+        model = params["model"]
+    except KeyError:
+        raise KeyError("Отсутствует обязательный параметр 'model' в params")
 
-    # 3) Разделим дугу на N сегментов
-    sector_angle_deg = 92.12132171
-    sector_rad = math.radians(sector_angle_deg)
-    result_pts: List[Tuple[float, float]] = []
-    lengths: List[float] = []
+    try:
+        input_point = params["input_point"]
+    except KeyError:
+        raise KeyError("Отсутствует обязательный параметр 'input_point' в params")
 
-    # Эталонные длины образующих для проверки
-    # [269.65823481820183, 263.7230842335816, ...] - для контроля
+    # Числовые параметры — пробуем привести к float и выдаём информативную ошибку при отсутствии
+    def _get_float(key: str) -> float:
+        if key not in params:
+            raise KeyError(f"Отсутствует обязательный параметр '{key}' в params")
+        val = params[key]
+        try:
+            return float(val)
+        except Exception as e:
+            raise ValueError(f"Параметр '{key}' должен быть числом (не удалось привести {val!r}): {e}")
 
-    for i in range(N + 1):
-        t = i / N
-        angle_flat = (t - 0.5) * sector_rad  # симметрия относительно Y
+    diameter_top = _get_float("diameter_top")
+    diameter_base = _get_float("diameter_base")
+    diameter_pipe = _get_float("diameter_pipe")
+    height_full = _get_float("height_full")
+    layout = params.get("layout", "0")
+    N = params.get("N", 12)  # количество точек разбиения дуги
 
-        # координата точки на дуге
-        x_arc = apex[0] + R * math.sin(angle_flat)
-        y_arc = apex[1] + R * math.cos(angle_flat)
-        pt_arc = (x_arc, y_arc)
+    # layout — опционально, по умолчанию "LASER-TEXT"
+    layout = params.get("layout", "LASER-TEXT")
+    if layout is None:
+        layout = "LASER-TEXT"
 
-        # рассчёт длины образующей через простую аппроксимацию
-        # длина = расстояние от апекса до точки пересечения с цилиндром
-        # приближённо: апекс + H в Y (расстояние до цилиндра) + смещение по X
-        dx = x_arc - apex[0]
-        dy = H
-        g_i = math.hypot(dx, dy)
-        lengths.append(g_i)
+    # Находим высоту конуса
+    height = height_full - math.sqrt((diameter_pipe / 2) ** 2 - (diameter_base / 2) ** 2)
 
-        # координата точки на полилинии: откладываем g_i от апекса
-        theta = math.atan2(y_arc - apex[1], x_arc - apex[0])
-        x_pt = apex[0] + g_i * math.cos(theta)
-        y_pt = apex[1] + g_i * math.sin(theta)
-        result_pts.append((x_pt, y_pt))
+    # Строим развертку конуса и получаем точку апекса развертки
+    cone = at_cone_sheet(model, input_point, diameter_base, diameter_top, height, layer_name="0")
+    cone_points_list, input_point, apex, theta_rad = cone
 
-    # Строим полилинию через add_polyline
-    polyline = add_polyline(model, result_pts, layer_name=layer_intersection, closed=False)
+    print(cone_points_list, input_point, apex, theta_rad, sep="\n")
 
-    # Контрольный вывод
-    print("--- at_nozzle_cone_sheet: контроль вывода ---")
-    print("Input (d1, d2, D, H):", d1, d2, D, H)
-    print("Used diameter_base (d2) =", d2)
-    print("Apex:", apex)
-    print("\nPoints on unfolded cone (N+1 = {}):".format(N+1))
-    pprint(result_pts)
-    print("\nCalculated generatrix lengths (g_i):")
-    pprint(lengths)
-    print("--- end control ---")
+    # Вычисляем длину первой образующей — r2 - он же радиус внешней дуги развертки конуса
+    p2 = (cone_points_list[1][0], cone_points_list[1][1])
+    r2 = distance_2points(apex, p2)
+    print(f"r2 = {r2}")
 
-    return polyline, apex, result_pts, lengths
+    # Находим угол сегмента
+    angle = theta_rad / N
+
+    # Список точек внешней дуги
+    arc_points = make_cone_arc_points(apex, r2, theta_rad, N)
+    pprint(f"arc_points = {arc_points}")
+
+    # ------------------------------
+    # Три особые точки внешней дуги
+    # ------------------------------
+
+    # Левая точка (крайняя первая точка полилинии)
+    left_point = cone_points_list[2]
+
+    # Правая точка (последняя точка в списке)
+    right_point = cone_points_list[1]
+
+    # Верхняя точка над апексом: X совпадает, Y = apex.y + r2
+    apex_x, apex_y = apex[:2]
+    top_point = (apex_x, apex_y + r2)
+
+    print("Left point:", left_point)
+    print("Right point:", right_point)
+    print("Top point:", top_point)
 
 
-# ----------------- тест -----------------
+# ----------------- Тест -----------------
 def run_test():
+    """
+    Тестовая функция: собирает примерный словарь параметров (как из GUI) и вызывает main().
+    Здесь model заменён на None — в реальной среде туда будет передаваться объект ModelSpace AutoCAD.
+    """
     acad = ATCadInit()
-    adoc = acad.document
-    model = acad.model_space
-    pt = at_get_point(adoc, prompt="Укажите центр отвода", as_variant=False)
-    d1 = 102.0
-    d2 = 138.0
-    D = 273.0
-    H = 185.78
+    adoc, model = acad.document, acad.model_space
 
-    at_nozzle_cone_sheet(
-        model=model,
-        pt=pt,
-        d1=d1,
-        d2=d2,
-        D=D,
-        H=H,
-        N=12
-    )
+    data = {
+        "model": model,
+        "input_point": [0.0, 0.0],          # пример точки вставки
+        "diameter_top": 102.0,              # верхний диаметр конуса
+        "diameter_base": 138.0,             # нижний диаметр / хорда
+        "diameter_pipe": 273.0,             # диаметр цилиндра
+        "height_full": 185.78,              # H — расстояние от верхнего основания до плоскости оси цилиндра
+        "layout": "LASER-TEXT",              # имя слоя (опционально)
+        "N": 12
+    }
 
+
+    main(data)
 
 if __name__ == "__main__":
     run_test()
