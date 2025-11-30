@@ -150,6 +150,18 @@ def deg_to_rad(angle: float) -> Optional[float]:
     """
     return math.radians(angle)
 
+def rad_to_deg(angle: float) -> Optional[float]:
+    """
+    Конвертирует угол из радиан в градусы.
+
+    Args:
+        angle: Угол в радианах.
+
+    Returns:
+        Угол в градусах.
+    """
+    return math.degrees(angle)
+
 
 def circle_center_from_points(A: Tuple[float, float],
                               B: Tuple[float, float],
@@ -726,5 +738,7 @@ def make_cone_arc_points(
         pts.append((x, y))
 
     return pts
+
+
 
 # Конец модуля

@@ -9,9 +9,64 @@ from pprint import pprint
 from typing import Any, Dict, Optional, Tuple
 
 from config.at_cad_init import ATCadInit
+from programs.at_base import regen
 from programs.at_construction import at_cone_sheet
-from programs.at_geometry import distance_2points, make_cone_arc_points
+from programs.at_geometry import distance_2points, make_cone_arc_points, rad_to_deg
 
+
+def make_generatrix_list(L: float, h: float, h90: float, N: int):
+    """
+    Возвращает список длин образующих для развертки конуса (N+1 шт.).
+    Линейное подобие треугольников даёт:
+        L(phi) = L * k(phi),
+    где k(phi) линейно меняется между:
+        phi=0°   => k = 1
+        phi=90°  => k = h90 / h
+        phi=180° => k = 1
+        phi=270° => k = h90 / h
+        phi=360° => k = 1
+    """
+
+    # коэффициент наименьшей образующей
+    k_min = h90 / h
+
+    # четыре контрольные точки (по кругу 360°)
+    control = {
+        0.0:  1.0,
+        90.0: k_min,
+        180.0: 1.0,
+        270.0: k_min,
+        360.0: 1.0
+    }
+
+    # список образующих
+    result = []
+
+    for i in range(N + 1):
+        phi = 360 * i / N  # текущий угол
+
+        # определяем между какими контрольными точками находится phi
+        if phi <= 90:
+            phi0, phi1 = 0, 90
+        elif phi <= 180:
+            phi0, phi1 = 90, 180
+        elif phi <= 270:
+            phi0, phi1 = 180, 270
+        else:
+            phi0, phi1 = 270, 360
+
+        k0 = control[phi0]
+        k1 = control[phi1]
+
+        # линейная интерполяция коэффициента
+        t = (phi - phi0) / (phi1 - phi0)
+        k = k0 + (k1 - k0) * t
+
+        # длина образующей
+        Lphi = L * k
+        result.append(Lphi)
+
+    return result
 
 def main(params: Dict[str, Any]) -> Tuple[Any, Any, float, float, float, float, str]:
     """
@@ -67,14 +122,54 @@ def main(params: Dict[str, Any]) -> Tuple[Any, Any, float, float, float, float, 
     if layout is None:
         layout = "LASER-TEXT"
 
-    # Находим высоту конуса
+    # Находим высоту усеченного конуса
     height = height_full - math.sqrt((diameter_pipe / 2) ** 2 - (diameter_base / 2) ** 2)
+    print(f'height={height}')
+
+    # высота от плоскости цилиндра до нижнего основания конуса
+    height_lower = height_full - height
+    print(f'height_lower={height_lower}')
+
+    # высота от верхнего основания до апекса
+    height_top = height / (diameter_base / diameter_top - 1)
+    print(f'height_top={height_top}')
+
+    # высота апекса полная
+    h_apex = height + height_top + height_lower
+    print(f'h_apex={h_apex}')
+
+    # высота от апекса до края цилиндра
+    height_cyl = h_apex - (diameter_pipe / 2)
+    print(f'height_cyl={height_cyl}')
+
+    L_full = math.hypot(height + height_top, diameter_base / 2.0)
+    print(f'L_full={L_full}')
+
+    L_top = math.hypot(height_top, diameter_top / 2.0)
+    print(f'L_top={L_top}')
+
+    k = L_full / diameter_base
+    k1 = diameter_top / (h_apex - height_lower - height)
+
+    def D_of_z(z: float) -> float:
+        return k1 * (h_apex - z)
+
+    def L_of_d(d: float) -> float:
+        return k * d
+
+    L_to_cyl = L_of_d(D_of_z(diameter_pipe / 2.0))
+    print(f'L_to_cyl={L_to_cyl}')
+
+
+
+    # ----------------------------------------------------
 
     # Строим развертку конуса и получаем точку апекса развертки
     cone = at_cone_sheet(model, input_point, diameter_base, diameter_top, height, layer_name="0")
+
     cone_points_list, input_point, apex, theta_rad = cone
 
-    print(cone_points_list, input_point, apex, theta_rad, sep="\n")
+    print(f'cone_points_list:{cone_points_list}, input_point:{input_point}, apex:{apex}, theta_rad:', sep="\n")
 
     # Вычисляем длину первой образующей — r2 - он же радиус внешней дуги развертки конуса
     p2 = (cone_points_list[1][0], cone_points_list[1][1])
@@ -83,6 +178,7 @@ def main(params: Dict[str, Any]) -> Tuple[Any, Any, float, float, float, float, 
 
     # Находим угол сегмента
     angle = theta_rad / N
+    print(f'angle={rad_to_deg(angle)}')
 
     # Список точек внешней дуги
     arc_points = make_cone_arc_points(apex, r2, theta_rad, N)
@@ -107,6 +203,7 @@ def main(params: Dict[str, Any]) -> Tuple[Any, Any, float, float, float, float, 
     print("Top point:", top_point)
 
 
+
 # ----------------- Тест -----------------
 def run_test():
     """
@@ -123,12 +220,12 @@ def run_test():
         "diameter_base": 138.0,             # нижний диаметр / хорда
         "diameter_pipe": 273.0,             # диаметр цилиндра
         "height_full": 185.78,              # H — расстояние от верхнего основания до плоскости оси цилиндра
-        "layout": "LASER-TEXT",              # имя слоя (опционально)
+        "layout": "LASER-TEXT",             # имя слоя (опционально)
         "N": 12
     }
 
-
     main(data)
+    regen(adoc)
 
 if __name__ == "__main__":
     run_test()
