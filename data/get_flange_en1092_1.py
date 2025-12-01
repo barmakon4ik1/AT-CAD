@@ -329,7 +329,7 @@ def get_flange_en1092_1(params, db_path="en1092-1.db", verbose: bool = False):
 
 # === 🔧 Тестовый запуск ===
 if __name__ == "__main__":
-    params = {"type": "11", "face": "B1", "DN": "100", "PN": "40"}
+    params = {"type": "11", "face": "B1", "DN": "200", "PN": "16"}
     result = get_flange_en1092_1(params, db_path="en1092-1.db", verbose=True)
 
     print(f'EN1092-1 /{params["type"]} / {params["face"]} / {params["DN"]} / {params["PN"]}')

@@ -13,60 +13,34 @@ from programs.at_base import regen
 from programs.at_construction import at_cone_sheet
 from programs.at_geometry import distance_2points, make_cone_arc_points, rad_to_deg
 
-
-def make_generatrix_list(L: float, h: float, h90: float, N: int):
+def Diameter_of_z(height: float, diameter_top: float, diameter_base: float, z: float) -> float:
     """
-    Возвращает список длин образующих для развертки конуса (N+1 шт.).
-    Линейное подобие треугольников даёт:
-        L(phi) = L * k(phi),
-    где k(phi) линейно меняется между:
-        phi=0°   => k = 1
-        phi=90°  => k = h90 / h
-        phi=180° => k = 1
-        phi=270° => k = h90 / h
-        phi=360° => k = 1
+    Функция нахождения радиуса сечения конуса на высоте z от основания конуса
+    Args:
+        height: высота конуса
+        diameter_top: диаметр верхнего основания
+        diameter_base: диаметр нижнего основания
+        z: высота от основания для расчета диаметра
+
+    Returns:
+        диаметр сечения конуса на высоте z от нижнего основания
     """
+    r2 = diameter_base / 2
+    r1 = diameter_top / 2
+    return 2 * (r2 - z * (r2 - r1) / height)
 
-    # коэффициент наименьшей образующей
-    k_min = h90 / h
+def Generatrix_of_d(L_full: float, diameter_base:float, d: float) -> float:
+    """
+    Функция нахождения длины образующей конуса в зависимости от диаметра сечения
+    Args:
+        L_full: полная длина образующей (от вершины до основания конуса)
+        diameter_base: диаметр основания конуса
+        d: диаметр сечения конуса для поиска длины образующей
 
-    # четыре контрольные точки (по кругу 360°)
-    control = {
-        0.0:  1.0,
-        90.0: k_min,
-        180.0: 1.0,
-        270.0: k_min,
-        360.0: 1.0
-    }
-
-    # список образующих
-    result = []
-
-    for i in range(N + 1):
-        phi = 360 * i / N  # текущий угол
-
-        # определяем между какими контрольными точками находится phi
-        if phi <= 90:
-            phi0, phi1 = 0, 90
-        elif phi <= 180:
-            phi0, phi1 = 90, 180
-        elif phi <= 270:
-            phi0, phi1 = 180, 270
-        else:
-            phi0, phi1 = 270, 360
-
-        k0 = control[phi0]
-        k1 = control[phi1]
-
-        # линейная интерполяция коэффициента
-        t = (phi - phi0) / (phi1 - phi0)
-        k = k0 + (k1 - k0) * t
-
-        # длина образующей
-        Lphi = L * k
-        result.append(Lphi)
-
-    return result
+    Returns:
+        длина образующей конуса в зависимости от диаметра сечения
+    """
+    return L_full * d / diameter_base
 
 def main(params: Dict[str, Any]) -> Tuple[Any, Any, float, float, float, float, str]:
     """
@@ -122,6 +96,10 @@ def main(params: Dict[str, Any]) -> Tuple[Any, Any, float, float, float, float, 
     if layout is None:
         layout = "LASER-TEXT"
 
+    # -------------------------------------
+    # Расчет основных параметров
+    # -------------------------------------
+
     # Находим высоту усеченного конуса
     height = height_full - math.sqrt((diameter_pipe / 2) ** 2 - (diameter_base / 2) ** 2)
     print(f'height={height}')
@@ -130,78 +108,74 @@ def main(params: Dict[str, Any]) -> Tuple[Any, Any, float, float, float, float, 
     height_lower = height_full - height
     print(f'height_lower={height_lower}')
 
-    # высота от верхнего основания до апекса
+    # высота от верхнего основания до вершины конуса
     height_top = height / (diameter_base / diameter_top - 1)
     print(f'height_top={height_top}')
 
-    # высота апекса полная
-    h_apex = height + height_top + height_lower
-    print(f'h_apex={h_apex}')
+    # высота полная - от плоскости цилиндра до вершины конуса
+    height_apex = height + height_top + height_lower
+    print(f'height_apex={height_apex}')
 
-    # высота от апекса до края цилиндра
-    height_cyl = h_apex - (diameter_pipe / 2)
+    # высота от вершины конуса до края цилиндра
+    height_cyl = height_apex - (diameter_pipe / 2)
     print(f'height_cyl={height_cyl}')
 
+    # образующая полного конуса (от вершины до нижнего основания конуса) - максимальная образующая
     L_full = math.hypot(height + height_top, diameter_base / 2.0)
     print(f'L_full={L_full}')
 
+    # образующая от вершины до верхнего основания конуса
     L_top = math.hypot(height_top, diameter_top / 2.0)
     print(f'L_top={L_top}')
 
-    k = L_full / diameter_base
-    k1 = diameter_top / (h_apex - height_lower - height)
-
-    def D_of_z(z: float) -> float:
-        return k1 * (h_apex - z)
-
-    def L_of_d(d: float) -> float:
-        return k * d
-
-    L_to_cyl = L_of_d(D_of_z(diameter_pipe / 2.0))
+    # Расчет образующей в крайней точке цилиндра - минимальная образующая для линии пересечения конуса с цилиндром
+    z = height - (height_full - diameter_pipe / 2.0)
+    d_of_z = Diameter_of_z(height, diameter_top, diameter_base, z)
+    L_to_cyl = Generatrix_of_d(L_full, diameter_base, d_of_z)
+    print(f'diameter of cone by R_pipe ={d_of_z}')
     print(f'L_to_cyl={L_to_cyl}')
 
 
 
     # ----------------------------------------------------
 
-    # Строим развертку конуса и получаем точку апекса развертки
-    cone = at_cone_sheet(model, input_point, diameter_base, diameter_top, height, layer_name="0")
+    # # Строим развертку конуса и получаем точку апекса развертки
+    # cone = at_cone_sheet(model, input_point, diameter_base, diameter_top, height, layer_name="0")
+    #
+    # cone_points_list, input_point, apex, theta_rad = cone
+    #
+    # print(f'cone_points_list:{cone_points_list}, input_point:{input_point}, apex:{apex}, theta_rad:', sep="\n")
+    #
+    # # Вычисляем длину первой образующей — r2 - он же радиус внешней дуги развертки конуса
+    # p2 = (cone_points_list[1][0], cone_points_list[1][1])
+    # r2 = distance_2points(apex, p2)
+    # print(f"r2 = {r2}")
+    #
+    # # Находим угол сегмента
+    # angle = theta_rad / N
+    # print(f'angle={rad_to_deg(angle)}')
+    #
+    # # Список точек внешней дуги
+    # # arc_points = make_cone_arc_points(apex, r2, theta_rad, N)
+    # # pprint(f"arc_points = {arc_points}")
+    #
+    # # ------------------------------
+    # # Три особые точки внешней дуги
+    # # ------------------------------
+    #
+    # # Левая точка (крайняя первая точка полилинии)
+    # left_point = cone_points_list[2]
+    #
+    # # Правая точка (последняя точка в списке)
+    # right_point = cone_points_list[1]
+    #
+    # # Верхняя точка над апексом: X совпадает, Y = apex.y + r2
+    # apex_x, apex_y = apex[:2]
+    # top_point = (apex_x, apex_y + r2)
 
-    cone_points_list, input_point, apex, theta_rad = cone
-
-    print(f'cone_points_list:{cone_points_list}, input_point:{input_point}, apex:{apex}, theta_rad:', sep="\n")
-
-    # Вычисляем длину первой образующей — r2 - он же радиус внешней дуги развертки конуса
-    p2 = (cone_points_list[1][0], cone_points_list[1][1])
-    r2 = distance_2points(apex, p2)
-    print(f"r2 = {r2}")
-
-    # Находим угол сегмента
-    angle = theta_rad / N
-    print(f'angle={rad_to_deg(angle)}')
-
-    # Список точек внешней дуги
-    arc_points = make_cone_arc_points(apex, r2, theta_rad, N)
-    pprint(f"arc_points = {arc_points}")
-
-    # ------------------------------
-    # Три особые точки внешней дуги
-    # ------------------------------
-
-    # Левая точка (крайняя первая точка полилинии)
-    left_point = cone_points_list[2]
-
-    # Правая точка (последняя точка в списке)
-    right_point = cone_points_list[1]
-
-    # Верхняя точка над апексом: X совпадает, Y = apex.y + r2
-    apex_x, apex_y = apex[:2]
-    top_point = (apex_x, apex_y + r2)
-
-    print("Left point:", left_point)
-    print("Right point:", right_point)
-    print("Top point:", top_point)
-
+    # print("Left point:", left_point)
+    # print("Right point:", right_point)
+    # print("Top point:", top_point)
 
 
 # ----------------- Тест -----------------
