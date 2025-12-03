@@ -203,7 +203,7 @@ def at_get_point(adoc: object = None,
         logging.error(f"Ошибка COM-ввода точки: {e}", exc_info=True)
         if not suppress_popups:
             show_popup(f"{loc.get('bridge_error_point')}: {e}", popup_type="error")
-        return None
+        return [0, 0, 0]
 
 
 def at_get_entity(adoc: object = None,
