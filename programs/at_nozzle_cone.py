@@ -5,7 +5,7 @@ programs/at_nozzle_cone.py
 Построение развертки линии пересечения усечённого конуса и цилиндра (патрубок/врезка).
 Модуль разработан в стиле и API, совместимом с programs/at_nozzle.py.
 
-Автор: (адаптация от A.Tutubalin)
+Автор: A.Tutubalin
 Дата: 2025
 """
 
@@ -119,6 +119,14 @@ def rotate_points(points: List[List[float]], angle_deg: float,
         out.append([rx + ox, ry + oy])
     return out
 
+# -----------------------------
+# Основная функция
+# -----------------------------
+def main(data):
+    """
+    Чтобы функция корректно работала в связке с остальными программами в основном окне.
+    """
+    return at_nozzle_cone(data)
 
 # ---------------------------------------------------------------------------
 # Основная логика: парсер входного словаря -> геометрия -> развертка
@@ -147,28 +155,18 @@ def at_nozzle_cone(data: Dict[str, Any], params=None) -> bool:
             show_popup(loc.get("no_data_error"), popup_type="error")
             return False
 
-        # --- чтение и маппинг параметров (совместимость с at_nozzle)
+        # --- чтение и маппинг параметров
         insert_point = data.get("insert_point")
         if insert_point is None:
-            show_popup(loc.get("no_data_error"), popup_type="error")
-            return False
+            at_get_point(adoc, prompt=loc.get("select_point", "Укажите точку вставки"), as_variant=False)
 
-        # mаппинг названий:
-        # diameter -> diameter_base
-        # diameter_main -> diameter_pipe
-        diameter_base = float(data.get("diameter", data.get("diameter_base", 0.0)))
-        diameter_pipe = float(data.get("diameter_main", data.get("diameter_pipe", 0.0)))
-        # length -> height_full
-        height_full = float(data.get("length", data.get("height_full", 0.0)))
-        # дополнительный верхний диаметр (для конуса) — обязательный
-        # в at_nozzle его нет: ожидаем ключ 'diameter_top' либо используем 'd_top' если передали
-        diameter_top = float(data.get("diameter_top", data.get("d_top", 0.0)))
+        diameter_base = float(data.get("diameter_base", 0.0))
+        diameter_pipe = float(data.get("diameter_pipe", 0.0))
+        height_full = float(data.get("height_full", 0.0))
+        diameter_top = float(data.get("diameter_top", 0.0))
 
         # остальное — дополнительный набор (по умолчанию)
-        weld_allowance = float(data.get("weld_allowance", 0.0))
-        # accuracy -> N
-        N = int(data.get("accuracy", data.get("N", 360)))
-        mode = data.get("mode", "polyline").lower()
+        N = int(data.get("N", 360))
         material = data.get("material", "")
         thickness = float(data.get("thickness", 0.0))
         order_number = data.get("order_number", "")
@@ -186,11 +184,6 @@ def at_nozzle_cone(data: Dict[str, Any], params=None) -> bool:
         if N <= 2:
             show_popup("Invalid accuracy (N)", popup_type="error")
             return False
-
-        # Если указан mode отличный от polyline — предупреждение (на данный момент поддерживаем polyline)
-        if mode != "polyline":
-            logging.warning(loc.get("unknown_mode").format(mode))
-            # но продолжаем, используем polyline логикой
 
         # ---------------------------------------------------------------------
         # Геометрические вычисления
@@ -283,7 +276,7 @@ def at_nozzle_cone(data: Dict[str, Any], params=None) -> bool:
         # ---------------------------------------------------------------------
         pts_flat = build_intersection_points_on_flat(apex, theta_rad, gens)
 
-        # Поворот: чтобы апекс оказался внизу (как у тебя было)
+        # Поворот: чтобы апекс оказался внизу
         rotate_angle = 90.0 - rad_to_deg(theta_rad) / 2.0
         pts_rot = rotate_points(pts_flat, rotate_angle, origin=apex)
 
@@ -302,28 +295,6 @@ def at_nozzle_cone(data: Dict[str, Any], params=None) -> bool:
         text_h = TEXT_HEIGHT_BIG
         text_s = TEXT_HEIGHT_SMALL
         text_point = polar_point(insert_point, 300, 0, as_variant=False)
-
-        # data_text = {
-        #     "order": params.get("order", ""),
-        #     "detail": params.get("detail", ""),
-        #     "material": params.get("material", ""),
-        #     "thickness": params.get("thickness", ""),
-        #     "diameter_base": diameter_base,
-        #     "diameter_top": diameter_top,
-        #     "diameter_pipe": diameter_pipe,
-        #     "height_full": height_full,
-        # }
-        #
-        # # Многострочный текст в нужном формате
-        # note_text = (
-        #     f"Komm.Nr: {data_text['order']}-{data_text['detail']}\n"
-        #     f"Wst: {data_text['material']}\n"
-        #     f"Dicke = {data_text['thickness']}\n"
-        #     f"D_unten = {data_text['diameter_base']}\n"
-        #     f"D_oben  = {data_text['diameter_top']}\n"
-        #     f"D_Rohr = {data_text['diameter_pipe']}\n"
-        #     f"L = {data_text['height_full']}"
-        # )
 
         # Список текстов для добавления
         text_configs = [
@@ -430,7 +401,7 @@ def at_nozzle_cone(data: Dict[str, Any], params=None) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Простой запуск для тестирования (как в at_nozzle.py)
+# Простой запуск для тестирования
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
@@ -442,13 +413,11 @@ if __name__ == "__main__":
 
     sample = {
         "insert_point": insert,
-        "diameter": 138.0,         # diameter -> diameter_base
-        "diameter_main": 273.0,    # diameter_main -> diameter_pipe
-        "diameter_top": 102.0,     # верхний диаметр конуса
-        "length": 185.78,          # length -> height_full
-        "weld_allowance": 0.0,
-        "accuracy": 360,
-        "mode": "polyline",
+        "diameter_base": 138.0,
+        "diameter_pipe": 273.0,
+        "diameter_top": 102.0,
+        "height_full": 185.78,
+        "N": 360,
         "material": "1.4301",
         "thickness": 0.0,
         "order_number": "20310",
