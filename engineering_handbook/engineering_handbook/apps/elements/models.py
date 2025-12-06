@@ -1,5 +1,10 @@
 from django.db import models
 
+class GroupElement(models.Model):
+    group = models.CharField(max_length=10, null=True, blank=True)
+
+
+
 class Element(models.Model):
     atomic_number = models.PositiveSmallIntegerField(unique=True)
     symbol = models.CharField(max_length=3, unique=True)
@@ -45,3 +50,4 @@ class Element(models.Model):
 
     def __str__(self):
         return f"{self.symbol} ({self.atomic_number})"
+
