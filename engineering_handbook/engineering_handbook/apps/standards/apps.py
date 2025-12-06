@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class MaterialsConfig(AppConfig):
+class StandardsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'materials'
+    name = "engineering_handbook.apps.standards"

@@ -2,7 +2,11 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+from pathlib import Path
 
+# Добавляем родительскую папку в sys.path, чтобы Python видел пакет engineering_handbook
+BASE_DIR = Path(__file__).resolve().parent
+sys.path.append(str(BASE_DIR.parent))  # теперь E:\AT-CAD в пути
 
 def main():
     """Run administrative tasks."""
@@ -16,7 +20,6 @@ def main():
             "forget to activate a virtual environment?"
         ) from exc
     execute_from_command_line(sys.argv)
-
 
 if __name__ == '__main__':
     main()

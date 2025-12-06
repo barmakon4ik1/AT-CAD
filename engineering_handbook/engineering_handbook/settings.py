@@ -18,7 +18,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     # наши приложения
-    'apps.materials',
+    'engineering_handbook.apps.elements',
+    'engineering_handbook.apps.materials',
+    'engineering_handbook.apps.units',
+    'engineering_handbook.apps.bolts',
+    'engineering_handbook.apps.flanges',
 
 ]
 
