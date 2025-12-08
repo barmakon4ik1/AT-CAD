@@ -4,6 +4,10 @@ from django.db import models
 # --- Группа по номеру (1–18) ---
 class GroupNumber(models.Model):
     number = models.PositiveSmallIntegerField(unique=True)
+    name = models.CharField(max_length=100, blank=True)
+    name_en = models.CharField(max_length=100, blank=True)
+    name_ru = models.CharField(max_length=100, blank=True)
+    name_de = models.CharField(max_length=100, blank=True)
 
     class Meta:
         verbose_name = "Номер группы"
@@ -26,7 +30,7 @@ class GroupElement(models.Model):
         verbose_name_plural = "Химические группы"
 
     def __str__(self):
-        return self.title
+        return self.title_ru
 
 
 

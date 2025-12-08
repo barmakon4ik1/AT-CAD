@@ -500,7 +500,7 @@ class NozzleContentPanel(BaseContentPanel):
                 return None
 
             thickness = parse_float(self.thickness_combo.GetValue())
-            if thickness is None or thickness <= 0:
+            if thickness is None or thickness < 0:
                 show_popup(
                     loc.get("invalid_input", "Некорректный ввод: {0}").format(loc.get("thickness_label", "Толщина, S")),
                     popup_type="error")

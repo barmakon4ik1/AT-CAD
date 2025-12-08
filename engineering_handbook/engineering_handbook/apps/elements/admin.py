@@ -16,9 +16,10 @@ class ElementAdmin(admin.ModelAdmin):
     list_display = (
         'atomic_number',
         'symbol',
+        'name',
         'name_en',
         'name_ru',
-        'electron_configuration',
+        'name_de',
         'period',
         'group_number',
         'standard_state',
@@ -28,7 +29,6 @@ class ElementAdmin(admin.ModelAdmin):
         'group_number',
         'group',
         'standard_state',
-        'block',
     )
     search_fields = (
         'symbol',
@@ -54,7 +54,7 @@ class GroupElementAdmin(admin.ModelAdmin):
 # -----------------------------
 @admin.register(GroupNumber)
 class GroupNumberAdmin(admin.ModelAdmin):
-    list_display = ('number',)
+    list_display = ('number','name_ru')
     ordering = ('number',)
 
 
