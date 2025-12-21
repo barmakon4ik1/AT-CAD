@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     'engineering_handbook.apps.units',
     'engineering_handbook.apps.bolts',
     'engineering_handbook.apps.flanges',
+    'engineering_handbook.apps.standards',
 
 ]
 
