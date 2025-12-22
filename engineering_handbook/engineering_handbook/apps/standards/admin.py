@@ -73,7 +73,7 @@ class StandardEditionOrganizationInline(admin.TabularInline):
 
 @admin.register(BaseStandard)
 class BaseStandardAdmin(admin.ModelAdmin):
-    list_display = ("__str__", "title_en")
+    list_display = ("__str__", "separator", "title_en")
     search_fields = (
         "series__organization__code",
         "series__code",
@@ -85,10 +85,8 @@ class BaseStandardAdmin(admin.ModelAdmin):
     list_filter = ("series__organization",)
     ordering = ("series__organization__code", "series__code", "number")
 
-    inlines = [
-        StandardPartInline,
-        StandardEditionInline,
-    ]
+    inlines = [StandardPartInline, StandardEditionInline]
+
 
 
 # ============================================================

@@ -30,6 +30,7 @@ class StandardSeries(models.Model):
     )
 
     code = models.CharField(max_length=50)  # 1092, B16, 7005
+
     title_en = models.CharField(max_length=300, blank=True)
     title_ru = models.CharField(max_length=300, blank=True)
     title_de = models.CharField(max_length=300, blank=True)
@@ -55,6 +56,11 @@ class BaseStandard(models.Model):
     )
 
     number = models.CharField(max_length=50)  # 1, 5, 1-1
+    separator = models.CharField(
+        max_length=1,
+        default="-",
+        help_text="Разделитель между серией и номером ('.' или '-')"
+    )
     title_en = models.CharField(max_length=500)
     title_ru = models.CharField(max_length=500, blank=True)
     title_de = models.CharField(max_length=500, blank=True)
@@ -66,7 +72,7 @@ class BaseStandard(models.Model):
 
 
     def __str__(self):
-        return f"{self.series}-{self.number}"
+        return f"{self.series}{self.separator}{self.number}"
 
 
 class StandardPart(models.Model):
