@@ -55,11 +55,13 @@ class BaseStandard(models.Model):
         related_name="base_standards"
     )
 
-    number = models.CharField(max_length=50)  # 1, 5, 1-1
+    number = models.CharField(max_length=50, blank=True, null=True)  # 1, 5, 1-1
     separator = models.CharField(
         max_length=1,
         default="-",
-        help_text="Разделитель между серией и номером ('.' или '-')"
+        help_text="Разделитель между серией и номером ('.' или '-')",
+        blank=True,
+        null=True
     )
     title_en = models.CharField(max_length=500)
     title_ru = models.CharField(max_length=500, blank=True)

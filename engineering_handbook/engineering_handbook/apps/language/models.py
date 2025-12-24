@@ -1,4 +1,6 @@
 from django.db import models
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 
 
 class Language(models.Model):
@@ -24,20 +26,9 @@ class Language(models.Model):
         help_text="Language name in its own language"
     )
 
-    is_active = models.BooleanField(
-        default=True,
-        help_text="Is language available for selection"
-    )
-
-    is_default = models.BooleanField(
-        default=False,
-        help_text="Default system language"
-    )
-
-    sort_order = models.PositiveSmallIntegerField(
-        default=0,
-        help_text="Ordering in UI"
-    )
+    is_active = models.BooleanField(default=True)
+    is_default = models.BooleanField(default=False)
+    sort_order = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
         verbose_name = "Язык"
@@ -46,4 +37,52 @@ class Language(models.Model):
 
     def __str__(self):
         return f"{self.code} — {self.name}"
+
+
+class Translation(models.Model):
+    """
+    Universal translation for any model and field.
+    """
+
+    content_type = models.ForeignKey(
+        ContentType,
+        on_delete=models.CASCADE,
+        verbose_name="Модель"
+    )
+
+    object_id = models.PositiveIntegerField(
+        verbose_name="ID объекта"
+    )
+
+    content_object = GenericForeignKey(
+        "content_type",
+        "object_id"
+    )
+
+    field = models.CharField(
+        max_length=50,
+        help_text="Translated field name (name, description, title, etc.)"
+    )
+
+    language = models.ForeignKey(
+        Language,
+        on_delete=models.PROTECT,
+        related_name="translations"
+    )
+
+    text = models.TextField()
+
+    class Meta:
+        verbose_name = "Перевод"
+        verbose_name_plural = "Переводы"
+        unique_together = (
+            "content_type",
+            "object_id",
+            "field",
+            "language",
+        )
+        ordering = ["content_type", "object_id", "field", "language"]
+
+    def __str__(self):
+        return f"{self.content_object} [{self.field}] ({self.language.code})"
 
