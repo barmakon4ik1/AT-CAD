@@ -60,7 +60,7 @@ class Material(models.Model):
     )
 
     main_group = models.PositiveSmallIntegerField(
-        help_text="1=Steel, 2=Heavy metals, 3=Light metals"
+        help_text="1 = Steel, 2 = Heavy metals, 3 = Light metals"
     )
 
     steel_group_en10020 = models.PositiveSmallIntegerField(
@@ -97,6 +97,11 @@ class Material(models.Model):
 
 
 class MaterialSymbolicName(models.Model):
+    """
+    Symbolic designation according to a specific standard
+    (e.g. X6CrNiMoTi17-12-2)
+    """
+
     material = models.ForeignKey(
         Material,
         on_delete=models.CASCADE,
@@ -109,10 +114,9 @@ class MaterialSymbolicName(models.Model):
     )
 
     standard = models.ForeignKey(
-        "standards.Standard",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True
+        "standards.StandardEdition",
+        on_delete=models.PROTECT,
+        related_name="symbolic_materials"
     )
 
     is_preferred = models.BooleanField(default=False)
@@ -125,6 +129,12 @@ class MaterialSymbolicName(models.Model):
 
 
 class MaterialEquivalent(models.Model):
+    """
+    Equivalent or comparable material designation
+    according to another standard system
+    (e.g. AISI 316L, UNS S31635)
+    """
+
     material = models.ForeignKey(
         Material,
         on_delete=models.CASCADE,
@@ -132,8 +142,9 @@ class MaterialEquivalent(models.Model):
     )
 
     standard = models.ForeignKey(
-        "standards.Standard",
-        on_delete=models.CASCADE
+        "standards.StandardEdition",
+        on_delete=models.PROTECT,
+        related_name="material_equivalents"
     )
 
     designation = models.CharField(
@@ -160,3 +171,53 @@ class MaterialEquivalent(models.Model):
         return self.designation
 
 
+class MaterialChemicalComposition(models.Model):
+    material = models.ForeignKey(
+        Material,
+        on_delete=models.CASCADE,
+        related_name="chemical_compositions"
+    )
+
+    standard = models.ForeignKey(
+        "standards.StandardEdition",
+        on_delete=models.PROTECT,
+        help_text="Standard defining chemical composition"
+    )
+
+    class Meta:
+        unique_together = ("material", "standard")
+        verbose_name = "Химический состав материала"
+        verbose_name_plural = "Химические составы материалов"
+
+    def __str__(self):
+        return f"{self.material} – {self.standard}"
+
+
+class MaterialChemicalElement(models.Model):
+    composition = models.ForeignKey(
+        MaterialChemicalComposition,
+        on_delete=models.CASCADE,
+        related_name="elements"
+    )
+
+    element = models.ForeignKey(
+        "elements.ChemicalElement",
+        on_delete=models.PROTECT
+    )
+
+    unit = models.ForeignKey(
+        "units.Unit",
+        on_delete=models.PROTECT,
+        limit_choices_to={"key": "percent"}
+    )
+
+    min_value = models.FloatField(default=0.0)
+    max_value = models.FloatField()
+
+    class Meta:
+        unique_together = ("composition", "element")
+        verbose_name = "Химический элемент"
+        verbose_name_plural = "Химические элементы"
+
+    def __str__(self):
+        return f"{self.element.symbol}: {self.min_value}–{self.max_value} %"

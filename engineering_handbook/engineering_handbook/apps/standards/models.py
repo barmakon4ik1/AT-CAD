@@ -72,9 +72,17 @@ class BaseStandard(models.Model):
         verbose_name_plural = "Базовые стандарты"
         unique_together = ("series", "number")
 
-
     def __str__(self):
-        return f"{self.series}{self.separator}{self.number}"
+        parts = []
+
+        if self.series:
+            parts.append(str(self.series))  # EN 1092
+
+        if self.number:
+            sep = self.separator or "-"
+            parts[-1] = f"{parts[-1]}{sep}{self.number}"
+
+        return " ".join(parts)
 
 
 class StandardPart(models.Model):
