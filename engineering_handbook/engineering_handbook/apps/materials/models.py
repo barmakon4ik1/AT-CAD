@@ -1,4 +1,9 @@
 from django.db import models
+from django.contrib.contenttypes.fields import GenericRelation
+
+from ..units.models import Unit, PhysicalQuantity
+from ..language.models import Translation
+from ..standards.models import StandardEdition
 
 
 class MaterialCategory(models.Model):
@@ -122,7 +127,7 @@ class MaterialSymbolicName(models.Model):
     is_preferred = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = ("material", "symbol")
+        unique_together = ("material", "standard", "symbol")
 
     def __str__(self):
         return self.symbol
@@ -201,7 +206,7 @@ class MaterialChemicalElement(models.Model):
     )
 
     element = models.ForeignKey(
-        "elements.ChemicalElement",
+        "elements.Element",
         on_delete=models.PROTECT
     )
 
@@ -221,3 +226,279 @@ class MaterialChemicalElement(models.Model):
 
     def __str__(self):
         return f"{self.element.symbol}: {self.min_value}–{self.max_value} %"
+
+
+class AbstractPropertyType(models.Model):
+    """
+    Abstract definition of a material property
+    """
+
+    key = models.CharField(max_length=50, unique=True)
+    symbol = models.CharField(max_length=20, blank=True)
+
+    physical_quantity = models.ForeignKey(
+        PhysicalQuantity,
+        on_delete=models.PROTECT
+    )
+
+    default_unit = models.ForeignKey(
+        Unit,
+        on_delete=models.PROTECT
+    )
+
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    translations = GenericRelation(Translation)
+
+    class Meta:
+        abstract = True
+        ordering = ("sort_order", "key")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["key", "physical_quantity"],
+                name="uniq_property_key_quantity"
+            )
+        ]
+
+    def __str__(self):
+        return self.key
+
+
+class MechanicalPropertyType(AbstractPropertyType):
+    class Meta:
+        verbose_name = "Тип механического свойства"
+        verbose_name_plural = "Типы механических свойств"
+
+
+class PhysicalPropertyType(AbstractPropertyType):
+    class Meta:
+        verbose_name = "Тип физического свойства"
+        verbose_name_plural = "Типы физических свойств"
+
+
+class AbstractPropertySet(models.Model):
+    material = models.ForeignKey(
+        "Material",
+        on_delete=models.CASCADE
+    )
+
+    standard_edition = models.ForeignKey(
+        StandardEdition,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+
+    temperature_min = models.FloatField(null=True, blank=True)
+    temperature_max = models.FloatField(null=True, blank=True)
+
+    temperature_unit = models.ForeignKey(
+        Unit,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+"
+    )
+
+    class Meta:
+        abstract = True
+
+
+class MaterialMechanicalPropertySet(AbstractPropertySet):
+    class Meta:
+        verbose_name = "Набор механических свойств"
+        verbose_name_plural = "Наборы механических свойств"
+
+
+class MaterialPhysicalPropertySet(AbstractPropertySet):
+    class Meta:
+        verbose_name = "Набор физических свойств"
+        verbose_name_plural = "Наборы физических свойств"
+
+
+class AbstractPropertyValue(models.Model):
+    min_value = models.FloatField()
+    max_value = models.FloatField()
+
+    unit = models.ForeignKey(
+        Unit,
+        on_delete=models.PROTECT
+    )
+
+    class Meta:
+        abstract = True
+
+
+class MaterialMechanicalProperty(AbstractPropertyValue):
+    property_set = models.ForeignKey(
+        MaterialMechanicalPropertySet,
+        on_delete=models.CASCADE,
+        related_name="properties"
+    )
+
+    property_type = models.ForeignKey(
+        MechanicalPropertyType,
+        on_delete=models.PROTECT
+    )
+
+    class Meta:
+        unique_together = ("property_set", "property_type")
+
+
+class MaterialPhysicalProperty(AbstractPropertyValue):
+    property_set = models.ForeignKey(
+        MaterialPhysicalPropertySet,
+        on_delete=models.CASCADE,
+        related_name="properties"
+    )
+
+    property_type = models.ForeignKey(
+        PhysicalPropertyType,
+        on_delete=models.PROTECT
+    )
+
+    class Meta:
+        unique_together = ("property_set", "property_type")
+
+
+class HeatTreatmentType(models.Model):
+    """
+    Type of heat treatment
+    (Annealing, Quenching, Tempering, Normalizing, etc.)
+    """
+
+    key = models.CharField(
+        max_length=50,
+        unique=True,
+        help_text="annealing, quenching, tempering, solution_annealing"
+    )
+
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    translations = GenericRelation(Translation)
+
+    class Meta:
+        verbose_name = "Тип термообработки"
+        verbose_name_plural = "Типы термообработки"
+        ordering = ("sort_order", "key")
+
+    def __str__(self):
+        return self.key
+
+
+class HeatTreatmentType(models.Model):
+    """
+    Type of heat treatment
+    (Annealing, Quenching, Tempering, Normalizing, etc.)
+    """
+
+    key = models.CharField(
+        max_length=50,
+        unique=True,
+        help_text="annealing, quenching, tempering, solution_annealing"
+    )
+
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    translations = GenericRelation(Translation)
+
+    class Meta:
+        verbose_name = "Тип термообработки"
+        verbose_name_plural = "Типы термообработки"
+        ordering = ("sort_order", "key")
+
+    def __str__(self):
+        return self.key
+
+
+class MaterialHeatTreatment(models.Model):
+    """
+    Heat treatment definition for a material
+    """
+
+    material = models.ForeignKey(
+        Material,
+        on_delete=models.CASCADE,
+        related_name="heat_treatments"
+    )
+
+    heat_treatment_type = models.ForeignKey(
+        HeatTreatmentType,
+        on_delete=models.PROTECT,
+        related_name="material_heat_treatments"
+    )
+
+    standard_edition = models.ForeignKey(
+        StandardEdition,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Standard defining this heat treatment"
+    )
+
+    is_recommended = models.BooleanField(
+        default=True,
+        help_text="Recommended / typical heat treatment"
+    )
+
+    notes = GenericRelation(Translation)
+
+    class Meta:
+        verbose_name = "Термообработка материала"
+        verbose_name_plural = "Термообработки материалов"
+        unique_together = ("material", "heat_treatment_type", "standard_edition")
+
+    def __str__(self):
+        return f"{self.material} – {self.heat_treatment_type}"
+
+
+class HeatTreatmentStep(models.Model):
+    """
+    Single step of heat treatment
+    (heating, holding, cooling)
+    """
+
+    heat_treatment = models.ForeignKey(
+        MaterialHeatTreatment,
+        on_delete=models.CASCADE,
+        related_name="steps"
+    )
+
+    step_order = models.PositiveSmallIntegerField()
+
+    temperature_min = models.FloatField(null=True, blank=True)
+    temperature_max = models.FloatField(null=True, blank=True)
+
+    temperature_unit = models.ForeignKey(
+        Unit,
+        on_delete=models.PROTECT,
+        related_name="+"
+    )
+
+    time_min = models.FloatField(null=True, blank=True)
+    time_max = models.FloatField(null=True, blank=True)
+
+    time_unit = models.ForeignKey(
+        Unit,
+        on_delete=models.PROTECT,
+        related_name="+"
+    )
+
+    cooling_medium = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="water, oil, air, furnace"
+    )
+
+    notes = GenericRelation(Translation)
+
+    class Meta:
+        verbose_name = "Шаг термообработки"
+        verbose_name_plural = "Шаги термообработки"
+        ordering = ("step_order",)
+
+    def __str__(self):
+        return f"Step {self.step_order}"
