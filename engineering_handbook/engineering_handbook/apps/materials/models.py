@@ -388,32 +388,6 @@ class HeatTreatmentType(models.Model):
         return self.key
 
 
-class HeatTreatmentType(models.Model):
-    """
-    Type of heat treatment
-    (Annealing, Quenching, Tempering, Normalizing, etc.)
-    """
-
-    key = models.CharField(
-        max_length=50,
-        unique=True,
-        help_text="annealing, quenching, tempering, solution_annealing"
-    )
-
-    sort_order = models.PositiveSmallIntegerField(default=0)
-    is_active = models.BooleanField(default=True)
-
-    translations = GenericRelation(Translation)
-
-    class Meta:
-        verbose_name = "Тип термообработки"
-        verbose_name_plural = "Типы термообработки"
-        ordering = ("sort_order", "key")
-
-    def __str__(self):
-        return self.key
-
-
 class MaterialHeatTreatment(models.Model):
     """
     Heat treatment definition for a material
