@@ -6,6 +6,24 @@ from ..language.models import Translation
 from ..standards.models import StandardEdition
 
 
+class StandardSystem(models.Model):
+    """
+    Top-level standard system (EN, ASME, ASTM, etc.)
+    """
+    key = models.CharField(max_length=20, unique=True)   # EN, ASME
+    name = models.CharField(max_length=100)              # European Norms, ASME BPVC
+    is_primary = models.BooleanField(default=False)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ("sort_order", "key")
+        verbose_name = "Система стандартов"
+        verbose_name_plural = "Системы стандартов"
+
+    def __str__(self):
+        return self.key
+
+
 class MaterialCategory(models.Model):
     """
     Metallurgical category
@@ -57,6 +75,13 @@ class Material(models.Model):
     """
     Base material according to DIN EN 10027-2
     """
+    standard_system = models.ForeignKey(
+        StandardSystem,
+        on_delete=models.PROTECT,
+        related_name="materials",
+        null=True,
+        blank=True
+    )
 
     material_number = models.CharField(
         max_length=10,
@@ -476,3 +501,62 @@ class HeatTreatmentStep(models.Model):
 
     def __str__(self):
         return f"Step {self.step_order}"
+
+
+class ASMEMaterial(models.Model):
+    standard_system = models.ForeignKey(
+        StandardSystem,
+        on_delete=models.PROTECT,
+        limit_choices_to={"key": "ASME"}
+    )
+
+    specification = models.CharField(max_length=20)  # SA-240
+    grade = models.CharField(max_length=50)          # Type 316L
+    uns_number = models.CharField(max_length=10, blank=True)
+
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        unique_together = ("specification", "grade")
+
+    def __str__(self):
+        return f"{self.specification} {self.grade}"
+
+
+class MaterialAnalogue(models.Model):
+    """
+    Cross-standard material analogue
+    """
+    from_system = models.ForeignKey(
+        StandardSystem,
+        on_delete=models.CASCADE,
+        related_name="analogues_from"
+    )
+
+    to_system = models.ForeignKey(
+        StandardSystem,
+        on_delete=models.CASCADE,
+        related_name="analogues_to"
+    )
+
+    from_material_code = models.CharField(max_length=50)
+    to_material_code = models.CharField(max_length=50)
+
+    equivalence_type = models.CharField(
+        max_length=20,
+        choices=[
+            ("equivalent", "Equivalent"),
+            ("comparable", "Comparable"),
+            ("approximate", "Approximate"),
+        ]
+    )
+
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Аналог материала"
+        verbose_name_plural = "Аналоги материалов"
+
+
+
+
