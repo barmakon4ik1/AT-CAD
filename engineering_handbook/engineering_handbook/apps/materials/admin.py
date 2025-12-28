@@ -1,4 +1,7 @@
 from django.contrib import admin
+from django.utils.html import format_html
+from django.utils.safestring import mark_safe
+
 from .models import (
     StandardSystem,
     MaterialCategory,
@@ -16,6 +19,8 @@ from .models import (
     MaterialPhysicalProperty,
     MaterialAnalogue,
 )
+from ..units.models import Unit
+
 
 # ============================================================
 # Базовые справочники
@@ -106,6 +111,7 @@ class MaterialAdmin(admin.ModelAdmin):
         "material_category",
         "iso_15608_group",
     )
+    readonly_fields = ("material_analogues_view",)
 
     inlines = (
         MaterialSymbolicNameInline,
@@ -122,11 +128,54 @@ class MaterialAdmin(admin.ModelAdmin):
                 "iso_15608_group",
             )
         }),
+        ("Аналоги в других стандартах", {
+            "fields": ("material_analogues_view",),
+        }),
         ("Статус", {
             "fields": ("is_active",)
         }),
     )
 
+    def material_analogues_view(self, obj):
+        if not obj or not obj.standard_system:
+            return "—"
+
+        analogues = MaterialAnalogue.objects.filter(
+            from_system=obj.standard_system,
+            from_material_code=obj.material_number
+        )
+
+        if not analogues.exists():
+            return "Аналоги не заданы"
+
+        rows = []
+        for a in analogues:
+            rows.append(
+                f"""
+                <tr>
+                    <td>{a.to_system.key}</td>
+                    <td>{a.to_material_code}</td>
+                    <td>{a.equivalence_type}</td>
+                </tr>
+                """
+            )
+
+        return mark_safe(f"""
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Система</th>
+                        <th>Материал</th>
+                        <th>Тип соответствия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {''.join(rows)}
+                </tbody>
+            </table>
+        """)
+
+    material_analogues_view.short_description = "Аналоги материала"
 
 # ============================================================
 # Типы свойств
@@ -171,11 +220,21 @@ class MaterialMechanicalPropertyInline(admin.TabularInline):
     extra = 0
     autocomplete_fields = ("property_type",)
 
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj, **kwargs)
+        formset.form.base_fields["unit"].queryset = Unit.objects.all()
+        return formset
+
 
 class MaterialPhysicalPropertyInline(admin.TabularInline):
     model = MaterialPhysicalProperty
     extra = 0
     autocomplete_fields = ("property_type",)
+
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj, **kwargs)
+        formset.form.base_fields["unit"].queryset = Unit.objects.all()
+        return formset
 
 
 # ============================================================
