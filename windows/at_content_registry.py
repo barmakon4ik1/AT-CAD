@@ -70,6 +70,11 @@ TRANSLATIONS = {
         "ru": "Эксцентричный конус",
         "de": "Exzentrischer Kegel",
         "en": "Eccentric Cone"
+    },
+    "at_run_cone_pipe": {
+        "ru": "Конусный отвод",
+        "de": "Kegelpassung",
+        "en": "Cone fitting"
     }
 }
 
@@ -122,6 +127,11 @@ CONTENT_REGISTRY = {
         "module": "windows.content_eccentric",
         "label": "at_run_eccentric",
         "build_module": "programs.at_run_ecc_red"
+    },
+    "cone_pipe": {
+        "module": "windows.content_cone_pipe",
+        "label": "at_run_cone_pipe",
+        "build_module": "programs.at_nozzle_cone"
     }
 }
 

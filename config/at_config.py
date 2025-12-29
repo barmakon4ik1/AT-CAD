@@ -38,6 +38,7 @@ NOZZLE_IMAGE_PATH: Path = IMAGES_DIR / "nozzle_image.png"
 CUTOUT_IMAGE_PATH: Path = IMAGES_DIR / "cutout_image.png"
 UNWRAPPER_PATH: Path = IMAGES_DIR / "unwrapper_image.png"
 ECCENTRIC_REDUCER_PATH: Path = IMAGES_DIR / "eccentric_reducer_image.png"
+CONE_PIPE_IMAGE_PATH: Path = IMAGES_DIR / "cone-pipe_image.png"
 
 # --- Иконки языков ---
 LANGUAGE_ICONS: dict[str, Path] = {
