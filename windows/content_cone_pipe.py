@@ -41,7 +41,7 @@ TRANSLATIONS = {
     "ok_button": {"ru": "ОК", "de": "OK", "en": "OK"},
     "clear_button": {"ru": "Очистить", "de": "Zurücksetzen", "en": "Clear"},
     "cancel_button": {"ru": "Возврат", "de": "Zurück", "en": "Return"},
-    "point_prompt": {"ru": "Укажите центр отвода", "de": "Geben Sie das Zentrum des Abzweigs an", "en": "Select nozzle center"},
+    "point_prompt": {"ru": "Укажите точку вставки", "de": "Geben Sie ein Punkt für Abwicklung", "en": "Select nozzle point"},
     "point_selection_error": {"ru": "Точка не выбрана", "de": "Punkt nicht gewählt", "en": "Point not selected"},
     "yes_label": {"ru": "Да", "de": "Ja", "en": "Yes"},
     "no_label": {"ru": "Нет", "de": "Nein", "en": "No"},
@@ -316,7 +316,7 @@ class ConePipeContentPanel(BaseContentPanel):
             cad = ATCadInit()
             pt = at_get_point(
                 cad.document,
-                prompt=loc.get("point_prompt", "Укажите центр отвода"),
+                prompt=loc.get("point_prompt", "Укажите точку вставки"),
                 as_variant=False
             )
 
@@ -471,7 +471,7 @@ class ConePipeContentPanel(BaseContentPanel):
         self.labels["diameter_top"].SetLabel(loc.get("diameter_label", "Диаметр, d"))
         self.labels["chorda"].SetLabel(loc.get("chorda_label", "Длина хорды, db"))
         self.labels["diameter_main"].SetLabel(loc.get("diameter_main_label", "Диаметр магистрали, D"))
-        self.labels["length"].SetLabel(loc.get("length_label", "Длина, L"))
+        self.labels["height"].SetLabel(loc.get("height_label", "Высота, H"))
         self.labels["accuracy"].SetLabel(loc.get("accuracy_label", "Точность"))
         self.labels["weld_allowance"].SetLabel(loc.get("weld_allowance_label", "Припуск на сварку"))
 
