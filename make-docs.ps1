@@ -1,63 +1,72 @@
-# make-docs.ps1
-# Полная сборка документации Sphinx для проекта AT-CAD с кастомным стилем
+$ErrorActionPreference = "Stop"
 
-$ProjectPath = "E:\AT-CAD"
-$DocsPath = Join-Path $ProjectPath "docs"
-$BuildPath = Join-Path $DocsPath "build"
-$ModulesRst = Join-Path $DocsPath "modules.rst"
-$StaticPath = Join-Path $DocsPath "_static"
+# ------------------------------------------------------------
+# Paths
+# ------------------------------------------------------------
+$ProjectPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+$DocsPath    = Join-Path $ProjectPath "docs"
+$BuildPath   = Join-Path $DocsPath "_build"
+$VenvPath    = Join-Path $ProjectPath ".venv"
+$PythonExe   = Join-Path $VenvPath "Scripts\python.exe"
 
-# --- Переходим в корень проекта ---
-Set-Location $ProjectPath
+$Languages = @("en", "ru", "de")
 
-# --- Проверяем и создаём папку _static ---
-if (-not (Test-Path $StaticPath)) {
-    Write-Host "Creating _static folder..."
-    New-Item -ItemType Directory -Path $StaticPath | Out-Null
+Write-Host "AT-CAD documentation build (EN / RU / DE)" -ForegroundColor Cyan
+
+# ------------------------------------------------------------
+# Ensure venv
+# ------------------------------------------------------------
+if (-not (Test-Path $PythonExe)) {
+    Write-Host "Creating virtual environment..."
+    python -m venv $VenvPath
 }
 
-# --- Очистка старой сборки ---
-if (Test-Path $BuildPath) {
-    Write-Host "Removing old build..."
-    Remove-Item -Recurse -Force $BuildPath
-}
+# ------------------------------------------------------------
+# Install dependencies
+# ------------------------------------------------------------
+Write-Host "Installing dependencies..."
+& $PythonExe -m pip install --quiet --upgrade `
+    sphinx `
+    sphinx-rtd-theme `
+    sphinx-intl
 
-# --- Получаем все Python модули (исключая __init__.py и .venv) ---
-$PythonFiles = Get-ChildItem -Recurse -File -Include *.py |
-    Where-Object { $_.Name -ne "__init__.py" -and $_.FullName -notmatch "\\.venv\\" }
-
-# --- Генерация modules.rst ---
-Write-Host "Generating modules.rst..."
-@"
-Modules Documentation
-=====================
-
-.. toctree::
-   :maxdepth: 2
-"@ | Set-Content $ModulesRst -Encoding UTF8
-
-foreach ($file in $PythonFiles) {
-    $relative = $file.FullName.Substring($ProjectPath.Length + 1) -replace "\\", "."
-    $moduleName = $relative -replace ".py$",""
-
-    @(
-        "",
-        ".. automodule:: $moduleName",
-        "    :members:",
-        "    :undoc-members:",
-        "    :show-inheritance:",
-        ""
-    ) | Add-Content -Path $ModulesRst -Encoding UTF8
-}
-
-# --- Сборка HTML документации ---
-Write-Host "Building HTML documentation..."
+# ------------------------------------------------------------
+# Build gettext templates
+# ------------------------------------------------------------
 Set-Location $DocsPath
-sphinx-build -b html . $BuildPath
+Write-Host "Generating gettext templates..."
+& $PythonExe -m sphinx -b gettext . $BuildPath/gettext
 
-# --- Открываем документацию в браузере ---
-Write-Host "Opening documentation in browser..."
-Start-Process (Join-Path $BuildPath "index.html")
+# ------------------------------------------------------------
+# Update / init translations
+# ------------------------------------------------------------
+Write-Host "Updating translations..."
+& $PythonExe -m sphinx_intl update -p $BuildPath/gettext -l ru -l de
 
-Write-Host "Documentation build completed!"
+# ------------------------------------------------------------
+# Build HTML for each language
+# ------------------------------------------------------------
+foreach ($lang in $Languages) {
 
+    if ($lang -eq "en") {
+        $OutDir = Join-Path $BuildPath "html"
+        Write-Host "Building HTML (EN)..."
+        & $PythonExe -m sphinx -b html . $OutDir
+    }
+    else {
+        $OutDir = Join-Path $BuildPath "html\$lang"
+        Write-Host "Building HTML ($lang)..."
+        & $PythonExe -m sphinx -b html -D language=$lang . $OutDir
+    }
+}
+
+# ------------------------------------------------------------
+# Open result
+# ------------------------------------------------------------
+$IndexFile = Join-Path $BuildPath "html\index.html"
+if (Test-Path $IndexFile) {
+    Write-Host "Documentation built successfully." -ForegroundColor Green
+    Start-Process $IndexFile
+} else {
+    Write-Host "ERROR: Documentation was not generated." -ForegroundColor Red
+}

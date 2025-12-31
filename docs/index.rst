@@ -1,28 +1,13 @@
-.. AT-CAD documentation master file
-
 AT-CAD Documentation
-====================
-
-Добро пожаловать в документацию проекта **AT-CAD**.
-
-Здесь вы найдёте описание модулей, классов и функций.
-
-Указатели и таблицы
 ===================
 
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
-
+AT-CAD is a Python-based engineering toolkit for CAD-related
+automation and geometric construction.
 
 .. toctree::
    :maxdepth: 2
-   :caption: API Reference
+   :caption: Contents:
 
-   modules
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Дополнительно
-
-   todo
+   user_guide/index
+   api/index
+   examples/index

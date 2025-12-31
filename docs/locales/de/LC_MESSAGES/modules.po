@@ -1,0 +1,4290 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C)
+# This file is distributed under the same license as the AT-CAD package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: AT-CAD 0.1\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-12-31 13:22+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: de\n"
+"Language-Team: de <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: ../../modules.rst:2
+msgid "Modules Documentation"
+msgstr ""
+
+#: config.at_cad_init:1 of
+msgid "Файл: at_cad_init.py Путь: config/at_cad_init.py"
+msgstr ""
+
+#: config.at_cad_init:4 of
+msgid ""
+"Описание: Модуль для инициализации AutoCAD через COM (win32com). "
+"Проверяет подключение к AutoCAD, ожидает готовность объектной модели "
+"(ActiveDocument/ModelSpace), автоматически создаёт предопределённые слои "
+"и задаёт стиль текста через SetFont(). Реализует паттерн синглтон "
+"(однократная инициализация). Внедрена логика синхронизации (фокус, retry "
+"COM, реген) для стабильности операций."
+msgstr ""
+
+#: config.at_cad_init.ATCadInit:1
+#: locales.at_localitation_manager.LocalizationManager:1
+#: locales.at_localization_class.Localization:1
+#: locales.at_translations.Localization:1 of
+#: programs.at_cylinder.CylinderBuilder:1
+#: programs.at_data_manager.DataManager:1
+msgid "Bases: :py:class:`object`"
+msgstr ""
+
+#: config.at_cad_init.ATCadInit:1 of
+msgid ""
+"Класс для инициализации и управления подключением к AutoCAD через COM. "
+"Реализует паттерн синглтон для однократной инициализации."
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.wait_for_autocad_ready:1 of
+msgid "Ожидает готовность AutoCAD (доступность ActiveDocument и его ModelSpace)."
+msgstr ""
+
+#: ../../modules.rst at_main_window.ATMainWindow.replace_flag_button_with_text
+#: config.at_config.get_setting config.at_config.save_user_settings
+#: config.at_config.set_autocad_mode
+#: locales.at_localitation_manager.LocalizationManager.add_translation
+#: locales.at_localitation_manager.LocalizationManager.delete_translation
+#: locales.at_localitation_manager.LocalizationManager.edit_translation
+#: locales.at_translations.Localization.get
+#: locales.at_translations.Localization.register_translations
+#: locales.at_translations.Localization.set_language of
+#: programs.at_base.run_program programs.at_calculation.at_plate_weight
+#: programs.at_com_utils.safe_utility_call programs.at_construction.add_text
+#: programs.at_cutout.compute_cyl_cyl_intersection_unwrap
+#: programs.at_cutting.get_primitive_with_contents
+#: programs.at_cutting.get_sheets
+#: programs.at_cylinder.CylinderBuilder.get_nozzle_insert_point
+#: programs.at_geometry.safe_div programs.at_highlight_utils.blink_entities
+#: programs.at_highlight_utils.blink_entity
+#: programs.at_highlight_utils.highlight_entities
+#: programs.at_highlight_utils.highlight_entity
+#: programs.at_highlight_utils.temp_highlight_color
+#: programs.at_input_lisp.get_entity programs.at_input_lisp.get_point
+#: programs.at_nozzle_cone.at_nozzle_cone
+#: programs.at_nozzle_cone.build_intersection_points_on_flat
+#: programs.at_nozzle_cone.diameter_at_height programs.at_nozzle_cone.finder_z
+#: programs.at_nozzle_cone.generatrix_by_diameter
+#: programs.at_nozzle_cone.rotate_points programs.at_packer.get_polyline_area
+#: programs.at_packer.get_polyline_bounding_box programs.at_packer.move_entity
+#: programs.at_packing.apply_transforms_to_entities
+#: programs.at_packing.compute_objective
+#: programs.at_packing.fits_without_overlap
+#: programs.at_packing.generate_candidate_positions
+#: programs.at_packing.initial_greedy_placement
+#: programs.at_packing.pack_primitives_in_container
+#: programs.at_packing.refine_placement
+#: programs.at_run_ecc_red.build_half_cone_unfold
+#: programs.at_run_ecc_red.safe_div programs.lisp_bridge.read_response
+#: programs.lisp_bridge.send_lisp_command
+#: scrapers.scrape_asme_tables.fetch_table
+#: scrapers.scrape_asme_tables.normalize_table
+#: scrapers.scrape_asme_tables.save_standard_csv
+#: windows.at_service_panel.ATServicePanel.log
+#: windows.at_service_panel.ATServicePanel.run_action
+#: windows.at_service_panel.ATServicePanel.update_status
+#: windows.at_window_utils.BaseContentPanel.on_cancel
+#: windows.at_window_utils.parse_float
+#: windows.content_plate.PlateContentPanel.on_ok
+#: windows.content_plate.PlateContentPanel.on_size_combo_change
+#: windows.content_shell.BranchWindow.on_cancel
+msgid "Parameters"
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.wait_for_autocad_ready:3 of
+msgid "Максимальное время ожидания, сек."
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.wait_for_autocad_ready:5 of
+msgid "Интервал между попытками, сек."
+msgstr ""
+
+#: ../../modules.rst of programs.at_construction.add_text
+msgid "Returns"
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.wait_for_autocad_ready:8 of
+msgid "True, если AutoCAD готов, иначе False."
+msgstr ""
+
+#: ../../modules.rst at_main_window.ATMainWindow.create_banner
+#: at_main_window.ATMainWindow.create_exit_button
+#: at_main_window.ATMainWindow.create_menu
+#: at_main_window.ATMainWindow.create_status_bar
+#: at_main_window.ATMainWindow.on_about at_main_window.ATMainWindow.on_close
+#: at_main_window.ATMainWindow.on_exit at_main_window.ATMainWindow.on_settings
+#: at_main_window.ATMainWindow.replace_flag_button_with_text
+#: config.at_cad_init.ATCadInit.is_initialized
+#: config.at_cad_init.ATCadInit.refresh_active_document
+#: config.at_config.get_autocad_mode config.at_config.load_user_settings
+#: config.at_config.save_user_settings config.at_config.set_autocad_mode
+#: locales.at_localitation_manager.LocalizationManager.add_translation
+#: locales.at_localitation_manager.LocalizationManager.delete_translation
+#: locales.at_localitation_manager.LocalizationManager.edit_translation
+#: locales.at_localitation_manager.LocalizationManager.interactive_mode
+#: locales.at_translations.Localization.get
+#: locales.at_translations.Localization.register_translations
+#: locales.at_translations.Localization.set_language of
+#: programs.at_base.run_program programs.at_calculation.at_plate_weight
+#: programs.at_com_utils.safe_utility_call programs.at_construction.add_text
+#: programs.at_cutout.compute_cyl_cyl_intersection_unwrap
+#: programs.at_cutting.get_primitive_with_contents
+#: programs.at_cutting.get_sheets
+#: programs.at_cylinder.CylinderBuilder.get_nozzle_insert_point
+#: programs.at_geometry.safe_div programs.at_input_lisp.get_entity
+#: programs.at_input_lisp.get_point programs.at_nozzle_cone.at_nozzle_cone
+#: programs.at_nozzle_cone.build_intersection_points_on_flat
+#: programs.at_nozzle_cone.diameter_at_height programs.at_nozzle_cone.finder_z
+#: programs.at_nozzle_cone.generatrix_by_diameter
+#: programs.at_nozzle_cone.rotate_points programs.at_packer.get_polyline_area
+#: programs.at_packer.get_polyline_bounding_box programs.at_packer.move_entity
+#: programs.at_packing.apply_transforms_to_entities
+#: programs.at_packing.collect_objects_inside
+#: programs.at_packing.compute_objective programs.at_packing.entity_to_shapely
+#: programs.at_packing.fits_without_overlap
+#: programs.at_packing.initial_greedy_placement
+#: programs.at_packing.pack_primitives_in_container
+#: programs.at_packing.refine_placement
+#: programs.at_run_ecc_red.build_half_cone_unfold
+#: programs.at_run_ecc_red.safe_div
+#: windows.at_settings_window.SettingsWindow.init_ui
+#: windows.at_settings_window.SettingsWindow.on_cancel
+#: windows.at_settings_window.SettingsWindow.on_reset
+#: windows.at_settings_window.SettingsWindow.on_save
+#: windows.at_window_utils.BaseContentPanel.clear_input_fields
+#: windows.at_window_utils.BaseContentPanel.on_cancel
+#: windows.at_window_utils.BaseContentPanel.update_ui_language
+#: windows.at_window_utils.BaseInputWindow.adjust_button_widths
+#: windows.at_window_utils.BaseInputWindow.update_ui_language
+#: windows.at_window_utils.parse_float
+#: windows.at_window_utils.reset_common_data_cache
+#: windows.content_cone.ConeContentPanel.clear_input_fields
+#: windows.content_cone.ConeContentPanel.load_last_input
+#: windows.content_cone.ConeContentPanel.setup_ui
+#: windows.content_cone.ConeContentPanel.update_ui_language
+#: windows.content_eccentric.ReducerContentPanel.get_data
+#: windows.content_eccentric.ReducerContentPanel.setup_ui
+#: windows.content_eccentric.ReducerContentPanel.update_ui_language
+#: windows.content_head.HeadContentPanel.clear_input_fields
+#: windows.content_head.HeadContentPanel.setup_ui
+#: windows.content_head.HeadContentPanel.update_ui_language
+#: windows.content_plate.PlateContentPanel.clear_input_fields
+#: windows.content_plate.PlateContentPanel.on_ok
+#: windows.content_plate.PlateContentPanel.on_size_combo_change
+#: windows.content_plate.PlateContentPanel.setup_ui
+#: windows.content_rings.RingsContentPanel.clear_input_fields
+msgid "Return type"
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.sync_focus:1 of
+msgid "Активирует фокус AutoCAD и документа для стабильных COM-вызовов."
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.sync_focus:3 of
+msgid "Задержка для sync (0.05-0.2 сек)."
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.sync_focus:6 of
+msgid "True при успехе (частично)."
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.retry_com_call:1 of
+msgid ""
+"Обёртка для COM-вызовов (AddText, AddDim и т.д.) с retry на "
+"фокус/рассинхрон."
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.retry_com_call:3 of
+msgid "COM-метод (e.g., self.adoc.ModelSpace.AddText)."
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.retry_com_call:4 of
+msgid "Аргументы для func."
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.retry_com_call:5 of
+msgid "Кол-во попыток (3-5)."
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.retry_com_call:7 of
+msgid "Задержка между (0.1 сек)."
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.retry_com_call:10 of
+msgid "Результат func или None при fail."
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.regen_doc:1 of
+msgid "Принудительная регенерация документа."
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.regen_doc:3 of
+msgid "0=AllViewports, 1=Current, etc."
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.refresh_active_document:1 of
+msgid ""
+"Обновляет ссылки на активный документ и пространство модели. Надёжно "
+"работает при переключении вкладок (включая несохранённые документы)."
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.is_initialized:1 of
+msgid "Проверяет, успешно ли инициализирован AutoCAD."
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.application:1 of
+msgid "Возвращает объект AutoCAD Application, если инициализирован."
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.document:1 of
+msgid "Возвращает объект ActiveDocument, если инициализирован."
+msgstr ""
+
+#: config.at_cad_init.ATCadInit.model_space:1 of
+msgid ""
+"Возвращает объект ModelSpace для текущего активного документа. Если "
+"пользователь переключил вкладку — автоматически обновляет ссылки."
+msgstr ""
+
+#: config.at_config:1 of
+msgid "Файл: at_config.py Путь: config/at_config.py"
+msgstr ""
+
+#: config.at_config:4 of
+msgid ""
+"Описание: Конфигурационный файл для проекта AT-CAD. Содержит: - Пути к "
+"ресурсам проекта (иконки, конфиги, изображения) - Настройки интерфейса и "
+"слоёв AutoCAD - Функции для загрузки/сохранения пользовательских настроек"
+msgstr ""
+
+#: config.at_config.get_autocad_mode:1 of
+msgid ""
+"Возвращает текущий режим взаимодействия с AutoCAD: 'COM' или 'LISP'. "
+"Значение берётся из user_settings.json, при отсутствии — используется "
+"DEFAULT_AUTOCAD_MODE."
+msgstr ""
+
+#: config.at_config.set_autocad_mode:1 of
+msgid ""
+"Устанавливает режим взаимодействия с AutoCAD ('COM' или 'LISP') и "
+"сохраняет его в user_settings.json."
+msgstr ""
+
+#: config.at_config.load_user_settings:1 of
+msgid ""
+"Загружает пользовательские настройки из USER_CONFIG_PATH. Если файл "
+"отсутствует или повреждён — возвращает DEFAULT_SETTINGS."
+msgstr ""
+
+#: config.at_config.save_user_settings:1 of
+msgid ""
+"Сохраняет настройки в USER_CONFIG_PATH. Автоматически дополняет "
+"недостающие ключи из DEFAULT_SETTINGS."
+msgstr ""
+
+#: config.at_config.get_setting:1 of
+msgid ""
+"Возвращает значение настройки по ключу из USER_CONFIG_PATH. Если ключ "
+"отсутствует — возвращает значение из DEFAULT_SETTINGS."
+msgstr ""
+
+#: config.at_config.show_config_window:1 of
+msgid ""
+"Открывает окно со списком всех путей и настроек (с подсветкой "
+"отсутствующих файлов)."
+msgstr ""
+
+#: config.at_last_input.save_last_input:1 of
+msgid "Сохраняет введённые данные в JSON-файл для указанной панели."
+msgstr ""
+
+#: config.at_last_input.save_last_input:3 of
+msgid "Имя файла для сохранения данных (например, 'last_cone_input.json')."
+msgstr ""
+
+#: config.at_last_input.save_last_input:4 of
+msgid "Словарь с данными для сохранения."
+msgstr ""
+
+#: data.add_applicability:1 of
+msgid "data/add_applicability.py"
+msgstr ""
+
+#: data.add_applicability:3 of
+msgid ""
+"Добавляет таблицу \"Applicability\" в en1092-1.db с колонками по вашему "
+"списку (Typ;PN;10;15;20;...;4000) и заполняет её указанными значениями."
+msgstr ""
+
+#: data.add_applicability:6 of
+msgid "Запуск:"
+msgstr ""
+
+#: data.add_applicability:7 of
+msgid "python data/add_applicability.py"
+msgstr ""
+
+#: data.add_applicability:9 of
+msgid ""
+"Важно: перед запуском закройте все программы, которые могут держать "
+"en1092-1.db (например: PyCharm Database view, DB Browser и т.п.), иначе "
+"может возникнуть ошибка \"database is locked\"."
+msgstr ""
+
+#: data.get_flange_en1092_1:1 of
+msgid "Файл: get_flange_en1092_1.py Путь: data/get_flange_en1092_1.py"
+msgstr ""
+
+#: data.get_flange_en1092_1:5 of
+msgid "Описание:"
+msgstr ""
+
+#: data.get_flange_en1092_1:6 of
+msgid ""
+"Модуль для получения параметров фланцев по стандарту EN 1092-1 из базы "
+"данных SQLite."
+msgstr ""
+
+#: data.get_flange_en1092_1:8 of
+msgid ""
+"Поддерживает: - Проверку применимости фланцев через таблицу "
+"Applicability. - Определение параметров по таблицам Terms, PNxx и Face. -"
+" Поддержку спец-кодов (32, 34, 35, 36, 37) для пар \"фланец+бурт\". - "
+"Отображение локализованных всплывающих сообщений об ошибках и "
+"исключениях."
+msgstr ""
+
+#: data.get_flange_en1092_1:14 of
+msgid ""
+"Зависимости: - pandas, sqlite3 - AT-CAD: windows.at_gui_utils.show_popup "
+"- AT-CAD: locales.at_translations.loc"
+msgstr ""
+
+#: data.get_flange_en1092_1:19 of
+msgid ""
+"Автор: AT-CAD Dev Team Дата: 2025-10-12 Версия: 2.3 "
+"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+msgstr ""
+
+#: data.get_flange_en1092_1.get_flange_en1092_1:1 of
+msgid "Получает параметры фланца по EN 1092-1 из SQLite-базы."
+msgstr ""
+
+#: data.get_flange_en1092_1.get_flange_en1092_1:3 of
+#, python-brace-format
+msgid ""
+"Входные параметры: {   \"type\": \"11\",   # тип фланца (например 01, 11,"
+" 21 и т.п.)   \"face\": \"B1\",   # форма уплотнительной поверхности   "
+"\"DN\": \"100\",    # номинальный диаметр   \"PN\": \"16\"      # "
+"номинальное давление }"
+msgstr ""
+
+#: data.get_flange_en1092_1.get_flange_en1092_1:3 of
+msgid "Входные параметры: {"
+msgstr ""
+
+#: data.get_flange_en1092_1.get_flange_en1092_1:5 of
+msgid ""
+"\"type\": \"11\",   # тип фланца (например 01, 11, 21 и т.п.) \"face\": "
+"\"B1\",   # форма уплотнительной поверхности \"DN\": \"100\",    # "
+"номинальный диаметр \"PN\": \"16\"      # номинальное давление"
+msgstr ""
+
+#: data.get_flange_en1092_1.get_flange_en1092_1:9 of windows.content_cutout:15
+#: windows.content_nozzle:25
+msgid "}"
+msgstr ""
+
+#: data.get_flange_en1092_1.get_flange_en1092_1:11 of
+msgid "путь к SQLite базе"
+msgstr ""
+
+#: data.get_flange_en1092_1.get_flange_en1092_1:13 of
+msgid "выводить отладочную информацию в консоль"
+msgstr ""
+
+#: data.get_flange_en1092_1.get_flange_en1092_1:16 of
+msgid "результат с данными фланца или сообщением об ошибке."
+msgstr ""
+
+#: engineering_handbook.engineering_handbook.apps.bolts.apps.BoltsConfig:1
+#: engineering_handbook.engineering_handbook.apps.elements.apps.ElementsConfig:1
+#: engineering_handbook.engineering_handbook.apps.flanges.apps.FlangesConfig:1
+#: engineering_handbook.engineering_handbook.apps.language.apps.LanguageConfig:1
+#: engineering_handbook.engineering_handbook.apps.materials.apps.MaterialsConfig:1
+#: engineering_handbook.engineering_handbook.apps.standards.apps.StandardsConfig:1
+#: engineering_handbook.engineering_handbook.apps.units.apps.UnitsConfig:1 of
+msgid "Bases: :py:class:`~django.apps.config.AppConfig`"
+msgstr ""
+
+#: engineering_handbook.engineering_handbook.apps.elements.migrations.0001_initial.Migration:1
+#: engineering_handbook.engineering_handbook.apps.elements.migrations.0002_groupnumber_name_groupnumber_name_de_and_more.Migration:1
+#: engineering_handbook.engineering_handbook.apps.language.migrations.0001_initial.Migration:1
+#: engineering_handbook.engineering_handbook.apps.language.migrations.0002_alter_language_is_active_alter_language_is_default_and_more.Migration:1
+#: engineering_handbook.engineering_handbook.apps.materials.migrations.0001_initial.Migration:1
+#: engineering_handbook.engineering_handbook.apps.materials.migrations.0002_standardsystem_materialanalogue_and_more.Migration:1
+#: engineering_handbook.engineering_handbook.apps.materials.migrations.0003_alter_materialanalogue_options_and_more.Migration:1
+#: engineering_handbook.engineering_handbook.apps.standards.migrations.0001_initial.Migration:1
+#: engineering_handbook.engineering_handbook.apps.standards.migrations.0002_alter_basestandard_options_and_more.Migration:1
+#: engineering_handbook.engineering_handbook.apps.standards.migrations.0003_standardseries_separator.Migration:1
+#: engineering_handbook.engineering_handbook.apps.standards.migrations.0004_remove_standardseries_separator_and_more.Migration:1
+#: engineering_handbook.engineering_handbook.apps.standards.migrations.0005_alter_basestandard_number_and_more.Migration:1
+#: engineering_handbook.engineering_handbook.apps.units.migrations.0001_initial.Migration:1
+#: of
+msgid "Bases: :py:class:`~django.db.migrations.migration.Migration`"
+msgstr ""
+
+#: engineering_handbook.manage:1 of
+msgid "Django's command-line utility for administrative tasks."
+msgstr ""
+
+#: engineering_handbook.manage.main:1 of
+msgid "Run administrative tasks."
+msgstr ""
+
+#: locales.at_localitation_manager:1 of
+msgid ""
+"Модуль для управления записями локализации: добавление, редактирование, "
+"удаление. Поддерживает интерактивный и программный режимы."
+msgstr ""
+
+#: locales.at_localitation_manager:4 of
+#, python-brace-format
+msgid ""
+"Методы add_translation, edit_translation, delete_translation можно "
+"использовать в коде. Пример использования: manager = "
+"LocalizationManager() manager.add_translation(\"new_key\", {\"ru\": "
+"\"Новый текст\", \"de\": \"Neuer Text\", \"en\": \"New Text\"}) "
+"manager.edit_translation(\"new_key\", {\"ru\": \"Изменённый текст\", "
+"\"de\": \"Geänderter Text\", \"en\": \"Edited Text\"}) "
+"manager.delete_translation(\"new_key\")"
+msgstr ""
+
+#: locales.at_localitation_manager.LocalizationManager:1 of
+msgid "Класс для управления записями локализации."
+msgstr ""
+
+#: locales.at_localitation_manager.LocalizationManager.add_translation:1 of
+msgid "Добавляет новую запись перевода."
+msgstr ""
+
+#: locales.at_localitation_manager.LocalizationManager.edit_translation:1 of
+msgid "Редактирует существующую запись перевода."
+msgstr ""
+
+#: locales.at_localitation_manager.LocalizationManager.delete_translation:1 of
+msgid "Удаляет запись перевода."
+msgstr ""
+
+#: locales.at_localitation_manager.LocalizationManager.interactive_mode:1 of
+msgid "Запускает интерактивный режим для управления локализацией."
+msgstr ""
+
+#: locales.at_localization:1 of
+msgid ""
+"locales/at_localization.py Модуль для хранения словаря переводов. "
+"Поддерживает переводы на русский, немецкий и английский языки."
+msgstr ""
+
+#: locales.at_localization_class:1 of
+msgid "Файл: at_localization_class.py Путь: locales/at_localization_class.py"
+msgstr ""
+
+#: locales.at_localization_class:4 of
+msgid ""
+"Описание: Модуль для управления локализацией в приложении AT-CAD. "
+"Предоставляет класс Localization для работы с переводами интерфейса на "
+"разные языки (ru, en, de)."
+msgstr ""
+
+#: locales.at_localization_class.Localization:1 of
+msgid "Класс для управления локализацией интерфейса приложения."
+msgstr ""
+
+#: at_main_window.ATMainWindow:3 locales.at_localization_class.Localization:3
+#: of windows.at_settings_window.SettingsWindow:3
+#: windows.content_apps.AppsContentPanel:4
+msgid "Атрибуты:"
+msgstr ""
+
+#: locales.at_localization_class.Localization:4 of
+msgid ""
+"language (str): Текущий язык локализации (например, \"ru\", \"en\", "
+"\"de\")."
+msgstr ""
+
+#: locales.at_localization_class.Localization.set_language:1
+#: locales.at_translations.Localization.set_language:1 of
+msgid "Устанавливает новый язык локализации."
+msgstr ""
+
+#: locales.at_localization_class.Localization.get:3
+#: locales.at_localization_class.Localization.set_language:3 of
+#: windows.at_settings_window.SettingsWindow.on_choose_color:3
+#: windows.content_cone_pipe.ConePipeContentPanel.on_ok:3
+#: windows.content_cutout.CutoutContentPanel.on_ok:4
+#: windows.content_nozzle.NozzleContentPanel.on_ok:3
+#: windows.content_shell.ShellContentPanel.on_ok:3
+#: windows.content_shell.ShellContentPanel.process_input:3
+#: windows.content_shell.ShellContentPanel.validate_input:3
+msgid "Аргументы:"
+msgstr ""
+
+#: locales.at_localization_class.Localization.set_language:4 of
+msgid ""
+"language (str): Код языка для установки (например, \"ru\", \"en\", "
+"\"de\")."
+msgstr ""
+
+#: locales.at_localization_class.Localization.get:1
+#: locales.at_translations.Localization.get:1 of
+msgid "Возвращает перевод строки по ключу для текущего языка."
+msgstr ""
+
+#: locales.at_localization_class.Localization.get:4 of
+msgid ""
+"key (str): Ключ перевода (строка). default (str): Значение по умолчанию, "
+"если перевод отсутствует."
+msgstr ""
+
+#: locales.at_localization_class.Localization.get:7 of
+#: programs.at_geometry.make_cone_arc_points:14
+#: programs.at_input.at_get_entity:5 programs.at_input.at_get_point:5
+#: programs.at_run_ecc_red.at_eccentric_reducer:14
+#: programs.at_shell.at_shell:19
+#: windows.content_shell.ShellContentPanel.process_input:6
+#: windows.content_shell.ShellContentPanel.validate_input:6
+msgid "Возвращает:"
+msgstr ""
+
+#: locales.at_localization_class.Localization.get:8 of
+msgid "str: Перевод строки или значение по умолчанию, если ключ отсутствует."
+msgstr ""
+
+#: locales.at_translations:1 of
+msgid ""
+"Файл: at_translations.py Путь: locales/at_translations.py Описание: "
+"Модуль для управления локализацией. Обрабатывает переводы из локальных "
+"словарей модулей и поддерживает динамическую смену языка."
+msgstr ""
+
+#: locales.at_translations.Localization:1 of
+msgid ""
+"Класс для управления локализацией приложения AT-CAD. Работает с "
+"локальными словарями переводов в каждом модуле."
+msgstr ""
+
+#: locales.at_translations.Localization.register_translations:1 of
+msgid "Регистрирует словарь переводов из модуля."
+msgstr ""
+
+#: of programs.at_addhead:1
+msgid ""
+"programs/at_addhead.py Модуль для построения днища в AutoCAD. Создаёт "
+"внутреннюю и внешнюю полилинии днища на основе заданных параметров. "
+"Поддерживает локализацию, логирование и интеграцию с ATCadInit."
+msgstr ""
+
+#: of programs.at_addhead.add_polyline:1
+msgid "Создаёт полилинию в AutoCAD."
+msgstr ""
+
+#: of programs.at_addhead.add_polyline:3 programs.at_addhead.create_polyline:3
+msgid "Модельное пространство AutoCAD."
+msgstr ""
+
+#: of programs.at_addhead.add_polyline:4
+msgid "Список координат [x1, y1, x2, y2, ...]."
+msgstr ""
+
+#: of programs.at_addhead.add_polyline:5 programs.at_addhead.create_polyline:6
+msgid "Имя слоя."
+msgstr ""
+
+#: of programs.at_addhead.add_polyline:7
+msgid "Объект полилинии AutoCAD или None при ошибке."
+msgstr ""
+
+#: of programs.at_addhead.create_polyline:1
+msgid "Создаёт полилинию с заданными точками и коэффициентами выпуклости."
+msgstr ""
+
+#: of programs.at_addhead.create_polyline:4
+msgid "Список точек полилинии [(x1, y1), (x2, y2), ...]."
+msgstr ""
+
+#: of programs.at_addhead.create_polyline:5
+msgid "Список кортежей (индекс, (начальная_точка, конечная_точка, центр))."
+msgstr ""
+
+#: of programs.at_addhead.create_polyline:8
+#: programs.at_construction.add_polyline:10
+msgid "Объект полилинии или None при ошибке."
+msgstr ""
+
+#: of programs.at_addhead.main:1
+msgid "Строит днище в AutoCAD на основе данных из словаря."
+msgstr ""
+
+#: of programs.at_addhead.main:3
+msgid ""
+"Словарь с параметрами: - D: Диаметр днища (float). - s: Толщина материала"
+" (float). - R: Большой радиус (float). - r: Малый радиус (float). - h1: "
+"Высота днища (float). - insert_point: Точка вставки (list[float]). - "
+"layer: Имя слоя (str)."
+msgstr ""
+
+#: of programs.at_addhead.main:12
+msgid "True, если построение успешно, иначе False."
+msgstr ""
+
+#: of programs.at_base:1
+msgid "Файл: at_base.py Путь: programs/at_base.py"
+msgstr ""
+
+#: of programs.at_base:4
+msgid ""
+"Описание: Модуль для базовых операций с AutoCAD через COM-интерфейс. "
+"Предоставляет функции для управления слоями и обновления видового экрана."
+msgstr ""
+
+#: of programs.at_base.run_program:1
+msgid ""
+"Универсальный запуск build-модуля по имени модуля. 1) Пытается вызвать "
+"module.main(data) 2) Если main отсутствует — пробует вызвать функцию с "
+"именем module_name.split('.')[-1] Возвращает результат вызова или None "
+"при ошибке."
+msgstr ""
+
+#: of programs.at_base.regen:1
+msgid "Обновляет видовой экран AutoCAD."
+msgstr ""
+
+#: of programs.at_base.ensure_layer:3 programs.at_base.layer_context:3
+#: programs.at_base.regen:3 programs.at_base.restore_layer:3
+#: programs.at_base.set_layer:3
+msgid "Объект документа AutoCAD."
+msgstr ""
+
+#: of programs.at_base.regen:5
+msgid "True, если обновление выполнено, False при ошибке."
+msgstr ""
+
+#: of programs.at_base.ensure_layer:1
+msgid "Проверяет наличие слоя и создает его, если он отсутствует."
+msgstr ""
+
+#: of programs.at_base.ensure_layer:4
+msgid "Имя слоя для проверки/создания."
+msgstr ""
+
+#: of programs.at_base.ensure_layer:6
+msgid "True, если слой существует или создан, False при ошибке."
+msgstr ""
+
+#: of programs.at_base.set_layer:1
+msgid "Устанавливает активный слой в AutoCAD."
+msgstr ""
+
+#: of programs.at_base.layer_context:4 programs.at_base.set_layer:4
+msgid "Имя слоя для установки."
+msgstr ""
+
+#: of programs.at_base.set_layer:6
+msgid "True, если слой установлен, False при ошибке."
+msgstr ""
+
+#: of programs.at_base.restore_layer:1
+msgid "Восстанавливает исходный активный слой."
+msgstr ""
+
+#: of programs.at_base.restore_layer:4
+msgid "Исходный слой для восстановления."
+msgstr ""
+
+#: of programs.at_base.restore_layer:6
+msgid "True, если слой восстановлен, False при ошибке."
+msgstr ""
+
+#: of programs.at_base.layer_context:1
+msgid "Контекстный менеджер для временного переключения слоя с восстановлением."
+msgstr ""
+
+#: of programs.at_base.layer_context
+msgid "Yields"
+msgstr ""
+
+#: of programs.at_base.layer_context:6
+msgid "*None* -- Выполняет код в контексте указанного слоя."
+msgstr ""
+
+#: of programs.at_calculation:1
+msgid "Файл: at_calculation.py Путь: programs/at_calculation.py"
+msgstr ""
+
+#: of programs.at_calculation.at_plate_weight:1
+msgid ""
+"Возвращает вес листа в зависимости от материала, толщины и площади фигуры"
+" :param thickness: толщина материала, мм :param density: плотность "
+"материала кг/м куб. :param area: площадь фигуры кв.м"
+msgstr ""
+
+#: of programs.at_calculation.at_plate_weight:6
+msgid "Returns: вычисленный вес листа, кг"
+msgstr ""
+
+#: of programs.at_calculation.at_density:1
+msgid ""
+"Возвращает плотность материала в зависимости от ее марки :param material:"
+" строковое название материала из json"
+msgstr ""
+
+#: of programs.at_calculation.at_density:4
+msgid "Returns: плотность материала в кг/м куб."
+msgstr ""
+
+#: ../../modules.rst
+msgid "Raises"
+msgstr ""
+
+#: of programs.at_calculation.at_density:6
+msgid "если материал не найден в JSON-файле"
+msgstr ""
+
+#: of programs.at_com_utils:1
+msgid "Файл: at_com_utils.py Путь: programs/at_com_utils.py"
+msgstr ""
+
+#: of programs.at_com_utils:4
+msgid ""
+"Описание: Утилиты для безопасного вызова методов AutoCAD через COM API. "
+"Поддерживает вызовы GetPoint, GetEntity, GetKeyword и другие, с "
+"автоопределением возвращаемого типа."
+msgstr ""
+
+#: of programs.at_com_utils.safe_utility_call:1
+msgid ""
+"Универсальный безопасный вызов метода AutoCAD Utility: корректно "
+"обрабатывает точки, объекты, строки и отмену (ESC)."
+msgstr ""
+
+#: of programs.at_construction:1
+msgid "Файл: at_construction.py Путь: programs/at_construction.py"
+msgstr ""
+
+#: of programs.at_construction:4
+msgid ""
+"Описание: Модуль для создания геометрических объектов в AutoCAD через "
+"COM-интерфейс. Переданный слой должен быть установлен как активный в "
+"системе."
+msgstr ""
+
+#: of programs.at_construction:8
+msgid ""
+"Дополнено: - Используется локальная регистрация переводов через "
+"locales.at_translations.loc. - Убраны все успешные всплывающие сообщения "
+"— построения выполняются тихо. - Логирование ведётся ТОЛЬКО по ошибкам "
+"(без info). - Сохранены все исходные функции построения и тестовый блок "
+"запуска."
+msgstr ""
+
+#: of programs.at_construction:14
+msgid ""
+"Примечание: Для работы модуль ожидает, что AutoCAD уже запущен и "
+"инициализирован через ATCadInit."
+msgstr ""
+
+#: of programs.at_construction.at_diameter:1
+msgid "Вычисляет средний диаметр с учётом толщины."
+msgstr ""
+
+#: of programs.at_construction.at_diameter:3
+msgid "Диаметр (внешний, внутренний или средний)."
+msgstr ""
+
+#: of programs.at_construction.at_diameter:4
+#: programs.at_nozzle.build_unwrapped_contour:10
+msgid "Толщина материала."
+msgstr ""
+
+#: of programs.at_construction.at_diameter:5
+msgid "Тип диаметра (\"inner\", \"middle\", \"outer\")."
+msgstr ""
+
+#: of programs.at_construction.at_diameter:7
+msgid "Средний диаметр."
+msgstr ""
+
+#: of programs.at_construction.at_diameter:10
+msgid "Если входные данные некорректны."
+msgstr ""
+
+#: of programs.at_construction.at_steigung:1
+msgid "Вычисляет наклон конуса."
+msgstr ""
+
+#: of programs.at_construction.at_cone_sheet:7
+#: programs.at_construction.at_steigung:3
+msgid "Высота конуса."
+msgstr ""
+
+#: of programs.at_construction.at_cone_height:3
+#: programs.at_construction.at_steigung:4
+msgid "Диаметр основания."
+msgstr ""
+
+#: of programs.at_construction.at_cone_height:4
+#: programs.at_construction.at_steigung:5
+msgid "Диаметр вершины (по умолчанию 0)."
+msgstr ""
+
+#: of programs.at_construction.at_steigung:7
+msgid "Наклон конуса или None при ошибке."
+msgstr ""
+
+#: of programs.at_construction.at_cone_height:1
+msgid "Вычисляет высоту конуса по заданным параметрам."
+msgstr ""
+
+#: of programs.at_construction.at_cone_height:5
+msgid "Наклон конуса (опционально)."
+msgstr ""
+
+#: of programs.at_construction.at_cone_height:6
+msgid "Угол конуса в градусах (опционально)."
+msgstr ""
+
+#: of programs.at_construction.at_cone_height:8
+msgid "Высота конуса или None при ошибке."
+msgstr ""
+
+#: of programs.at_construction.at_cone_sheet:1
+msgid "Создаёт развертку конуса в модельном пространстве."
+msgstr ""
+
+#: of programs.at_construction.add_circle:3 programs.at_construction.add_line:3
+#: programs.at_construction.add_polyline:3
+#: programs.at_construction.add_rectangle:3
+#: programs.at_construction.add_spline:3 programs.at_construction.add_text:3
+#: programs.at_construction.at_cone_sheet:3
+msgid "Объект ModelSpace активного документа AutoCAD."
+msgstr ""
+
+#: of programs.at_construction.at_cone_sheet:4
+msgid "Координаты базовой точки (список, кортеж или VARIANT)."
+msgstr ""
+
+#: of programs.at_construction.at_cone_sheet:5
+msgid "Диаметр основания конуса."
+msgstr ""
+
+#: of programs.at_construction.at_cone_sheet:6
+msgid "Диаметр вершины конуса (по умолчанию 0)."
+msgstr ""
+
+#: of programs.at_construction.add_polyline:6
+#: programs.at_construction.at_cone_sheet:8
+msgid "Имя слоя для полилинии."
+msgstr ""
+
+#: of programs.at_construction.at_cone_sheet:10
+msgid "Кортеж (объект полилинии, точка вставки) или None при ошибке."
+msgstr ""
+
+#: of programs.at_construction.add_circle:1
+msgid "Создаёт окружность в модельном пространстве."
+msgstr ""
+
+#: of programs.at_construction.add_circle:4
+msgid "Координаты центра окружности (список, кортеж или VARIANT)."
+msgstr ""
+
+#: of programs.at_construction.add_circle:5
+msgid "Радиус окружности."
+msgstr ""
+
+#: of programs.at_construction.add_circle:6
+msgid "Имя слоя для окружности."
+msgstr ""
+
+#: of programs.at_construction.add_circle:8
+msgid "Объект окружности или None при ошибке."
+msgstr ""
+
+#: of programs.at_construction.add_line:1
+msgid "Создаёт линию в модельном пространстве."
+msgstr ""
+
+#: of programs.at_construction.add_line:4
+msgid "Начальная точка линии (список, кортеж или VARIANT)."
+msgstr ""
+
+#: of programs.at_construction.add_line:5
+msgid "Конечная точка линии (список, кортеж или VARIANT)."
+msgstr ""
+
+#: of programs.at_construction.add_line:6
+msgid "Имя слоя для линии."
+msgstr ""
+
+#: of programs.at_construction.add_line:8
+msgid "Объект линии или None при ошибке."
+msgstr ""
+
+#: of programs.at_construction.add_polyline:1
+msgid "Создаёт легковесную полилинию в AutoCAD с опциональными значениями bulge."
+msgstr ""
+
+#: of programs.at_construction.add_polyline:4
+msgid ""
+"COM VARIANT с координатами вершин (x1, y1, x2, y2, ...) или список "
+"VARIANT-объектов с точками [x, y, z], или список кортежей (x, y, "
+"[bulge])."
+msgstr ""
+
+#: of programs.at_construction.add_polyline:7
+msgid "Закрывать полилинию или нет (по умолчанию True)."
+msgstr ""
+
+#: of programs.at_construction.add_polyline:8
+msgid ""
+"Опциональный список значений bulge для каждого сегмента (используется, "
+"если points не содержит bulge)."
+msgstr ""
+
+#: of programs.at_construction.add_spline:1
+msgid "Создаёт сплайн в AutoCAD через заданные точки."
+msgstr ""
+
+#: of programs.at_construction.add_spline:4
+msgid ""
+"COM VARIANT с координатами (x1, y1, z1, x2, y2, z2, ...), список "
+"VARIANT-объектов с точками [x, y, z], или список кортежей (x, y) или (x, "
+"y, z)."
+msgstr ""
+
+#: of programs.at_construction.add_spline:7
+msgid "Имя слоя для сплайна."
+msgstr ""
+
+#: of programs.at_construction.add_spline:8
+msgid "Замкнуть сплайн или нет (по умолчанию True)."
+msgstr ""
+
+#: of programs.at_construction.add_spline:10
+msgid "COM-объект сплайна или None при ошибке."
+msgstr ""
+
+#: of programs.at_construction.add_rectangle:1
+msgid "Создаёт прямоугольник в модельном пространстве."
+msgstr ""
+
+#: of programs.at_construction.add_rectangle:4
+msgid "Координаты базовой точки прямоугольника (список, кортеж или VARIANT)."
+msgstr ""
+
+#: of programs.at_construction.add_rectangle:5
+#: programs.at_geometry.add_rectangle_points:4
+msgid "Ширина прямоугольника."
+msgstr ""
+
+#: of programs.at_construction.add_rectangle:6
+#: programs.at_geometry.add_rectangle_points:5
+msgid "Высота прямоугольника."
+msgstr ""
+
+#: of programs.at_construction.add_rectangle:7
+msgid "Имя слоя для прямоугольника."
+msgstr ""
+
+#: of programs.at_construction.add_rectangle:8
+msgid "Положение базовой точки (\"left_bottom\", \"center\", и др.)."
+msgstr ""
+
+#: of programs.at_construction.add_rectangle:10
+msgid "Объект полилинии-прямоугольника или None при ошибке."
+msgstr ""
+
+#: of programs.at_construction.add_text:1
+msgid "Создаёт текст в модельном пространстве."
+msgstr ""
+
+#: of programs.at_construction.add_text:4
+msgid "Координаты базовой точки текста (список, кортеж или VARIANT)."
+msgstr ""
+
+#: of programs.at_construction.add_text:5
+msgid "Содержимое текста."
+msgstr ""
+
+#: of programs.at_construction.add_text:6
+msgid "Имя слоя для текста."
+msgstr ""
+
+#: of programs.at_construction.add_text:7
+msgid "Высота текста."
+msgstr ""
+
+#: of programs.at_construction.add_text:8
+msgid "Угол поворота текста (в радианах)."
+msgstr ""
+
+#: of programs.at_construction.add_text:9
+msgid "Код выравнивания текста (0 - по умолчанию, 4 - центр и т.д.)."
+msgstr ""
+
+#: of programs.at_construction.add_text:11
+msgid "Объект текста или None при ошибке."
+msgstr ""
+
+#: of programs.at_construction.add_text:15
+msgid "Notes"
+msgstr ""
+
+#: of programs.at_construction.add_text:16
+msgid ""
+"Значения выравнивания text_alignment: 0: acAlignmentLeft, 1: "
+"acAlignmentCenter, 2: acAlignmentRight, 3: acAlignmentAligned, 4: "
+"acAlignmentMiddle, 5: acAlignmentFit, 6: acAlignmentTopLeft, 7: "
+"acAlignmentTopCenter, 8: acAlignmentTopRight, 9: acAlignmentMiddleLeft, "
+"10: acAlignmentMiddleCenter, 11: acAlignmentMiddleRight, 12: "
+"acAlignmentBottomLeft, 13: acAlignmentBottomCenter, 14: "
+"acAlignmentBottomRight."
+msgstr ""
+
+#: of programs.at_cutout:1
+msgid ""
+"File: programs/at_cutout.py Назначение: Построение выреза в трубе для "
+"штуцера. Возвращает согласованный словарь результата (всегда)."
+msgstr ""
+
+#: of programs.at_cutout.compute_cyl_cyl_intersection_unwrap:1
+msgid ""
+"Возвращает список полилиний развёртки пересечения (может быть одна). "
+"Формат: [ [(s, z, bulge), ...] ] или [] если нет пересечения. (Эта "
+"функция почти неизменна — аккуратно защищена от краевых случаев.)"
+msgstr ""
+
+#: of programs.at_cutout.at_cutout:1
+msgid ""
+"Интеграция с AutoCAD: строит контур выреза и возвращает словарь "
+"результата. Ожидаемые ключи в data:"
+msgstr ""
+
+#: of programs.at_cutout.at_cutout:3
+msgid "insert_point: [x, y, z]"
+msgstr ""
+
+#: of programs.at_cutout.at_cutout:4
+msgid "diameter: диаметр отвода (r*2)"
+msgstr ""
+
+#: of programs.at_cutout.at_cutout:5
+msgid "diameter_main: диаметр основной трубы (R*2)"
+msgstr ""
+
+#: of programs.at_cutout.at_cutout:6
+msgid "offset: смещение (по смыслу функции) — если не задано, 0"
+msgstr ""
+
+#: of programs.at_cutout.at_cutout:7
+msgid "steps: число шагов дискретизации"
+msgstr ""
+
+#: of programs.at_cutout.at_cutout:8
+msgid "layer_name: имя слоя (используется для результата)"
+msgstr ""
+
+#: of programs.at_cutout.at_cutout:9
+msgid "mode: 'polyline'|'bulge'|'spline'"
+msgstr ""
+
+#: of programs.at_cutout.at_cutout:10
+msgid "text: подпись"
+msgstr ""
+
+#: of programs.at_cutout.at_cutout:11
+msgid "Поведение:"
+msgstr ""
+
+#: of programs.at_cutout.at_cutout:12
+msgid ""
+"если diameter <= 60.3 или diameter_main / diameter >= 5.0 => рисуем "
+"окружность радиуса r"
+msgstr ""
+
+#: of programs.at_cutout.at_cutout:13
+msgid "иначе => вычисляем развёртку и рисуем полилинию/сплайн/с bulge"
+msgstr ""
+
+#: of programs.at_cutting:1
+msgid "Файл: at_cutting.py Путь: programs/at_cutting.py"
+msgstr ""
+
+#: of programs.at_cutting:4
+msgid ""
+"Описание: Модуль для выбора полилиний листов в AutoCAD на слое 'SF-TEXT' "
+"с созданием рабочей области с отступом (margin). Использует shapely для "
+"геометрических вычислений и интегрируется с ATCadInit для "
+"COM-взаимодействия. Поддерживает выбор мышкой, проверку замкнутости и "
+"обработку ошибок через show_popup. Также содержит функцию выбора "
+"примитива на слое \"0\" и поиска объектов внутри него без изменения их "
+"положения."
+msgstr ""
+
+#: of programs.at_cutting.get_sheets:1
+msgid ""
+"Запрашивает у пользователя выбор полилиний на слое 'SF-TEXT' и создаёт "
+"рабочие области с отступом margin. Автоматически замыкает открытые "
+"полилинии."
+msgstr ""
+
+#: of programs.at_cutting.get_primitive_with_contents:1
+msgid ""
+"Выбирает один или несколько примитивов (полилиния, окружность и т.п.) на "
+"указанном слое. После выбора — собирает все объекты, полностью "
+"находящиеся внутри контура примитива."
+msgstr ""
+
+#: of programs.at_cylinder:1
+msgid "Модуль: at_cylinder.py Путь: programst_cylinder.py"
+msgstr ""
+
+#: of programs.at_cylinder:4
+msgid "Назначение:"
+msgstr ""
+
+#: of programs.at_cylinder:5
+msgid ""
+"Построение развёртки цилиндра (обечайки) вместе с возможными вырезами и "
+"развёртками ответвлений (отводов). Управляет вызовами:"
+msgstr ""
+
+#: of programs.at_cylinder:7
+msgid "at_shell — развёртка цилиндра"
+msgstr ""
+
+#: of programs.at_cylinder:8
+msgid "at_cutout — вырезы под отводы"
+msgstr ""
+
+#: of programs.at_cylinder:9
+msgid "at_nozzle — развёртки самих отводов"
+msgstr ""
+
+#: of programs.at_cylinder:11
+msgid "Возвращает единый результат с entities + metadata."
+msgstr ""
+
+#: of programs.at_cylinder:13
+msgid "Особенности реализации в этом файле (кратко):"
+msgstr ""
+
+#: of programs.at_cylinder:14
+msgid "Полные комментарии логики расчётов на русском языке."
+msgstr ""
+
+#: of programs.at_cylinder:15
+msgid "Защита от некорректных типов, возвращаемых вложенными модулями."
+msgstr ""
+
+#: of programs.at_cylinder:16
+msgid ""
+"Автоматический вертикальный отступ между развёртками отводов "
+"(per_nozzle_gap)."
+msgstr ""
+
+#: of programs.at_cylinder:17
+msgid ""
+"Точка входа main(data) для API и блок тестирования при запуске как "
+"скрипта."
+msgstr ""
+
+#: of programs.at_cylinder.main:1
+msgid "Точка входа для вызова модуля из API."
+msgstr ""
+
+#: of programs.at_cylinder.at_cylinder:3 programs.at_cylinder.main:3
+msgid "Словарь с данными оболочки и отводов."
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder.build:3
+#: programs.at_cylinder.at_cylinder:5 programs.at_cylinder.main:5
+#, python-brace-format
+msgid "Результат в формате {\"entities\": [...], \"metadata\": {...}}."
+msgstr ""
+
+#: of programs.at_cylinder.get_insert_point_unwrap:1
+msgid "Рассчитывает точку вставки выреза на развёртке цилиндра."
+msgstr ""
+
+#: of programs.at_cylinder.get_insert_point_unwrap:3
+msgid ""
+"Подробное пояснение логики: ─────────────────────────── Развёртка "
+"цилиндра представляет собой прямоугольник:"
+msgstr ""
+
+#: of programs.at_cylinder.get_insert_point_unwrap:6
+msgid "Ширина = длина окружности цилиндра = π * D"
+msgstr ""
+
+#: of programs.at_cylinder.get_insert_point_unwrap:7
+msgid "Высота = длина цилиндра"
+msgstr ""
+
+#: of programs.at_cylinder.get_insert_point_unwrap:9
+msgid ""
+"Каждое отверстие (вырез под отвод) имеет своё положение на поверхности "
+"цилиндра. Положение задаётся двумя параметрами:"
+msgstr ""
+
+#: of programs.at_cylinder.get_insert_point_unwrap:11
+msgid "cut['angle_deg'] — угловое положение отверстия на цилиндре."
+msgstr ""
+
+#: of programs.at_cylinder.get_insert_point_unwrap:12
+msgid "cut['offset_axial'] — осевой сдвиг вдоль длины цилиндра."
+msgstr ""
+
+#: of programs.at_cylinder.get_insert_point_unwrap:14
+msgid "Чтобы вычислить координаты отверстия на развёртке:"
+msgstr ""
+
+#: of programs.at_cylinder.get_insert_point_unwrap:15
+msgid ""
+"1) Определяем дуговое расстояние от линии шва до отверстия. Линия шва "
+"имеет угол shell_data['angle']. 2) Вычисляем угол: angle_from_seam = "
+"(cut_angle - seam_angle) mod 360 3) Если развёртка идёт по часовой "
+"стрелке, то направление дуги инвертируется: angle_from_seam = "
+"-angle_from_seam mod 360 4) Перевод угла в длину дуги: arc_length = R * "
+"radians(angle_from_seam) 5) Добавляем X0 — глобальную точку вставки, "
+"чтобы привести координаты в систему AutoCAD."
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder:1
+msgid "Управляет полной сборкой развёртки цилиндра с вырезами и отводами."
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder:3
+msgid "Логические этапы: ──────────────────"
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder:5
+msgid "Проверка входных данных"
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder:6
+msgid "Построение развёртки цилиндра (at_shell)"
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder:7
+msgid "Построение развёрток отверстий (at_cutout)"
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder:8
+msgid "Построение развёрток отвода (at_nozzle)"
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder.get_nozzle_insert_point:1
+msgid "Точка вставки развёртки отвода (за пределами развёртки цилиндра)."
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder.get_nozzle_insert_point:3
+msgid "Подробности:"
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder.get_nozzle_insert_point:4
+msgid ""
+"Рассчитывается generatrix для базовой позиции (угол 0) аналогично "
+"at_nozzle. gen0 = length_full - sqrt((0.5*diameter_main)^2 - offset^2)"
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder.get_nozzle_insert_point:6
+msgid "bottom_y = Y0 - nozzle_length (нижняя граница цилиндра на развёртке)"
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder.get_nozzle_insert_point:7
+msgid ""
+"insert_y = bottom_y - gen0 - (index-1) * per_nozzle_gap где "
+"per_nozzle_gap — минимальный вертикальный отступ между развёртками, может"
+" быть задан в shell_data как 'per_nozzle_gap' (в мм). По умолчанию 200."
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder.get_nozzle_insert_point:11
+msgid ""
+"Углублённая логика: ─────────────────── Развёртка отвода располагается "
+"под обечайкой. Чтобы избежать наложения нескольких отвода друг на друга, "
+"каждый следующий сдвигается вниз на фиксированное расстояние gap."
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder.get_nozzle_insert_point:17
+msgid "Основной расчёт — определение генератрисы отвода:"
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder.get_nozzle_insert_point:18
+msgid "half_Dm = Dm / 2 gen0 = L_full - sqrt(half_Dm² - offset²)"
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder.get_nozzle_insert_point:20
+msgid "где:"
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder.get_nozzle_insert_point:21
+msgid "Dm — диаметр основного цилиндра"
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder.get_nozzle_insert_point:22
+msgid "offset — смещение оси отвода"
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder.get_nozzle_insert_point:23
+msgid "L_full — высота + припуск сварки"
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder.get_nozzle_insert_point:25
+msgid ""
+"Полученная величина gen0 определяет вертикальное положение начала "
+"развёртки."
+msgstr ""
+
+#: of programs.at_cylinder.CylinderBuilder.build:1
+msgid "Собирает развёртку цилиндра с вырезами и развёртками отвода."
+msgstr ""
+
+#: of programs.at_cylinder.at_cylinder:1
+msgid "Основная функция для построения цилиндра с отводами."
+msgstr ""
+
+#: of programs.at_data_manager:1
+msgid ""
+"Модуль для управления данными, загружаемыми из JSON-файла. Предоставляет "
+"доступ к конфигурационным данным по заданным путям."
+msgstr ""
+
+#: of programs.at_data_manager.DataManager:1
+msgid "Класс для загрузки и доступа к данным из JSON-файла."
+msgstr ""
+
+#: of programs.at_data_manager.DataManager.load_data:1
+msgid "Загружает данные из JSON-файла."
+msgstr ""
+
+#: of programs.at_data_manager.DataManager.load_data:3
+msgid "Данные из файла или пустой словарь при ошибке."
+msgstr ""
+
+#: of programs.at_data_manager.DataManager.get_data:1
+msgid "Извлекает данные по указанному пути в формате 'section.subsection.key'."
+msgstr ""
+
+#: of programs.at_data_manager.DataManager.get_data:3
+msgid "Путь к данным (например, 'dimensions.diameters')."
+msgstr ""
+
+#: of programs.at_data_manager.DataManager.get_data:5
+msgid "Данные по указанному пути или пустой список при ошибке."
+msgstr ""
+
+#: of programs.at_dimension:1
+msgid "Файл: programs/add_dimension.py Описание:"
+msgstr ""
+
+#: of programs.at_dimension:3
+msgid "Добавление размеров в AutoCAD через COM API. Поддерживаются типы размеров:"
+msgstr ""
+
+#: of programs.at_dimension:5
+msgid "H : Горизонтальный  (Rotated Dimension)"
+msgstr ""
+
+#: of programs.at_dimension:6
+msgid "V : Вертикальный    (Rotated Dimension)"
+msgstr ""
+
+#: of programs.at_dimension:7
+msgid "L : Линейный под углом верх/низ (Aligned Dimension)"
+msgstr ""
+
+#: of programs.at_dimension:8
+msgid "R : Радиусный       (Radial Dimension)"
+msgstr ""
+
+#: of programs.at_dimension:9
+msgid "D : Диаметральный   (Diametric Dimension)"
+msgstr ""
+
+#: of programs.at_dimension:10
+msgid "A : Угловой         (Angular Dimension)"
+msgstr ""
+
+#: of programs.at_dimension:12
+msgid "Зависимости:"
+msgstr ""
+
+#: of programs.at_dimension:13
+msgid "config.at_cad_init.ATCadInit — инициализация AutoCAD COM API"
+msgstr ""
+
+#: of programs.at_dimension:14
+msgid "programs.at_base.regen — регенерация чертежа"
+msgstr ""
+
+#: of programs.at_dimension:15
+msgid "programs.at_input.at_get_point — запрос точки у пользователя"
+msgstr ""
+
+#: of programs.at_dimension:16
+msgid "config.at_config — значения по умолчанию (масштаб, отступ, стиль, слой)"
+msgstr ""
+
+#: of programs.at_dimension:17
+msgid "locales.at_localization_class.loc — локализация"
+msgstr ""
+
+#: of programs.at_dimension:19
+msgid "Примечания по COM:"
+msgstr ""
+
+#: of programs.at_dimension:20
+msgid "AddDimRotated(xline1Point, xline2Point, dimLinePoint, rotationRadians)"
+msgstr ""
+
+#: of programs.at_dimension:21
+msgid "AddDimAligned(xline1Point, xline2Point, dimLinePoint)"
+msgstr ""
+
+#: of programs.at_dimension:22
+msgid "AddDimRadial(center, chordPoint, leaderLength)"
+msgstr ""
+
+#: of programs.at_dimension:23
+msgid "AddDimDiametric(chordPoint1, chordPoint2, leaderLength)"
+msgstr ""
+
+#: of programs.at_dimension:24
+msgid "AddDimAngular(angleVertex, firstEndPoint, secondEndPoint, textPoint)"
+msgstr ""
+
+#: of programs.at_dimension.add_dimension:1
+msgid ""
+"Добавляет размер в AutoCAD, запрашивая недостающие параметры у "
+"пользователя."
+msgstr ""
+
+#: of programs.at_dimension.add_dimension:3
+msgid "COM-объект ActiveDocument AutoCAD"
+msgstr ""
+
+#: of programs.at_dimension.add_dimension:4
+msgid "Тип размера (H/V/L/R/D/A)"
+msgstr ""
+
+#: of programs.at_dimension.add_dimension:5
+msgid "Первая точка (VARIANT). Для A — вершина угла."
+msgstr ""
+
+#: of programs.at_dimension.add_dimension:6
+msgid "Вторая точка (VARIANT). Для A — точка на первой стороне."
+msgstr ""
+
+#: of programs.at_dimension.add_dimension:7
+msgid "Длина выносной (для R/D)"
+msgstr ""
+
+#: of programs.at_dimension.add_dimension:8
+msgid "Для A — точка на второй стороне"
+msgstr ""
+
+#: of programs.at_dimension.add_dimension:9
+msgid "Для A — точка на дуге размерной линии"
+msgstr ""
+
+#: of programs.at_dimension.add_dimension:10
+msgid "Отступ размерной линии от контура"
+msgstr ""
+
+#: of programs.at_dimension.add_dimension:11
+msgid "COM-объект созданного размера или None"
+msgstr ""
+
+#: of programs.at_geometry:1
+msgid "Модуль: at_geometry.py Путь: programst_geometry.py"
+msgstr ""
+
+#: of programs.at_geometry:4
+msgid "Модуль для геометрических вычислений."
+msgstr ""
+
+#: of programs.at_geometry:6
+msgid ""
+"Содержит функции для вычисления углов треугольника, конвертации углов, "
+"вычисления коэффициента bulge дуги, нахождения точек пересечения "
+"окружностей, вычисления точек прямоугольника и функцию для вычисления "
+"координат точки по полярным координатам с возвратом COM VARIANT для "
+"AutoCAD."
+msgstr ""
+
+#: of programs.at_geometry:11
+msgid "Автор: Alexander Tutubalin Дата создания: 13.08.2025"
+msgstr ""
+
+#: of programs.at_geometry.safe_div:1
+msgid ""
+"Безопасное деление, чтобы избежать ZeroDivisionError. Возвращает default,"
+" если делитель близок к нулю."
+msgstr ""
+
+#: of programs.at_geometry.ensure_point_variant:1
+msgid "Приводит любую точку к COM VARIANT (VT_ARRAY | VT_R8) в формате [x, y, z]."
+msgstr ""
+
+#: of programs.at_geometry.ensure_point_variant:3
+msgid ""
+"Может быть готовым VARIANT или любым итерируемым с координатами (список, "
+"кортеж, генератор)."
+msgstr ""
+
+#: of programs.at_geometry.ensure_point_variant:5
+msgid "COM-массив double [x, y, z]."
+msgstr ""
+
+#: of programs.at_geometry.ensure_point_variant:8
+msgid "Примечания:"
+msgstr ""
+
+#: of programs.at_geometry.ensure_point_variant:9
+msgid "Если передан готовый VARIANT, он возвращается без изменений."
+msgstr ""
+
+#: of programs.at_geometry.ensure_point_variant:10
+msgid "Если координат меньше трёх, недостающие заполняются нулями."
+msgstr ""
+
+#: of programs.at_geometry.ensure_point_variant:11
+msgid "Если координат больше трёх, лишние отбрасываются."
+msgstr ""
+
+#: of programs.at_geometry.ensure_point_variant:12
+msgid "Все значения преобразуются в float."
+msgstr ""
+
+#: of programs.at_geometry.calculate_angles:1
+msgid "Вычисляет углы треугольника по трём точкам."
+msgstr ""
+
+#: of programs.at_geometry.calculate_angles:3
+msgid "0 для возврата всех углов, 1–3 для возврата одного из углов."
+msgstr ""
+
+#: of programs.at_geometry.calculate_angles:4
+msgid "0 — результат в градусах, 1 — в радианах."
+msgstr ""
+
+#: of programs.at_geometry.calculate_angles:5
+#: programs.at_geometry.calculate_angles:6
+#: programs.at_geometry.calculate_angles:7
+msgid "координаты вершин треугольника."
+msgstr ""
+
+#: of programs.at_geometry.calculate_angles:9
+msgid "Угол или кортеж углов в зависимости от параметра angle."
+msgstr ""
+
+#: of programs.at_geometry.deg_to_rad:1
+msgid "Конвертирует угол из градусов в радианы."
+msgstr ""
+
+#: of programs.at_geometry.deg_to_rad:3 programs.at_geometry.rad_to_deg:5
+msgid "Угол в градусах."
+msgstr ""
+
+#: of programs.at_geometry.deg_to_rad:5 programs.at_geometry.rad_to_deg:3
+msgid "Угол в радианах."
+msgstr ""
+
+#: of programs.at_geometry.rad_to_deg:1
+msgid "Конвертирует угол из радиан в градусы."
+msgstr ""
+
+#: of programs.at_geometry.circle_center_from_points:1
+msgid "Находит центр окружности, проходящей через три точки."
+msgstr ""
+
+#: of programs.at_geometry.circle_center_from_points:3
+#: programs.at_geometry.circle_center_from_points:4
+#: programs.at_geometry.circle_center_from_points:5
+msgid "Три точки (x, y)."
+msgstr ""
+
+#: of programs.at_geometry.circle_center_from_points:7
+msgid "Координаты центра окружности или None, если точки на одной прямой."
+msgstr ""
+
+#: of programs.at_geometry.at_bulge:1
+msgid "Вычисляет коэффициент выпуклости (bulge) для дуги."
+msgstr ""
+
+#: of programs.at_geometry.at_bulge:3
+msgid "Начальная точка дуги (x, y)."
+msgstr ""
+
+#: of programs.at_geometry.at_bulge:4
+msgid "Конечная точка дуги (x, y)."
+msgstr ""
+
+#: of programs.at_geometry.at_bulge:5
+msgid "Точка центра окружности (x, y)."
+msgstr ""
+
+#: of programs.at_geometry.at_bulge:7
+msgid "Коэффициент выпуклости (float)."
+msgstr ""
+
+#: of programs.at_geometry.bulge_from_center:1
+msgid ""
+"Вычисляет bulge (коэффициент выпуклости) для дуги заданной начальной и "
+"конечной точками и центром окружности."
+msgstr ""
+
+#: of programs.at_geometry.bulge_from_center:4
+msgid ""
+"Bulge = tan(sweep / 4), где sweep — угол дуги (в радианах). sweep "
+"выбирается так, чтобы направление дуги соответствовало параметру "
+"clockwise:"
+msgstr ""
+
+#: of programs.at_geometry.bulge_from_center:6
+msgid "clockwise=False -> выбираем положительный (CCW) sweep (0..2π)"
+msgstr ""
+
+#: of programs.at_geometry.bulge_from_center:7
+msgid "clockwise=True  -> выбираем отрицательный (CW) sweep (0..-2π)"
+msgstr ""
+
+#: of programs.at_geometry.bulge_from_center:9
+msgid "(x, y) — начальная точка дуги."
+msgstr ""
+
+#: of programs.at_geometry.bulge_from_center:10
+msgid "(x, y) — конечная точка дуги."
+msgstr ""
+
+#: of programs.at_geometry.bulge_from_center:11
+msgid "(x, y) — центр окружности, которой принадлежит дуга."
+msgstr ""
+
+#: of programs.at_geometry.bulge_from_center:12
+msgid "направление обхода дуги (False — CCW, True — CW)."
+msgstr ""
+
+#: of programs.at_geometry.bulge_from_center:14
+msgid "значение bulge (может быть отрицательным для CW-дуг)."
+msgstr ""
+
+#: of programs.at_geometry.bulge_from_three_points:1
+msgid ""
+"Вычисляет bulge для дуги, проходящей через три точки (start, mid, end). "
+"Точка `mid` должна лежать на самой дуге (не на хорде)."
+msgstr ""
+
+#: of programs.at_geometry.bulge_from_three_points:4
+msgid "Алгоритм:"
+msgstr ""
+
+#: of programs.at_geometry.bulge_from_three_points:5
+msgid "Находит центр описанной окружности (circumcenter) по трём точкам."
+msgstr ""
+
+#: of programs.at_geometry.bulge_from_three_points:6
+msgid ""
+"Определяет, лежит ли средняя точка между start->end по направлению CCW. "
+"Если да — считаем направление CCW, иначе — CW."
+msgstr ""
+
+#: of programs.at_geometry.bulge_from_three_points:8
+msgid "Вызывает bulge_from_center для вычисления bulge."
+msgstr ""
+
+#: of programs.at_geometry.bulge_from_three_points:10
+msgid "(x, y) — начало дуги."
+msgstr ""
+
+#: of programs.at_geometry.bulge_from_three_points:11
+msgid "(x, y) — точка на дуге (не на хорде)."
+msgstr ""
+
+#: of programs.at_geometry.bulge_from_three_points:12
+msgid "(x, y) — конец дуги."
+msgstr ""
+
+#: of programs.at_geometry.bulge_from_three_points:14
+msgid "bulge (или None при ошибке / вырожденных точках)."
+msgstr ""
+
+#: of programs.at_geometry.find_intersection_points:1
+msgid "Находит точки пересечения двух окружностей."
+msgstr ""
+
+#: of programs.at_geometry.find_intersection_points:3
+msgid "Центр первой окружности (x, y)."
+msgstr ""
+
+#: of programs.at_geometry.find_intersection_points:4
+msgid "Радиус первой окружности."
+msgstr ""
+
+#: of programs.at_geometry.find_intersection_points:5
+msgid "Центр второй окружности (x, y)."
+msgstr ""
+
+#: of programs.at_geometry.find_intersection_points:6
+msgid "Радиус второй окружности."
+msgstr ""
+
+#: of programs.at_geometry.find_intersection_points:8
+msgid "Список точек пересечения [(x1, y1), (x2, y2)] или None."
+msgstr ""
+
+#: of programs.at_geometry.add_rectangle_points:1
+msgid "Вычисляет координаты точек прямоугольника и возвращает COM VARIANT."
+msgstr ""
+
+#: of programs.at_geometry.add_rectangle_points:3
+msgid "Начальная точка (VARIANT)."
+msgstr ""
+
+#: of programs.at_geometry.add_rectangle_points:6
+msgid ""
+"Позиция точки относительно прямоугольника (\"left_bottom\", "
+"\"right_bottom\", \"center\", \"left_top\", \"right_top\")."
+msgstr ""
+
+#: of programs.at_geometry.add_rectangle_points:9
+msgid "COM-массив double [x0, y0, x1, y1, x2, y2, x3, y3]."
+msgstr ""
+
+#: of programs.at_geometry.offset_point:1
+msgid ""
+"Вычисляет координаты точки, смещенной от исходной на заданные значения по"
+" осям X и Y, с фиксированной координатой Z=0, и возвращает готовый COM "
+"VARIANT для AutoCAD или список [x, y]."
+msgstr ""
+
+#: of programs.at_geometry.offset_point:4
+msgid "Исходная точка (список, кортеж или готовый VARIANT)."
+msgstr ""
+
+#: of programs.at_geometry.offset_point:5
+msgid "Смещение по оси X."
+msgstr ""
+
+#: of programs.at_geometry.offset_point:6
+msgid "Смещение по оси Y."
+msgstr ""
+
+#: of programs.at_geometry.offset_point:7 programs.at_geometry.polar_point:7
+msgid "Если True, возвращает VARIANT [x, y, 0]; если False, возвращает [x, y]."
+msgstr ""
+
+#: of programs.at_geometry.offset_point:9 programs.at_geometry.polar_point:9
+msgid "Список [x, y] или COM-массив double [x, y, 0]."
+msgstr ""
+
+#: of programs.at_geometry.polar_point:1
+msgid ""
+"Вычисляет координаты точки, расположенной на заданном расстоянии и под "
+"углом от базовой точки, и возвращает готовый COM VARIANT для AutoCAD или "
+"список [x, y]."
+msgstr ""
+
+#: of programs.at_geometry.polar_point:4
+msgid "Базовая точка (список, кортеж или готовый VARIANT)."
+msgstr ""
+
+#: of programs.at_geometry.polar_point:5
+msgid "Расстояние до новой точки."
+msgstr ""
+
+#: of programs.at_geometry.polar_point:6
+msgid "Угол в градусах (0° = по оси X, 90° = по оси Y)."
+msgstr ""
+
+#: of programs.at_geometry.build_polyline_list:1
+msgid "Создаёт список точек для полилинии на основе данных листа."
+msgstr ""
+
+#: of programs.at_geometry.build_polyline_list:3
+msgid ""
+"Словарь с данными (insert_point, point_list, material, thickness, "
+"melt_no, allowance)."
+msgstr ""
+
+#: of programs.at_geometry.build_polyline_list:5
+msgid "Список точек в формате [[x1, y1], [x2, y2], ...] или None при ошибке."
+msgstr ""
+
+#: of programs.at_geometry.convert_to_variant_points:1
+msgid "Преобразует список точек [[x, y], ...] в список VARIANT для AutoCAD."
+msgstr ""
+
+#: of programs.at_geometry.convert_to_variant_points:3
+msgid "Список точек в формате [[x1, y1], [x2, y2], ...]."
+msgstr ""
+
+#: of programs.at_geometry.convert_to_variant_points:5
+msgid "Список точек в формате VARIANT."
+msgstr ""
+
+#: of programs.at_geometry.get_unwrapped_points:1
+msgid "Возвращает список (угол, x, y) вдоль развертки цилиндра."
+msgstr ""
+
+#: of programs.at_geometry.get_unwrapped_points:3
+msgid ""
+"D  - диаметр цилиндра L  - высота цилиндра (не используется, но для "
+"совместимости) A_deg - угол разреза в градусах clockwise - направление "
+"обхода:"
+msgstr ""
+
+#: of programs.at_geometry.get_unwrapped_points:7
+msgid "False = против часовой стрелки (по умолчанию) True  = по часовой стрелке"
+msgstr ""
+
+#: of programs.at_geometry.get_insert_point_on_shell:1
+msgid "Возвращает точку вставки выреза на развертке цилиндра."
+msgstr ""
+
+#: of programs.at_geometry.get_insert_point_on_shell:3
+msgid "базовая точка вставки прямоугольника оболочки [x, y, z]"
+msgstr ""
+
+#: of programs.at_geometry.get_insert_point_on_shell:4
+msgid "диаметр цилиндра (D)"
+msgstr ""
+
+#: of programs.at_geometry.get_insert_point_on_shell:5
+msgid "длина цилиндра (L)"
+msgstr ""
+
+#: of programs.at_geometry.get_insert_point_on_shell:6
+msgid "угол поворота (0° = X=0 на развёртке)"
+msgstr ""
+
+#: of programs.at_geometry.get_insert_point_on_shell:7
+msgid "осевой отступ (мм) от нижнего края цилиндра"
+msgstr ""
+
+#: of programs.at_geometry.get_insert_point_on_shell:8
+msgid "дополнительное смещение вдоль оси (мм)"
+msgstr ""
+
+#: of programs.at_geometry.get_insert_point_on_shell:9
+msgid "припуск сверху (мм)"
+msgstr ""
+
+#: of programs.at_geometry.get_insert_point_on_shell:10
+msgid "припуск снизу (мм)"
+msgstr ""
+
+#: of programs.at_geometry.get_insert_point_on_shell:11
+msgid "координаты точки вставки [X, Y, Z]"
+msgstr ""
+
+#: of programs.at_geometry.angle_to_unroll_x:1
+msgid "Перевод угла окружности цилиндра в координату X на развёртке."
+msgstr ""
+
+#: of programs.at_geometry.angle_to_unroll_x:3
+msgid "исходный угол (в системе цилиндра)"
+msgstr ""
+
+#: of programs.at_geometry.angle_to_unroll_x:4
+msgid "диаметр цилиндра"
+msgstr ""
+
+#: of programs.at_geometry.angle_to_unroll_x:5
+msgid "угол, по которому сделан разрез (левый край развёртки)"
+msgstr ""
+
+#: of programs.at_geometry.angle_to_unroll_x:6
+msgid "направление разворота: \"CW\" или \"CCW\""
+msgstr ""
+
+#: of programs.at_geometry.angle_to_unroll_x:7
+msgid "координата X (мм)"
+msgstr ""
+
+#: of programs.at_geometry.distance_2points:1
+msgid "Находит расстояние между двумя точками. Поддерживаем форматы:"
+msgstr ""
+
+#: of programs.at_geometry.distance_2points:3
+msgid "(x, y), [x, y], (x, y, z), [x, y, z]"
+msgstr ""
+
+#: of programs.at_geometry.distance_2points:5
+msgid "Если z отсутствует — используется z=0."
+msgstr ""
+
+#: of programs.at_geometry.normalize_point:1
+msgid ""
+"Превращает p в точку (x, y, z), даже если p имеет лишние вложения. "
+"Поддерживает форматы: [x, y], (x, y), (x, y, z), [ [x, y] ], ( [x, y, z],"
+" ), etc."
+msgstr ""
+
+#: of programs.at_geometry.make_cone_arc_points:1
+msgid "Создаёт N+1 точек внешней дуги развертки конуса."
+msgstr ""
+
+#: of programs.at_geometry.make_cone_arc_points:3
+msgid "Дуга располагается так:"
+msgstr ""
+
+#: of programs.at_geometry.make_cone_arc_points:4
+msgid "апекс в точке (apex_x, apex_y)"
+msgstr ""
+
+#: of programs.at_geometry.make_cone_arc_points:5
+msgid "дуга симметрична относительно вертикальной оси, проходящей через апекс"
+msgstr ""
+
+#: of programs.at_geometry.make_cone_arc_points:6
+msgid "крайние точки: углы -theta_rad/2 и +theta_rad/2"
+msgstr ""
+
+#: of programs.at_geometry.make_cone_arc_points:8
+#: programs.at_run_ecc_red.build_truncated_cone_from_halves:4
+#: programs.at_shell.at_shell:3
+msgid "Параметры:"
+msgstr ""
+
+#: of programs.at_geometry.make_cone_arc_points:9
+msgid ""
+"apex       - координаты апекса (x, y) R          - радиус внешней дуги "
+"(первая образующая) theta_rad  - центральный угол развертки (в радианах) "
+"N          - количество делений дуги"
+msgstr ""
+
+#: of programs.at_geometry.make_cone_arc_points:15
+msgid "Список из N+1 точек [(x0,y0), (x1,y1), ... , (xN,yN)]"
+msgstr ""
+
+#: of programs.at_highlight_utils:1
+msgid "Файл: at_highlight_utils.py Путь: programs/at_highlight_utils.py"
+msgstr ""
+
+#: of programs.at_highlight_utils:4
+msgid ""
+"Описание: Модуль для визуальной подсветки объектов AutoCAD через COM API."
+" Содержит функции для временного выделения (Highlight), изменения цвета, "
+"мигания, подсветки контуров и их внутреннего содержимого."
+msgstr ""
+
+#: of programs.at_highlight_utils.highlight_entity:1
+msgid "Временная подсветка объекта AutoCAD (аналог выделения)."
+msgstr ""
+
+#: of programs.at_highlight_utils.blink_entity:1
+msgid "Эффект мигания выделенного объекта."
+msgstr ""
+
+#: of programs.at_highlight_utils.temp_highlight_color:1
+msgid ""
+"Временная подсветка объекта изменением цвета. Автоматически возвращает "
+"исходный цвет по истечении времени."
+msgstr ""
+
+#: of programs.at_highlight_utils.highlight_entities:1
+msgid "Подсветка группы объектов."
+msgstr ""
+
+#: of programs.at_highlight_utils.blink_entities:1
+msgid "Мигание группы объектов."
+msgstr ""
+
+#: of programs.at_highlight_utils.highlight_inside_polygon:1
+msgid ""
+"Подсвечивает все объекты внутри замкнутого полигона. Требуется "
+"установленная библиотека shapely (pip install shapely)."
+msgstr ""
+
+#: of programs.at_highlight_utils.highlight_inside_polygon:4
+msgid "активный документ AutoCAD."
+msgstr ""
+
+#: of programs.at_highlight_utils.highlight_inside_polygon:5
+msgid "COM-объект полилинии (AcDbPolyline или LWPolyline)."
+msgstr ""
+
+#: of programs.at_highlight_utils.highlight_inside_polygon:6
+msgid "включать ли границу (саму полилинию)."
+msgstr ""
+
+#: of programs.at_highlight_utils.highlight_inside_polygon:7
+msgid "True — включить подсветку, False — выключить."
+msgstr ""
+
+#: of programs.at_highlight_utils.clear_highlights:1
+msgid "Снимает подсветку со всех объектов модели."
+msgstr ""
+
+#: of programs.at_highlight_utils.highlight_safe:1
+msgid "Подсветка объекта с защитой от ошибок COM."
+msgstr ""
+
+#: of programs.at_input.at_get_point:1
+msgid ""
+"Запрашивает точку у пользователя. Если use_bridge=True — через LISP мост "
+"(интерактивный ввод в AutoCAD), иначе — через COM."
+msgstr ""
+
+#: of programs.at_input.at_get_point:6
+msgid "[x, y, z] — если успешно, None — при ошибке или отмене."
+msgstr ""
+
+#: of programs.at_input.at_get_entity:1
+msgid ""
+"Запрашивает объект у пользователя. Если use_bridge=True — через LISP мост"
+" (интерактивный ввод в AutoCAD), иначе — попытка COM-ввода."
+msgstr ""
+
+#: of programs.at_input.at_get_entity:6
+msgid "(entity, pick_point, ok, cancelled, error)"
+msgstr ""
+
+#: of programs.at_input_lisp:1
+msgid "Файл: programs/at_input_lisp.py"
+msgstr ""
+
+#: of programs.at_input_lisp:3
+msgid ""
+"Описание: Безопасные функции выбора точки и примитива (объекта) через "
+"LISP-мост. Замена нестабильным COM-вызовам вроде doc.Utility.GetPoint() и"
+" doc.Utility.GetEntity(). Работает через модуль lisp_bridge.py."
+msgstr ""
+
+#: of programs.at_input_lisp.get_point:1
+msgid ""
+"Запрашивает точку у пользователя через LISP. Возвращает координаты (x, y,"
+" z) или None при отмене."
+msgstr ""
+
+#: of programs.at_input_lisp.get_entity:1
+msgid ""
+"Запрашивает выбор примитива у пользователя. Возвращает словарь с данными "
+"объекта (handle, тип, слой и т.д.) или None при отмене."
+msgstr ""
+
+#: of programs.at_nozzle:1
+msgid ""
+"File: programs/at_nozzle.py Назначение: Построение развертки патрубка "
+"прямоугольного простого переходного тройника с сопутствующими данными "
+"(текстами, размерами и т.п.) Поддерживает три режима:"
+msgstr ""
+
+#: of programs.at_nozzle:6
+msgid "polyline (отрезки)"
+msgstr ""
+
+#: of programs.at_nozzle:7
+msgid ""
+"bulge (полилиния с дугами: верхняя часть криволинейная, "
+"левая/нижняя/правая стороны прямые)"
+msgstr ""
+
+#: of programs.at_nozzle:8
+msgid "spline (сплайн для верхней части, полилиния для боковых и нижней сторон)"
+msgstr ""
+
+#: of programs.at_nozzle.build_unwrapped_contour:1
+msgid "Строит контур развёртки."
+msgstr ""
+
+#: of programs.at_nozzle.build_unwrapped_contour:3
+#: programs.at_nozzle.get_profile_point:3
+msgid "Точка вставки [x, y, z]."
+msgstr ""
+
+#: of programs.at_nozzle.build_unwrapped_contour:4
+msgid "Диаметр отвода."
+msgstr ""
+
+#: of programs.at_nozzle.build_unwrapped_contour:5
+msgid "Диаметр основной трубы."
+msgstr ""
+
+#: of programs.at_nozzle.build_unwrapped_contour:6
+msgid "Длина патрубка."
+msgstr ""
+
+#: of programs.at_nozzle.build_unwrapped_contour:7
+msgid "Припуск на сварку."
+msgstr ""
+
+#: of programs.at_nozzle.build_unwrapped_contour:8
+#: programs.at_nozzle.get_profile_point:6
+msgid "Количество делений развертки."
+msgstr ""
+
+#: of programs.at_nozzle.build_unwrapped_contour:9
+msgid "Смещение центра."
+msgstr ""
+
+#: of programs.at_nozzle.build_unwrapped_contour:11
+msgid "Признак корректировки толщины."
+msgstr ""
+
+#: of programs.at_nozzle.build_unwrapped_contour:12
+msgid "\"polyline\", \"bulge\" или \"spline\" (режим построения контура)."
+msgstr ""
+
+#: of programs.at_nozzle.build_unwrapped_contour:14
+msgid ""
+"Список координат верхней криволинейной части [(x, y, bulge), ...]. "
+"contour_rect: Список координат прямоугольной части (правая, нижняя, левая"
+" стороны) [(x, y, bulge), ...]. generatrix_length: Список длин "
+"образующих. width: Полная ширина развертки."
+msgstr ""
+
+#: of programs.at_nozzle.get_profile_point:1
+msgid "Возвращает координаты точки на профиле."
+msgstr ""
+
+#: of programs.at_nozzle.get_profile_point:4
+msgid "Общая ширина развертки."
+msgstr ""
+
+#: of programs.at_nozzle.get_profile_point:5
+msgid "Массив длин образующих."
+msgstr ""
+
+#: of programs.at_nozzle.get_profile_point:7
+msgid "Доля по ширине (0.0 ... 1.0)."
+msgstr ""
+
+#: of programs.at_nozzle.get_profile_point:9
+msgid ""
+"Точка на нижней линии (variant). p_top_variant: Точка на верхней линии "
+"(variant). (x, y): Числовые координаты верхней точки."
+msgstr ""
+
+#: of programs.at_nozzle.build_axes:1
+msgid "Строит вертикальные оси в долях 1/4, 1/2, 3/4 ширины."
+msgstr ""
+
+#: of programs.at_nozzle.build_axis_marks:1
+msgid "Рисует метки на осях сверху и снизу."
+msgstr ""
+
+#: of programs.at_nozzle.build_axis_marks:3
+msgid "Пространство модели."
+msgstr ""
+
+#: of programs.at_nozzle.build_axis_marks:4
+#: programs.at_nozzle.build_dimensions:4
+msgid "Точка вставки."
+msgstr ""
+
+#: of programs.at_nozzle.build_axis_marks:5
+#: programs.at_nozzle.build_dimensions:5
+msgid "Ширина развертки."
+msgstr ""
+
+#: of programs.at_nozzle.build_axis_marks:6
+#: programs.at_nozzle.build_dimensions:6
+msgid "Список длин образующих."
+msgstr ""
+
+#: of programs.at_nozzle.build_axis_marks:7
+#: programs.at_nozzle.build_dimensions:7
+msgid "Количество делений."
+msgstr ""
+
+#: of programs.at_nozzle.build_axis_marks:8
+msgid "Длина метки (если 0 - не строим)."
+msgstr ""
+
+#: of programs.at_nozzle.build_dimensions:1
+msgid "Добавляет размеры H и V."
+msgstr ""
+
+#: of programs.at_nozzle.build_dimensions:3
+msgid "Документ AutoCAD."
+msgstr ""
+
+#: of programs.at_nozzle.build_dimensions:8
+msgid "Правая нижняя точка."
+msgstr ""
+
+#: of programs.at_nozzle.main:1 programs.at_nozzle_cone.main:1
+msgid ""
+"Чтобы функция корректно работала в связке с остальными программами в "
+"основном окне."
+msgstr ""
+
+#: of programs.at_nozzle.at_nozzle:1
+msgid "Основная функция построения развертки патрубка."
+msgstr ""
+
+#: of programs.at_nozzle.at_nozzle:3
+msgid ""
+"Словарь параметров, содержит: insert_point: [x, y, z] точка вставки. "
+"diameter: Диаметр отвода. diameter_main: Диаметр основной трубы. length: "
+"Длина патрубка. axis: Флаг построения осей. axis_marks: Длина меток на "
+"осях. layer_name: Имя слоя для контура. thickness: Толщина материала. "
+"order_number: Номер заказа. detail_number: Номер детали. material: Марка "
+"материала. weld_allowance: Припуск на сварку. accuracy: Количество "
+"делений. offset: Смещение центра. thk_correction: Корректировка толщины "
+"отвода равнопроходного тройника. mode: \"polyline\", \"bulge\" или "
+"\"spline\" (режим построения контура)."
+msgstr ""
+
+#: of programs.at_nozzle.at_nozzle:21
+#: programs.at_run_ecc_red.at_eccentric_reducer:15
+msgid "True при успешном построении, False при ошибке."
+msgstr ""
+
+#: of programs.at_nozzle_cone:1
+msgid "programs/at_nozzle_cone.py"
+msgstr ""
+
+#: of programs.at_nozzle_cone:3
+msgid ""
+"Построение развертки линии пересечения усечённого конуса и цилиндра "
+"(патрубок/врезка). Модуль разработан в стиле и API, совместимом с "
+"programs/at_nozzle.py."
+msgstr ""
+
+#: of programs.at_nozzle_cone:6
+msgid "Автор: A.Tutubalin Дата: 2025"
+msgstr ""
+
+#: of programs.at_nozzle_cone.diameter_at_height:1
+msgid "Линейный диаметр сечения конуса на высоте z от нижнего основания."
+msgstr ""
+
+#: of programs.at_nozzle_cone.generatrix_by_diameter:1
+msgid "Длина образующей, пропорциональная диаметру сечения."
+msgstr ""
+
+#: of programs.at_nozzle_cone.finder_z:1
+msgid ""
+"Высота z от нижнего основания конуса до линии пересечения с цилиндром для"
+" угла alpha (в радианах) вдоль полу-хорды."
+msgstr ""
+
+#: of programs.at_nozzle_cone.build_intersection_points_on_flat:1
+msgid ""
+"Возвращает список точек [x,y] для полилинии линии пересечения на "
+"развертке. apex: (x,y,z) из at_cone_sheet theta_rad: полный угол сектора "
+"развертки (в радианах) generatrix_list: список длин образующих (N+1)"
+msgstr ""
+
+#: of programs.at_nozzle_cone.rotate_points:1
+msgid "Поворачивает список точек на angle_deg вокруг origin (ox,oy)."
+msgstr ""
+
+#: of programs.at_nozzle_cone.at_nozzle_cone:1
+msgid "Основная функция построения развертки патрубка-конуса."
+msgstr ""
+
+#: of programs.at_nozzle_cone.at_nozzle_cone:3
+msgid "Поддерживает входной словарь в стиле at_nozzle.py. Выполняет:"
+msgstr ""
+
+#: of programs.at_nozzle_cone.at_nozzle_cone:4
+msgid "чтение и маппинг параметров"
+msgstr ""
+
+#: of programs.at_nozzle_cone.at_nozzle_cone:5
+msgid "вычисление геометрии (высоты, L_full и т.п.)"
+msgstr ""
+
+#: of programs.at_nozzle_cone.at_nozzle_cone:6
+msgid "формирование списка длин образующих (N+1)"
+msgstr ""
+
+#: of programs.at_nozzle_cone.at_nozzle_cone:7
+msgid "получение развертки конуса через at_cone_sheet"
+msgstr ""
+
+#: of programs.at_nozzle_cone.at_nozzle_cone:8
+msgid "построение полилинии на развертке и добавление её в модель"
+msgstr ""
+
+#: of programs.at_nozzle_cone.at_nozzle_cone:10
+msgid "Возвращает True при успехе, False при ошибке."
+msgstr ""
+
+#: of programs.at_offset:1
+msgid "Файл: programs/at_offset.py"
+msgstr ""
+
+#: of programs.at_offset.at_offset:1
+msgid "Создает смещенную полилинию с использованием win32com."
+msgstr ""
+
+#: of programs.at_offset.at_offset:3
+msgid "Объект полилинии (AcadLWPolyline)."
+msgstr ""
+
+#: of programs.at_offset.at_offset:4
+msgid "Расстояние смещения (float)."
+msgstr ""
+
+#: of programs.at_offset.at_offset:5
+msgid "ActiveDocument AutoCAD."
+msgstr ""
+
+#: of programs.at_offset.at_offset:6
+msgid "ModelSpace AutoCAD."
+msgstr ""
+
+#: of programs.at_offset.at_offset:8
+msgid "Список смещенных полилиний или None в случае ошибки."
+msgstr ""
+
+#: of programs.at_packer:1
+msgid ""
+"Описание: Модуль упаковки замкнутых полилиний (слой 0) внутрь базового "
+"контура (слой SF-TEXT) с минимизацией занимаемой площади и обеспечением "
+"отступов между объектами."
+msgstr ""
+
+#: of programs.at_packer:5
+msgid ""
+"Алгоритм: 1. Пользователь выбирает базовый контур (SF-TEXT). 2. "
+"Пользователь выбирает несколько замкнутых полилиний (слой 0). 3. Модуль "
+"вычисляет габариты каждой фигуры и располагает их внутри базового контура"
+msgstr ""
+
+#: of programs.at_packer:9
+msgid "с зазором 10 мм между собой и от границ."
+msgstr ""
+
+#: of programs.at_packer:11
+msgid "Использует:"
+msgstr ""
+
+#: of programs.at_packer:12
+msgid "ATCadInit  (инициализация AutoCAD)"
+msgstr ""
+
+#: of programs.at_packer:13
+msgid "safe_utility_call из at_com_utils"
+msgstr ""
+
+#: of programs.at_packer.get_polyline_bounding_box:1
+msgid "Возвращает габариты полилинии (xmin, ymin, xmax, ymax)."
+msgstr ""
+
+#: of programs.at_packer.get_polyline_area:1
+msgid "Возвращает площадь замкнутой полилинии."
+msgstr ""
+
+#: of programs.at_packer.move_entity:1
+msgid "Перемещает объект на (dx, dy)."
+msgstr ""
+
+#: of programs.at_packing.collect_objects_inside:1
+msgid ""
+"Собирает объекты (COM-объекты) из ModelSpace, полностью содержащиеся в "
+"геометрии 'entity'. Возвращает список объектов (не shapely)."
+msgstr ""
+
+#: of programs.at_packing.entity_to_shapely:1
+msgid "Преобразует AutoCAD-entity (полилиния/окружность) в shapely-геометрию."
+msgstr ""
+
+#: of programs.at_packing.fits_without_overlap:1
+msgid ""
+"Проверяет, помещается ли candidate_poly внутри container_inner и не "
+"пересекается с placed_polys."
+msgstr ""
+
+#: of programs.at_packing.generate_candidate_positions:1
+msgid "Генерирует позиции в виде спирали от центра — yield (x,y)."
+msgstr ""
+
+#: of programs.at_packing.initial_greedy_placement:1
+msgid ""
+"Возвращает список трансформаций (dx, dy, angle) для каждой примитивной "
+"фигуры. Greedy: ставим по убыванию площади, спирально ищем позицию."
+msgstr ""
+
+#: of programs.at_packing.compute_objective:1
+msgid "Возвращает метрику компактности — площадь объединения (меньше — лучше)."
+msgstr ""
+
+#: of programs.at_packing.refine_placement:1
+msgid ""
+"Простая имлементация simulated annealing / local search. Перемещаем "
+"случайный примитив небольшим шагом и принимаем если лучше."
+msgstr ""
+
+#: of programs.at_packing.pack_primitives_in_container:1
+msgid ""
+"Основная обёртка: принимает AutoCAD-entity (container) и список primitive"
+" entities, возвращает словарь с трансформами и результатом "
+"(успех/неуспех). Не перемещает объекты в AutoCAD — только вычисляет "
+"размещение. Для применения трансформаций использовать "
+"apply_transforms_to_entities()."
+msgstr ""
+
+#: of programs.at_packing.apply_transforms_to_entities:1
+msgid ""
+"Принимает results[\"transforms\"] (описание выше) и применяет Move/Rotate"
+" к объектам в AutoCAD. ВАЖНО: переносит сам primitive *и* вложенные в "
+"него объекты (их надо собрать заранее)."
+msgstr ""
+
+#: of programs.at_ringe:1
+msgid ""
+"programs/at_ringe.py Модуль для построения колец в AutoCAD на основе "
+"данных из диалогового окна. Создаёт окружности с заданными диаметрами и "
+"добавляет текстовые метки с номером работы."
+msgstr ""
+
+#: of programs.at_ringe.main:1
+msgid "Основная функция для построения колец в AutoCAD."
+msgstr ""
+
+#: of programs.at_ringe.main:3
+msgid "Словарь с данными колец (work_number, diameters, input_point)."
+msgstr ""
+
+#: of programs.at_ringe.main:5 programs.at_run_cone.main:8
+#: programs.at_run_plate.main:5
+msgid "True при успешном выполнении, None при прерывании (отмена) или ошибке."
+msgstr ""
+
+#: of programs.at_run_cone:1
+msgid ""
+"Файл: programs/at_run_cone.py Описание: Модуль для построения развертки "
+"конуса в AutoCAD с использованием Win32com (COM). Использует данные из "
+"окна content_cone.py для создания развертки конуса, добавления текстовых "
+"меток и размеров. Локализация через словарь TRANSLATIONS. Поддерживает "
+"слои LASER-TEXT, schrift, TEXT."
+msgstr ""
+
+#: of programs.at_run_cone.main:1
+msgid "Основная функция для построения развертки конуса в AutoCAD."
+msgstr ""
+
+#: of programs.at_run_cone.main:3
+msgid ""
+"Словарь с данными конуса, полученными из окна content_cone.py "
+"(order_number, detail_number, material, thickness, diameter_top, "
+"diameter_base, d_type, D_type, height, steigung, angle, weld_allowance, "
+"insert_point, thickness_text)."
+msgstr ""
+
+#: of programs.at_run_ecc_red:1
+msgid "Файл: programs/at_run_ecc_red.py Модуль: at_run_ecc_red Описание:"
+msgstr ""
+
+#: of programs.at_run_ecc_red:4
+msgid ""
+"Построение развертки усечённого конуса с одной вертикальной образующей. "
+"Поддерживаются режимы построения: lines (polyline), bulge (дуги), spline "
+"(сплайны). Добавляет в модель AutoCAD контур развертки и тексты "
+"маркировки/гравировки."
+msgstr ""
+
+#: of programs.at_run_ecc_red:8
+msgid ""
+"Автор: Alexander Tutubalin Дата правки: 2025-10-16 (корректировки: "
+"локализация, вычисление точки гравировки, докстринги)"
+msgstr ""
+
+#: of programs.at_run_ecc_red.safe_div:1
+msgid "Безопасно делит a / b, возвращая default при малом знаменателе."
+msgstr ""
+
+#: of programs.at_run_ecc_red.build_half_cone_unfold:1
+msgid ""
+"Строит половину развёртки (по одной стороне от оси). Возвращает список "
+"точек (x, y) в локальной системе координат развёртки. Параметры:"
+msgstr ""
+
+#: of programs.at_run_ecc_red.build_half_cone_unfold:4
+msgid ""
+"D: диаметр основания (для половины развёртки используется D как диаметр "
+"всей окружности) H: высота соответствующего (вспомогательного) конуса n: "
+"количество точек дискретизации дуги (целое положительное)"
+msgstr ""
+
+#: of programs.at_run_ecc_red.build_truncated_cone_from_halves:1
+msgid ""
+"Строит контур развертки усечённого конуса (одна вертикальная образующая)."
+" Возвращает:"
+msgstr ""
+
+#: of programs.at_run_ecc_red.build_truncated_cone_from_halves:3
+msgid ""
+"contour (список точек локально), bulge_list, lower_path, upper_path, "
+"bulge_lower, bulge_upper"
+msgstr ""
+
+#: of programs.at_run_ecc_red.build_truncated_cone_from_halves:5
+msgid ""
+"d1: верхний диаметр (вершина) d2: нижний диаметр (основание) h: высота "
+"усечения (разность высот) n: точность/количество делений curve_mode: "
+"\"polyline\"|\"bulge\"|\"spline\""
+msgstr ""
+
+#: of programs.at_run_ecc_red.at_eccentric_reducer:1
+msgid "Основная функция построения развертки усечённого конуса в AutoCAD."
+msgstr ""
+
+#: of programs.at_run_ecc_red.at_eccentric_reducer:3
+msgid "Ожидаемый входной словарь (data):"
+msgstr ""
+
+#: of programs.at_run_ecc_red.at_eccentric_reducer:4
+msgid ""
+"insert_point: [x, y, z] — точка вставки (может быть None — тогда будет "
+"запрошена) order_number: str detail_number: str material: str thickness: "
+"float diameter_top: float  — верхний диаметр (d1) diameter_base: float — "
+"нижний диаметр (d2) height: float        — высота (h) mode: str"
+"            — \"polyline\"|\"bulge\"|\"spline\" accuracy: int"
+msgstr ""
+
+#: of programs.at_run_plate:1
+msgid ""
+"Модуль для построения листа для лазерной резки в AutoCAD с использованием"
+" Win32com (COM)."
+msgstr ""
+
+#: of programs.at_run_plate.main:1
+msgid "Основная функция для построения листа для лазерной резки в AutoCAD."
+msgstr ""
+
+#: of programs.at_run_plate.main:3
+msgid "Словарь с данными листа, полученными из окна"
+msgstr ""
+
+#: of programs.at_shell:1
+msgid ""
+"File: programs/at_shell.py Назначение: Построение развертки цилиндра "
+"(оболочки) с нанесением осей, текстов и размеров в AutoCAD"
+msgstr ""
+
+#: of programs.at_shell.at_shell:1
+msgid "Основная функция для построения развертки цилиндра (оболочки)."
+msgstr ""
+
+#: of programs.at_shell.at_shell:4
+msgid "data (dict): словарь исходных данных, содержащий:"
+msgstr ""
+
+#: of programs.at_shell.at_shell:5
+msgid "insert_point (list/tuple): точка вставки [x, y, z]"
+msgstr ""
+
+#: of programs.at_shell.at_shell:6
+msgid "diameter (float): диаметр цилиндра"
+msgstr ""
+
+#: of programs.at_shell.at_shell:7
+msgid "length (float): длина цилиндра"
+msgstr ""
+
+#: of programs.at_shell.at_shell:8
+msgid "angle (float): угол развертки в градусах"
+msgstr ""
+
+#: of programs.at_shell.at_shell:9
+msgid "clockwise (bool): направление развертки"
+msgstr ""
+
+#: of programs.at_shell.at_shell:10
+msgid "axis (bool): рисовать ли оси"
+msgstr ""
+
+#: of programs.at_shell.at_shell:11
+msgid "axis_marks (float): длина меток осей"
+msgstr ""
+
+#: of programs.at_shell.at_shell:12
+msgid "layer_name (str): имя слоя для отрисовки"
+msgstr ""
+
+#: of programs.at_shell.at_shell:13
+msgid "thickness (float|str): толщина детали"
+msgstr ""
+
+#: of programs.at_shell.at_shell:14
+msgid "order_number (str): номер заказа"
+msgstr ""
+
+#: of programs.at_shell.at_shell:15
+msgid "detail_number (str): номер детали"
+msgstr ""
+
+#: of programs.at_shell.at_shell:16
+msgid "weld_allowance_top (float): припуск сварки сверху"
+msgstr ""
+
+#: of programs.at_shell.at_shell:17
+msgid "weld_allowance_bottom (float): припуск сварки снизу"
+msgstr ""
+
+#: of programs.at_shell.at_shell:20
+msgid "bool: True при успешном построении, иначе None."
+msgstr ""
+
+#: of programs.at_utils:1
+msgid "programs/at_utils.py Модуль утилит для работы с AutoCAD (фасад)."
+msgstr ""
+
+#: of programs.at_utils.handle_errors:1
+msgid "Декоратор для обработки ошибок в функциях."
+msgstr ""
+
+#: of programs.at_utils.finder:1
+msgid ""
+"Представление числа x, округленного до знака accuracy через простую дробь"
+" из числа в диапазоне от 1 до r"
+msgstr ""
+
+#: of programs.lisp_bridge.read_response:1
+msgid "Ожидает появления response.json до тайм-аута."
+msgstr ""
+
+#: of programs.lisp_bridge.send_lisp_command:1
+msgid ""
+"Передаёт команду в AutoCAD через JSON и вызывает (ATC_PROCESS_REQUEST) из"
+" единого модуля ATC_LISP_BRIDGE.lsp."
+msgstr ""
+
+#: of programs.lisp_bridge.ensure_lisp_loaded:1
+msgid ""
+"Проверяет, загружен ли Lisp-модуль. Можно использовать (atc_ping) или "
+"(ATC_LOAD_LISP) для загрузки вручную."
+msgstr ""
+
+#: of programs.lisp_bridge.ping:1
+msgid "Проверяет доступность Lisp-моста."
+msgstr ""
+
+#: of scrapers.scrape_asme_tables.fetch_table:1
+msgid "Загружает и возвращает список таблиц со страницы"
+msgstr ""
+
+#: of scrapers.scrape_asme_tables.normalize_table:1
+msgid "Нормализует таблицу ASME — подбирает столбцы автоматически."
+msgstr ""
+
+#: of scrapers.scrape_asme_tables.save_standard_csv:1
+msgid "Сохраняет таблицу в CSV."
+msgstr ""
+
+#: of windows.at_content_registry:1
+msgid ""
+"windows/at_content_registry.py Модуль для хранения реестра контента AT-"
+"CAD. Содержит словарь CONTENT_REGISTRY, в котором хранятся данные о "
+"панелях контента, включая путь к модулю, метку для отображения и модуль "
+"построения."
+msgstr ""
+
+#: of windows.at_content_registry.run_build:1
+msgid "Унифицированный запуск build_module для указанного контента."
+msgstr ""
+
+#: of windows.at_content_registry.run_build:3
+msgid "Имя контента из CONTENT_REGISTRY."
+msgstr ""
+
+#: of windows.at_content_registry.run_build:5
+msgid "Данные для передачи в программу."
+msgstr ""
+
+#: of windows.at_content_registry.run_build:7
+msgid "Результат выполнения build_module или None при ошибке."
+msgstr ""
+
+#: of windows.at_gui_utils:1
+msgid "Файл: at_gui_utils.py Путь: windowst_gui_utils.py"
+msgstr ""
+
+#: of windows.at_gui_utils:4
+msgid ""
+"Описание: Модуль с утилитами для создания графического интерфейса в "
+"приложении AT-CAD. Содержит функцию show_popup для отображения "
+"всплывающих окон с сообщениями. Использует настройки шрифтов из "
+"user_settings.json через get_setting и пути к изображениям из "
+"at_config.py."
+msgstr ""
+
+#: of windows.at_gui_utils.show_popup:1
+msgid "Показывает всплывающее окно с сообщением."
+msgstr ""
+
+#: of windows.at_gui_utils.show_popup:3
+msgid "Текст сообщения."
+msgstr ""
+
+#: of windows.at_gui_utils.show_popup:4
+msgid "Заголовок окна (если None, используется локализованный заголовок)."
+msgstr ""
+
+#: of windows.at_gui_utils.show_popup:5
+msgid "Тип окна (\"error\", \"success\", \"info\")."
+msgstr ""
+
+#: of windows.at_gui_utils.show_popup:6
+msgid "Размер иконки в пикселях."
+msgstr ""
+
+#: of windows.at_gui_utils.show_popup:7
+msgid "Список кнопок (\"OK\", \"Cancel\")."
+msgstr ""
+
+#: of windows.at_gui_utils.show_popup:9
+msgid "Код возврата (1 для OK, 0 для Cancel)."
+msgstr ""
+
+#: of windows.at_run_dialog_window:1
+msgid "Файл: at_run_dialog_window.py Путь: windows/at_run_dialog_window.py"
+msgstr ""
+
+#: of windows.at_run_dialog_window:4
+msgid ""
+"Описание: Модуль для управления динамической загрузкой контента в "
+"приложении AT-CAD. Предоставляет функции для загрузки панелей контента и "
+"создания списка пунктов меню с локализованными метками, используя ключи "
+"из CONTENT_REGISTRY и переводы из locales.at_localization."
+msgstr ""
+
+#: of windows.at_run_dialog_window.load_content:1
+msgid "Загружает контент по его имени."
+msgstr ""
+
+#: of windows.at_run_dialog_window.load_content:3
+msgid "Имя контента (например, 'content_apps', 'cone' или 'get_content_menu')."
+msgstr ""
+
+#: of windows.at_run_dialog_window.load_content:4
+msgid "Родительский элемент (обычно content_panel)."
+msgstr ""
+
+#: of windows.at_run_dialog_window.load_content:6
+msgid ""
+"- список программ для меню (если content_name == \"get_content_menu\"), -"
+" панель контента (wx.Window), - None при ошибке."
+msgstr ""
+
+#: of windows.at_run_dialog_window.load_content:6
+msgid "список программ для меню (если content_name == \"get_content_menu\"),"
+msgstr ""
+
+#: of windows.at_run_dialog_window.load_content:7
+msgid "панель контента (wx.Window),"
+msgstr ""
+
+#: of windows.at_run_dialog_window.load_content:8
+msgid "None при ошибке."
+msgstr ""
+
+#: of windows.at_run_dialog_window.at_load_content:1
+msgid "Вспомогательная функция для загрузки контента."
+msgstr ""
+
+#: of windows.at_run_dialog_window.at_load_content:3
+msgid "Имя контента."
+msgstr ""
+
+#: of windows.at_run_dialog_window.at_load_content:4
+#: windows.at_window_utils.create_standard_buttons:3
+msgid "Родительский элемент."
+msgstr ""
+
+#: of windows.at_run_dialog_window.at_load_content:6
+msgid "Панель контента или None при ошибке."
+msgstr ""
+
+#: at_main_window.ATMainWindow:1 of windows.at_service_panel.ATServicePanel:1
+#: windows.at_window_utils.BaseInputWindow:1
+msgid "Bases: :py:class:`~wx._core.Frame`"
+msgstr ""
+
+#: of windows.at_service_panel.ATServicePanel.update_status:1
+msgid ""
+"Обновление строки статуса (вызвать только из главного потока или через "
+"wx.CallAfter)."
+msgstr ""
+
+#: of windows.at_service_panel.ATServicePanel.log:1
+msgid "Добавление записи в журнал (безопасно из главного потока)."
+msgstr ""
+
+#: of windows.at_service_panel.ATServicePanel.run_action:1
+msgid "Запуск теста (создаём рабочий поток)."
+msgstr ""
+
+#: of windows.at_settings_window:1
+msgid ""
+"Файл: at_settings_window.py Путь: E:\\AT-"
+"CAD\\windows\\at_settings_window.py"
+msgstr ""
+
+#: of windows.at_settings_window:4
+msgid ""
+"Описание: Окно настроек приложения AT-CAD. Позволяет изменять шрифт, "
+"стиль шрифта, размер шрифта, цвета интерфейса и другие параметры. "
+"Сохраняет настройки в user_settings.json."
+msgstr ""
+
+#: of windows.at_settings_window.SettingsWindow:1
+#: windows.content_shell.BranchWindow:1
+msgid "Bases: :py:class:`~wx._core.Dialog`"
+msgstr ""
+
+#: of windows.at_settings_window.SettingsWindow:1
+msgid "Класс окна настроек приложения AT-CAD."
+msgstr ""
+
+#: of windows.at_settings_window.SettingsWindow:4
+msgid ""
+"parent (wx.Frame): Родительское окно (ATMainWindow). settings (dict): "
+"Текущие настройки, загруженные из user_settings.json. font_name_combo "
+"(wx.ComboBox): Выбор названия шрифта. font_type_combo (wx.ComboBox): "
+"Выбор стиля шрифта. font_size_spin (wx.SpinCtrl): Выбор размера шрифта. "
+"label_font_name_combo (wx.ComboBox): Выбор названия шрифта для меток. "
+"label_font_type_combo (wx.ComboBox): Выбор стиля шрифта для меток. "
+"label_font_weight_combo (wx.ComboBox): Выбор веса шрифта для меток. "
+"label_font_size_spin (wx.SpinCtrl): Выбор размера шрифта для меток. "
+"bg_color_button (wx.Button): Кнопка выбора цвета фона. fg_color_button "
+"(wx.Button): Кнопка выбора цвета текста. banner_color_button (wx.Button):"
+" Кнопка выбора цвета баннера. banner_text_color_button (wx.Button): "
+"Кнопка выбора цвета текста баннера. exit_button_color_button (wx.Button):"
+" Кнопка выбора цвета кнопки выхода. status_text_color_button (wx.Button):"
+" Кнопка выбора цвета текста статуса. label_font_color_button (wx.Button):"
+" Кнопка выбора цвета шрифта меток. button_font_color_button (wx.Button): "
+"Кнопка выбора цвета шрифта кнопок."
+msgstr ""
+
+#: of windows.at_settings_window.SettingsWindow.init_ui:1
+msgid "Инициализирует пользовательский интерфейс окна настроек."
+msgstr ""
+
+#: of windows.at_settings_window.SettingsWindow.on_choose_color:1
+msgid "Открывает диалог выбора цвета и обновляет соответствующую настройку."
+msgstr ""
+
+#: of windows.at_settings_window.SettingsWindow.on_choose_color:4
+msgid ""
+"event: Событие кнопки. color_key (str): Ключ настройки цвета (например, "
+"\"BACKGROUND_COLOR\")."
+msgstr ""
+
+#: of windows.at_settings_window.SettingsWindow.on_save:1
+msgid "Сохраняет настройки и обновляет интерфейс главного окна."
+msgstr ""
+
+#: of windows.at_settings_window.SettingsWindow.on_reset:1
+msgid ""
+"Сбрасывает настройки на значения по умолчанию и обновляет интерфейс "
+"главного окна."
+msgstr ""
+
+#: of windows.at_settings_window.SettingsWindow.on_cancel:1
+msgid "Закрывает окно настроек без сохранения изменений."
+msgstr ""
+
+#: of windows.at_status_bar.update_status_bar_point_selected:1
+msgid ""
+"Обновляет строку состояния главного окна, отображая координаты выбранной "
+"точки или сообщение о её отсутствии."
+msgstr ""
+
+#: of windows.at_status_bar.update_status_bar_point_selected:3
+msgid "Родительский wx.Window (панель контента)."
+msgstr ""
+
+#: of windows.at_status_bar.update_status_bar_point_selected:4
+msgid "Объект точки с атрибутами x, y (или None, если точка не выбрана)."
+msgstr ""
+
+#: of windows.at_style:1
+msgid ""
+"Модуль для применения стилей к элементам интерфейса в проекте AT-CAD. "
+"Содержит функции для стилизации виджетов wxWidgets с использованием "
+"настроек из at_config."
+msgstr ""
+
+#: of windows.at_style.style_textctrl:1
+msgid "Применяет стиль к текстовому полю (wx.TextCtrl)."
+msgstr ""
+
+#: of windows.at_style.style_textctrl:3
+msgid "Текстовое поле для стилизации."
+msgstr ""
+
+#: of windows.at_style.style_combobox:1
+msgid "Применяет стиль к выпадающему списку (wx.ComboBox)."
+msgstr ""
+
+#: of windows.at_style.style_combobox:3
+msgid "Выпадающий список для стилизации."
+msgstr ""
+
+#: of windows.at_style.style_radiobutton:1
+msgid "Применяет стиль к радиокнопке (wx.RadioButton)."
+msgstr ""
+
+#: of windows.at_style.style_radiobutton:3
+msgid "Радиокнопка для стилизации."
+msgstr ""
+
+#: of windows.at_style.style_staticbox:1
+msgid "Применяет стиль к статическому контейнеру (wx.StaticBox)."
+msgstr ""
+
+#: of windows.at_style.style_staticbox:3
+msgid "Контейнер для стилизации."
+msgstr ""
+
+#: of windows.at_style.style_label:1
+msgid "Применяет стиль к метке (wx.StaticText)."
+msgstr ""
+
+#: of windows.at_style.style_label:3
+msgid "Метка для стилизации."
+msgstr ""
+
+#: of windows.at_window_utils:1
+msgid "Файл: at_window_utils.py Путь: windows/at_window_utils.py"
+msgstr ""
+
+#: of windows.at_window_utils:4
+msgid ""
+"Описание: Модуль с утилитами для главного окна AT-CAD. Содержит функции "
+"для работы с позицией окна, всплывающими окнами, шрифтами и стилизацией "
+"интерфейса. Все настройки (FONT_NAME, FONT_TYPE, FONT_SIZE, "
+"BACKGROUND_COLOR и т.д.) читаются из user_settings.json через "
+"get_setting. Локализация текстов осуществляется через loc.get с "
+"использованием словаря translations."
+msgstr ""
+
+#: of windows.at_window_utils.BaseContentPanel:1
+#: windows.at_window_utils.CanvasPanel:1
+msgid "Bases: :py:class:`~wx._core.Panel`"
+msgstr ""
+
+#: of windows.at_window_utils.BaseContentPanel:1
+msgid ""
+"Базовый класс для панелей контента: AppsContentPanel, ConeContentPanel, "
+"RingsContentPanel, PlateContentPanel, HeadContentPanel."
+msgstr ""
+
+#: of windows.at_window_utils.BaseContentPanel.switch_content_panel:1
+msgid "Переключает содержимое главного окна на указанную панель."
+msgstr ""
+
+#: of windows.at_window_utils.BaseContentPanel.switch_content_panel:3
+msgid "Имя модуля контента для переключения."
+msgstr ""
+
+#: of windows.at_window_utils.BaseContentPanel.on_ok:1
+msgid ""
+"Обрабатывает нажатие кнопки OK: собирает данные, проверяет их валидность,"
+" обрабатывает данные."
+msgstr ""
+
+#: of windows.at_window_utils.BaseContentPanel.on_clear:3
+#: windows.at_window_utils.BaseContentPanel.on_ok:3
+#: windows.content_cone.ConeContentPanel.on_angle_text:3
+#: windows.content_cone.ConeContentPanel.on_debounce_timeout:3
+#: windows.content_cone.ConeContentPanel.on_height_text:3
+#: windows.content_cone.ConeContentPanel.on_steigung_text:3
+#: windows.content_cone_pipe.ConePipeContentPanel.on_clear:3
+#: windows.content_cutout.CutoutContentPanel.on_clear:3
+#: windows.content_nozzle.NozzleContentPanel.on_clear:3
+#: windows.content_rings.RingsContentPanel.on_cancel:3
+#: windows.content_rings.RingsContentPanel.on_clear:3
+#: windows.content_rings.RingsContentPanel.on_ok:3
+msgid "Событие wxPython."
+msgstr ""
+
+#: of windows.at_window_utils.BaseContentPanel.on_ok:4
+#: windows.content_rings.RingsContentPanel.on_ok:4
+msgid "Если True, переключает на content_apps после успешной обработки."
+msgstr ""
+
+#: of windows.at_window_utils.BaseContentPanel.on_clear:1
+#: windows.content_cone_pipe.ConePipeContentPanel.on_clear:1
+#: windows.content_cutout.CutoutContentPanel.on_clear:1
+#: windows.content_nozzle.NozzleContentPanel.on_clear:1
+msgid "Очищает все поля ввода и сбрасывает статусную строку."
+msgstr ""
+
+#: of windows.at_window_utils.BaseContentPanel.on_cancel:1
+#: windows.content_cone_pipe.ConePipeContentPanel.on_cancel:1
+#: windows.content_cutout.CutoutContentPanel.on_cancel:1
+#: windows.content_nozzle.NozzleContentPanel.on_cancel:1
+msgid ""
+"Переключает контент на указанную панель с подтверждением (если отказ — "
+"остаёмся). :param event: Событие wxPython. :param switch_content: Имя "
+"контента для переключения."
+msgstr ""
+
+#: of windows.at_window_utils.BaseContentPanel.collect_input_data:1
+msgid "Собирает данные из полей ввода панели."
+msgstr ""
+
+#: of windows.at_window_utils.BaseContentPanel.collect_input_data:3
+#: windows.at_window_utils.BaseContentPanel.process_input:3
+#: windows.at_window_utils.BaseContentPanel.validate_input:3
+#: windows.content_head.HeadContentPanel.validate_input:3
+#: windows.content_plate.PlateContentPanel.validate_input:3
+msgid "Словарь с данными из полей ввода."
+msgstr ""
+
+#: of windows.at_window_utils.BaseContentPanel.validate_input:1
+#: windows.content_cone.ConeContentPanel.validate_input:1
+#: windows.content_head.HeadContentPanel.validate_input:1
+#: windows.content_plate.PlateContentPanel.validate_input:1
+msgid "Проверяет валидность введённых данных."
+msgstr ""
+
+#: of windows.at_window_utils.BaseContentPanel.validate_input:5
+#: windows.content_cone.ConeContentPanel.validate_input:5
+#: windows.content_head.HeadContentPanel.validate_input:5
+#: windows.content_plate.PlateContentPanel.validate_input:5
+#: windows.content_rings.RingsContentPanel.validate_input:5
+msgid "True, если данные валидны, иначе False."
+msgstr ""
+
+#: of windows.at_window_utils.BaseContentPanel.process_input:1
+msgid ""
+"Обрабатывает собранные данные (например, выполняет расчёты или "
+"построение)."
+msgstr ""
+
+#: of windows.at_window_utils.BaseContentPanel.process_input:5
+msgid "True, если обработка успешна, иначе False."
+msgstr ""
+
+#: of windows.at_window_utils.BaseContentPanel.clear_input_fields:1
+#: windows.content_plate.PlateContentPanel.clear_input_fields:1
+msgid "Очищает все поля ввода панели."
+msgstr ""
+
+#: of windows.at_window_utils.BaseContentPanel.update_ui_language:1
+msgid "Обновляет текст элементов интерфейса при смене языка."
+msgstr ""
+
+#: of windows.at_window_utils.load_common_data:1
+msgid ""
+"Загружает данные о материалах, толщинах и конфигурации днищ из файлов "
+"'config/common_data.json' и 'config/config.json' с кэшированием."
+msgstr ""
+
+#: of windows.at_window_utils.load_common_data:4
+msgid ""
+"Словарь с ключами 'material', 'thicknesses', 'h1_table', 'head_types', "
+"'fields'."
+msgstr ""
+
+#: of windows.at_window_utils.reset_common_data_cache:1
+msgid "Сбрасывает кэш данных из common_data.json и config.json."
+msgstr ""
+
+#: of windows.at_window_utils.save_last_position:1
+msgid "Сохраняет координаты позиции окна в файл 'config/last_position.json'."
+msgstr ""
+
+#: of windows.at_window_utils.save_last_position:3
+msgid "Координата x окна."
+msgstr ""
+
+#: of windows.at_window_utils.save_last_position:4
+msgid "Координата y окна."
+msgstr ""
+
+#: of windows.at_window_utils.load_last_position:1
+msgid ""
+"Загружает координаты последней позиции окна из файла "
+"'config/last_position.json'."
+msgstr ""
+
+#: of windows.at_window_utils.load_last_position:3
+msgid "Координаты окна (x, y) или (-1, -1) при ошибке или отсутствии файла."
+msgstr ""
+
+#: of windows.at_window_utils.load_last_input:1
+msgid "Загружает последние введённые данные из указанного файла."
+msgstr ""
+
+#: of windows.at_window_utils.load_last_input:3
+msgid "Имя файла для загрузки (например, 'last_cone_input.json')."
+msgstr ""
+
+#: of windows.at_window_utils.load_last_input:6
+msgid "Словарь с данными или пустой словарь при ошибке."
+msgstr ""
+
+#: of windows.at_window_utils.save_last_input:1
+msgid "Сохраняет введённые данные в указанный файл."
+msgstr ""
+
+#: of windows.at_window_utils.save_last_input:3
+msgid "Имя файла для сохранения."
+msgstr ""
+
+#: of windows.at_window_utils.save_last_input:5
+msgid "Словарь с данными."
+msgstr ""
+
+#: of windows.at_window_utils.get_standard_font:1
+msgid "Возвращает стандартный шрифт на основе конфигурации из user_settings.json."
+msgstr ""
+
+#: of windows.at_window_utils.get_standard_font:3
+msgid "Объект шрифта с заданным размером, стилем и именем."
+msgstr ""
+
+#: of windows.at_window_utils.get_button_font:1
+msgid "Возвращает шрифт для кнопок (на 2 пункта больше стандартного)."
+msgstr ""
+
+#: of windows.at_window_utils.get_button_font:3
+msgid "Объект шрифта для кнопок."
+msgstr ""
+
+#: of windows.at_window_utils.get_link_font:1
+msgid ""
+"Возвращает шрифт для текстовых ссылок на основе параметров из "
+"user_settings.json."
+msgstr ""
+
+#: of windows.at_window_utils.get_link_font:3
+msgid "Шрифт для ссылок."
+msgstr ""
+
+#: of windows.at_window_utils.fit_text_to_height:1
+msgid ""
+"Подбирает наибольший размер шрифта, при котором текст помещается по "
+"высоте."
+msgstr ""
+
+#: of windows.at_window_utils.fit_text_to_height:3
+msgid "Виджет для отображения текста."
+msgstr ""
+
+#: of windows.at_window_utils.fit_text_to_height:4
+msgid "Текст для измерения."
+msgstr ""
+
+#: of windows.at_window_utils.fit_text_to_height:5
+msgid "Максимальная ширина текста."
+msgstr ""
+
+#: of windows.at_window_utils.fit_text_to_height:6
+msgid "Максимальная высота текста."
+msgstr ""
+
+#: of windows.at_window_utils.fit_text_to_height:7
+msgid "Имя шрифта."
+msgstr ""
+
+#: of windows.at_window_utils.fit_text_to_height:8
+msgid "Словарь с параметрами стиля шрифта (style, weight)."
+msgstr ""
+
+#: of windows.at_window_utils.fit_text_to_height:10
+msgid "Оптимальный размер шрифта."
+msgstr ""
+
+#: of windows.at_window_utils.parse_float:1
+msgid "Преобразует строку в число, заменяя запятую на точку."
+msgstr ""
+
+#: of windows.at_window_utils.CanvasPanel:1
+msgid "Панель для отображения изображения с поддержкой масштабирования."
+msgstr ""
+
+#: of windows.at_window_utils.CanvasPanel:5
+msgid "Объект wx.Image или None при ошибке загрузки."
+msgstr ""
+
+#: of windows.at_window_utils.CanvasPanel:9
+msgid "Кэшированное масштабированное изображение."
+msgstr ""
+
+#: of windows.at_window_utils.CanvasPanel.on_paint:1
+msgid ""
+"Отрисовывает изображение или сообщение об ошибке, если изображение "
+"недоступно."
+msgstr ""
+
+#: of windows.at_window_utils.CanvasPanel.on_paint:3
+msgid "Событие отрисовки (wx.EVT_PAINT)."
+msgstr ""
+
+#: of windows.at_window_utils.CanvasPanel.on_resize:1
+msgid "Обновляет отображение при изменении размера панели."
+msgstr ""
+
+#: of windows.at_window_utils.CanvasPanel.on_resize:3
+msgid "Событие изменения размера (wx.EVT_SIZE)."
+msgstr ""
+
+#: of windows.at_window_utils.BaseInputWindow:1
+msgid "Базовый класс для диалоговых окон ввода параметров."
+msgstr ""
+
+#: of windows.at_window_utils.BaseInputWindow:3
+msgid ""
+"Обеспечивает унифицированную инициализацию, работу с AutoCAD, обработку "
+"событий и сохранение данных."
+msgstr ""
+
+#: of windows.at_window_utils.BaseInputWindow.on_cancel:1
+msgid ""
+"Отменяет ввод с подтверждением. При подтверждении — закрывает окно и "
+"восстанавливает родительское окно."
+msgstr ""
+
+#: of windows.at_window_utils.BaseInputWindow.on_cancel:3
+#: windows.at_window_utils.BaseInputWindow.on_select_point:3
+msgid "Событие кнопки (wx.EVT_BUTTON)."
+msgstr ""
+
+#: of windows.at_window_utils.BaseInputWindow.on_close:1
+msgid "Сохраняет позицию окна, закрывает его и восстанавливает родительское окно."
+msgstr ""
+
+#: of windows.at_window_utils.BaseInputWindow.on_close:3
+msgid "Событие закрытия (wx.EVT_CLOSE)."
+msgstr ""
+
+#: of windows.at_window_utils.BaseInputWindow.adjust_button_widths:1
+msgid "Устанавливает одинаковую ширину для кнопок с учётом локализации текста."
+msgstr ""
+
+#: of windows.at_window_utils.BaseInputWindow.on_key_down:1
+msgid "Обрабатывает нажатие клавиши Esc для отмены."
+msgstr ""
+
+#: of windows.at_window_utils.BaseInputWindow.on_key_down:3
+msgid "Событие клавиатуры (wx.EVT_KEY_DOWN)."
+msgstr ""
+
+#: of windows.at_window_utils.BaseInputWindow.on_select_point:1
+msgid ""
+"Запрашивает выбор точки вставки в AutoCAD, минимизируя окно на время "
+"выбора."
+msgstr ""
+
+#: of windows.at_window_utils.BaseInputWindow.update_ui_language:1
+msgid ""
+"Обновляет язык и стили интерфейса окна на основе настроек из "
+"user_settings.json."
+msgstr ""
+
+#: of windows.at_window_utils.create_window:1
+msgid "Создаёт и отображает диалоговое окно для ввода параметров."
+msgstr ""
+
+#: of windows.at_window_utils.create_window:3
+msgid "Класс окна (например, ConeInputWindow, ShellInputWindow и т.д.)."
+msgstr ""
+
+#: of windows.at_window_utils.create_window:4
+msgid "Родительское окно (например, MainWindow)."
+msgstr ""
+
+#: of windows.at_window_utils.create_window:6
+msgid "Данные из диалога или None при отмене."
+msgstr ""
+
+#: of windows.at_window_utils.apply_styles_recursively:1
+msgid ""
+"Рекурсивно применяет стили к виджету и его дочерним элементам. "
+"Поддерживает wx.StaticText, wx.TextCtrl, wx.ComboBox, wx.RadioButton, "
+"wx.StaticBox."
+msgstr ""
+
+#: of windows.at_window_utils.apply_styles_recursively:4
+msgid "Виджет для стилизации."
+msgstr ""
+
+#: of windows.at_window_utils.apply_styles_to_panel:1
+msgid "Применяет стили ко всем элементам внутри заданной панели."
+msgstr ""
+
+#: of windows.at_window_utils.apply_styles_to_panel:3
+msgid "Панель для стилизации."
+msgstr ""
+
+#: of windows.at_window_utils.create_standard_buttons:1
+msgid "Создаёт стандартные кнопки (OK, Cancel, Clear) с привязкой событий."
+msgstr ""
+
+#: of windows.at_window_utils.create_standard_buttons:4
+msgid "Обработчик для кнопки OK."
+msgstr ""
+
+#: of windows.at_window_utils.create_standard_buttons:5
+msgid "Обработчик для кнопки Cancel."
+msgstr ""
+
+#: of windows.at_window_utils.create_standard_buttons:6
+msgid "Обработчик для кнопки Clear (опционально, если None, кнопка не создаётся)."
+msgstr ""
+
+#: of windows.at_window_utils.create_standard_buttons:8
+msgid ""
+"Список кнопок [ok_button, cancel_button, clear_button] (clear_button "
+"опционально)."
+msgstr ""
+
+#: of windows.at_window_utils.adjust_button_widths:1
+msgid ""
+"Устанавливает одинаковую ширину для переданных кнопок с учётом "
+"локализации текста."
+msgstr ""
+
+#: of windows.at_window_utils.adjust_button_widths:3
+msgid "Список кнопок для стилизации."
+msgstr ""
+
+#: of windows.at_window_utils.update_status_bar_point_selected:1
+msgid "Обновляет статусную строку окна с координатами выбранной точки."
+msgstr ""
+
+#: of windows.at_window_utils.update_status_bar_point_selected:3
+msgid "Окно или панель, содержащее строку состояния."
+msgstr ""
+
+#: of windows.at_window_utils.update_status_bar_point_selected:4
+msgid "Объект точки с атрибутами x, y (например, APoint)."
+msgstr ""
+
+#: of windows.content_apps:1
+msgid "Файл: windows/content_apps.py"
+msgstr ""
+
+#: of windows.content_apps:3
+msgid ""
+"Модуль для создания панели со списком доступных программ. Эта панель "
+"отображает текстовые ссылки (StaticText) в один столбец. При клике на "
+"ссылку управление передаётся главному окну ATMainWindow, которое вызывает"
+" switch_content и переключает отображаемый контент."
+msgstr ""
+
+#: of windows.content_apps:8
+msgid ""
+"Особенности: - Панель не создаёт вложенные панели самостоятельно. - Все "
+"панели-контенты равноправные: их создание и переключение управляется "
+"ATMainWindow. - Локализация текста выполняется через loc.get и словарь "
+"TRANSLATIONS."
+msgstr ""
+
+#: of windows.content_apps.create_window:1
+msgid "Фабричная функция для создания панели со списком программ."
+msgstr ""
+
+#: of windows.content_apps.create_window:3
+#: windows.content_shell.create_window:2
+msgid "Родительская панель (обычно content_panel в ATMainWindow)."
+msgstr ""
+
+#: of windows.content_apps.create_window:6
+msgid "Инициализированный экземпляр AppsContentPanel."
+msgstr ""
+
+#: of windows.content_apps.AppsContentPanel:1
+#: windows.content_cone.ConeContentPanel:1
+#: windows.content_cone_pipe.ConePipeContentPanel:1
+#: windows.content_cutout.CutoutContentPanel:1
+#: windows.content_eccentric.ReducerContentPanel:1
+#: windows.content_head.HeadContentPanel:1
+#: windows.content_nozzle.NozzleContentPanel:1
+#: windows.content_plate.PlateContentPanel:1
+#: windows.content_rings.RingsContentPanel:1
+#: windows.content_shell.ShellContentPanel:1
+msgid "Bases: :py:class:`~windows.at_window_utils.BaseContentPanel`"
+msgstr ""
+
+#: of windows.content_apps.AppsContentPanel:1
+msgid ""
+"Панель для отображения списка программ в виде текстовых ссылок. Эта "
+"панель всегда живёт в главном окне как самостоятельный контент."
+msgstr ""
+
+#: of windows.content_apps.AppsContentPanel:5
+msgid ""
+"content_name (str): Имя контента (используется в CONTENT_REGISTRY). links"
+" (list): Список ссылок (wx.StaticText), добавленных в панель."
+msgstr ""
+
+#: of windows.content_apps.AppsContentPanel.setup_ui:1
+msgid "Строит интерфейс панели: добавляет список ссылок на доступные программы."
+msgstr ""
+
+#: of windows.content_apps.AppsContentPanel.update_ui_language:1
+msgid ""
+"Обновляет тексты интерфейса при смене языка. Пересобирает список ссылок с"
+" новыми переводами."
+msgstr ""
+
+#: of windows.content_apps.AppsContentPanel.on_link_click:1
+msgid "Обрабатывает клик по ссылке и передаёт управление главному окну."
+msgstr ""
+
+#: of windows.content_apps.AppsContentPanel.on_link_click:3
+msgid "Имя модуля контента для загрузки (например, 'cone')."
+msgstr ""
+
+#: of windows.content_cone:1
+msgid ""
+"Файл: windows/content_cone.py Описание: Модуль для создания панели ввода "
+"параметров развертки конуса. Обеспечивает интерфейс для ввода данных "
+"конуса с валидацией, вызовом функции выбора точки и возвратом словаря с "
+"данными через callback. Локализация через словарь TRANSLATIONS, "
+"регистрируемый в loc. Настройки из user_settings.json. Сохраняет "
+"указанные данные (order_number, material, thickness, weld_allowance) в "
+"last_cone_input.json для использования в качестве начальных значений. "
+"Изображение конуса отображается с помощью CanvasPanel слева, кнопки под "
+"изображением, поля ввода справа. Поддерживает автоматический пересчёт "
+"параметров высоты, наклона и угла с использованием debounce."
+msgstr ""
+
+#: of windows.content_cone:12
+msgid ""
+"Особенности: - Выход из окна конуса происходит только по кнопке "
+"\"Возврат\" (переключение на content_apps). - При нажатии \"ОК\" данные "
+"передаются через callback, после чего очищаются поля, не сохраняемые"
+msgstr ""
+
+#: of windows.content_cone:15
+msgid "в last_cone_input.json, и окно остаётся открытым."
+msgstr ""
+
+#: of windows.content_cone:16
+msgid ""
+"Исправлена ошибка \"wrapped C/C++ object of type TextCtrl has been "
+"deleted\" путём проверки состояния окна перед очисткой полей и "
+"отложенного вызова clear_input_fields."
+msgstr ""
+
+#: of windows.content_cone.create_window:1
+msgid "Создаёт панель контента для ввода параметров конуса."
+msgstr ""
+
+#: of windows.content_cone.create_window:3 windows.content_head.create_window:3
+#: windows.content_plate.create_window:3
+msgid "Родительский wx.Window (content_panel из ATMainWindow)."
+msgstr ""
+
+#: of windows.content_cone.create_window:5
+msgid "Панель с интерфейсом для ввода параметров конуса или None при ошибке."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel:1
+msgid "Панель для ввода параметров развертки конуса."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel.setup_ui:1
+#: windows.content_eccentric.ReducerContentPanel.setup_ui:1
+msgid ""
+"Настраивает элементы интерфейса, создавая компоновку с левой "
+"(изображение, кнопки) и правой (поля ввода) частями. Все поля ввода "
+"(TextCtrl, ComboBox, Choice) имеют одинаковую ширину и выровнены по "
+"правому краю с использованием wx.StretchSpacer() между метками и полями."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel.load_last_input:1
+msgid "Загружает последние введённые данные из last_cone_input.json."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel.clear_input_fields:1
+msgid ""
+"Очищает поля ввода, не сохраняемые в last_cone_input.json. Проверяет, что"
+" элементы не были уничтожены перед очисткой."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel.update_ui_language:1
+#: windows.content_eccentric.ReducerContentPanel.update_ui_language:1
+msgid ""
+"Обновляет текст меток и групп при смене языка. Проверяет, что элементы не"
+" уничтожены."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel.on_height_text:1
+msgid "Запускает обработку ввода высоты с задержкой (debounce)."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel.on_steigung_text:1
+msgid "Запускает обработку ввода наклона с задержкой (debounce)."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel.on_angle_text:1
+msgid "Запускает обработку ввода угла с задержкой (debounce)."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel.on_debounce_timeout:1
+msgid "Выполняет расчёты высоты, наклона или угла после задержки."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel.collect_input_data:1
+msgid "Собирает данные из полей ввода, корректируя диаметры и высоту."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel.collect_input_data:3
+msgid ""
+"Диаметры: - Если диаметр равен 0, заменяется на значение толщины. - Если "
+"тип диаметра 'outer', вычитается толщина. - Если тип диаметра 'inner', "
+"прибавляется толщина. - Если тип диаметра 'middle', диаметр остаётся без "
+"изменений. Высота: - К высоте прибавляется припуск на сварку. Диаметр "
+"основания: - К диаметру D прибавляется коррекция диаметра D перед "
+"обработкой."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel.collect_input_data:13
+msgid ""
+"Словарь с данными (order_number, detail_number, material, thickness, "
+"diameter_top, diameter_base, d_type, D_type, height, steigung, angle, "
+"weld_allowance, insert_point, thickness_text) или None при ошибке."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel.validate_input:3
+msgid "Словарь с данными из полей ввода (после корректировки)."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel.on_ok:1
+#: windows.content_eccentric.ReducerContentPanel.on_ok:1
+msgid ""
+"Обрабатывает нажатие кнопки \"ОК\", запрашивает точку, передаёт данные "
+"через callback и очищает поля, не сохраняемые в last_cone_input.json, "
+"если окно не уничтожено."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel.on_ok:4
+#: windows.content_eccentric.ReducerContentPanel.on_ok:4
+#: windows.content_head.HeadContentPanel.on_ok:3
+msgid "Событие нажатия кнопки \"ОК\"."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel.on_clear:1
+msgid "Очищает поля ввода, не сохраняемые в last_cone_input.json."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel.on_cancel:3
+#: windows.content_cone.ConeContentPanel.on_clear:3
+#: windows.content_eccentric.ReducerContentPanel.on_cancel:3
+#: windows.content_eccentric.ReducerContentPanel.on_clear:3
+#: windows.content_head.HeadContentPanel.on_clear:3
+#: windows.content_shell.BranchWindow.on_clear:4
+#: windows.content_shell.BranchWindow.on_ok:4
+#: windows.content_shell.ShellContentPanel.on_branch:4
+msgid "Событие нажатия кнопки."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel.on_cancel:1
+#: windows.content_eccentric.ReducerContentPanel.on_cancel:1
+#: windows.content_rings.RingsContentPanel.on_cancel:1
+msgid "Переключает контент на указанную панель (по умолчанию content_apps)."
+msgstr ""
+
+#: of windows.content_cone.ConeContentPanel.on_cancel:4
+#: windows.content_eccentric.ReducerContentPanel.on_cancel:4
+#: windows.content_rings.RingsContentPanel.on_cancel:4
+msgid "Имя контента для переключения."
+msgstr ""
+
+#: of windows.content_cone_pipe:1
+msgid "Модуль построения линии пересечения конусного отвода на трубе"
+msgstr ""
+
+#: of windows.content_cone_pipe.ConePipeContentPanel:1
+msgid "Панель для настройки параметров конусного отвода"
+msgstr ""
+
+#: of windows.content_cone_pipe.ConePipeContentPanel.on_ok:1
+#: windows.content_nozzle.NozzleContentPanel.on_ok:1
+#: windows.content_shell.ShellContentPanel.on_ok:1
+msgid ""
+"Обрабатывает нажатие кнопки \"ОК\": запрашивает точку вставки и передает "
+"данные в callback."
+msgstr ""
+
+#: of windows.content_cone_pipe.ConePipeContentPanel.on_ok:4
+#: windows.content_cutout.CutoutContentPanel.on_ok:5
+#: windows.content_nozzle.NozzleContentPanel.on_ok:4
+#: windows.content_shell.ShellContentPanel.on_ok:4
+msgid "event: Событие wxPython."
+msgstr ""
+
+#: of windows.content_cone_pipe.ConePipeContentPanel.get_data:1
+#: windows.content_cutout.CutoutContentPanel.get_data:1
+#: windows.content_nozzle.NozzleContentPanel.get_data:1
+msgid "Собирает данные из полей ввода в словарь."
+msgstr ""
+
+#: of windows.content_cone_pipe.ConePipeContentPanel.get_data:3
+#: windows.content_cutout.CutoutContentPanel.get_data:3
+#: windows.content_nozzle.NozzleContentPanel.get_data:3
+msgid "Словарь с данными или None в случае ошибки."
+msgstr ""
+
+#: of windows.content_cone_pipe.ConePipeContentPanel.update_ui_language:1
+#: windows.content_cutout.CutoutContentPanel.update_ui_language:1
+#: windows.content_nozzle.NozzleContentPanel.update_ui_language:1
+msgid "Переводит все подписи при смене языка."
+msgstr ""
+
+#: of windows.content_cutout:1
+msgid ""
+"Модуль содержит панель CutoutContentPanel для настройки параметров выреза"
+" в приложении AT-CAD. Панель собирает данные в словарь и передает их "
+"через callback."
+msgstr ""
+
+#: of windows.content_cutout:4
+msgid ""
+"Функциональность: - UI по образцу окна отвода (NozzleContentPanel) - Сбор"
+" данных в словарь:"
+msgstr ""
+
+#: of windows.content_cutout:7 windows.content_nozzle:8
+msgid "{"
+msgstr ""
+
+#: of windows.content_cutout:8
+msgid ""
+"\"insert_point\": PointVariant | None, \"diameter\": float, "
+"\"diameter_main\": float, \"offset\": float, \"steps\": int, \"mode\": "
+"str, \"text\": str"
+msgstr ""
+
+#: of windows.content_cutout:16
+msgid "Тестовый запуск в конце файла (аналогично nozzle_content_panel.py)"
+msgstr ""
+
+#: of windows.content_cutout:17 windows.content_nozzle:27
+msgid "Поддержка динамической смены языка через update_ui_language()"
+msgstr ""
+
+#: of windows.content_cutout:18 windows.content_nozzle:28
+msgid "Минимальная валидация полей"
+msgstr ""
+
+#: of windows.content_cutout:19
+msgid "Возможность ввода пользовательского значения steps (editable ComboBox)"
+msgstr ""
+
+#: of windows.content_cutout.CutoutContentPanel:1
+msgid "Панель для настройки параметров выреза."
+msgstr ""
+
+#: of windows.content_cutout.CutoutContentPanel.on_mode_change:1
+#: windows.content_shell.BranchWindow.on_mode_change:1
+msgid "Меняет список значений steps при смене режима построения."
+msgstr ""
+
+#: of windows.content_cutout.CutoutContentPanel.on_ok:1
+msgid ""
+"Обрабатывает нажатие кнопки \"ОК\": собирает данные в словарь, добавляет "
+"точку вставки и выводит словарь на экран в тестовом режиме. В реальном "
+"режиме передает данные через callback."
+msgstr ""
+
+#: of windows.content_eccentric:1
+msgid ""
+"Файл: windows/content_eccentric.py Описание: Модуль для создания панели "
+"ввода параметров развертки усечённого конуса с одной вертикальной "
+"образующей. Обеспечивает интерфейс для ввода данных конуса с валидацией, "
+"вызовом функции выбора точки и возвратом словаря с данными через "
+"callback. Локализация через словарь TRANSLATIONS, регистрируемый в loc. "
+"Настройки из user_settings.json. Изображение конуса отображается с "
+"помощью CanvasPanel слева, кнопки под изображением, поля ввода справа."
+msgstr ""
+
+#: of windows.content_eccentric:9
+msgid ""
+"Особенности: - Выход из окна конуса происходит только по кнопке "
+"\"Возврат\" (переключение на content_apps). - При нажатии \"ОК\" данные "
+"передаются через callback, после чего очищаются поля и окно остаётся "
+"открытым."
+msgstr ""
+
+#: of windows.content_eccentric.create_window:1
+msgid ""
+"Создаёт панель контента для ввода параметров конуса. :param parent: "
+"Родительский wx.Window (content_panel из ATMainWindow)."
+msgstr ""
+
+#: of windows.content_eccentric.create_window:4
+msgid "Панель с интерфейсом для ввода параметров конуса."
+msgstr ""
+
+#: of windows.content_eccentric.ReducerContentPanel:1
+msgid ""
+"Панель для ввода параметров развертки усечённого конуса с одной "
+"вертикальной образующей. Данные собираются в словарь и передаются через "
+"callback в другую программу."
+msgstr ""
+
+#: of windows.content_eccentric.ReducerContentPanel.on_mode_change:1
+#: windows.content_nozzle.NozzleContentPanel.on_mode_change:1
+msgid "Меняет список значений accuracy при смене режима построения."
+msgstr ""
+
+#: of windows.content_eccentric.ReducerContentPanel.on_clear:1
+msgid "Очищает поля ввода."
+msgstr ""
+
+#: of windows.content_eccentric.ReducerContentPanel.get_data:1
+msgid ""
+"Собирает данные из полей ввода, выполняет валидацию и вычисляет "
+"фактические (средние) диаметры и высоту с учётом припуска на сварку. "
+":returns: словарь с данными или None в случае ошибки. :rtype: dict | None"
+msgstr ""
+
+#: of windows.content_head:1
+msgid ""
+"windows/content_head.py Модуль для создания панели для ввода параметров "
+"днища."
+msgstr ""
+
+#: of windows.content_head.create_window:1
+msgid "Создаёт панель контента для ввода параметров днища."
+msgstr ""
+
+#: of windows.content_head.create_window:5
+msgid "Панель с интерфейсом для ввода параметров днища или None при ошибке."
+msgstr ""
+
+#: of windows.content_head.get_h1_values:1
+msgid "Возвращает допустимые значения высоты h1 для типа днища и толщины."
+msgstr ""
+
+#: of windows.content_head.get_h1_values:3
+msgid "Тип днища (например, 'DIN 28011')."
+msgstr ""
+
+#: of windows.content_head.get_h1_values:4
+msgid "Толщина материала (строка, например, '5')."
+msgstr ""
+
+#: of windows.content_head.get_h1_values:5
+msgid "Данные конфигурации из config.json."
+msgstr ""
+
+#: of windows.content_head.get_h1_values:7
+msgid "Список строковых значений h1."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel:1
+msgid "Панель для ввода параметров днища."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel.setup_ui:1
+#: windows.content_plate.PlateContentPanel.setup_ui:1
+msgid ""
+"Настраивает элементы интерфейса, создавая компоновку с левой "
+"(изображение, кнопки) и правой (поля ввода) частями."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel.on_clear:1
+msgid ""
+"Очищает все поля ввода без обновления строки состояния и сохранения "
+"данных."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel.on_D_change:1
+msgid "Обновляет параметры при изменении диаметра."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel.on_D_change:3
+msgid "Событие выбора диаметра."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel.on_s_change:1
+msgid "Обновляет параметры при изменении толщины."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel.on_s_change:3
+msgid "Событие выбора толщины."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel.on_head_type_change:1
+msgid "Обновляет параметры при изменении типа днища."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel.on_head_type_change:3
+msgid "Событие выбора типа (может быть None)."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel.on_layer_change:1
+msgid "Обрабатывает выбор слоя."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel.on_layer_change:3
+msgid "Событие выбора."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel.on_layer_text_change:1
+msgid "Обрабатывает ввод текста в поле слоя."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel.on_layer_text_change:3
+msgid "Событие ввода текста."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel.on_ok:1
+msgid "Собирает данные из полей ввода и возвращает словарь с параметрами."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel.on_ok:5
+msgid ""
+"Словарь с данными (D, s, h1, head_type, insert_point, layer, R, r) или "
+"None, если данные не собраны."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel.clear_input_fields:1
+msgid "Очищает все поля ввода и сбрасывает точку вставки."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel.update_ui_language:1
+#: windows.content_plate.PlateContentPanel.update_ui_language:1
+#: windows.content_rings.RingsContentPanel.update_ui_language:1
+msgid "Обновляет текст меток и групп при смене языка."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel.collect_input_data:1
+#: windows.content_plate.PlateContentPanel.collect_input_data:1
+msgid "Собирает данные из полей ввода."
+msgstr ""
+
+#: of windows.content_head.HeadContentPanel.collect_input_data:3
+msgid ""
+"Словарь с данными (D, s, h1, head_type, insert_point, layer, R, r) или "
+"None при ошибке."
+msgstr ""
+
+#: of windows.content_nozzle:1
+msgid ""
+"Модуль содержит панель NozzleContentPanel для настройки параметров "
+"одиночного отвода в приложении AT-CAD. Панель собирает данные и передает "
+"их через callback в вызывающую часть приложения (например, в программу "
+"построения отвода)."
+msgstr ""
+
+#: of windows.content_nozzle:5
+msgid ""
+"Функциональность: - UI по образцу окна обечайки (ShellContentPanel) - "
+"Сбор данных в словарь:"
+msgstr ""
+
+#: of windows.content_nozzle:9
+msgid ""
+"\"insert_point\": PointVariant | None, \"diameter\": float, "
+"\"diameter_main\": float, \"length\": float, \"axis\": bool, "
+"\"axis_marks\": float, \"layer_name\": \"0\", \"thickness\": float, "
+"\"order_number\": str, \"detail_number\": str, \"material\": str, "
+"\"weld_allowance\": float, \"accuracy\": int, \"offset\": float, "
+"\"thk_correction\": bool, \"mode\": str"
+msgstr ""
+
+#: of windows.content_nozzle:26
+msgid "Тестовый запуск в конце файла (аналогично shell_content_panel.py)"
+msgstr ""
+
+#: of windows.content_nozzle:29
+msgid "Возможность ввода пользовательского значения accuracy (editable ComboBox)"
+msgstr ""
+
+#: of windows.content_nozzle.NozzleContentPanel:1
+msgid "Панель для настройки параметров одиночного отвода."
+msgstr ""
+
+#: of windows.content_plate:1
+msgid ""
+"windows/content_plate.py Модуль для создания панели для ввода параметров "
+"листа."
+msgstr ""
+
+#: of windows.content_plate.create_window:1
+msgid "Создаёт панель контента для ввода параметров листа."
+msgstr ""
+
+#: of windows.content_plate.create_window:5
+msgid "Панель с интерфейсом для ввода параметров листа или None при ошибке."
+msgstr ""
+
+#: of windows.content_plate.PlateContentPanel:1
+msgid "Панель для ввода параметров листа."
+msgstr ""
+
+#: of windows.content_plate.PlateContentPanel.on_size_combo_change:1
+msgid "Обрабатывает изменение выбора в выпадающем списке размеров."
+msgstr ""
+
+#: of windows.content_plate.PlateContentPanel.collect_input_data:3
+msgid ""
+"Словарь с данными (insert_point, point_list, material, thickness, "
+"melt_no, allowance)       или None при ошибке."
+msgstr ""
+
+#: of windows.content_plate.PlateContentPanel.collect_input_data:5
+msgid ""
+"Словарь с данными (insert_point, point_list, material, thickness, "
+"melt_no, allowance)"
+msgstr ""
+
+#: of windows.content_plate.PlateContentPanel.collect_input_data:6
+msgid "или None при ошибке."
+msgstr ""
+
+#: of windows.content_plate.PlateContentPanel.on_ok:1
+msgid "Обрабатывает нажатие кнопки \"ОК\", запрашивает точку и вызывает callback."
+msgstr ""
+
+#: of windows.content_rings:1
+msgid ""
+"windows/content_rings.py Модуль для создания панели для ввода параметров "
+"колец. Работает с AutoCAD через win32com.client."
+msgstr ""
+
+#: of windows.content_rings.create_window:1
+msgid "Создаёт панель контента для ввода параметров колец."
+msgstr ""
+
+#: of windows.content_rings.create_window:3
+msgid "Родительский wx.Window (например, content_panel)."
+msgstr ""
+
+#: of windows.content_rings.create_window:5
+msgid "Панель RingsContentPanel или None при ошибке."
+msgstr ""
+
+#: of windows.content_rings.RingsContentPanel:1
+msgid "Панель для ввода параметров колец."
+msgstr ""
+
+#: of windows.content_rings.RingsContentPanel.collect_input_data:1
+msgid ""
+"Собирает данные из полей ввода. Возвращает словарь с данными: "
+"work_number, diameters, input_point."
+msgstr ""
+
+#: of windows.content_rings.RingsContentPanel.collect_input_data:4
+msgid "Словарь с данными или None при ошибке."
+msgstr ""
+
+#: of windows.content_rings.RingsContentPanel.validate_input:1
+msgid "Минимальная проверка UI-уровня: наличие хотя бы одного диаметра и точки."
+msgstr ""
+
+#: of windows.content_rings.RingsContentPanel.validate_input:3
+msgid "Словарь с данными ввода."
+msgstr ""
+
+#: of windows.content_rings.RingsContentPanel.on_ok:1
+msgid ""
+"Обрабатывает нажатие кнопки OK: запрашивает точку, собирает данные, "
+"проверяет и передаёт их через callback."
+msgstr ""
+
+#: of windows.content_rings.RingsContentPanel.on_clear:1
+msgid "Очищает поля ввода и сбрасывает статусную строку."
+msgstr ""
+
+#: of windows.content_rings.RingsContentPanel.clear_input_fields:1
+msgid "Очищает поля ввода и сбрасывает выбранную точку."
+msgstr ""
+
+#: of windows.content_shell:1
+msgid ""
+"Модуль содержит панель ShellContentPanel для настройки параметров "
+"оболочки и модальное окно BranchWindow для настройки параметров отвода в "
+"приложении AT-CAD."
+msgstr ""
+
+#: of windows.content_shell.create_window:1
+msgid "Фабричная функция для создания панели ShellContentPanel."
+msgstr ""
+
+#: of windows.content_shell.create_window:5
+msgid "Инициализированный экземпляр ShellContentPanel."
+msgstr ""
+
+#: of windows.content_shell.BranchWindow:1
+msgid ""
+"Модальное окно для настройки параметров отвода. Содержит изображение "
+"слева, три стандартные кнопки (ОК, Очистить, Возврат) и таблицу справа "
+"для ввода параметров."
+msgstr ""
+
+#: of windows.content_shell.BranchWindow.setup_ui:1
+msgid ""
+"Настраивает пользовательский интерфейс окна BranchWindow. Левая панель "
+"(рисунок + кнопки) создаётся внутри left_panel_container, правая (таблица"
+" и контролы) — внутри right_panel_container."
+msgstr ""
+
+#: of windows.content_shell.BranchWindow.on_add_row:1
+msgid "Добавляет новую строку в таблицу."
+msgstr ""
+
+#: of windows.content_shell.BranchWindow.on_add_row:3
+msgid "Событие нажатия кнопки \"Добавить строку\"."
+msgstr ""
+
+#: of windows.content_shell.BranchWindow.on_cell_changed:1
+msgid ""
+"Автоматически подгоняет ширину столбца под содержимое (увеличивает и "
+"уменьшает)."
+msgstr ""
+
+#: of windows.content_shell.BranchWindow.on_resize:1
+msgid "Обработчик изменения размера окна — вызывает перераспределение столбцов."
+msgstr ""
+
+#: of windows.content_shell.BranchWindow.adjust_table_columns:1
+msgid ""
+"Равномерно распределяет ширину всех столбцов, без горизонтального скролла"
+" и скрытия последнего."
+msgstr ""
+
+#: of windows.content_shell.BranchWindow.collect_input_data:1
+msgid "Собирает данные из таблицы параметров отвода."
+msgstr ""
+
+#: of windows.content_shell.BranchWindow.collect_input_data:3
+msgid ""
+"Список словарей с данными отводов или None, если данные невалидны или "
+"таблица пуста."
+msgstr ""
+
+#: of windows.content_shell.BranchWindow.clear_input_fields:1
+msgid ""
+"Очищает поля таблицы параметров отвода, сбрасывая их на значения по "
+"умолчанию."
+msgstr ""
+
+#: of windows.content_shell.BranchWindow.on_ok:1
+msgid ""
+"Обрабатывает нажатие кнопки \"ОК\". Собирает данные из таблицы и "
+"закрывает окно с результатом wx.ID_OK."
+msgstr ""
+
+#: of windows.content_shell.BranchWindow.on_clear:1
+msgid ""
+"Обрабатывает нажатие кнопки \"Очистить\". Сбрасывает значения полей "
+"таблицы."
+msgstr ""
+
+#: of windows.content_shell.BranchWindow.on_cancel:1
+msgid ""
+"Обрабатывает нажатие кнопки \"Возврат\" или закрытие окна. Перед "
+"закрытием спрашивает подтверждение, чтобы избежать потери несохранённых "
+"данных."
+msgstr ""
+
+#: of windows.content_shell.ShellContentPanel:1
+msgid ""
+"Панель для настройки параметров оболочки в приложении AT-CAD. Наследуется"
+" от BaseContentPanel, предоставляя интерфейс для ввода данных об "
+"оболочке, таких как заказ, материал, размеры, припуски и дополнительные "
+"параметры. Данные собираются в словарь и передаются через callback в "
+"другую программу."
+msgstr ""
+
+#: of windows.content_shell.ShellContentPanel.setup_ui:1
+msgid ""
+"Настраивает пользовательский интерфейс панели ShellContentPanel. Создает "
+"левый сайзер с изображением и кнопками и правый сайзер с полями ввода. "
+"Все поля ввода (TextCtrl, ComboBox, Choice) имеют одинаковую ширину и "
+"выровнены по правому краю с использованием wx.StretchSpacer() между "
+"метками и полями. Стилизация выполняется через функции из "
+"at_window_utils."
+msgstr ""
+
+#: of windows.content_shell.ShellContentPanel.on_branch:1
+msgid ""
+"Обрабатывает нажатие кнопки \"Наличие отвода\". Создает и отображает "
+"модальное окно BranchWindow для ввода параметров отвода."
+msgstr ""
+
+#: of windows.content_shell.ShellContentPanel.collect_input_data:1
+msgid ""
+"Собирает данные из полей ввода панели в словарь для передачи в другую "
+"программу."
+msgstr ""
+
+#: of windows.content_shell.ShellContentPanel.collect_input_data:3
+msgid "Словарь с данными из полей ввода, включая данные отводов."
+msgstr ""
+
+#: of windows.content_shell.ShellContentPanel.validate_input:1
+msgid "Проверяет валидность введенных данных."
+msgstr ""
+
+#: of windows.content_shell.ShellContentPanel.process_input:4
+#: windows.content_shell.ShellContentPanel.validate_input:4
+msgid "data: Словарь с данными из полей ввода."
+msgstr ""
+
+#: of windows.content_shell.ShellContentPanel.validate_input:7
+msgid "bool: True, если данные валидны, иначе False."
+msgstr ""
+
+#: of windows.content_shell.ShellContentPanel.process_input:1
+msgid "Обрабатывает введенные данные, передавая их в callback-функцию."
+msgstr ""
+
+#: of windows.content_shell.ShellContentPanel.process_input:7
+msgid "bool: True, если обработка успешна, иначе False."
+msgstr ""
+
+#: of windows.content_shell.ShellContentPanel.clear_input_fields:1
+msgid "Очищает все поля ввода и сбрасывает значения на начальные."
+msgstr ""
+
+#: of windows.content_shell.ShellContentPanel.update_ui_language:1
+msgid "Обновляет язык интерфейса, применяя переводы ко всем элементам."
+msgstr ""
+
+#: at_main_window:1 of
+msgid "Файл: at_main_window.py Путь: windows/at_main_window.py"
+msgstr ""
+
+#: at_main_window:4 of
+msgid ""
+"Описание: Главное окно приложения AT-CAD. Содержит меню, баннер, основную"
+" область для контента, область кнопок и строку статуса. Управляет "
+"переключением контента и локализацией интерфейса."
+msgstr ""
+
+#: at_main_window.ATMainWindow:1 of
+msgid "Класс главного окна приложения AT-CAD."
+msgstr ""
+
+#: at_main_window.ATMainWindow:4 of
+msgid ""
+"last_input (dict): Словарь для хранения последних введённых данных. "
+"settings (dict): Текущие настройки приложения. exit_item (wx.MenuItem): "
+"Пункт меню \"Выход\". about_item (wx.MenuItem): Пункт меню \"О "
+"программе\". settings_item (wx.MenuItem): Пункт меню \"Настройки\". panel"
+" (wx.Panel): Главная панель окна. content_panel (wx.Panel): Панель для "
+"отображения контента. content_sizer (wx.BoxSizer): Сайзер для контента. "
+"current_content (wx.Window | None): Текущий контент в content_panel. "
+"button_panel (wx.Panel): Панель для кнопок. button_sizer (wx.BoxSizer): "
+"Сайзер для кнопок. exit_button (wx.Button): Кнопка выхода. main_sizer "
+"(wx.BoxSizer): Главный сайзер окна. banner_panel (wx.Panel): Панель "
+"баннера. title (wx.StaticText): Заголовок в баннере. flag_button "
+"(wx.StaticBitmap | wx.StaticText): Иконка языка в баннере. language_menu "
+"(wx.Menu): Меню выбора языка. lang_items (dict): Словарь пунктов меню для"
+" языков. status_text (wx.StaticText): Текст строки статуса. "
+"copyright_text (wx.StaticText): Текст копирайта."
+msgstr ""
+
+#: at_main_window.ATMainWindow.scale_bitmap:1 of
+msgid "Масштабирует изображение до заданных размеров."
+msgstr ""
+
+#: at_main_window.ATMainWindow.scale_bitmap:3 of
+msgid "Исходное изображение."
+msgstr ""
+
+#: at_main_window.ATMainWindow.scale_bitmap:5 of
+msgid "Целевая ширина."
+msgstr ""
+
+#: at_main_window.ATMainWindow.scale_bitmap:7 of
+msgid "Целевая высота."
+msgstr ""
+
+#: at_main_window.ATMainWindow.scale_bitmap:10 of
+msgid "Масштабированное изображение."
+msgstr ""
+
+#: at_main_window.ATMainWindow.switch_content:1 of
+msgid "Переключает содержимое основной области на указанный контент."
+msgstr ""
+
+#: at_main_window.ATMainWindow.switch_content:3 of
+msgid "Имя контента для отображения."
+msgstr ""
+
+#: at_main_window.ATMainWindow.create_banner:1 of
+msgid ""
+"Создаёт баннер в верхней части окна с логотипом, названием и иконкой "
+"языка."
+msgstr ""
+
+#: at_main_window.ATMainWindow.create_menu:1 of
+msgid "Создаёт меню приложения."
+msgstr ""
+
+#: at_main_window.ATMainWindow.on_settings:1 of
+msgid "Открывает окно настроек и обновляет настройки после закрытия."
+msgstr ""
+
+#: at_main_window.ATMainWindow.create_status_bar:1 of
+msgid "Создаёт строку статуса и копирайт в нижней части окна."
+msgstr ""
+
+#: at_main_window.ATMainWindow.create_exit_button:1 of
+msgid "Создаёт кнопку выхода."
+msgstr ""
+
+#: at_main_window.ATMainWindow.update_language_icon:1 of
+msgid "Обновляет иконку флага в баннере."
+msgstr ""
+
+#: at_main_window.ATMainWindow.update_language_icon:3 of
+msgid "Код языка (ru, en, de)."
+msgstr ""
+
+#: at_main_window.ATMainWindow.replace_flag_button_with_text:1 of
+msgid "Заменяет кнопку с флагом текстовой меткой, если иконка не найдена."
+msgstr ""
+
+#: at_main_window.ATMainWindow.update_ui:1 of
+msgid "Обновляет пользовательский интерфейс с использованием указанных настроек."
+msgstr ""
+
+#: at_main_window.ATMainWindow.update_ui:3 of
+msgid "Словарь с настройками интерфейса."
+msgstr ""
+
+#: at_main_window.ATMainWindow.on_about:1 of
+msgid "Показывает информацию о программе."
+msgstr ""
+
+#: at_main_window.ATMainWindow.on_exit:1 of
+msgid "Закрывает приложение."
+msgstr ""
+
+#: at_main_window.ATMainWindow.on_close:1 of
+msgid "Сохраняет позицию окна и язык при закрытии."
+msgstr ""
+
+#~ msgid "Безопасный mock для отсутствующих библиотек."
+#~ msgstr ""
+
