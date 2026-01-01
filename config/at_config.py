@@ -23,6 +23,7 @@ RESOURCE_DIR: Path = BASE_DIR / "config"
 USER_CONFIG_PATH: Path = RESOURCE_DIR / "user_settings.json"
 USER_LANGUAGE_PATH: Path = RESOURCE_DIR / "user_language.json"
 LAST_CONE_INPUT_FILE: Path = RESOURCE_DIR / "last_input.json"
+NAME_PLATES_FILE = RESOURCE_DIR / "name_plates.json"
 
 # --- Иконки приложения ---
 ICON_PATH: Path = IMAGES_DIR / "AT-CAD_8.png"
@@ -107,6 +108,7 @@ RECTANGLE_LAYER: str = "0"
 DEFAULT_CIRCLE_LAYER: str = "0"
 HEADS_LAYER: str = "AM_0"
 DEFAULT_TEXT_LAYER: str = "schrift"
+DEFAULT_LASER_LAYER: str = "LASER-TEXT"
 
 # --- Настройки размеров ---
 DEFAULT_DIM_LAYER: str = "AM_5"

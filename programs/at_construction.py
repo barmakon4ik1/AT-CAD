@@ -20,6 +20,8 @@ import sys
 from typing import Optional, Any, List, Union, Tuple
 import os
 import logging
+
+import win32com
 from win32com.client import VARIANT
 import pythoncom
 
@@ -623,28 +625,83 @@ def add_spline(
         return None
 
 
-def add_rectangle(model: Any, point: Union[List[float], VARIANT],
-                  width: float, height: float,
-                  layer_name: str = "0",
-                  point_direction: str = "left_bottom") -> Optional[Any]:
+def add_rectangle(
+    model: Any,
+    point: Union[List[float], tuple, VARIANT],
+    width: float,
+    height: float,
+    layer_name: str = "0",
+    point_direction: str = "left_bottom",
+    radius: float = 0.0
+) -> Optional[Any]:
     """
     Создаёт прямоугольник в модельном пространстве.
+    Если radius > 0 — создаёт прямоугольник со скруглёнными углами.
 
     Args:
-        model: Объект ModelSpace активного документа AutoCAD.
-        point: Координаты базовой точки прямоугольника (список, кортеж или VARIANT).
-        width: Ширина прямоугольника.
-        height: Высота прямоугольника.
-        layer_name: Имя слоя для прямоугольника.
-        point_direction: Положение базовой точки ("left_bottom", "center", и др.).
+        model: Объект ModelSpace.
+        point: Координаты базовой точки.
+        width: Ширина.
+        height: Высота.
+        layer_name: Слой.
+        point_direction: "left_bottom", "center" и т.д.
+        radius: Радиус скругления углов (по умолчанию 0 — обычный прямоугольник).
 
     Returns:
-        Optional[Any]: Объект полилинии-прямоугольника или None при ошибке.
+        Объект LightWeightPolyline или None.
     """
     try:
-        points_variant = add_rectangle_points(point, width, height, point_direction)
-        polyline = add_polyline(model, points_variant, layer_name=layer_name, closed=True)
+        # Проверка на слишком большой радиус
+        if radius > 0 and radius * 2 >= min(width, height):
+            raise ValueError(f"Радиус {radius} слишком велик для размеров {width}x{height}")
+
+        if radius <= 0:
+            # === Обычный прямоугольник (старое поведение) ===
+            points_variant = add_rectangle_points(point, width, height, point_direction)
+            polyline = add_polyline(model, points_variant, layer_name=layer_name, closed=True)
+            return polyline
+
+        # === Скруглённый прямоугольник ===
+        # Получаем 4 угловые точки для вычисления центра и ориентации
+        temp_points = add_rectangle_points(point, width, height, point_direction)
+        coords = list(temp_points.value)  # [x1,y1, x2,y2, x3,y3, x4,y4]
+
+        # Вычисляем центр
+        cx = sum(coords[::2]) / 4.0
+        cy = sum(coords[1::2]) / 4.0
+
+        half_w = width / 2.0
+        half_h = height / 2.0
+
+        # 8 точек + соответствующие им bulge (только для угловых сегментов)
+        pts = [
+            (cx - half_w + radius, cy - half_h),  # 0: начало нижней стороны
+            (cx + half_w - radius, cy - half_h),  # 1: → дуга
+            (cx + half_w, cy - half_h + radius),  # 2: начало правой
+            (cx + half_w, cy + half_h - radius),  # 3: → дуга
+            (cx + half_w - radius, cy + half_h),  # 4: начало верхней
+            (cx - half_w + radius, cy + half_h),  # 5: → дуга
+            (cx - half_w, cy + half_h - radius),  # 6: начало левой
+            (cx - half_w, cy - half_h + radius),  # 7: → дуга (замыкание)
+        ]
+
+        # Bulge только для сегментов 1→2, 3→4, 5→6, 7→0 (индексы: 1,3,5,7)
+        bl = math.tan(math.radians(90 / 4)) # величина bulge = tan (90°/4)
+        bulges = [0.0, bl, 0.0, bl, 0.0, bl, 0.0, bl]
+
+        # Передаём точки как список кортежей (x, y), а bulges отдельно
+        points_list = [(x, y) for x, y in pts]
+
+        polyline = add_polyline(
+            model=model,
+            points=points_list,
+            layer_name=layer_name,
+            closed=True,
+            bulges=bulges
+        )
+
         return polyline
+
     except Exception as e:
         logger.error(f"add_rectangle failed: {str(e)}")
         show_popup(loc.get("rectangle_error", f"Ошибка при создании прямоугольника: {str(e)}"), popup_type="error")
