@@ -740,5 +740,87 @@ def make_cone_arc_points(
     return pts
 
 
+Point = Tuple[float, float]
+def fillet_segments(
+        seg1_start: Point,
+        seg1_end: Point,
+        seg2_end: Point,
+        radius: float
+) -> List[Point]:
+    """
+    Возвращает точки для вставки скругления (дуги) между двумя сегментами полилинии.
+
+    Args:
+        seg1_start: Начало первого сегмента (x, y)
+        seg1_end:   Конец первого сегмента = начало второго (x, y)
+        seg2_end:   Конец второго сегмента (x, y)
+        radius:     Радиус скругления (> 0)
+
+    Returns:
+        Список точек: [seg1_start, touch_point1, touch_point2, seg2_end]
+        Где touch_point1 и touch_point2 — точки касания дуги с прямыми сегментами.
+
+    Если радиус слишком большой — поднимает ValueError.
+
+
+    Пример использования:
+    # Два сегмента: от (0,0) до (100,0), затем до (100,100)
+    points = fillet_segments(
+        seg1_start=(0, 0),
+        seg1_end=(100, 0),
+        seg2_end=(100, 100),
+        radius=30
+    )
+
+    print(points)
+    # Вывод: [(0, 0), (70.0, 0.0), (100.0, 30.0), (100, 100)]
+    """
+    if radius <= 0:
+        raise ValueError("Радиус должен быть положительным")
+
+    A = seg1_start
+    B = seg1_end  # общая вершина
+    C = seg2_end
+
+    # Векторы от B к A и от B к C
+    vec_BA = (A[0] - B[0], A[1] - B[1])
+    vec_BC = (C[0] - B[0], C[1] - B[1])
+
+    len_BA = math.hypot(*vec_BA)
+    len_BC = math.hypot(*vec_BC)
+
+    if len_BA < radius or len_BC < radius:
+        raise ValueError("Радиус слишком большой — один из сегментов короче радиуса")
+
+    # Единичные векторы в направлениях BA и BC
+    unit_BA = (vec_BA[0] / len_BA, vec_BA[1] / len_BA)
+    unit_BC = (vec_BC[0] / len_BC, vec_BC[1] / len_BC)
+
+    # Точки касания: отступаем от B на расстояние radius по направлениям
+    touch1 = (B[0] + unit_BA[0] * radius, B[1] + unit_BA[1] * radius)
+    touch2 = (B[0] + unit_BC[0] * radius, B[1] + unit_BC[1] * radius)
+
+    # Возвращаем цепочку точек: начало → точка касания 1 → точка касания 2 → конец
+    return [A, touch1, touch2, C]
+
+
+def fillet_bulge_angle(
+        seg1_start: Point,
+        seg1_end: Point,
+        seg2_end: Point
+) -> float:
+    """Возвращает значение bulge для дуги 90° и меньше (для AutoCAD)"""
+    A, B, C = seg1_start, seg1_end, seg2_end
+    vec_BA = (A[0] - B[0], A[1] - B[1])
+    vec_BC = (C[0] - B[0], C[1] - B[1])
+
+    # Угол между векторами BA и BC (внутренний угол поворота)
+    dot = vec_BA[0] * vec_BC[0] + vec_BA[1] * vec_BC[1]
+    det = vec_BA[0] * vec_BC[1] - vec_BA[1] * vec_BC[0]
+    angle = math.atan2(det, dot)  # от -pi до pi
+
+    # bulge = tan(angle / 4)  — формула AutoCAD
+    return math.tan(angle / 4.0)
+
 
 # Конец модуля
