@@ -11,15 +11,20 @@ from typing import Dict, List
 from config.at_cad_init import ATCadInit
 from config.at_config import NAME_PLATES_FILE, DEFAULT_TEXT_LAYER, DEFAULT_LASER_LAYER
 from programs.at_base import regen
-from programs.at_construction import add_polyline, add_text, add_rectangle
-from programs.at_geometry import polar_point
+from programs.at_construction import add_polyline, add_text, add_rectangle, add_circle
 from locales.at_translations import loc
+from programs.at_input import at_get_point
 
 # ---------------------------------------------------------------------------
 # Локализация
 # ---------------------------------------------------------------------------
 
 TRANSLATIONS = {
+    "select_point_prompt": {
+        "ru": "Укажите точку:",
+        "de": "Wählen Sie einen Punkt:",
+        "en": "Select a point:",
+    },
     "nameplate.no_data": {
         "ru": "Данные табличек не загружены",
         "en": "Name plate data not loaded"
@@ -36,6 +41,7 @@ TRANSLATIONS = {
         "ru": "Табличка '{0}' не найдена",
         "en": "Name plate '{0}' not found"
     },
+
 }
 
 loc.register_translations(TRANSLATIONS)
@@ -109,6 +115,162 @@ class NamePlate:
     def __repr__(self) -> str:
         return f"<NamePlate count={len(self.plates)} path='{self.config_path}'>"
 
+
+# ---------------------------------------------------------------------------
+# Стандартные тексты мостика
+# ---------------------------------------------------------------------------
+class BridgeTexts:
+    """
+    Единый обработчик стандартных текстов для всех типов мостиков.
+    """
+
+    def __init__(self, data: dict):
+        self.data = data
+
+    def draw(self, model, center_point):
+        """
+        Нанесение стандартных текстов мостика
+        """
+        order_number = self.data["order_number"]
+        detail_number = self.data["detail_number"]
+
+        # основной текст
+        add_text(
+            model=model,
+            point=center_point,
+            text=f"{order_number}-{detail_number}",
+            layer_name=DEFAULT_TEXT_LAYER,
+            text_height=30,
+            text_angle=0,
+            text_alignment=4,
+        )
+
+        # лазерная маркировка
+        add_text(
+            model=model,
+            point=center_point,
+            text=order_number,
+            layer_name=DEFAULT_LASER_LAYER,
+            text_height=7,
+            text_angle=0,
+            text_alignment=4,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Вертикальная компоновка табличек
+# ---------------------------------------------------------------------------
+class PlateLayoutVertical:
+    """
+    Отвечает только за расчет позиций табличек
+    относительно центра мостика.
+    """
+
+    @staticmethod
+    def compute_positions(
+        bridge_height: float,
+        plates: list[dict],
+        plates_data: dict,
+        gap: float = 5.0,
+        offset_top: float | str = "center",
+    ) -> list[tuple[float, float]]:
+        """
+        Возвращает список (dx, dy) для каждой таблички
+        относительно центра мостика.
+        """
+
+        heights = [plates_data[p["name"]]["b1"] for p in plates]
+        n = len(heights)
+
+        block_height = sum(heights) + gap * (n - 1)
+
+        # Смещение верхнего края блока табличек относительно верхнего края мостика
+        if offset_top == "center":
+            top_edge_offset = (bridge_height - block_height) / 2
+        else:
+            top_edge_offset = float(offset_top)
+
+        # Верхний край блока табличек относительно центра мостика
+        y_top = bridge_height / 2 - top_edge_offset
+
+        positions = []
+        current_top = y_top
+
+        for h in heights:
+            # центр таблички = верхний край - половина высоты
+            y_center = current_top - h / 2
+            positions.append((0.0, y_center))
+            # сдвиг вниз на следующий верхний край: вычитаем высоту + gap
+            current_top = current_top - h - gap
+
+        return positions
+
+
+# ---------------------------------------------------------------------------
+# Отверстия таблички (генерация по a, b, d)
+# ---------------------------------------------------------------------------
+class PlateHoles:
+    """
+    Генерирует и отрисовывает отверстия таблички
+    по параметрам a, b, d из JSON.
+    """
+
+    def __init__(self, plate_data: dict):
+        self.a = float(plate_data["a"])
+        self.b = float(plate_data["b"])
+        self.d = float(plate_data["d"])
+
+    def get_local_positions(self):
+        """
+        Локальные координаты отверстий относительно центра таблички.
+        """
+        a2 = self.a / 2.0
+
+        # 2 отверстия
+        if self.b == 0:
+            return [
+                (-a2, 0.0),
+                ( a2, 0.0),
+            ]
+
+        # 4 отверстия
+        b2 = self.b / 2.0
+        return [
+            (-a2, -b2),
+            ( a2, -b2),
+            ( a2,  b2),
+            (-a2,  b2),
+        ]
+
+    def get_global_positions(self, plate_center):
+        """
+        Перенос отверстий в координаты развертки.
+        """
+        cx, cy = plate_center
+        result = []
+
+        for x, y in self.get_local_positions():
+            result.append({
+                "x": cx + x,
+                "y": cy + y,
+                "d": self.d,
+            })
+
+        return result
+
+    def draw(self, model, plate_center, layer_name="0"):
+        """
+        Отрисовка отверстий.
+        """
+        for hole in self.get_global_positions(plate_center):
+            add_circle(
+                model=model,
+                center=(hole["x"], hole["y"]),
+                radius=hole["d"] / 2.0,
+                layer_name=layer_name,
+            )
+
+
 # ---------------------------------------------------------------------------
 # Мостик для таблички
 # ---------------------------------------------------------------------------
@@ -136,9 +298,9 @@ class BaseBridge:
 
         raise ValueError(f"Unsupported bridge type: {bridge_type}")
 
-    def __init__(self, data: dict, plate_data: dict):
-        self.data = data            # из пользовательского окна
-        self.plate = plate_data     # параметры таблички
+    def __init__(self, data: dict, plates_data: dict):
+        self.data = data
+        self.plates_data = plates_data
 
         self.validate()
 
@@ -152,10 +314,10 @@ class BaseBridge:
         """
         raise NotImplementedError
 
+
 # ---------------------------------------------------------------------------
 # Мостик для таблички Тип 1 — плоский с перемычкой
 # ---------------------------------------------------------------------------
-
 class FlatWebBridge(BaseBridge):
     """
     Тип 1 — плоский мостик с перемычкой
@@ -178,6 +340,21 @@ class FlatWebBridge(BaseBridge):
         "l_cut": float,
         "r_cut": float,
 
+        # таблички
+        "plates": [
+            {
+                "name": "GEA_gross",
+                # опционально
+                "offset_top": "center" | float
+            },
+            {
+                "name": "GEA_klein"
+            }
+        ],
+
+    # вертикальные параметры размещения
+    "plates_gap": 5.0,   # расстояние между краями табличек (опц., default = 5)
+
         # обязательные технологические параметры
         "order_number": str,
         "detail_number": str,
@@ -198,46 +375,103 @@ class FlatWebBridge(BaseBridge):
 
     def build(self, model):
         data = self.data
+        plates = data.get("plates", [])
 
-        # ------------------------------------------------------------------
-        # 1. Извлечение и базовая нормализация параметров
-        # ------------------------------------------------------------------
         center_point = data["pt"]
-        width = data["width"]
-        height = data["height"]
-        radius = data.get("radius", 0.0)
+        bridge_width = data["width"]
+        bridge_height = data["height"]
 
         # ------------------------------------------------------------------
-        # 2. Построение контура мостика
+        # 1. Контур мостика
         # ------------------------------------------------------------------
-        add_rectangle(model=model, point=center_point, width=width, height=height,
-                      layer_name="0", point_direction="center", radius=radius)
-
-
-
-        # ------------------------------------------------------------------
-        # 5. Тексты
-        # ------------------------------------------------------------------
-        add_text(
+        add_rectangle(
             model=model,
             point=center_point,
-            text=data["order_number"] + data["detail_number"],
-            layer_name=DEFAULT_TEXT_LAYER,
-            text_height=30,
-            text_angle=0,
-            text_alignment=4,
+            width=bridge_width,
+            height=bridge_height,
+            layer_name="0",
+            point_direction="center",
+            radius=data.get("radius", 0.0),
         )
 
-        add_text(
-            model=model,
-            point=center_point,
-            text=data["order_number"],
-            layer_name=DEFAULT_LASER_LAYER,
-            text_height=7,
-            text_angle=0,
-            text_alignment=4,
-        )
+        # ------------------------------------------------------------------
+        # 2. Таблички + отверстия
+        # ------------------------------------------------------------------
+        if plates:
+            gap = data.get("plates_gap", 5.0)
+            offset_top = plates[0].get("offset_top", "center")
 
+            positions = PlateLayoutVertical.compute_positions(
+                bridge_height=bridge_height,
+                plates=plates,
+                plates_data=self.plates_data,
+                gap=gap,
+                offset_top=offset_top,
+            )
+
+            for plate_cfg, (dx, dy) in zip(plates, positions):
+                plate_name = plate_cfg["name"]
+                plate_data = self.plates_data[plate_name]
+
+                # центр таблички в координатах мостика
+                plate_center = (
+                    center_point[0] + dx,
+                    center_point[1] + dy,
+                )
+
+                a1 = float(plate_data["a1"])
+                b1 = float(plate_data["b1"])
+                a = float(plate_data["a"])
+                b = float(plate_data["b"])
+                d = float(plate_data["d"])
+
+                # ----------------------------------------------------------
+                # 2.1 Контур таблички
+                # ----------------------------------------------------------
+                add_rectangle(
+                    model=model,
+                    point=plate_center,
+                    width=a1,
+                    height=b1,
+                    layer_name="AM_5",
+                    point_direction="center",
+                    radius=float(plate_data.get("r", 0.0)),
+                )
+
+                # ----------------------------------------------------------
+                # 2.2 Отверстия таблички (перенос в развертку)
+                # ----------------------------------------------------------
+                cx, cy = plate_center
+                a2 = a / 2.0
+
+                # 2 отверстия
+                if b == 0:
+                    hole_positions = [
+                        (-a2, 0.0),
+                        (a2, 0.0),
+                    ]
+                # 4 отверстия
+                else:
+                    b2 = b / 2.0
+                    hole_positions = [
+                        (-a2, -b2),
+                        (a2, -b2),
+                        (a2, b2),
+                        (-a2, b2),
+                    ]
+
+                for hx, hy in hole_positions:
+                    add_circle(
+                        model=model,
+                        center=(cx + hx, cy + hy),
+                        radius=d / 2.0,
+                        layer_name="0",
+                    )
+
+        # ------------------------------------------------------------------
+        # 3. Тексты (общие для всех типов)
+        # ------------------------------------------------------------------
+        BridgeTexts(data).draw(model, center_point)
 
 
 # ---------------------------------------------------------------------------
@@ -322,38 +556,58 @@ class BentConeBridge(BaseBridge):
 
 if __name__ == "__main__":
 
+    cad = ATCadInit()
+    adoc = cad.document
+    model = cad.model_space
+
     np = NamePlate()
-    name = "GEA_gross"
-    name_plate = np.get(name)
+    pt = [0,0]
+    print(pt)
 
     bridge_data = {
         "type": "flat_web",
 
-        # геометрия мостика
-        "pt": [0, 0],  # точка вставки (центр мостика)
-        "width": 148,  # полная ширина мостика
-        "height": 148,  # полная высота мостика
-        "radius": 2,  # радиус скругления углов
+        # --------------------------------------------------
+        # Геометрия мостика
+        # --------------------------------------------------
+        "pt": pt,
+        "width": 160.0,
+        "height": 220.0,
+        "radius": 0.0,
 
-        # перемычка (будет реализовано позже)
-        "length": 50,
-        "height_web": 120,
-        "h_cut": 20,
-        "l_cut": 20,
-        "r_cut": 10,
+        # --------------------------------------------------
+        # Перемычка (пока не используется)
+        # --------------------------------------------------
+        "length": 50.0,
+        "height_web": 120.0,
+        "h_cut": 20.0,
+        "l_cut": 20.0,
+        "r_cut": 10.0,
 
-        # обязательные технологические параметры
-        "order_number": "K-Nr",
+        # --------------------------------------------------
+        # Таблички
+        # --------------------------------------------------
+        "plates": [
+            {
+                "name": "GEA_gross",  # имя из name_plates.json
+                # "offset_top": 5.0 # отступ верхнего края таблички от верха мостика
+            },
+            {"name": "GEA_klein"},
+        ],
+
+        "plates_gap": 5.0,  # расстояние между краями табличек
+
+        # --------------------------------------------------
+        # Технологические параметры (обязательные)
+        # --------------------------------------------------
+        "order_number": "XXXXX",
         "detail_number": "1",
         "material": "1.4301",
-        "thickness": 3,
+        "thickness": 3.0,
     }
 
-    acad = ATCadInit()
-    adoc = acad.document
-    model = acad.model_space
 
-    bridge = BaseBridge.create_bridge(bridge_data, name_plate)
+    bridge = BaseBridge.create_bridge(bridge_data, np.plates)
     bridge.build(model)
 
     regen(adoc)
