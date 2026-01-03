@@ -740,87 +740,115 @@ def make_cone_arc_points(
     return pts
 
 
+def fillet_points(A, B, C, r):
+    """
+    Возвращает точки касания дуги радиуса r
+    для угла ABC (90°)
+    """
+    BA = (A[0] - B[0], A[1] - B[1])
+    BC = (C[0] - B[0], C[1] - B[1])
+
+    len_BA = math.hypot(*BA)
+    len_BC = math.hypot(*BC)
+
+    uBA = (BA[0] / len_BA, BA[1] / len_BA)
+    uBC = (BC[0] / len_BC, BC[1] / len_BC)
+
+    t1 = (B[0] + uBA[0] * r, B[1] + uBA[1] * r)
+    t2 = (B[0] + uBC[0] * r, B[1] + uBC[1] * r)
+
+    return t1, t2
+
+
 Point = Tuple[float, float]
-def fillet_segments(
-        seg1_start: Point,
-        seg1_end: Point,
-        seg2_end: Point,
-        radius: float
-) -> List[Point]:
+Vertex = Tuple[float, float, float]
+
+def _unit_vector(a: Point, b: Point) -> Point:
+    dx = b[0] - a[0]
+    dy = b[1] - a[1]
+    l = math.hypot(dx, dy)
+    return (dx / l, dy / l)
+
+def _bulge_for_90(p1: Point, p2: Point, p3: Point) -> float:
     """
-    Возвращает точки для вставки скругления (дуги) между двумя сегментами полилинии.
-
-    Args:
-        seg1_start: Начало первого сегмента (x, y)
-        seg1_end:   Конец первого сегмента = начало второго (x, y)
-        seg2_end:   Конец второго сегмента (x, y)
-        radius:     Радиус скругления (> 0)
-
-    Returns:
-        Список точек: [seg1_start, touch_point1, touch_point2, seg2_end]
-        Где touch_point1 и touch_point2 — точки касания дуги с прямыми сегментами.
-
-    Если радиус слишком большой — поднимает ValueError.
-
-
-    Пример использования:
-    # Два сегмента: от (0,0) до (100,0), затем до (100,100)
-    points = fillet_segments(
-        seg1_start=(0, 0),
-        seg1_end=(100, 0),
-        seg2_end=(100, 100),
-        radius=30
+    Возвращает bulge со знаком,
+    соответствующим направлению поворота.
+    """
+    cross = (
+            (p2[0] - p1[0]) * (p3[1] - p2[1])
+            - (p2[1] - p1[1]) * (p3[0] - p2[0])
     )
+    sign = -1.0 if cross > 0 else 1.0
+    return sign * math.tan(math.radians(22.5))
 
-    print(points)
-    # Вывод: [(0, 0), (70.0, 0.0), (100.0, 30.0), (100, 100)]
+
+class PolylineBuilder:
     """
-    if radius <= 0:
-        raise ValueError("Радиус должен быть положительным")
+    Builder для LWPolyline с поддержкой:
+    - прямых сегментов
+    - скруглений (r > 0)
+    - фасок (r < 0)
+    """
 
-    A = seg1_start
-    B = seg1_end  # общая вершина
-    C = seg2_end
+    def __init__(self, start: Point):
+        self._vertices: List[Vertex] = [(start[0], start[1], 0.0)]
+        self._last_point: Point = start
 
-    # Векторы от B к A и от B к C
-    vec_BA = (A[0] - B[0], A[1] - B[1])
-    vec_BC = (C[0] - B[0], C[1] - B[1])
+    # --------------------------------------------------
+    # Прямой сегмент
+    # --------------------------------------------------
+    def line_to(self, p: Point):
+        self._vertices.append((p[0], p[1], 0.0))
+        self._last_point = p
+        return self
 
-    len_BA = math.hypot(*vec_BA)
-    len_BC = math.hypot(*vec_BC)
+    # --------------------------------------------------
+    # Угол: прямой / скругление / фаска
+    # --------------------------------------------------
+    def corner(self, vertex: Point, next_point: Point, r: float):
+        """
+        Обрабатывает угол в точке vertex между последним сегментом и сегментом к next_point.
 
-    if len_BA < radius or len_BC < radius:
-        raise ValueError("Радиус слишком большой — один из сегментов короче радиуса")
+        r = 0  → прямой угол
+        r > 0  → скругление радиусом r
+        r < 0  → фаска длиной |r|
+        """
+        prev = self._last_point
+        curr = vertex
+        nextp = next_point
 
-    # Единичные векторы в направлениях BA и BC
-    unit_BA = (vec_BA[0] / len_BA, vec_BA[1] / len_BA)
-    unit_BC = (vec_BC[0] / len_BC, vec_BC[1] / len_BC)
+        # --- прямой угол ---
+        if r == 0:
+            self.line_to(curr)
+            return self
 
-    # Точки касания: отступаем от B на расстояние radius по направлениям
-    touch1 = (B[0] + unit_BA[0] * radius, B[1] + unit_BA[1] * radius)
-    touch2 = (B[0] + unit_BC[0] * radius, B[1] + unit_BC[1] * radius)
+        # --- фаска или скругление ---
+        t1, t2 = fillet_points(prev, curr, nextp, abs(r))
 
-    # Возвращаем цепочку точек: начало → точка касания 1 → точка касания 2 → конец
-    return [A, touch1, touch2, C]
+        if r > 0:
+            # скругление — ставим bulge на первый сегмент
+            BULGE_90 = -math.tan(math.radians(22.5))  # для 90° угла
+            self._vertices.append((t1[0], t1[1], BULGE_90))
+        else:
+            # фаска — просто прямая, bulge=0
+            self._vertices.append((t1[0], t1[1], 0.0))
+
+        # вторая точка касания — всегда обычная вершина
+        self._vertices.append((t2[0], t2[1], 0.0))
+        self._last_point = t2
+        return self
 
 
-def fillet_bulge_angle(
-        seg1_start: Point,
-        seg1_end: Point,
-        seg2_end: Point
-) -> float:
-    """Возвращает значение bulge для дуги 90° и меньше (для AutoCAD)"""
-    A, B, C = seg1_start, seg1_end, seg2_end
-    vec_BA = (A[0] - B[0], A[1] - B[1])
-    vec_BC = (C[0] - B[0], C[1] - B[1])
+    # --------------------------------------------------
+    def close(self):
+        if self._vertices[0][:2] != self._vertices[-1][:2]:
+            x0, y0, _ = self._vertices[0]
+            self._vertices.append((x0, y0, 0.0))
+        return self
 
-    # Угол между векторами BA и BC (внутренний угол поворота)
-    dot = vec_BA[0] * vec_BC[0] + vec_BA[1] * vec_BC[1]
-    det = vec_BA[0] * vec_BC[1] - vec_BA[1] * vec_BC[0]
-    angle = math.atan2(det, dot)  # от -pi до pi
+    def vertices(self) -> List[Vertex]:
+        return self._vertices
 
-    # bulge = tan(angle / 4)  — формула AutoCAD
-    return math.tan(angle / 4.0)
 
 
 # Конец модуля

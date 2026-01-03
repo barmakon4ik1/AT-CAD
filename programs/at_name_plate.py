@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import math
 from typing import Dict, List
 
 from config.at_cad_init import ATCadInit
@@ -13,6 +14,7 @@ from config.at_config import NAME_PLATES_FILE, DEFAULT_TEXT_LAYER, DEFAULT_LASER
 from programs.at_base import regen
 from programs.at_construction import add_polyline, add_text, add_rectangle, add_circle
 from locales.at_translations import loc
+from programs.at_geometry import polar_point, fillet_points, PolylineBuilder
 from programs.at_input import at_get_point
 
 # ---------------------------------------------------------------------------
@@ -339,6 +341,9 @@ class FlatWebBridge(BaseBridge):
         "h_cut": float,
         "l_cut": float,
         "r_cut": float,
+            r_cut = 0      → прямой угол
+            r_cut > 0      → скругление (радиус = r_cut)
+            r_cut < 0      → фаска (длина = |r_cut|)
 
         # таблички
         "plates": [
@@ -473,6 +478,50 @@ class FlatWebBridge(BaseBridge):
         # ------------------------------------------------------------------
         BridgeTexts(data).draw(model, center_point)
 
+        # ------------------------------------------------------------------
+        # 4. Перемычка
+        # ------------------------------------------------------------------
+        web_l = data.get("length")
+        web_h = data.get("height_web")
+        h_cut = data.get("h_cut")
+        web_h1 = (web_h - h_cut) / 2
+        web_l_cut = data.get("l_cut")
+        r_cut = data.get("r_cut", 0.0)
+
+        # Определяем вершины контура перемычки
+        p0 = (center_point[0] + bridge_width / 2.0 + 30, center_point[1] - bridge_height / 2.0)
+        p1 = (p0[0] + web_l, p0[1])
+        p2 = (p1[0], p1[1] + web_h1)
+        p3 = (p2[0] - web_l_cut, p2[1])
+        p4 = (p3[0], p3[1] + h_cut)
+        p5 = (p2[0], p4[1])
+        p6 = (p1[0], p1[1] + web_h)
+        p7 = (p0[0], p6[1])
+
+        pb = PolylineBuilder(p0)
+
+        # Прямые сегменты
+        pb.line_to(p1)
+        pb.line_to(p2)
+
+        if r_cut == 0.0:
+            # все сегменты прямые
+            pb.line_to(p3)
+            pb.line_to(p4)
+        else:
+            # скругления или фаски через corner
+            pb.corner(p3, p4, r_cut)
+            pb.corner(p4, p5, r_cut)
+
+        # Завершаем прямые сегменты
+        pb.line_to(p5)
+        pb.line_to(p6)
+        pb.line_to(p7)
+        pb.close()
+
+        # Строим полилинию
+        add_polyline(model, pb.vertices(), layer_name="0", closed=True)
+
 
 # ---------------------------------------------------------------------------
 # Мостик для таблички Тип 2 — гнутый с прямыми краями
@@ -562,7 +611,6 @@ if __name__ == "__main__":
 
     np = NamePlate()
     pt = [0,0]
-    print(pt)
 
     bridge_data = {
         "type": "flat_web",
@@ -576,11 +624,11 @@ if __name__ == "__main__":
         "radius": 0.0,
 
         # --------------------------------------------------
-        # Перемычка (пока не используется)
+        # Перемычка
         # --------------------------------------------------
         "length": 50.0,
         "height_web": 120.0,
-        "h_cut": 20.0,
+        "h_cut": 80.0,
         "l_cut": 20.0,
         "r_cut": 10.0,
 
