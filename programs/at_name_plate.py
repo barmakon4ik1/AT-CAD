@@ -18,6 +18,7 @@ from locales.at_translations import loc
 from programs.at_dimension import add_dimension
 from programs.at_geometry import polar_point, fillet_points, PolylineBuilder, ensure_point_variant
 from programs.at_input import at_get_point
+from windows.at_gui_utils import show_popup
 
 # ---------------------------------------------------------------------------
 # Локализация
@@ -770,6 +771,9 @@ if __name__ == "__main__":
 
 
     bridge = BaseBridge.create_bridge(bridge_data, np.plates)
-    bridge.build(model)
+    if model:
+        bridge.build(model)
 
-    regen(adoc)
+        regen(adoc)
+    else:
+        show_popup("Невозможно выполнить тестовый запуск программы. Автокад не запущен или нет доступа к пространству модели.", "error")
