@@ -10,11 +10,13 @@ import math
 from typing import Dict, List
 
 from config.at_cad_init import ATCadInit
-from config.at_config import NAME_PLATES_FILE, DEFAULT_TEXT_LAYER, DEFAULT_LASER_LAYER
+from config.at_config import NAME_PLATES_FILE, DEFAULT_TEXT_LAYER, DEFAULT_LASER_LAYER, DEFAULT_DIM_OFFSET, \
+    DEFAULT_ACCOMPANY_TEXT_LAYER, TEXT_HEIGHT_BIG, TEXT_HEIGHT_LASER, TEXT_HEIGHT_SMALL, TEXT_DISTANCE
 from programs.at_base import regen
 from programs.at_construction import add_polyline, add_text, add_rectangle, add_circle
 from locales.at_translations import loc
-from programs.at_geometry import polar_point, fillet_points, PolylineBuilder
+from programs.at_dimension import add_dimension
+from programs.at_geometry import polar_point, fillet_points, PolylineBuilder, ensure_point_variant
 from programs.at_input import at_get_point
 
 # ---------------------------------------------------------------------------
@@ -135,6 +137,7 @@ class BridgeTexts:
         """
         order_number = self.data["order_number"]
         detail_number = self.data["detail_number"]
+        material = self.data["material"]
 
         # основной текст
         add_text(
@@ -142,20 +145,47 @@ class BridgeTexts:
             point=center_point,
             text=f"{order_number}-{detail_number}",
             layer_name=DEFAULT_TEXT_LAYER,
-            text_height=30,
+            text_height=TEXT_HEIGHT_SMALL,
             text_angle=0,
             text_alignment=4,
         )
 
         # лазерная маркировка
+        if material != "3.7035" or material != "3.7235":
+            add_text(
+                model=model,
+                point=center_point,
+                text=order_number,
+                layer_name=DEFAULT_LASER_LAYER,
+                text_height=TEXT_HEIGHT_LASER,
+                text_angle=0,
+                text_alignment=4,
+            )
+
+
+class AccompanyText:
+    """
+    Сопроводительный текст с толщиной и маркой материала
+    """
+
+    def __init__(self, data: dict):
+        self.data = data
+
+    def draw(self, model, text_insert_point):
+        """
+        Отображение текста
+        """
+        thickness = self.data["thickness"]
+        material = self.data["material"]
+
         add_text(
             model=model,
-            point=center_point,
-            text=order_number,
-            layer_name=DEFAULT_LASER_LAYER,
-            text_height=7,
+            point=text_insert_point,
+            text=f"{thickness}mm {material}",
+            layer_name=DEFAULT_ACCOMPANY_TEXT_LAYER,
+            text_height=TEXT_HEIGHT_BIG,
             text_angle=0,
-            text_alignment=4,
+            text_alignment=0,
         )
 
 
@@ -327,7 +357,7 @@ class FlatWebBridge(BaseBridge):
     Входящий словарь (self.data):
 
     {
-        "type": "flat_web",
+        "type": "flat_web",         # тип мостика - мостик - плата с перемычкой
 
         # геометрия мостика
         "pt": [x, y],               # точка вставки (центр мостика)
@@ -336,21 +366,22 @@ class FlatWebBridge(BaseBridge):
         "radius": float,            # радиус скругления углов
 
         # перемычка (будет реализовано позже)
-        "length": float,
-        "height_web": float,
-        "h_cut": float,
-        "l_cut": float,
-        "r_cut": float,
-            r_cut = 0      → прямой угол
-            r_cut > 0      → скругление (радиус = r_cut)
-            r_cut < 0      → фаска (длина = |r_cut|)
+        "length": float,            # длина перемычки (расстояние от мостика до сосуда)
+        "height_web": float,        # высота перемычки
+        "h_cut": float,             # вырез, горизонтальный размер от края
+        "l_cut": float,             # вырез, вертикальный симметричный размер
+        "r_cut": float,             # тип углов выреза:
+                                    # r_cut = 0      → прямой угол
+                                    # r_cut > 0      → скругление (радиус = r_cut)
+                                    # r_cut < 0      → фаска (длина = |r_cut|)
+        "web_detail_number": str,   # номер детали перемычки
 
-        # таблички
+        # таблички, их может быть несколько
         "plates": [
             {
                 "name": "GEA_gross",
                 # опционально
-                "offset_top": "center" | float
+                "offset_top": "center" | float # Отступ от верхнего края таблички до верхнего края мостика
             },
             {
                 "name": "GEA_klein"
@@ -358,13 +389,13 @@ class FlatWebBridge(BaseBridge):
         ],
 
     # вертикальные параметры размещения
-    "plates_gap": 5.0,   # расстояние между краями табличек (опц., default = 5)
+    "plates_gap": 5.0,              # расстояние между краями табличек (опц., default = 5)
 
         # обязательные технологические параметры
-        "order_number": str,
-        "detail_number": str,
-        "material": str,
-        "thickness": float,
+        "order_number": str,        # номер заказа детали
+        "detail_number": str,       # номер детали мостика
+        "material": str,            # материал
+        "thickness": float,         # толщина
     }
     """
 
@@ -474,7 +505,7 @@ class FlatWebBridge(BaseBridge):
                     )
 
         # ------------------------------------------------------------------
-        # 3. Тексты (общие для всех типов)
+        # 3. Тексты номера заказа и лазерная гравировка на мостике
         # ------------------------------------------------------------------
         BridgeTexts(data).draw(model, center_point)
 
@@ -489,7 +520,7 @@ class FlatWebBridge(BaseBridge):
         r_cut = data.get("r_cut", 0.0)
 
         # Определяем вершины контура перемычки
-        p0 = (center_point[0] + bridge_width / 2.0 + 30, center_point[1] - bridge_height / 2.0)
+        p0 = (center_point[0] + bridge_width / 2.0 + 100, center_point[1] - bridge_height / 2.0)
         p1 = (p0[0] + web_l, p0[1])
         p2 = (p1[0], p1[1] + web_h1)
         p3 = (p2[0] - web_l_cut, p2[1])
@@ -521,6 +552,87 @@ class FlatWebBridge(BaseBridge):
 
         # Строим полилинию
         add_polyline(model, pb.vertices(), layer_name="0", closed=True)
+
+        # ------------------------------------------------------------------
+        # 5. Размеры
+        # ------------------------------------------------------------------
+        cx, cy = center_point
+
+        # Габариты мостика
+        x_min = cx - bridge_width / 2
+        x_max = cx + bridge_width / 2
+        y_min = cy - bridge_height / 2
+        y_max = cy + bridge_height / 2
+
+        # горизонтальный габарит мостика (общая ширина)
+        p_left_max = (x_min, y_max)
+        add_dimension(
+            adoc,
+            "H",
+            ensure_point_variant(p_left_max),
+            ensure_point_variant((x_max, y_max)),
+            offset=DEFAULT_DIM_OFFSET,
+        )
+        # вертикальный габарит мостика (общая высота)
+        add_dimension(
+            adoc,
+            "V",
+            ensure_point_variant((x_min, y_min)),
+            ensure_point_variant((x_min, y_max)),
+            offset=DEFAULT_DIM_OFFSET,
+        )
+        # горизонтальный размер перемычки (ширина перемычки)
+        add_dimension(
+            adoc,
+            "H",
+            ensure_point_variant(p1),
+            ensure_point_variant(p0),
+            offset=DEFAULT_DIM_OFFSET,
+        )
+        # вертикальный размер перемычки (высота перемычки)
+        add_dimension(
+            adoc,
+            "V",
+            ensure_point_variant(p6),
+            ensure_point_variant(p1),
+            offset=DEFAULT_DIM_OFFSET,
+        )
+
+        # ------------------------------------------------------------------
+        # 6. Сопроводительный текст
+        # ------------------------------------------------------------------
+        text_insert_point = polar_point(p_left_max, TEXT_DISTANCE + DEFAULT_DIM_OFFSET, 90)
+        AccompanyText(data).draw(model, text_insert_point)
+
+        # ------------------------------------------------------------------
+        # 7. Тексты номера заказа и лазерная гравировка на перемычке
+        # ------------------------------------------------------------------
+        web_text_point = polar_point(p0, 10, 45)
+        order_number = data.get("order_number")
+        detail_number = data.get("web_detail_number")
+        material = data.get("material")
+
+        add_text(
+            model=model,
+            point=web_text_point,
+            text=f"{order_number}-{detail_number}",
+            layer_name=DEFAULT_TEXT_LAYER,
+            text_height=TEXT_HEIGHT_SMALL,
+            text_angle=math.radians(90),
+            text_alignment=6,
+        )
+
+        # лазерная маркировка
+        if material != "3.7035" or material != "3.7235":
+            add_text(
+                model=model,
+                point=web_text_point,
+                text=order_number,
+                layer_name=DEFAULT_LASER_LAYER,
+                text_height=TEXT_HEIGHT_LASER,
+                text_angle=0,
+                text_alignment=0,
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -599,6 +711,7 @@ class BentConeBridge(BaseBridge):
         }
 
 
+
 # ---------------------------------------------------------------------------
 # Тестовый запуск
 # ---------------------------------------------------------------------------
@@ -631,6 +744,7 @@ if __name__ == "__main__":
         "h_cut": 80.0,
         "l_cut": 20.0,
         "r_cut": 10.0,
+        "web_detail_number": "2",
 
         # --------------------------------------------------
         # Таблички
@@ -648,7 +762,7 @@ if __name__ == "__main__":
         # --------------------------------------------------
         # Технологические параметры (обязательные)
         # --------------------------------------------------
-        "order_number": "XXXXX",
+        "order_number": "22000",
         "detail_number": "1",
         "material": "1.4301",
         "thickness": 3.0,

@@ -109,6 +109,7 @@ DEFAULT_CIRCLE_LAYER: str = "0"
 HEADS_LAYER: str = "AM_0"
 DEFAULT_TEXT_LAYER: str = "schrift"
 DEFAULT_LASER_LAYER: str = "LASER-TEXT"
+DEFAULT_ACCOMPANY_TEXT_LAYER: str = "AM_5"
 
 # --- Настройки размеров ---
 DEFAULT_DIM_LAYER: str = "AM_5"
@@ -122,6 +123,7 @@ TEXT_BOLD: bool = False
 TEXT_ITAL: bool = True
 TEXT_HEIGHT_BIG: int = 60
 TEXT_HEIGHT_SMALL: int = 30
+TEXT_HEIGHT_LASER: int = 7
 TEXT_DISTANCE: int = 80
 
 # --- Символы статусов ---
