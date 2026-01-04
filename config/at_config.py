@@ -104,6 +104,7 @@ LAYER_DATA: list[dict[str, object]] = [
 ]
 
 # --- Слои по умолчанию для объектов AutoCAD ---
+DEFAULT_CUTOUT_LAYER: str = "0"
 RECTANGLE_LAYER: str = "0"
 DEFAULT_CIRCLE_LAYER: str = "0"
 HEADS_LAYER: str = "AM_0"

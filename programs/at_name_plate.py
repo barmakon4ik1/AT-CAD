@@ -11,9 +11,10 @@ from typing import Dict, List
 
 from config.at_cad_init import ATCadInit
 from config.at_config import NAME_PLATES_FILE, DEFAULT_TEXT_LAYER, DEFAULT_LASER_LAYER, DEFAULT_DIM_OFFSET, \
-    DEFAULT_ACCOMPANY_TEXT_LAYER, TEXT_HEIGHT_BIG, TEXT_HEIGHT_LASER, TEXT_HEIGHT_SMALL, TEXT_DISTANCE
+    DEFAULT_ACCOMPANY_TEXT_LAYER, TEXT_HEIGHT_BIG, TEXT_HEIGHT_LASER, TEXT_HEIGHT_SMALL, TEXT_DISTANCE, \
+    DEFAULT_CUTOUT_LAYER, DEFAULT_DIM_LAYER
 from programs.at_base import regen
-from programs.at_construction import add_polyline, add_text, add_rectangle, add_circle
+from programs.at_construction import add_polyline, add_text, add_rectangle, add_circle, add_line
 from locales.at_translations import loc
 from programs.at_dimension import add_dimension
 from programs.at_geometry import polar_point, fillet_points, PolylineBuilder, ensure_point_variant
@@ -212,29 +213,32 @@ class PlateLayoutVertical:
         относительно центра мостика.
         """
 
-        heights = [plates_data[p["name"]]["b1"] for p in plates]
+        heights = [float(plates_data[p["name"]]["b1"]) for p in plates]
         n = len(heights)
+
+        # --- частный, но ОБЯЗАТЕЛЬНЫЙ случай ---
+        if n == 1 and offset_top == "center":
+            return [(0.0, 0.0)]
 
         block_height = sum(heights) + gap * (n - 1)
 
-        # Смещение верхнего края блока табличек относительно верхнего края мостика
+        # положение верхнего края блока относительно ВЕРХНЕГО края мостика
         if offset_top == "center":
             top_edge_offset = (bridge_height - block_height) / 2
         else:
             top_edge_offset = float(offset_top)
 
-        # Верхний край блока табличек относительно центра мостика
+        # y верхнего края блока относительно ЦЕНТРА мостика
         y_top = bridge_height / 2 - top_edge_offset
 
         positions = []
         current_top = y_top
 
         for h in heights:
-            # центр таблички = верхний край - половина высоты
+            # центр таблички относительно ЦЕНТРА мостика
             y_center = current_top - h / 2
             positions.append((0.0, y_center))
-            # сдвиг вниз на следующий верхний край: вычитаем высоту + gap
-            current_top = current_top - h - gap
+            current_top -= h + gap
 
         return positions
 
@@ -364,7 +368,10 @@ class FlatWebBridge(BaseBridge):
         "pt": [x, y],               # точка вставки (центр мостика)
         "width": float,             # полная ширина мостика
         "height": float,            # полная высота мостика
-        "radius": float,            # радиус скругления углов
+        "radius": float,            # поведение углов:
+                                    # > 0 - скругление
+                                    # < 0 - фаска
+                                    # == 0 - просто углы
 
         # перемычка (будет реализовано позже)
         "length": float,            # длина перемычки (расстояние от мостика до сосуда)
@@ -648,15 +655,199 @@ class BentStraightBridge(BaseBridge):
             if key not in self.data:
                 raise ValueError(f"Missing parameter: {key}")
 
-    def get_unfold_data(self) -> dict:
-        return {
-            "type": self.bridge_type,
-            "width": self.data["width"],
-            "height": self.data["height"],
-            "length": self.data["length"],
-            "thickness": self.data["thickness"],
-            "edges": "straight",
-        }
+    def build(self, model):
+        data = self.data
+        plates = data.get("plates", [])
+
+        center_point = data["pt"]
+        width = data["width"]
+        bridge_height = data["height"]
+        length = data["length"]
+        thickness = data["thickness"]
+        order_number = data["order_number"]
+        detail_number = data["detail_number"]
+        material = data["material"]
+        shell_radius = data.get("shell_diameter", 0.0) / 2
+
+        h_cut = data.get("h_cut")
+        h1_cut = (bridge_height - h_cut) / 2
+        l_cut = data.get("l_cut")
+        r_cut = data.get("r_cut", 0.0)
+
+        if shell_radius != 0.0:
+            length_full = length + shell_radius - (shell_radius ** 2 - width ** 2 / 4) ** 0.5
+        else:
+            length_full = length
+
+        # ------------------------------------------------------------------
+        # 1. Контур мостика
+        # ------------------------------------------------------------------
+
+        # Расчетные точки:
+        cx, cy = center_point
+        p0 = cx + (0.5 * width - thickness), cy - (0.5 * bridge_height - thickness)
+        p1 = p0[0] + (length_full - thickness), p0[1]
+        p15 = cx - (0.5 * width - thickness), p0[1]
+        p14 = p15[0] - (length_full - thickness), p1[1]
+        p2 = p1[0], p1[1] + h1_cut
+        p3 = p2[0] - l_cut, p2[1]
+        p4 = p3[0], p3[1] + h_cut
+        p5 = p2[0], p4[1]
+        p6 = p1[0], p1[1] + bridge_height
+        p7 = p0[0], p6[1]
+        p8 = p15[0], p6[1]
+        p9 = p14[0], p6[1]
+        p10 = p9[0], p4[1]
+        p11 = p10[0] + l_cut, p10[1]
+        p12 = p11[0], p3[1]
+        p13 = p14[0], p3[1]
+
+        pb = PolylineBuilder(p0)
+
+        # Прямые сегменты
+        pb.line_to(p1)
+        pb.line_to(p2)
+
+        if r_cut == 0.0:
+            # все сегменты прямые
+            pb.line_to(p3)
+            pb.line_to(p4)
+        else:
+            # скругления или фаски через corner
+            pb.corner(p3, p4, r_cut)
+            pb.corner(p4, p5, r_cut)
+
+        # Далее прямые сегменты
+        pb.line_to(p5)
+        pb.line_to(p6)
+        pb.line_to(p7)
+        pb.line_to(p8)
+        pb.line_to(p9)
+        pb.line_to(p10)
+
+        if r_cut == 0.0:
+            # все сегменты прямые
+            pb.line_to(p11)
+            pb.line_to(p12)
+        else:
+            # скругления или фаски через corner
+            pb.corner(p11, p12, r_cut)
+            pb.corner(p12, p13, r_cut)
+
+        pb.line_to(p13)
+        pb.line_to(p14)
+        pb.line_to(p15)
+        pb.line_to(p0)
+
+        pb.close()
+
+        # Строим полилинию
+        add_polyline(model, pb.vertices(), layer_name=DEFAULT_CUTOUT_LAYER, closed=True)
+
+        # Линии гиба
+        add_line(model, p0, p7, layer_name=DEFAULT_DIM_LAYER)
+        add_line(model, p15, p8, layer_name=DEFAULT_DIM_LAYER)
+
+        # ------------------------------------------------------------------
+        # 2. Таблички + отверстия
+        # ------------------------------------------------------------------
+        if plates:
+            gap = data.get("plates_gap", 5.0)
+            offset_top = plates[0].get("offset_top", "center")
+
+            positions = PlateLayoutVertical.compute_positions(
+                bridge_height=bridge_height,
+                plates=plates,
+                plates_data=self.plates_data,
+                gap=gap,
+                offset_top=offset_top,
+            )
+
+            for plate_cfg, (dx, dy) in zip(plates, positions):
+                plate_name = plate_cfg["name"]
+                plate_data = self.plates_data[plate_name]
+
+                # центр таблички в координатах мостика
+                plate_center = (
+                    center_point[0] + dx,
+                    center_point[1] + dy,
+                )
+
+                a1 = float(plate_data["a1"])
+                b1 = float(plate_data["b1"])
+                a = float(plate_data["a"])
+                b = float(plate_data["b"])
+                d = float(plate_data["d"])
+
+                # ----------------------------------------------------------
+                # 2.1 Контур таблички
+                # ----------------------------------------------------------
+                add_rectangle(
+                    model=model,
+                    point=plate_center,
+                    width=a1,
+                    height=b1,
+                    layer_name="AM_5",
+                    point_direction="center",
+                    radius=float(plate_data.get("r", 0.0)),
+                )
+
+                # ----------------------------------------------------------
+                # 2.2 Отверстия таблички (перенос в развертку)
+                # ----------------------------------------------------------
+                cx, cy = plate_center
+                a2 = a / 2.0
+
+                # 2 отверстия
+                if b == 0:
+                    hole_positions = [
+                        (-a2, 0.0),
+                        (a2, 0.0),
+                    ]
+                # 4 отверстия
+                else:
+                    b2 = b / 2.0
+                    hole_positions = [
+                        (-a2, -b2),
+                        (a2, -b2),
+                        (a2, b2),
+                        (-a2, b2),
+                    ]
+
+                for hx, hy in hole_positions:
+                    add_circle(
+                        model=model,
+                        center=(cx + hx, cy + hy),
+                        radius=d / 2.0,
+                        layer_name="0",
+                    )
+
+        # ------------------------------------------------------------------
+        # 3. Тексты номера заказа и лазерная гравировка на мостике
+        # ------------------------------------------------------------------
+        BridgeTexts(data).draw(model, center_point)
+
+        # ------------------------------------------------------------------
+        # 4. Размеры
+        # ------------------------------------------------------------------
+        p9v = ensure_point_variant(p9)
+        p8v = ensure_point_variant(p8)
+        p7v = ensure_point_variant(p7)
+        p6v = ensure_point_variant(p6)
+        p14v = ensure_point_variant(p14)
+
+        add_dimension(adoc,"H", p9v, p8v, offset=DEFAULT_DIM_OFFSET)
+        add_dimension(adoc,"H", p8v, p7v, offset=DEFAULT_DIM_OFFSET)
+        add_dimension(adoc,"H", p7v, p6v, offset=DEFAULT_DIM_OFFSET)
+        add_dimension(adoc,"H", p9v, p6v, offset=2 * DEFAULT_DIM_OFFSET)
+        add_dimension(adoc,"V", p14v, p9v, offset=DEFAULT_DIM_OFFSET)
+
+        # ------------------------------------------------------------------
+        # 5. Сопроводительный текст
+        # ------------------------------------------------------------------
+        text_insert_point = polar_point(p9, TEXT_DISTANCE + 2 * DEFAULT_DIM_OFFSET, 90)
+        AccompanyText(data).draw(model, text_insert_point)
+
 
 # ---------------------------------------------------------------------------
 # Мостик для таблички Тип 3 — гнутый под трубу (одинаковые диаметры)
@@ -726,26 +917,64 @@ if __name__ == "__main__":
     np = NamePlate()
     pt = [0,0]
 
+    # bridge_data = {
+    #     "type": "flat_web", # "bent_straight"
+    #
+    #     # --------------------------------------------------
+    #     # Геометрия мостика
+    #     # --------------------------------------------------
+    #     "pt": pt,
+    #     "width": 160.0,
+    #     "height": 220.0,
+    #     "radius": 0.0,
+    #
+    #     # --------------------------------------------------
+    #     # Перемычка
+    #     # --------------------------------------------------
+    #     "length": 50.0,
+    #     "height_web": 120.0,
+    #     "h_cut": 80.0,
+    #     "l_cut": 20.0,
+    #     "r_cut": 10.0,
+    #     "web_detail_number": "2",
+    #
+    #     # --------------------------------------------------
+    #     # Таблички
+    #     # --------------------------------------------------
+    #     "plates": [
+    #         {
+    #             "name": "GEA_gross",  # имя из name_plates.json
+    #             # "offset_top": 5.0 # отступ верхнего края таблички от верха мостика
+    #         },
+    #         {"name": "GEA_klein"},
+    #     ],
+    #
+    #     "plates_gap": 5.0,  # расстояние между краями табличек
+    #
+    #     # --------------------------------------------------
+    #     # Технологические параметры (обязательные)
+    #     # --------------------------------------------------
+    #     "order_number": "22000",
+    #     "detail_number": "1",
+    #     "material": "1.4301",
+    #     "thickness": 3.0,
+    # }
+
     bridge_data = {
-        "type": "flat_web",
+        "type": "bent_straight",
 
         # --------------------------------------------------
         # Геометрия мостика
         # --------------------------------------------------
         "pt": pt,
-        "width": 160.0,
-        "height": 220.0,
+        "width": 170.0,
+        "height": 160.0,
         "radius": 0.0,
-
-        # --------------------------------------------------
-        # Перемычка
-        # --------------------------------------------------
-        "length": 50.0,
-        "height_web": 120.0,
-        "h_cut": 80.0,
+        "shell_diameter": 0,
+        "length": 100.0,
+        "h_cut": 120.0,
         "l_cut": 20.0,
         "r_cut": 10.0,
-        "web_detail_number": "2",
 
         # --------------------------------------------------
         # Таблички
@@ -755,7 +984,7 @@ if __name__ == "__main__":
                 "name": "GEA_gross",  # имя из name_plates.json
                 # "offset_top": 5.0 # отступ верхнего края таблички от верха мостика
             },
-            {"name": "GEA_klein"},
+            # {"name": "GEA_klein"},
         ],
 
         "plates_gap": 5.0,  # расстояние между краями табличек

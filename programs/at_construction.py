@@ -645,23 +645,23 @@ def add_rectangle(
         height: Высота.
         layer_name: Слой.
         point_direction: "left_bottom", "center" и т.д.
-        radius: Радиус скругления углов (по умолчанию 0 — обычный прямоугольник).
+        radius: Поведение углов (по умолчанию 0 — обычный прямоугольник), > 0 - скругление, < 0 - фаска
 
     Returns:
         Объект LightWeightPolyline или None.
     """
     try:
         # Проверка на слишком большой радиус
-        if radius > 0 and radius * 2 >= min(width, height):
+        if abs(radius) != 0 and radius * 2 >= min(width, height):
             raise ValueError(f"Радиус {radius} слишком велик для размеров {width}x{height}")
 
-        if radius <= 0:
-            # === Обычный прямоугольник (старое поведение) ===
+        if radius == 0:
+            # === Обычный прямоугольник ===
             points_variant = add_rectangle_points(point, width, height, point_direction)
             polyline = add_polyline(model, points_variant, layer_name=layer_name, closed=True)
             return polyline
 
-        # === Скруглённый прямоугольник ===
+        # === Скруглённый прямоугольник или с фасками===
         # Получаем 4 угловые точки для вычисления центра и ориентации
         temp_points = add_rectangle_points(point, width, height, point_direction)
         coords = list(temp_points.value)  # [x1,y1, x2,y2, x3,y3, x4,y4]
@@ -673,21 +673,26 @@ def add_rectangle(
         half_w = width / 2.0
         half_h = height / 2.0
 
+        abs_radius = abs(radius)
+
         # 8 точек + соответствующие им bulge (только для угловых сегментов)
         pts = [
-            (cx - half_w + radius, cy - half_h),  # 0: начало нижней стороны
-            (cx + half_w - radius, cy - half_h),  # 1: → дуга
-            (cx + half_w, cy - half_h + radius),  # 2: начало правой
-            (cx + half_w, cy + half_h - radius),  # 3: → дуга
-            (cx + half_w - radius, cy + half_h),  # 4: начало верхней
-            (cx - half_w + radius, cy + half_h),  # 5: → дуга
-            (cx - half_w, cy + half_h - radius),  # 6: начало левой
-            (cx - half_w, cy - half_h + radius),  # 7: → дуга (замыкание)
+            (cx - half_w + abs_radius, cy - half_h),  # 0: начало нижней стороны
+            (cx + half_w - abs_radius, cy - half_h),  # 1: → дуга
+            (cx + half_w, cy - half_h + abs_radius),  # 2: начало правой
+            (cx + half_w, cy + half_h - abs_radius),  # 3: → дуга
+            (cx + half_w - abs_radius, cy + half_h),  # 4: начало верхней
+            (cx - half_w + abs_radius, cy + half_h),  # 5: → дуга
+            (cx - half_w, cy + half_h - abs_radius),  # 6: начало левой
+            (cx - half_w, cy - half_h + abs_radius),  # 7: → дуга (замыкание)
         ]
 
         # Bulge только для сегментов 1→2, 3→4, 5→6, 7→0 (индексы: 1,3,5,7)
-        bl = math.tan(math.radians(90 / 4)) # величина bulge = tan (90°/4)
-        bulges = [0.0, bl, 0.0, bl, 0.0, bl, 0.0, bl]
+        if radius > 0:
+            bl = math.tan(math.radians(90 / 4))  # величина bulge = tan (90°/4)
+            bulges = [0.0, bl, 0.0, bl, 0.0, bl, 0.0, bl]
+        else:
+            bulges = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
         # Передаём точки как список кортежей (x, y), а bulges отдельно
         points_list = [(x, y) for x, y in pts]
