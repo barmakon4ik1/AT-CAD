@@ -123,6 +123,81 @@ class NamePlate:
 
 
 # ---------------------------------------------------------------------------
+# Блок табличек + отверстий
+# ---------------------------------------------------------------------------
+class PlateBlock:
+    """
+    Универсальная отрисовка табличек и отверстий
+    для всех типов мостиков.
+    """
+
+    def __init__(
+        self,
+        plates: list[dict],
+        plates_data: dict,
+        bridge_height: float,
+        plates_gap: float = 5.0,
+    ):
+        self.plates = plates
+        self.plates_data = plates_data
+        self.bridge_height = bridge_height
+        self.plates_gap = plates_gap
+
+    def draw(self, model, center_point):
+        if not self.plates:
+            return
+
+        cx, cy = center_point
+        y_top_bridge = cy + self.bridge_height / 2
+
+        heights = [
+            float(self.plates_data[p["name"]]["b1"])
+            for p in self.plates
+        ]
+
+        offset_top_cfg = self.plates[0].get("offset_top")
+
+        offset_top, block_height = PlateLayoutVertical.compute_offset_top(
+            bridge_height=self.bridge_height,
+            heights=heights,
+            plates_gap=self.plates_gap,
+            offset_top=offset_top_cfg,
+        )
+
+        # Y верхнего края блока табличек
+        y_top_block = y_top_bridge - offset_top
+
+        current_y = y_top_block
+
+        for i, (plate_cfg, h) in enumerate(zip(self.plates, heights)):
+            plate_data = self.plates_data[plate_cfg["name"]]
+
+            # центр текущей таблички
+            plate_center = (
+                cx,
+                current_y - h / 2,
+            )
+
+            # --- контур таблички ---
+            add_rectangle(
+                model=model,
+                point=plate_center,
+                width=float(plate_data["a1"]),
+                height=float(plate_data["b1"]),
+                layer_name="AM_5",
+                point_direction="center",
+                radius=float(plate_data.get("r", 0.0)),
+            )
+
+            # --- отверстия ---
+            PlateHoles(plate_data).draw(model, plate_center)
+
+            # переход к следующей табличке
+            if len(self.plates) > 1:
+                current_y -= h + self.plates_gap
+
+
+# ---------------------------------------------------------------------------
 # Стандартные тексты мостика
 # ---------------------------------------------------------------------------
 class BridgeTexts:
@@ -192,55 +267,38 @@ class AccompanyText:
 
 
 # ---------------------------------------------------------------------------
-# Вертикальная компоновка табличек
+# Вертикальная компоновка табличек (от верхнего края мостика)
 # ---------------------------------------------------------------------------
 class PlateLayoutVertical:
     """
-    Отвечает только за расчет позиций табличек
-    относительно центра мостика.
+    Отвечает ТОЛЬКО за вертикальную компоновку блока табличек
+    относительно ВЕРХНЕГО КРАЯ мостика.
     """
 
     @staticmethod
-    def compute_positions(
+    def compute_offset_top(
         bridge_height: float,
-        plates: list[dict],
-        plates_data: dict,
-        gap: float = 5.0,
-        offset_top: float | str = "center",
-    ) -> list[tuple[float, float]]:
+        heights: list[float],
+        plates_gap: float,
+        offset_top: float | None,
+    ) -> tuple[float, float]:
         """
-        Возвращает список (dx, dy) для каждой таблички
-        относительно центра мостика.
+        Возвращает:
+        - offset_top: расстояние от верхнего края мостика до верхнего края блока
+        - block_height: полная высота блока табличек
         """
 
-        heights = [float(plates_data[p["name"]]["b1"]) for p in plates]
+        if not heights:
+            return 0.0, 0.0
+
         n = len(heights)
+        block_height = sum(heights) + plates_gap * (n - 1)
 
-        # --- частный, но ОБЯЗАТЕЛЬНЫЙ случай ---
-        if n == 1 and offset_top == "center":
-            return [(0.0, 0.0)]
+        # Центрирование блока
+        if offset_top is None:
+            offset_top = (bridge_height - block_height) / 2
 
-        block_height = sum(heights) + gap * (n - 1)
-
-        # положение верхнего края блока относительно ВЕРХНЕГО края мостика
-        if offset_top == "center":
-            top_edge_offset = (bridge_height - block_height) / 2
-        else:
-            top_edge_offset = float(offset_top)
-
-        # y верхнего края блока относительно ЦЕНТРА мостика
-        y_top = bridge_height / 2 - top_edge_offset
-
-        positions = []
-        current_top = y_top
-
-        for h in heights:
-            # центр таблички относительно ЦЕНТРА мостика
-            y_center = current_top - h / 2
-            positions.append((0.0, y_center))
-            current_top -= h + gap
-
-        return positions
+        return float(offset_top), block_height
 
 
 # ---------------------------------------------------------------------------
@@ -351,6 +409,22 @@ class BaseBridge:
         """
         raise NotImplementedError
 
+    def draw_plates(self, model):
+        """
+        Универсальная отрисовка табличек и отверстий
+        для всех типов мостиков.
+        """
+        plates = self.data.get("plates", [])
+        if not plates:
+            return
+
+        PlateBlock(
+            plates=plates,
+            plates_data=self.plates_data,
+            bridge_height=self.data["height"],
+            plates_gap=self.data.get("plates_gap", 5.0),
+        ).draw(model, self.data["pt"])
+
 
 # ---------------------------------------------------------------------------
 # Мостик для таблички Тип 1 — плоский с перемычкой
@@ -441,76 +515,7 @@ class FlatWebBridge(BaseBridge):
         # ------------------------------------------------------------------
         # 2. Таблички + отверстия
         # ------------------------------------------------------------------
-        if plates:
-            gap = data.get("plates_gap", 5.0)
-            offset_top = plates[0].get("offset_top", "center")
-
-            positions = PlateLayoutVertical.compute_positions(
-                bridge_height=bridge_height,
-                plates=plates,
-                plates_data=self.plates_data,
-                gap=gap,
-                offset_top=offset_top,
-            )
-
-            for plate_cfg, (dx, dy) in zip(plates, positions):
-                plate_name = plate_cfg["name"]
-                plate_data = self.plates_data[plate_name]
-
-                # центр таблички в координатах мостика
-                plate_center = (
-                    center_point[0] + dx,
-                    center_point[1] + dy,
-                )
-
-                a1 = float(plate_data["a1"])
-                b1 = float(plate_data["b1"])
-                a = float(plate_data["a"])
-                b = float(plate_data["b"])
-                d = float(plate_data["d"])
-
-                # ----------------------------------------------------------
-                # 2.1 Контур таблички
-                # ----------------------------------------------------------
-                add_rectangle(
-                    model=model,
-                    point=plate_center,
-                    width=a1,
-                    height=b1,
-                    layer_name="AM_5",
-                    point_direction="center",
-                    radius=float(plate_data.get("r", 0.0)),
-                )
-
-                # ----------------------------------------------------------
-                # 2.2 Отверстия таблички (перенос в развертку)
-                # ----------------------------------------------------------
-                cx, cy = plate_center
-                a2 = a / 2.0
-
-                # 2 отверстия
-                if b == 0:
-                    hole_positions = [
-                        (-a2, 0.0),
-                        (a2, 0.0),
-                    ]
-                # 4 отверстия
-                else:
-                    b2 = b / 2.0
-                    hole_positions = [
-                        (-a2, -b2),
-                        (a2, -b2),
-                        (a2, b2),
-                        (-a2, b2),
-                    ]
-
-                for hx, hy in hole_positions:
-                    add_circle(
-                        model=model,
-                        center=(cx + hx, cy + hy),
-                        radius=d / 2.0,
-                        layer_name="0",
-                    )
+        self.draw_plates(model)
 
         # ------------------------------------------------------------------
         # 3. Тексты номера заказа и лазерная гравировка на мостике
@@ -685,7 +690,7 @@ class BentStraightBridge(BaseBridge):
 
         # Расчетные точки:
         cx, cy = center_point
-        p0 = cx + (0.5 * width - thickness), cy - (0.5 * bridge_height - thickness)
+        p0 = cx + (0.5 * width - thickness), cy - (0.5 * bridge_height)
         p1 = p0[0] + (length_full - thickness), p0[1]
         p15 = cx - (0.5 * width - thickness), p0[1]
         p14 = p15[0] - (length_full - thickness), p1[1]
@@ -751,76 +756,7 @@ class BentStraightBridge(BaseBridge):
         # ------------------------------------------------------------------
         # 2. Таблички + отверстия
         # ------------------------------------------------------------------
-        if plates:
-            gap = data.get("plates_gap", 5.0)
-            offset_top = plates[0].get("offset_top", "center")
-
-            positions = PlateLayoutVertical.compute_positions(
-                bridge_height=bridge_height,
-                plates=plates,
-                plates_data=self.plates_data,
-                gap=gap,
-                offset_top=offset_top,
-            )
-
-            for plate_cfg, (dx, dy) in zip(plates, positions):
-                plate_name = plate_cfg["name"]
-                plate_data = self.plates_data[plate_name]
-
-                # центр таблички в координатах мостика
-                plate_center = (
-                    center_point[0] + dx,
-                    center_point[1] + dy,
-                )
-
-                a1 = float(plate_data["a1"])
-                b1 = float(plate_data["b1"])
-                a = float(plate_data["a"])
-                b = float(plate_data["b"])
-                d = float(plate_data["d"])
-
-                # ----------------------------------------------------------
-                # 2.1 Контур таблички
-                # ----------------------------------------------------------
-                add_rectangle(
-                    model=model,
-                    point=plate_center,
-                    width=a1,
-                    height=b1,
-                    layer_name="AM_5",
-                    point_direction="center",
-                    radius=float(plate_data.get("r", 0.0)),
-                )
-
-                # ----------------------------------------------------------
-                # 2.2 Отверстия таблички (перенос в развертку)
-                # ----------------------------------------------------------
-                cx, cy = plate_center
-                a2 = a / 2.0
-
-                # 2 отверстия
-                if b == 0:
-                    hole_positions = [
-                        (-a2, 0.0),
-                        (a2, 0.0),
-                    ]
-                # 4 отверстия
-                else:
-                    b2 = b / 2.0
-                    hole_positions = [
-                        (-a2, -b2),
-                        (a2, -b2),
-                        (a2, b2),
-                        (-a2, b2),
-                    ]
-
-                for hx, hy in hole_positions:
-                    add_circle(
-                        model=model,
-                        center=(cx + hx, cy + hy),
-                        radius=d / 2.0,
-                        layer_name="0",
-                    )
+        self.draw_plates(model)
 
         # ------------------------------------------------------------------
         # 3. Тексты номера заказа и лазерная гравировка на мостике
@@ -862,15 +798,9 @@ class BentPipeBridge(BaseBridge):
                 raise ValueError(f"Missing parameter: {key}")
 
     def get_unfold_data(self) -> dict:
-        return {
-            "type": self.bridge_type,
-            "width": self.data["width"],
-            "height": self.data["height"],
-            "length": self.data["length"],
-            "thickness": self.data["thickness"],
-            "diameter_left": self.data["diameter"],
-            "diameter_right": self.data["diameter"],
-        }
+        return
+
+
 
 # ---------------------------------------------------------------------------
 # Мостик для таблички Тип 4 — гнутый под конус (разные диаметры)
@@ -915,50 +845,49 @@ if __name__ == "__main__":
     model = cad.model_space
 
     np = NamePlate()
-    pt = [0,0]
 
-    # bridge_data = {
-    #     "type": "flat_web", # "bent_straight"
-    #
-    #     # --------------------------------------------------
-    #     # Геометрия мостика
-    #     # --------------------------------------------------
-    #     "pt": pt,
-    #     "width": 160.0,
-    #     "height": 220.0,
-    #     "radius": 0.0,
-    #
-    #     # --------------------------------------------------
-    #     # Перемычка
-    #     # --------------------------------------------------
-    #     "length": 50.0,
-    #     "height_web": 120.0,
-    #     "h_cut": 80.0,
-    #     "l_cut": 20.0,
-    #     "r_cut": 10.0,
-    #     "web_detail_number": "2",
-    #
-    #     # --------------------------------------------------
-    #     # Таблички
-    #     # --------------------------------------------------
-    #     "plates": [
-    #         {
-    #             "name": "GEA_gross",  # имя из name_plates.json
-    #             # "offset_top": 5.0 # отступ верхнего края таблички от верха мостика
-    #         },
-    #         {"name": "GEA_klein"},
-    #     ],
-    #
-    #     "plates_gap": 5.0,  # расстояние между краями табличек
-    #
-    #     # --------------------------------------------------
-    #     # Технологические параметры (обязательные)
-    #     # --------------------------------------------------
-    #     "order_number": "22000",
-    #     "detail_number": "1",
-    #     "material": "1.4301",
-    #     "thickness": 3.0,
-    # }
+    bridge_data_1 = {
+        "type": "flat_web", # "bent_straight"
+
+        # --------------------------------------------------
+        # Геометрия мостика
+        # --------------------------------------------------
+        "pt": [0,0],
+        "width": 160.0,
+        "height": 220.0,
+        "radius": 0.0,
+
+        # --------------------------------------------------
+        # Перемычка
+        # --------------------------------------------------
+        "length": 50.0,
+        "height_web": 120.0,
+        "h_cut": 80.0,
+        "l_cut": 20.0,
+        "r_cut": 10.0,
+        "web_detail_number": "2",
+
+        # --------------------------------------------------
+        # Таблички
+        # --------------------------------------------------
+        "plates": [
+            {
+                "name": "GEA_gross",  # имя из name_plates.json
+                # "offset_top": 5.0 # отступ верхнего края таблички от верха мостика
+            },
+            {"name": "GEA_klein"},
+        ],
+
+        "plates_gap": 5.0,  # расстояние между краями табличек
+
+        # --------------------------------------------------
+        # Технологические параметры (обязательные)
+        # --------------------------------------------------
+        "order_number": "22000-1",
+        "detail_number": "31",
+        "material": "1.4571",
+        "thickness": 4.0,
+    }
 
     bridge_data = {
         "type": "bent_straight",
@@ -966,7 +895,7 @@ if __name__ == "__main__":
         # --------------------------------------------------
         # Геометрия мостика
         # --------------------------------------------------
-        "pt": pt,
+        "pt": [-800, 0],
         "width": 170.0,
         "height": 160.0,
         "radius": 0.0,
@@ -987,7 +916,7 @@ if __name__ == "__main__":
             # {"name": "GEA_klein"},
         ],
 
-        "plates_gap": 5.0,  # расстояние между краями табличек
+        #"plates_gap": 5.0,  # расстояние между краями табличек
 
         # --------------------------------------------------
         # Технологические параметры (обязательные)
@@ -1000,8 +929,11 @@ if __name__ == "__main__":
 
 
     bridge = BaseBridge.create_bridge(bridge_data, np.plates)
+    bridge1 = BaseBridge.create_bridge(bridge_data_1, np.plates)
+
     if model:
         bridge.build(model)
+        bridge1.build(model)
 
         regen(adoc)
     else:
