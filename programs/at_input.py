@@ -351,6 +351,6 @@ if __name__ == "__main__":
     ent = at_get_entity(use_bridge=False)
     print("Результат объекта:", ent)
 
-    print("\nПопытка получить точку через мост...")
-    pt2 = at_get_point(use_bridge=True)
-    print("Результат (мост):", pt2)
+    # print("\nПопытка получить точку через мост...")
+    # pt2 = at_get_point(use_bridge=True)
+    # print("Результат (мост):", pt2)

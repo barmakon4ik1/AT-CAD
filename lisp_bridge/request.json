@@ -1,6 +1,4 @@
 {
-  "command": "get_entity",
-  "params": {
-    "prompt": "Выберите объект на чертеже:"
-  }
+  "command": "get_point",
+  "params": {}
 }
