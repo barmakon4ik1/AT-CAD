@@ -17,7 +17,8 @@ from programs.at_base import regen
 from programs.at_construction import add_polyline, add_text, add_rectangle, add_circle, add_line
 from locales.at_translations import loc
 from programs.at_dimension import add_dimension
-from programs.at_geometry import polar_point, PolylineBuilder, ensure_point_variant
+from programs.at_geometry import polar_point, PolylineBuilder, ensure_point_variant, bulge_from_center, at_bulge, \
+    calculate_angles
 from windows.at_gui_utils import show_popup
 
 # ---------------------------------------------------------------------------
@@ -879,7 +880,7 @@ def build_type3(model, cfg: BridgeConfig):
     )
 
     # ------------------------------------------------------------------
-    # Линии гиба
+    # Линии сгиба
     # ------------------------------------------------------------------
 
     add_line(model, p0, p7, layer_name=DEFAULT_DIM_LAYER)
@@ -919,6 +920,145 @@ def build_type3(model, cfg: BridgeConfig):
     }
 
 
+def build_type4(model, cfg: BridgeConfig):
+    """
+    Построение развертки мостика типа BentStraight на трубу (type4).
+    """
+
+    # ------------------------------------------------------------------
+    # Исходные данные (read-only из BridgeConfig)
+    # ------------------------------------------------------------------
+    center_point = cfg.center_point
+    width = cfg.width
+    bridge_height = cfg.height
+    length = cfg.length
+    thickness = cfg.thickness
+    diameter2 = cfg.diameter2
+
+    h_cut = cfg.h_cut
+    l_cut = cfg.l_cut
+    # Если r_cut = 0 - сегмент будет повторять окружность цилиндра с отступом,
+    # иначе - вертикальный прямой, но со скруглением (>0) или фаской abs(<0)
+    r_cut = cfg.r_cut
+
+    # ------------------------------------------------------------------
+    # Расчетные данные
+    # ------------------------------------------------------------------
+    h1_cut = (bridge_height - h_cut) / 2
+    l1 = length - thickness
+    w1 = 0.5 * width - thickness
+    r2 = diameter2 / 2.0
+    a = bridge_height / 2 - h1_cut
+    x = l1 + r2 - (r2 ** 2 - bridge_height ** 2 / 4) ** 0.5
+    alpha = math.atan(bridge_height / (2 * r2))
+    l2 = math.sqrt(r2 ** 2 - a ** 2)
+
+    # ------------------------------------------------------------------
+    # 1. Контур мостика
+    # ------------------------------------------------------------------
+    cx, cy = center_point
+
+    p0 = (cx + w1, cy - bridge_height / 2.0)
+    p1 =(p0[0] + x, p0[1])
+    p15 = (cx - w1, p0[1])
+    p14 = (p15[0] - x, p0[1])
+    pc = (p0[0] + l1, cy)
+
+    p2 = (p0[0] + (l1 + r2 - l2), p1[1] + h1_cut)
+    p3 = (p2[0] - l_cut, p2[1])
+    p4 = (p3[0], p3[1] + h_cut)
+    p5 = (p2[0], p4[1])
+
+    p6 = (p1[0], p1[1] + bridge_height)
+    p7 = (p0[0], p6[1])
+    p8 = (p15[0], p6[1])
+    p9 = (p14[0], p6[1])
+
+    p10 = (p8[0] - (l1 + r2 - l2), p9[1] - h1_cut)
+    p11 = (p10[0] + l_cut, p10[1])
+    p12 = (p11[0], p3[1])
+    p13 = (p10[0], p3[1])
+
+    cp = (cx + w1 + l1 + r2, cy)
+    bulge = at_bulge(p1, p2, cp)
+    bulge1 = math.tan(calculate_angles(1, 1, p3, p4, cp) / 4)
+
+    pb = PolylineBuilder(p0)
+
+    # --- нижняя часть
+    pb.arc_to(p1, -bulge)
+    pb.line_to(p2)
+
+    if r_cut == 0.0:
+        pb.arc_to(p3, -bulge1)
+        pb.line_to(p4)
+    else:
+        pb.corner(p3, p4, r_cut)
+        pb.corner(p4, p5, r_cut)
+
+    # --- верх и левая сторона
+    pb.arc_to(p5, -bulge)
+    pb.line_to(p6)
+    pb.line_to(p7)
+    pb.line_to(p8)
+    pb.arc_to(p9, -bulge)
+    pb.line_to(p10)
+
+    if r_cut == 0.0:
+        pb.arc_to(p11, -bulge1)
+        pb.line_to(p12)
+    else:
+        pb.corner(p11, p12, r_cut)
+        pb.corner(p12, p13, r_cut)
+
+    pb.arc_to(p13, -bulge)
+    pb.line_to(p14)
+    pb.line_to(p15)
+    pb.line_to(p0)
+
+    pb.close()
+
+    # Контур
+    add_polyline(
+        model,
+        pb.vertices(),
+        layer_name=DEFAULT_CUTOUT_LAYER,
+        closed=True,
+    )
+
+    # ------------------------------------------------------------------
+    # Линии сгиба
+    # ------------------------------------------------------------------
+
+    add_line(model, p0, p7, layer_name=DEFAULT_DIM_LAYER)
+    add_line(model, p15, p8, layer_name=DEFAULT_DIM_LAYER)
+
+    # ------------------------------------------------------------------
+    # Размеры
+    # ------------------------------------------------------------------
+
+    p9v = ensure_point_variant(p9)
+    p8v = ensure_point_variant(p8)
+    p7v = ensure_point_variant(p7)
+    p6v = ensure_point_variant(p6)
+    p14v = ensure_point_variant(p14)
+
+    add_dimension(adoc, "H", p9v, p8v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(adoc, "H", p8v, p7v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(adoc, "H", p7v, p6v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(adoc, "H", p9v, p6v, offset=2 * DEFAULT_DIM_OFFSET)
+    add_dimension(adoc, "V", p14v, p9v, offset=DEFAULT_DIM_OFFSET)
+
+    # Возвращаем ключевые точки, если понадобятся дальше
+    # Габариты мостика
+
+    text_insert_point = polar_point(p9, TEXT_DISTANCE + 2 * DEFAULT_DIM_OFFSET, 90)
+    return {
+        "top_right": p6,
+        "top_left": p9,
+        "center": center_point,
+        "accompany_text_point": text_insert_point,
+    }
 
 
 class BridgeBuilder:
@@ -957,6 +1097,8 @@ class BridgeBuilder:
             key_points = build_type2(model, self.cfg)
         elif bridge_type == "type3":
             key_points = build_type3(model, self.cfg)
+        elif bridge_type == "type4":
+            key_points = build_type4(model, self.cfg)
         else:
             raise ValueError(f"Unsupported bridge type: {bridge_type}")
 
@@ -1006,7 +1148,7 @@ if __name__ == "__main__":
     np = NamePlate()
 
     bridge_data = {
-        "type": "type2",
+        "type": "type4",
         # --------------------------------------------------
         # Технологические параметры (обязательные)
         # --------------------------------------------------
@@ -1019,26 +1161,26 @@ if __name__ == "__main__":
         # Геометрия мостика
         # --------------------------------------------------
         "center_point": [0, 0],
-        "width": 125.0,
-        "height": 65.0,
+        "width": 170.0,
+        "height": 250.0,
         "diameter1": 0.0,
-        "diameter2": 0.0,
-        "length": 50.0,
+        "diameter2": 600.0,
+        "length": 100.0,
         "web_height": 0.0,
-        "h_cut": 30.0,
-        "l_cut": 15.0,
-        "r_cut": 5.0,
-        "angle": 120.0,
+        "h_cut": 180.0,
+        "l_cut": 20.0,
+        "r_cut": 0.0,
+        "angle": 0.0,
         "web_built": False,
         "bridge_built": True,
         # --------------------------------------------------
         # Таблички
         # --------------------------------------------------
         "plates": [
-            # {
-            #     "name": "GEA_gross",  # имя из name_plates.json
-            #     # "offset_top": 5.0 # отступ верхнего края таблички от верха мостика
-            # },
+            {
+                "name": "GEA_gross",  # имя из name_plates.json
+                "offset_top": 5.0 # отступ верхнего края таблички от верха мостика
+            },
             {"name": "GEA_klein"},
         ],
         "plates_gap": 5.0,  # расстояние между краями табличек

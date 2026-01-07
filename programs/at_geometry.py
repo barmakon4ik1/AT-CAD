@@ -838,6 +838,9 @@ class PolylineBuilder:
         self._last_point = t2
         return self
 
+    def arc_to(self, pt, bulge):
+        self._vertices.append((pt[0], pt[1], float(bulge)))
+
 
     # --------------------------------------------------
     def close(self):
