@@ -18,7 +18,7 @@ from programs.at_construction import add_polyline, add_text, add_rectangle, add_
 from locales.at_translations import loc
 from programs.at_dimension import add_dimension
 from programs.at_geometry import polar_point, PolylineBuilder, ensure_point_variant, bulge_from_center, at_bulge, \
-    calculate_angles
+    calculate_angles, distance_2points, bulge_chord
 from windows.at_gui_utils import show_popup
 
 # ---------------------------------------------------------------------------
@@ -531,16 +531,19 @@ def build_type1(model, cfg: BridgeConfig):
     pb = PolylineBuilder(p0)
 
     pb.line_to(p1)
-    pb.line_to(p2)
 
-    if r_cut == 0.0:
-        pb.line_to(p3)
-        pb.line_to(p4)
-    else:
-        pb.corner(p3, p4, r_cut)
-        pb.corner(p4, p5, r_cut)
+    if web_h != 0 and h_cut != 0:
+        pb.line_to(p2)
 
-    pb.line_to(p5)
+        if r_cut == 0.0:
+            pb.line_to(p3)
+            pb.line_to(p4)
+        else:
+            pb.corner(p3, p4, r_cut)
+            pb.corner(p4, p5, r_cut)
+
+        pb.line_to(p5)
+
     pb.line_to(p6)
     pb.line_to(p7)
     pb.close()
@@ -696,33 +699,32 @@ def build_type2(model, cfg: BridgeConfig):
 
     pb = PolylineBuilder(p0)
 
-    # --- нижняя часть
     pb.line_to(p1)
-    pb.line_to(p2)
+    if l_cut != 0.0 and h_cut != 0.0:
+        pb.line_to(p2)
+        if r_cut == 0.0:
+            pb.line_to(p3)
+            pb.line_to(p4)
+        else:
+            pb.corner(p3, p4, r_cut)
+            pb.corner(p4, p5, r_cut)
+        pb.line_to(p5)
 
-    if r_cut == 0.0:
-        pb.line_to(p3)
-        pb.line_to(p4)
-    else:
-        pb.corner(p3, p4, r_cut)
-        pb.corner(p4, p5, r_cut)
-
-    # --- верх и левая сторона
-    pb.line_to(p5)
     pb.line_to(p6)
     pb.line_to(p7)
     pb.line_to(p8)
     pb.line_to(p9)
-    pb.line_to(p10)
 
-    if r_cut == 0.0:
-        pb.line_to(p11)
-        pb.line_to(p12)
-    else:
-        pb.corner(p11, p12, r_cut)
-        pb.corner(p12, p13, r_cut)
+    if l_cut != 0.0 and h_cut != 0.0:
+        pb.line_to(p10)
+        if r_cut == 0.0:
+            pb.line_to(p11)
+            pb.line_to(p12)
+        else:
+            pb.corner(p11, p12, r_cut)
+            pb.corner(p12, p13, r_cut)
+        pb.line_to(p13)
 
-    pb.line_to(p13)
     pb.line_to(p14)
     pb.line_to(p15)
     pb.line_to(p0)
@@ -786,6 +788,8 @@ def build_type3(model, cfg: BridgeConfig):
     length = cfg.length
     thickness = cfg.thickness
     angle = cfg.angle
+    if angle <= 0:
+        angle = 90
     diameter1 = cfg.diameter1
     h_cut = cfg.h_cut
     l_cut = cfg.l_cut
@@ -834,36 +838,36 @@ def build_type3(model, cfg: BridgeConfig):
 
     pb = PolylineBuilder(p0)
 
-    # --- нижняя часть
     pb.line_to(p01)
     pb.line_to(p1)
-    pb.line_to(p2)
 
-    if r_cut == 0.0:
-        pb.line_to(p3)
-        pb.line_to(p4)
-    else:
-        pb.corner(p3, p4, r_cut)
-        pb.corner(p4, p5, r_cut)
+    if l_cut != 0.0 and h_cut != 0.0:
+        pb.line_to(p2)
+        if r_cut == 0.0:
+            pb.line_to(p3)
+            pb.line_to(p4)
+        else:
+            pb.corner(p3, p4, r_cut)
+            pb.corner(p4, p5, r_cut)
+        pb.line_to(p5)
 
-    # --- верх и левая сторона
-    pb.line_to(p5)
     pb.line_to(p6)
     pb.line_to(p67)
     pb.line_to(p7)
     pb.line_to(p8)
     pb.line_to(p89)
     pb.line_to(p9)
-    pb.line_to(p10)
 
-    if r_cut == 0.0:
-        pb.line_to(p11)
-        pb.line_to(p12)
-    else:
-        pb.corner(p11, p12, r_cut)
-        pb.corner(p12, p13, r_cut)
+    if l_cut != 0.0 and h_cut != 0.0:
+        pb.line_to(p10)
+        if r_cut == 0.0:
+            pb.line_to(p11)
+            pb.line_to(p12)
+        else:
+            pb.corner(p11, p12, r_cut)
+            pb.corner(p12, p13, r_cut)
+        pb.line_to(p13)
 
-    pb.line_to(p13)
     pb.line_to(p14)
     pb.line_to(p1415)
     pb.line_to(p15)
@@ -950,7 +954,7 @@ def build_type4(model, cfg: BridgeConfig):
     r2 = diameter2 / 2.0
     a = bridge_height / 2 - h1_cut
     x = l1 + r2 - (r2 ** 2 - bridge_height ** 2 / 4) ** 0.5
-    alpha = math.atan(bridge_height / (2 * r2))
+    # alpha = math.atan(bridge_height / (2 * r2))
     l2 = math.sqrt(r2 ** 2 - a ** 2)
 
     # ------------------------------------------------------------------
@@ -962,7 +966,7 @@ def build_type4(model, cfg: BridgeConfig):
     p1 =(p0[0] + x, p0[1])
     p15 = (cx - w1, p0[1])
     p14 = (p15[0] - x, p0[1])
-    pc = (p0[0] + l1, cy)
+    # pc = (p0[0] + l1, cy)
 
     p2 = (p0[0] + (l1 + r2 - l2), p1[1] + h1_cut)
     p3 = (p2[0] - l_cut, p2[1])
@@ -980,38 +984,44 @@ def build_type4(model, cfg: BridgeConfig):
     p13 = (p10[0], p3[1])
 
     cp = (cx + w1 + l1 + r2, cy)
-    bulge = at_bulge(p1, p2, cp)
-    bulge1 = math.tan(calculate_angles(1, 1, p3, p4, cp) / 4)
 
     pb = PolylineBuilder(p0)
 
-    # --- нижняя часть
-    pb.arc_to(p1, -bulge)
-    pb.line_to(p2)
-
-    if r_cut == 0.0:
-        pb.arc_to(p3, -bulge1)
-        pb.line_to(p4)
+    if l_cut != 0.0 and h_cut != 0.0:
+        chord = distance_2points(p1, p2)
+        bulge = bulge_chord(r2, chord)
+        chord1 = distance_2points(p3, p4)
+        bulge1 = bulge_chord(r2 + r_cut, chord1)
+        pb.arc_to(p1, -bulge)
+        pb.line_to(p2)
+        if r_cut == 0.0:
+            pb.arc_to(p3, -bulge1)
+            pb.line_to(p4)
+        else:
+            pb.corner(p3, p4, r_cut)
+            pb.corner(p4, p5, r_cut)
+        pb.arc_to(p5, -bulge)
+        pb.line_to(p6)
+        pb.line_to(p7)
+        pb.line_to(p8)
+        pb.arc_to(p9, -bulge)
+        pb.line_to(p10)
+        if r_cut == 0.0:
+            pb.arc_to(p11, -bulge1)
+            pb.line_to(p12)
+        else:
+            pb.corner(p11, p12, r_cut)
+            pb.corner(p12, p13, r_cut)
+        pb.arc_to(p13, -bulge)
     else:
-        pb.corner(p3, p4, r_cut)
-        pb.corner(p4, p5, r_cut)
+        chord = distance_2points(p1, p6)
+        bulge = bulge_chord(r2, chord)
+        pb.arc_to(p1, -bulge)
+        pb.line_to(p6)
+        pb.line_to(p7)
+        pb.line_to(p8)
+        pb.arc_to(p9, -bulge)
 
-    # --- верх и левая сторона
-    pb.arc_to(p5, -bulge)
-    pb.line_to(p6)
-    pb.line_to(p7)
-    pb.line_to(p8)
-    pb.arc_to(p9, -bulge)
-    pb.line_to(p10)
-
-    if r_cut == 0.0:
-        pb.arc_to(p11, -bulge1)
-        pb.line_to(p12)
-    else:
-        pb.corner(p11, p12, r_cut)
-        pb.corner(p12, p13, r_cut)
-
-    pb.arc_to(p13, -bulge)
     pb.line_to(p14)
     pb.line_to(p15)
     pb.line_to(p0)
@@ -1161,26 +1171,26 @@ if __name__ == "__main__":
         # Геометрия мостика
         # --------------------------------------------------
         "center_point": [0, 0],
-        "width": 170.0,
-        "height": 250.0,
-        "diameter1": 0.0,
-        "diameter2": 600.0,
+        "width": 125.0,
+        "height": 65.0,
+        "diameter1": 168.3,
+        "diameter2": 273,
         "length": 100.0,
-        "web_height": 0.0,
-        "h_cut": 180.0,
+        "web_height": 250.0,
+        "h_cut": 30.0,
         "l_cut": 20.0,
         "r_cut": 0.0,
-        "angle": 0.0,
+        "angle": 90.0,
         "web_built": False,
         "bridge_built": True,
         # --------------------------------------------------
         # Таблички
         # --------------------------------------------------
         "plates": [
-            {
-                "name": "GEA_gross",  # имя из name_plates.json
-                "offset_top": 5.0 # отступ верхнего края таблички от верха мостика
-            },
+            # {
+            #     "name": "GEA_gross",  # имя из name_plates.json
+            #     "offset_top": 5.0 # отступ верхнего края таблички от верха мостика
+            # },
             {"name": "GEA_klein"},
         ],
         "plates_gap": 5.0,  # расстояние между краями табличек

@@ -675,7 +675,10 @@ def distance_2points(p1, p2):
     dx = p1[0] - p2[0]
     dy = p1[1] - p2[1]
     dz = p1[2] - p2[2]
-    return math.sqrt(dx*dx + dy*dy + dz*dz)
+    return math.hypot(dx, dy, dz)  # sqrt(dx*dx + dy*dy + dz*dz)
+
+def bulge_chord(radius: float, chord: float) -> float:
+    return math.tan(0.5 * math.asin(chord / (2 * radius)))
 
 def normalize_point(p):
     """
