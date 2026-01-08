@@ -407,10 +407,6 @@ class BridgeConfig:
         "plates",
         "offset_top",
         "plates_gap",
-
-        # flags
-        "web_built",
-        "bridge_built",
     )
 
     def __init__(self, data: dict):
@@ -453,11 +449,6 @@ class BridgeConfig:
         self.plates = data.get("plates", [])
         self.offset_top = float(data.get("offset_top", 0.0))
         self.plates_gap = float(data.get("plates_gap", 5.0))
-
-        # -------------------------------------------------
-        # flags
-        self.web_built = bool(data.get("web_built", True))
-        self.bridge_built = bool(data.get("bridge_built", True))
 
     # =====================================================
     # helpers
@@ -941,7 +932,7 @@ def build_type4(model, cfg: BridgeConfig):
 
     h_cut = cfg.h_cut
     l_cut = cfg.l_cut
-    # Если r_cut = 0 - сегмент будет повторять окружность цилиндра с отступом,
+    # Если r_cut = 0 - сегмент будет повторять окружность цилиндра с вырезом,
     # иначе - вертикальный прямой, но со скруглением (>0) или фаской abs(<0)
     r_cut = cfg.r_cut
 
@@ -1071,6 +1062,171 @@ def build_type4(model, cfg: BridgeConfig):
     }
 
 
+def build_type5(model, cfg: BridgeConfig):
+    """
+    Построение развертки мостика со скошенными краями на трубу (type5).
+    """
+
+    # ------------------------------------------------------------------
+    # Исходные данные (read-only из BridgeConfig)
+    # ------------------------------------------------------------------
+    center_point = cfg.center_point
+    width = cfg.width
+    bridge_height = cfg.height
+    length = cfg.length
+    thickness = cfg.thickness
+    diameter2 = cfg.diameter2
+    angle = cfg.angle
+
+    h_cut = cfg.h_cut
+    l_cut = cfg.l_cut
+    # Если r_cut = 0 - сегмент будет повторять окружность цилиндра с вырезом,
+    # иначе - вертикальный прямой, но со скруглением (>0) или фаской abs(<0)
+    r_cut = cfg.r_cut
+
+    # ------------------------------------------------------------------
+    # Расчетные данные
+    # ------------------------------------------------------------------
+    angle_rad = math.radians(angle)
+    h1_cut = (bridge_height - h_cut) / 2
+    l1 = length - thickness
+    w1 = 0.5 * width - thickness
+    r2 = diameter2 / 2.0
+    l_full = w1 + l1 + r2
+    lx = bridge_height / (2 * math.tan(angle_rad / 2.0))
+    l01 = l_full - lx
+    #
+    # a = bridge_height / 2 - h1_cut
+    # x = l1 + r2 - (r2 ** 2 - bridge_height ** 2 / 4) ** 0.5
+    # l2 = math.sqrt(r2 ** 2 - a ** 2)
+
+    # ------------------------------------------------------------------
+    # 1. Контур мостика
+    # ------------------------------------------------------------------
+    cx, cy = center_point
+
+    p0 = (cx + w1, cy - bridge_height / 2.0)
+    p01 = (cx + l01, p0[1])
+    cp = (cx + w1 + l1 + r2, cy)
+    cp1 = (cx - w1 - l1 - r2, cy)
+    l1x = lx * r2 / (distance_2points(p01, cp))
+    h1x = math.sqrt(r2 * r2 - l1x * l1x)
+    p1 =(cp[0] - l1x , cp[1] - h1x)
+    p15 = (p0[0] - 2 * w1, p0[1])
+    p14 = (cp1[0] + l1x , cp[1] - h1x)
+    l2x = (math.sqrt(r2 * r2 - (h_cut / 2.0) ** 2))
+    p2 = (cp[0] - l2x, cy - h_cut / 2.0)
+    p3 = (p2[0] - l_cut, p2[1])
+    p4 = (p3[0], p3[1] + h_cut)
+    p5 = (p2[0], p4[1])
+
+    p6 = (p1[0], cp[1] + h1x)
+    p67 = (p01[0], p0[1] + bridge_height)
+    p7 = (p0[0], p67[1])
+    p8 = (p15[0], p67[1])
+    p89 = (cx - l01, p67[1])
+    p9 = (p14[0], p6[1])
+
+    p10 = (cp1[0] + l2x, cy + h_cut / 2.0)
+    p11 = (p10[0] + l_cut, p10[1])
+    p12 = (p11[0], p3[1])
+    p13 = (p10[0], p3[1])
+    p1415 = (p89[0], p0[1])
+
+    pb = PolylineBuilder(p0)
+
+    pb.line_to(p01)
+    pb.line_to(p1)
+    if l_cut != 0.0 and h_cut != 0.0:
+        bulge = bulge_chord(r2, distance_2points(p1, p2))
+        bulge1 = bulge_chord(r2 + r_cut, distance_2points(p3, p4))
+        pb.arc_to(p1, -bulge)
+        pb.line_to(p2)
+        if r_cut == 0.0:
+            pb.arc_to(p3, -bulge1)
+            pb.line_to(p4)
+        else:
+            pb.corner(p3, p4, r_cut)
+            pb.corner(p4, p5, r_cut)
+        pb.arc_to(p5, -bulge)
+        pb.line_to(p6)
+        pb.line_to(p67)
+        pb.line_to(p7)
+        pb.line_to(p8)
+        pb.line_to(p89)
+        pb.arc_to(p9, -bulge)
+        pb.line_to(p10)
+        if r_cut == 0.0:
+            pb.arc_to(p11, -bulge1)
+            pb.line_to(p12)
+        else:
+            pb.corner(p11, p12, r_cut)
+            pb.corner(p12, p13, r_cut)
+        pb.arc_to(p13, -bulge)
+    else:
+        chord = distance_2points(p1, p6)
+        bulge = bulge_chord(r2, chord)
+        pb.arc_to(p1, -bulge)
+        pb.line_to(p6)
+        pb.line_to(p67)
+        pb.line_to(p7)
+        pb.line_to(p8)
+        pb.line_to(p89)
+        pb.arc_to(p9, -bulge)
+
+    pb.line_to(p14)
+    pb.line_to(p1415)
+    pb.line_to(p15)
+    pb.line_to(p0)
+
+    pb.close()
+
+    # Контур
+    add_polyline(
+        model,
+        pb.vertices(),
+        layer_name=DEFAULT_CUTOUT_LAYER,
+        closed=True,
+    )
+
+    # ------------------------------------------------------------------
+    # Линии сгиба
+    # ------------------------------------------------------------------
+
+    add_line(model, p0, p7, layer_name=DEFAULT_DIM_LAYER)
+    add_line(model, p15, p8, layer_name=DEFAULT_DIM_LAYER)
+
+    # ------------------------------------------------------------------
+    # Размеры
+    # ------------------------------------------------------------------
+
+    p9v = ensure_point_variant(p9)
+    p89v = ensure_point_variant(p89)
+    p8v = ensure_point_variant(p8)
+    p7v = ensure_point_variant(p7)
+    p6v = ensure_point_variant(p6)
+    p1415v = ensure_point_variant(p1415)
+    off_v_89_1415 = abs(p9[0] - p89[0])
+    off_h_9_89 = abs(p89[1] - p9[1])
+
+    add_dimension(adoc, "H", p9v, p8v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(adoc, "H", p8v, p7v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(adoc, "H", p7v, p6v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(adoc, "H", p9v, p6v, offset=2 * DEFAULT_DIM_OFFSET + off_h_9_89)
+    add_dimension(adoc, "V", p1415v, p89v, offset=DEFAULT_DIM_OFFSET + off_v_89_1415)
+
+    # Возвращаем ключевые точки, если понадобятся дальше
+    # Габариты мостика
+
+    text_insert_point = polar_point(p9, TEXT_DISTANCE + off_h_9_89 + 2 * DEFAULT_DIM_OFFSET, 90)
+    return {
+        "top_right": p6,
+        "top_left": p9,
+        "center": center_point,
+        "accompany_text_point": text_insert_point,
+    }
+
+
 class BridgeBuilder:
     """
     Центральный класс построения развертки мостика.
@@ -1109,6 +1265,8 @@ class BridgeBuilder:
             key_points = build_type3(model, self.cfg)
         elif bridge_type == "type4":
             key_points = build_type4(model, self.cfg)
+        elif bridge_type == "type5":
+            key_points = build_type5(model, self.cfg)
         else:
             raise ValueError(f"Unsupported bridge type: {bridge_type}")
 
@@ -1171,27 +1329,25 @@ if __name__ == "__main__":
         # Геометрия мостика
         # --------------------------------------------------
         "center_point": [0, 0],
-        "width": 125.0,
-        "height": 65.0,
+        "width": 170.0,
+        "height": 160.0,
         "diameter1": 168.3,
-        "diameter2": 273,
+        "diameter2": 500,
         "length": 100.0,
-        "web_height": 250.0,
+        "web_height": 0.0,
         "h_cut": 30.0,
         "l_cut": 20.0,
         "r_cut": 0.0,
         "angle": 90.0,
-        "web_built": False,
-        "bridge_built": True,
         # --------------------------------------------------
         # Таблички
         # --------------------------------------------------
         "plates": [
-            # {
-            #     "name": "GEA_gross",  # имя из name_plates.json
-            #     "offset_top": 5.0 # отступ верхнего края таблички от верха мостика
-            # },
-            {"name": "GEA_klein"},
+            {
+                "name": "GEA_gross",  # имя из name_plates.json
+                # "offset_top": 5.0 # отступ верхнего края таблички от верха мостика
+            },
+            # {"name": "GEA_klein"},
         ],
         "plates_gap": 5.0,  # расстояние между краями табличек
     }
