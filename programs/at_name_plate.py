@@ -33,22 +33,40 @@ TRANSLATIONS = {
     },
     "nameplate.no_data": {
         "ru": "Данные табличек не загружены",
-        "en": "Name plate data not loaded"
+        "de": "Die Typenschilddaten wurden nicht geladen",
+        "en": "Name plate data not loaded",
     },
     "nameplate.file_not_found": {
         "ru": "Файл конфигурации не найден: {0}",
-        "en": "Configuration file not found: {0}"
+        "de": "Konfigurationsdatei nicht gefunden: {0}",
+        "en": "Configuration file not found: {0}",
     },
     "nameplate.invalid_format": {
         "ru": "Файл name_plates.json должен содержать список объектов",
-        "en": "name_plates.json must contain a list of objects"
+        "de": "Die Datei name_plates.json muss eine Liste von Objekten enthalten",
+        "en": "name_plates.json must contain a list of objects",
     },
     "nameplate.not_found": {
         "ru": "Табличка '{0}' не найдена",
-        "en": "Name plate '{0}' not found"
+        "de": "Typenschild '{0}' wurde nicht gefunden",
+        "en": "Name plate '{0}' not found",
     },
-
+    "cad_not_ready": {
+        "ru": (
+            "Невозможно выполнить тестовый запуск программы. "
+            "Автокад не запущен или нет доступа к пространству модели"
+        ),
+        "de": (
+            "Der Testlauf kann nicht ausgeführt werden. "
+            "AutoCAD ist nicht gestartet oder es besteht kein Zugriff auf den Modellbereich"
+        ),
+        "en": (
+            "Unable to execute the test run. "
+            "AutoCAD is not running or there is no access to the model space"
+        ),
+    },
 }
+
 
 loc.register_translations(TRANSLATIONS)
 
@@ -228,7 +246,7 @@ class BridgeTexts:
         )
 
         # лазерная маркировка
-        if material != "3.7035" and material != "3.7235":
+        if material not in ("3.7035" , "3.7235"):
             add_text(
                 model=model,
                 point=center_point,
@@ -379,7 +397,6 @@ class BridgeConfig:
         # main data
         "order_number",
         "detail_number",
-        "add_detail_number",
         "material",
 
         # type
@@ -393,9 +410,8 @@ class BridgeConfig:
         "width",
         "height",
         "length",
-        "diameter1",
-        "diameter2",
-        "web_height",
+        "parameter1",
+        "parameter2",
         "angle",
 
         # cut
@@ -415,7 +431,6 @@ class BridgeConfig:
         # main data
         self.order_number = data["order_number"]
         self.detail_number = data["detail_number"]
-        self.add_detail_number = data.get("add_detail_number", "")
         self.material = data["material"]
 
         # -------------------------------------------------
@@ -433,9 +448,8 @@ class BridgeConfig:
         self.height = float(data["height"])
         self.length = float(data["length"])
 
-        self.diameter1 = float(data.get("diameter1", 0.0))
-        self.diameter2 = float(data.get("diameter2", 0.0))
-        self.web_height = float(data.get("web_height", 0.0))
+        self.parameter1 = float(data.get("parameter1", 0.0))
+        self.parameter2 = float(data.get("parameter2", 0.0))
         self.angle = float(data.get("angle", 0))
 
         # -------------------------------------------------
@@ -478,7 +492,7 @@ def build_type1(model, cfg: BridgeConfig):
     center_point = cfg.center_point
     bridge_width = cfg.width
     bridge_height = cfg.height
-    radius = cfg.diameter1 / 2  # поведение углов мостика
+    radius = cfg.parameter1 / 2  # поведение углов мостика
 
     # ------------------------------------------------------------------
     # 1. Контур мостика
@@ -499,7 +513,7 @@ def build_type1(model, cfg: BridgeConfig):
     # ------------------------------------------------------------------
 
     web_l = cfg.length
-    web_h = cfg.web_height
+    web_h = cfg.parameter2
     h_cut = cfg.h_cut
     web_h1 = (web_h - h_cut) / 2
     web_l_cut = cfg.l_cut
@@ -602,7 +616,7 @@ def build_type1(model, cfg: BridgeConfig):
     add_text(
         model=model,
         point=web_text_point,
-        text=f"{cfg.order_number}-{cfg.add_detail_number}",
+        text=f"{cfg.order_number}",
         layer_name=DEFAULT_TEXT_LAYER,
         text_height=TEXT_HEIGHT_SMALL,
         text_angle=math.radians(90),
@@ -646,7 +660,7 @@ def build_type2(model, cfg: BridgeConfig):
     length = cfg.length
     thickness = cfg.thickness
 
-    shell_radius = cfg.diameter1 / 2 if cfg.diameter1 else 0.0
+    shell_radius = cfg.parameter1 / 2 if cfg.parameter1 else 0.0
 
     h_cut = cfg.h_cut
     h1_cut = (bridge_height - h_cut) / 2
@@ -781,7 +795,7 @@ def build_type3(model, cfg: BridgeConfig):
     angle = cfg.angle
     if angle <= 0:
         angle = 90
-    diameter1 = cfg.diameter1
+    parameter1 = cfg.parameter1
     h_cut = cfg.h_cut
     l_cut = cfg.l_cut
     r_cut = cfg.r_cut
@@ -790,7 +804,7 @@ def build_type3(model, cfg: BridgeConfig):
     # Расчетные данные
     # ------------------------------------------------------------------
     h1_cut = (bridge_height - h_cut) / 2
-    radius = diameter1 / 2.0
+    radius = parameter1 / 2.0
     angle_rad = math.radians(angle)
     alpha_rad = (math.pi - angle_rad) / 2.0
     xs = thickness / math.sin(angle_rad / 2.0)
@@ -928,7 +942,7 @@ def build_type4(model, cfg: BridgeConfig):
     bridge_height = cfg.height
     length = cfg.length
     thickness = cfg.thickness
-    diameter2 = cfg.diameter2
+    parameter2 = cfg.parameter2
 
     h_cut = cfg.h_cut
     l_cut = cfg.l_cut
@@ -942,7 +956,7 @@ def build_type4(model, cfg: BridgeConfig):
     h1_cut = (bridge_height - h_cut) / 2
     l1 = length - thickness
     w1 = 0.5 * width - thickness
-    r2 = diameter2 / 2.0
+    r2 = parameter2 / 2.0
     a = bridge_height / 2 - h1_cut
     x = l1 + r2 - (r2 ** 2 - bridge_height ** 2 / 4) ** 0.5
     # alpha = math.atan(bridge_height / (2 * r2))
@@ -1075,7 +1089,7 @@ def build_type5(model, cfg: BridgeConfig):
     bridge_height = cfg.height
     length = cfg.length
     thickness = cfg.thickness
-    diameter2 = cfg.diameter2
+    parameter2 = cfg.parameter2
     angle = cfg.angle
 
     h_cut = cfg.h_cut
@@ -1091,14 +1105,10 @@ def build_type5(model, cfg: BridgeConfig):
     h1_cut = (bridge_height - h_cut) / 2
     l1 = length - thickness
     w1 = 0.5 * width - thickness
-    r2 = diameter2 / 2.0
+    r2 = parameter2 / 2.0
     l_full = w1 + l1 + r2
     lx = bridge_height / (2 * math.tan(angle_rad / 2.0))
     l01 = l_full - lx
-    #
-    # a = bridge_height / 2 - h1_cut
-    # x = l1 + r2 - (r2 ** 2 - bridge_height ** 2 / 4) ** 0.5
-    # l2 = math.sqrt(r2 ** 2 - a ** 2)
 
     # ------------------------------------------------------------------
     # 1. Контур мостика
@@ -1314,7 +1324,6 @@ if __name__ == "__main__":
     # pt = at_get_point(adoc, prompt="Введите точку", as_variant=False)
 
     np = NamePlate()
-
     bridge_data = {
         "type": "type4",
         # --------------------------------------------------
@@ -1322,7 +1331,6 @@ if __name__ == "__main__":
         # --------------------------------------------------
         "order_number": "22000-1",
         "detail_number": "10",
-        "add_detail_number": "",
         "material": "1.4301",
         "thickness": 3.0,
         # --------------------------------------------------
@@ -1331,14 +1339,16 @@ if __name__ == "__main__":
         "center_point": [0, 0],
         "width": 170.0,
         "height": 160.0,
-        "diameter1": 168.3,
-        "diameter2": 500,
+        "parameter1": 168.3,
+        "parameter2": 500,
         "length": 100.0,
-        "web_height": 0.0,
+        "angle": 90.0,
+        # --------------------------------------------------
+        # Геометрия выреза в мостике
+        # --------------------------------------------------
         "h_cut": 30.0,
         "l_cut": 20.0,
         "r_cut": 0.0,
-        "angle": 90.0,
         # --------------------------------------------------
         # Таблички
         # --------------------------------------------------
@@ -1352,6 +1362,7 @@ if __name__ == "__main__":
         "plates_gap": 5.0,  # расстояние между краями табличек
     }
 
+
     if model:
         cfg = BridgeConfig(bridge_data)
         builder = BridgeBuilder(cfg, np.plates)
@@ -1359,4 +1370,4 @@ if __name__ == "__main__":
 
         regen(adoc)
     else:
-        show_popup("Невозможно выполнить тестовый запуск программы. Автокад не запущен или нет доступа к пространству модели.", "error")
+        show_popup((loc.tr("cad_not_ready")), "error")

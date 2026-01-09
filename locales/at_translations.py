@@ -89,6 +89,12 @@ class Localization:
             logging.critical(f"Ошибка форматирования строки '{translation}': {e}")
             return translation
 
+    def tr(self, key: str, default: str = "Translation missing", *args) -> str:
+        """
+        Алиас для get(). Семантически означает 'translate'.
+        """
+        return self.get(key, default, *args)
+
 
 # Глобальный экземпляр локализации
 loc = Localization()
