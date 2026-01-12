@@ -390,19 +390,6 @@ def save_last_input(filename: str, data: Dict) -> None:
         logging.error(f"Ошибка сохранения {abs_path}: {e}")
 
 
-# def show_popup(message: str, popup_type: str = "info") -> None:
-#     """
-#     Отображает всплывающее окно с сообщением.
-#
-#     Args:
-#         message (str): Текст сообщения.
-#         popup_type (str): Тип сообщения ("info" для информационного, "error" для ошибки).
-#     """
-#     title = loc.get(popup_type, popup_type.capitalize())
-#     style = wx.OK | (wx.ICON_INFORMATION if popup_type == "info" else wx.ICON_ERROR)
-#     wx.MessageBox(message, title, style)
-
-
 def get_standard_font() -> wx.Font:
     """
     Возвращает стандартный шрифт на основе конфигурации из user_settings.json.
