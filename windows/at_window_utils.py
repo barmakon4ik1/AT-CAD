@@ -13,6 +13,9 @@ import os
 import json
 import wx
 from typing import Tuple, Dict, Optional, List
+
+from wx.lib.buttons import GenButton
+
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programs.at_input import at_get_point
@@ -20,6 +23,7 @@ from windows.at_gui_utils import show_popup
 from windows.at_style import style_textctrl, style_combobox, style_radiobutton, style_staticbox, style_label
 from config.at_config import load_user_settings, DEFAULT_SETTINGS, get_setting, ICON_PATH, RESOURCE_DIR
 from config.at_last_input import save_last_input
+from wx.lib.platebtn import PlateButton, PB_STYLE_DEFAULT, PB_STYLE_SQUARE, PB_STYLE_GRADIENT
 
 # -----------------------------
 # Кастомные события
@@ -806,46 +810,46 @@ def apply_styles_to_panel(panel: wx.Window) -> None:
     apply_styles_recursively(panel)
 
 
-def create_standard_buttons(parent: wx.Window, on_ok, on_cancel, on_clear=None) -> List[wx.Button]:
-    """
-    Создаёт стандартные кнопки (OK, Cancel, Clear) с привязкой событий.
-
-    Args:
-        parent: Родительский элемент.
-        on_ok: Обработчик для кнопки OK.
-        on_cancel: Обработчик для кнопки Cancel.
-        on_clear: Обработчик для кнопки Clear (опционально, если None, кнопка не создаётся).
-
-    Returns:
-        List[wx.Button]: Список кнопок [ok_button, cancel_button, clear_button] (clear_button опционально).
-    """
-    button_font = get_button_font()
-    button_color = get_setting("BUTTON_FONT_COLOR") or DEFAULT_SETTINGS["BUTTON_FONT_COLOR"]
-
-    ok_button = wx.Button(parent, label=loc.get("ok_button"))
-    ok_button.SetFont(button_font)
-    ok_button.SetBackgroundColour(wx.Colour(0, 128, 0))
-    ok_button.SetForegroundColour(wx.Colour(button_color))
-    ok_button.Bind(wx.EVT_BUTTON, on_ok)
-
-    clear_button = None
-    if on_clear:
-        clear_button = wx.Button(parent, label=loc.get("clear_button"))
-        clear_button.SetFont(button_font)
-        clear_button.SetBackgroundColour(wx.Colour(64, 64, 64))
-        clear_button.SetForegroundColour(wx.Colour(button_color))
-        clear_button.Bind(wx.EVT_BUTTON, on_clear)
-
-    cancel_button = wx.Button(parent, label=loc.get("cancel_button"))
-    cancel_button.SetFont(button_font)
-    cancel_button.SetBackgroundColour(wx.Colour(255, 0, 0))
-    cancel_button.SetForegroundColour(wx.Colour(button_color))
-    cancel_button.Bind(wx.EVT_BUTTON, on_cancel)
-
-    buttons = [ok_button, cancel_button]
-    if clear_button:
-        buttons.insert(1, clear_button)
-    return buttons
+# def create_standard_buttons(parent: wx.Window, on_ok, on_cancel, on_clear=None) -> List[wx.Button]:
+#     """
+#     Создаёт стандартные кнопки (OK, Cancel, Clear) с привязкой событий.
+#
+#     Args:
+#         parent: Родительский элемент.
+#         on_ok: Обработчик для кнопки OK.
+#         on_cancel: Обработчик для кнопки Cancel.
+#         on_clear: Обработчик для кнопки Clear (опционально, если None, кнопка не создаётся).
+#
+#     Returns:
+#         List[wx.Button]: Список кнопок [ok_button, cancel_button, clear_button] (clear_button опционально).
+#     """
+#     button_font = get_button_font()
+#     button_color = get_setting("BUTTON_FONT_COLOR") or DEFAULT_SETTINGS["BUTTON_FONT_COLOR"]
+#
+#     ok_button = wx.Button(parent, label=loc.get("ok_button"))
+#     ok_button.SetFont(button_font)
+#     ok_button.SetBackgroundColour(wx.Colour(0, 128, 0))
+#     ok_button.SetForegroundColour(wx.Colour(button_color))
+#     ok_button.Bind(wx.EVT_BUTTON, on_ok)
+#
+#     clear_button = None
+#     if on_clear:
+#         clear_button = wx.Button(parent, label=loc.get("clear_button"))
+#         clear_button.SetFont(button_font)
+#         clear_button.SetBackgroundColour(wx.Colour(64, 64, 64))
+#         clear_button.SetForegroundColour(wx.Colour(button_color))
+#         clear_button.Bind(wx.EVT_BUTTON, on_clear)
+#
+#     cancel_button = wx.Button(parent, label=loc.get("cancel_button"))
+#     cancel_button.SetFont(button_font)
+#     cancel_button.SetBackgroundColour(wx.Colour(255, 0, 0))
+#     cancel_button.SetForegroundColour(wx.Colour(button_color))
+#     cancel_button.Bind(wx.EVT_BUTTON, on_cancel)
+#
+#     buttons = [ok_button, cancel_button]
+#     if clear_button:
+#         buttons.insert(1, clear_button)
+#     return buttons
 
 
 def adjust_button_widths(buttons: List[wx.Button]) -> None:
@@ -892,6 +896,232 @@ def update_status_bar_point_selected(window: wx.Window, insert_point: Optional[o
                 logging.error(f"Ошибка при обновлении строки состояния: {e}")
         else:
             main_window.GetStatusBar().SetStatusText(loc.get("point_not_selected", "Точка не выбрана"), 0)
+
+def _normalize_color_to_hex(color: str) -> str:
+        """
+        Приводит цвет из настроек к HEX-формату для style_gen_button.
+        """
+        if isinstance(color, str) and color.startswith("#"):
+            return color
+
+        wx_col = wx.Colour(color)
+        if not wx_col.IsOk():
+            return "#7f8c8d"  # безопасный fallback
+
+        return "#{:02x}{:02x}{:02x}".format(
+            wx_col.Red(),
+            wx_col.Green(),
+            wx_col.Blue(),
+        )
+
+# ---------------------------------------------------------
+# Улучшения кнопок
+# ---------------------------------------------------------
+def darken_color(hex_color: str, factor: float = 0.75) -> str:
+    """Уменьшает яркость цвета (для pressed-состояния)"""
+    hex_color = hex_color.lstrip('#')
+    rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    darkened = tuple(int(c * factor) for c in rgb)
+    return f'#{darkened[0]:02x}{darkened[1]:02x}{darkened[2]:02x}'
+
+
+def style_button(
+    btn: GenButton,
+    bg: str = "#2c3e50",
+    fg: str = "white",
+    hover_bg: str = None,
+    pressed_bg: str = None,
+    bezel: int = 1
+):
+    """
+    Стилизует GenButton: обычный фон, hover, pressed, шрифт.
+
+    Аргументы:
+        bg          — цвет фона в обычном состоянии
+        fg          — цвет текста
+        hover_bg    — цвет при наведении (по умолчанию: немного светлее bg)
+        pressed_bg  — цвет при нажатии  (по умолчанию: затемнённый bg)
+        bezel       — толщина "объёма" (0 = плоская кнопка)
+
+    Популярные комбинации (Material Design / Flat UI цвета):
+
+    Назначение,         bg (обычный),   hover_bg,   fg (текст),     Пример кнопки
+    Основное действие,  #27ae60,        #2ecc71,    white,          Добавить / Сохранить
+    Второстепенное,     #3498db,        #5dade2,    white,          OK / Применить
+    Предупреждение,     #f39c12,        #f1c40f,    white,          Внимание!
+    Опасно,             #c0392b,        #e74c3c,    white,          Удалить
+    Отмена,             #95a5a6,        #bdc3c7,    white / black,  Отмена
+    Тёмная тема,        #2c3e50,        #34495e,    #ecf0f1,        Фоновая кнопка
+    """
+
+    if hover_bg is None:
+        hover_bg = darken_color(bg, 1.15)  # светлее на ~15%
+
+    if pressed_bg is None:
+        pressed_bg = darken_color(bg, 0.70)  # темнее на ~30%
+
+    # Устанавливаем начальные цвета
+    btn.SetBackgroundColour(bg)  # ← вот где используется bg
+    btn.SetForegroundColour(fg)  # цвет надписи
+
+    btn.SetBezelWidth(1)  # лёгкая "объёмность" (0 = совсем плоская)
+    btn.SetUseFocusIndicator(False)  # убираем пунктирную рамку фокуса
+    btn.SetFont(wx.Font(10, wx.FONTFAMILY_DEFAULT,
+                        wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+
+    # Сохраняем цвета для удобства
+    btn.normal_bg = bg
+    btn.hover_bg = hover_bg
+    btn.pressed_bg = pressed_bg
+    btn.current_bg = bg
+
+    # ── Логика hover ───────────────────────────────────────
+    def update_background(color):
+        btn.current_bg = color
+        btn.SetBackgroundColour(color)
+        btn.Refresh()
+
+    def on_enter(evt):
+        if btn.current_bg != btn.pressed_bg:  # не перебиваем pressed
+            update_background(btn.hover_bg)
+        evt.Skip()
+
+    def on_leave(evt):
+        if btn.current_bg != btn.pressed_bg:
+            update_background(btn.normal_bg)
+        evt.Skip()
+
+    def on_left_down(evt):
+        update_background(btn.pressed_bg)
+        btn.SetBezelWidth(0)  # убираем объём при нажатии
+        btn.Refresh()
+
+
+    def on_left_up(evt):
+        # Возвращаем hover или normal в зависимости от положения курсора
+        pos = btn.GetPosition()
+        btn.SetPosition((pos[0] - 1, pos[1] - 1))  # возврат назад
+        x, y = evt.GetPosition()
+        if btn.HitTest((x, y)) == wx.HT_WINDOW_INSIDE:
+            update_background(btn.hover_bg)
+        else:
+            update_background(btn.normal_bg)
+        evt.Skip()
+
+        # Привязываем события
+        btn.Bind(wx.EVT_ENTER_WINDOW, on_enter)
+        btn.Bind(wx.EVT_LEAVE_WINDOW, on_leave)
+        btn.Bind(wx.EVT_LEFT_DOWN, on_left_down)
+        btn.Bind(wx.EVT_LEFT_UP, on_left_up)
+
+
+def darken(hex_color: str, factor: float = 0.78) -> str:
+    """Сделать цвет темнее (для pressed)"""
+    hex_color = hex_color.lstrip('#')
+    rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    darkened = tuple(int(max(0, min(255, c * factor))) for c in rgb)
+    return f'#{darkened[0]:02x}{darkened[1]:02x}{darkened[2]:02x}'
+
+
+def lighten(hex_color: str, factor: float = 1.18) -> str:
+    """Сделать цвет светлее (для hover)"""
+    hex_color = hex_color.lstrip('#')
+    rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    lightened = tuple(int(min(255, c * factor)) for c in rgb)
+    return f'#{lightened[0]:02x}{lightened[1]:02x}{lightened[2]:02x}'
+
+
+def style_gen_button(btn: GenButton,
+                     normal_bg: str,
+                     text_color: str = "#ffffff",
+                     bezel: int = 1,
+                     font_size: int = 14,  # ← новый параметр
+                     button_height: int = 0):  # 0 = авто, иначе принудительно
+
+    hover_bg   = lighten(normal_bg, 1.15)
+    pressed_bg = darken(normal_bg, 0.72)
+
+    btn.normal_bg  = normal_bg
+    btn.hover_bg   = hover_bg
+    btn.pressed_bg = pressed_bg
+    btn.current_bg = normal_bg
+
+    btn.SetBackgroundColour(wx.Colour(normal_bg))
+    btn.SetForegroundColour(wx.Colour(text_color))
+    btn.SetBezelWidth(bezel)               # 0 = совсем плоская, 1–2 = лёгкий объём
+    btn.SetUseFocusIndicator(False)
+
+    # Шрифт
+    font = wx.Font(font_size, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+    btn.SetFont(font)
+
+    # Принудительный размер, если указан
+    if button_height > 0:
+        w, _ = btn.GetSize()
+        btn.SetMinSize((w, button_height))
+        btn.SetSize((w, button_height))  # иногда нужно оба вызова
+
+    def update_bg(color: str):
+        btn.current_bg = color
+        btn.SetBackgroundColour(wx.Colour(color))
+        btn.Refresh()
+
+    def on_enter(evt):
+        if btn.current_bg != btn.pressed_bg:
+            update_bg(btn.hover_bg)
+        evt.Skip()
+
+    def on_leave(evt):
+        if btn.current_bg != btn.pressed_bg:
+            update_bg(btn.normal_bg)
+        evt.Skip()
+
+    def on_down(evt):
+        update_bg(btn.pressed_bg)
+        evt.Skip()
+
+    def on_up(evt):
+        pos = evt.GetPosition()
+        inside = btn.HitTest(pos) == wx.HT_WINDOW_INSIDE
+        new_color = btn.hover_bg if inside else btn.normal_bg
+        update_bg(new_color)
+        evt.Skip()
+
+    btn.Bind(wx.EVT_ENTER_WINDOW, on_enter)
+    btn.Bind(wx.EVT_LEAVE_WINDOW, on_leave)
+    btn.Bind(wx.EVT_LEFT_DOWN,   on_down)
+    btn.Bind(wx.EVT_LEFT_UP,     on_up)
+
+
+def create_standard_buttons(parent: wx.Window, on_ok, on_cancel, on_clear=None) -> list[GenButton]:
+    """
+    Теперь возвращает GenButton вместо wx.Button
+    """
+    button_font = get_button_font()   # предполагаем, что функция существует
+    button_color = get_setting("BUTTON_FONT_COLOR") or "#ffffff"   # белый текст по умолчанию
+
+    # OK — зелёный
+    ok_button = GenButton(parent, label=loc.get("ok_button"))
+    style_gen_button(ok_button, normal_bg="#27ae60", text_color=button_color, bezel=1)
+    ok_button.Bind(wx.EVT_BUTTON, on_ok)
+
+    # Clear — серый (если нужен)
+    clear_button = None
+    if on_clear:
+        clear_button = GenButton(parent, label=loc.get("clear_button"))
+        style_gen_button(clear_button, normal_bg="#7f8c8d", text_color=button_color, bezel=1)
+        clear_button.Bind(wx.EVT_BUTTON, on_clear)
+
+    # Cancel — красный
+    cancel_button = GenButton(parent, label=loc.get("cancel_button"))
+    style_gen_button(cancel_button, normal_bg="#c0392b", text_color=button_color, bezel=1)
+    cancel_button.Bind(wx.EVT_BUTTON, on_cancel)
+
+    buttons = [ok_button, cancel_button]
+    if clear_button:
+        buttons.insert(1, clear_button)
+
+    return buttons
 
 
 if __name__ == "__main__":

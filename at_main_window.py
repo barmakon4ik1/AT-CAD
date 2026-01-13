@@ -12,6 +12,9 @@ import os
 import sys
 import logging
 import json
+
+from wx.lib.buttons import GenButton
+
 from config.at_config import (
     ICON_PATH,
     BANNER_HIGH,
@@ -25,7 +28,8 @@ from config.at_config import (
     USER_LANGUAGE_PATH,
 )
 from locales.at_translations import loc
-from windows.at_window_utils import load_last_position, save_last_position, get_button_font, fit_text_to_height, LANGUAGE_CHANGE_EVT_TYPE, LANGUAGE_CHANGE_EVT
+from windows.at_window_utils import load_last_position, save_last_position, get_button_font, fit_text_to_height, \
+    LANGUAGE_CHANGE_EVT_TYPE, LANGUAGE_CHANGE_EVT, style_gen_button, _normalize_color_to_hex
 from windows.at_gui_utils import show_popup
 from windows.at_run_dialog_window import load_content, at_load_content
 from windows.at_content_registry import CONTENT_REGISTRY
@@ -57,6 +61,11 @@ TRANSLATIONS = {
         "ru": "&Выйти",
         "de": "&Beenden",
         "en": "&Exit"
+    },
+    "btn_exit": {
+        "ru": "Выйти",
+        "de": "Beenden",
+        "en": "Exit"
     },
     "copyright": {
         "ru": "Дизайн и разработка: А.Тутубалин © 2025",
@@ -582,7 +591,7 @@ class ATMainWindow(wx.Frame):
         """
         status_panel = wx.Panel(self.panel)
         status_panel.SetBackgroundColour(wx.Colour(self.settings.get("BACKGROUND_COLOR", DEFAULT_SETTINGS["BACKGROUND_COLOR"])))
-        status_panel.SetMinSize((-1, 30))
+        status_panel.SetMinSize((-1, 20))
         status_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         # Строка статуса
@@ -609,31 +618,69 @@ class ATMainWindow(wx.Frame):
         status_panel.SetSizer(status_sizer)
         self.main_sizer.Add(status_panel, proportion=0, flag=wx.EXPAND | wx.ALL, border=5)
 
+    # def create_exit_button(self) -> None:
+    #     """
+    #     Создаёт кнопку выхода.
+    #     """
+    #     self.exit_button = wx.Button(self.button_panel, label=loc.get("button_exit", "Выход"))
+    #     button_font = get_button_font()
+    #     self.exit_button.SetFont(button_font)
+    #     self.exit_button.SetBackgroundColour(
+    #         wx.Colour(self.settings.get("EXIT_BUTTON_COLOR", DEFAULT_SETTINGS["EXIT_BUTTON_COLOR"])))
+    #     self.exit_button.SetForegroundColour(
+    #         wx.Colour(self.settings.get("BUTTON_FONT_COLOR", DEFAULT_SETTINGS["BUTTON_FONT_COLOR"])))
+    #     self.exit_button.Bind(wx.EVT_BUTTON, self.on_exit)
+    #
+    #     # Рассчитываем минимальную ширину кнопки на основе текущего языка
+    #     label = loc.get("button_exit", "Выход")
+    #     dc = wx.ClientDC(self.exit_button)
+    #     dc.SetFont(button_font)
+    #     width, _ = dc.GetTextExtent(label)
+    #     max_width = width + 20
+    #     self.exit_button.SetMinSize((max_width, 30))
+    #
+    #     self.button_sizer.AddStretchSpacer()
+    #     self.button_sizer.Add(self.exit_button, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.ALL, border=10)
+    #     logging.info(
+    #         f"Кнопка выхода создана: текст={loc.get('button_exit', 'Выход')}, размер={max_width}x30")
+
     def create_exit_button(self) -> None:
         """
-        Создаёт кнопку выхода.
+        Создаёт кнопку выхода (GenButton) в фирменном стиле AT-CAD.
         """
-        self.exit_button = wx.Button(self.button_panel, label=loc.get("button_exit", "Выход"))
-        button_font = get_button_font()
-        self.exit_button.SetFont(button_font)
-        self.exit_button.SetBackgroundColour(
-            wx.Colour(self.settings.get("EXIT_BUTTON_COLOR", DEFAULT_SETTINGS["EXIT_BUTTON_COLOR"])))
-        self.exit_button.SetForegroundColour(
-            wx.Colour(self.settings.get("BUTTON_FONT_COLOR", DEFAULT_SETTINGS["BUTTON_FONT_COLOR"])))
+
+        label = loc.get("button_exit", "Выход")
+
+        self.exit_button = GenButton(
+            self.button_panel,
+            label=label,
+            size=(140, 30),
+        )
+
+        # raw_color = self.settings.get(
+        #     "EXIT_BUTTON_COLOR",
+        #     DEFAULT_SETTINGS["EXIT_BUTTON_COLOR"],
+        # )
+
+        # bg_color = _normalize_color_to_hex(raw_color)
+
+        style_gen_button(
+            self.exit_button,
+            normal_bg="#2c3e50",
+            font_size=14,
+            button_height=30,
+        )
+
         self.exit_button.Bind(wx.EVT_BUTTON, self.on_exit)
 
-        # Рассчитываем минимальную ширину кнопки на основе текущего языка
-        label = loc.get("button_exit", "Выход")
-        dc = wx.ClientDC(self.exit_button)
-        dc.SetFont(button_font)
-        width, _ = dc.GetTextExtent(label)
-        max_width = width + 20
-        self.exit_button.SetMinSize((max_width, 30))
-
+        # # автоподбор ширины
+        # dc = wx.ClientDC(self.exit_button)
+        # dc.SetFont(self.exit_button.GetFont())
+        # w, _ = dc.GetTextExtent(label)
+        # self.exit_button.SetMinSize((w + 24, 30))
+        #
         self.button_sizer.AddStretchSpacer()
-        self.button_sizer.Add(self.exit_button, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.ALL, border=10)
-        logging.info(
-            f"Кнопка выхода создана: текст={loc.get('button_exit', 'Выход')}, размер={max_width}x30")
+        self.button_sizer.Add(self.exit_button, 0, wx.RIGHT, 5,)
 
     def update_language_icon(self, new_lang: str) -> None:
         """

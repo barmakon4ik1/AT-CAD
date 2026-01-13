@@ -277,7 +277,7 @@ class AccompanyText:
             model=model,
             point=text_insert_point,
             text=f"{thickness}mm {material}",
-            layer_name=DEFAULT_ACCOMPANY_TEXT_LAYER,
+            layer_name=DEFAULT_TEXT_LAYER,
             text_height=TEXT_HEIGHT_BIG,
             text_angle=0,
             text_alignment=0,
@@ -1325,37 +1325,37 @@ if __name__ == "__main__":
 
     np = NamePlate()
     bridge_data = {
-        "type": "type4",
+        "type": "type2",
         # --------------------------------------------------
         # Технологические параметры (обязательные)
         # --------------------------------------------------
-        "order_number": "22000-1",
-        "detail_number": "10",
-        "material": "1.4301",
+        "order_number": "20364",
+        "detail_number": "13",
+        "material": "1.4571",
         "thickness": 3.0,
         # --------------------------------------------------
         # Геометрия мостика
         # --------------------------------------------------
         "center_point": [0, 0],
-        "width": 170.0,
-        "height": 160.0,
-        "parameter1": 168.3,
-        "parameter2": 500,
-        "length": 100.0,
-        "angle": 90.0,
+        "width": 144.0,
+        "height": 117.0,
+        "parameter1": 0.0,
+        "parameter2": 0,
+        "length": 25.0,
+        "angle": 0.0,
         # --------------------------------------------------
         # Геометрия выреза в мостике
         # --------------------------------------------------
-        "h_cut": 30.0,
-        "l_cut": 20.0,
-        "r_cut": 0.0,
+        "h_cut": 90.0,
+        "l_cut": 10.0,
+        "r_cut": 5.0,
         # --------------------------------------------------
         # Таблички
         # --------------------------------------------------
         "plates": [
             {
-                "name": "GEA_gross",  # имя из name_plates.json
-                # "offset_top": 5.0 # отступ верхнего края таблички от верха мостика
+                "name": "Haensel",  # имя из name_plates.json
+                "offset_top": 0.0 # отступ верхнего края таблички от верха мостика
             },
             # {"name": "GEA_klein"},
         ],

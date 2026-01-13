@@ -75,7 +75,8 @@ TRANSLATIONS = {
         "ru": "Конусный отвод",
         "de": "Kegelpassung",
         "en": "Cone fitting"
-    }
+    },
+    "at_vessel_name": {"ru": "Таблички", "en": "Name Plates", "de": "Typenschilder"}
 }
 
 # Регистрируем локальные переводы
@@ -132,7 +133,12 @@ CONTENT_REGISTRY = {
         "module": "windows.content_cone_pipe",
         "label": "at_run_cone_pipe",
         "build_module": "programs.at_nozzle_cone"
-    }
+    },
+    "vessel_name": {
+        "module": "config.name_plates.nameplate_dialog",
+        "label": "at_vessel_name",
+        "build_module": "config.name_plates.nameplate_dialog"
+    },
 }
 
 
