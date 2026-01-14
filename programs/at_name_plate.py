@@ -509,60 +509,9 @@ def build_type1(model, cfg: BridgeConfig):
     )
 
     # ------------------------------------------------------------------
-    # 2. Перемычка
+    # 2. Размеры
     # ------------------------------------------------------------------
-
-    web_l = cfg.length
-    web_h = cfg.parameter2
-    h_cut = cfg.h_cut
-    web_h1 = (web_h - h_cut) / 2
-    web_l_cut = cfg.l_cut
-    r_cut = cfg.r_cut
-
     cx, cy = center_point
-
-    p0 = (
-        cx + bridge_width / 2.0 + 100,
-        cy - bridge_height / 2.0,
-    )
-    p1 = (p0[0] + web_l, p0[1])
-    p2 = (p1[0], p1[1] + web_h1)
-    p3 = (p2[0] - web_l_cut, p2[1])
-    p4 = (p3[0], p3[1] + h_cut)
-    p5 = (p2[0], p4[1])
-    p6 = (p1[0], p1[1] + web_h)
-    p7 = (p0[0], p6[1])
-
-    pb = PolylineBuilder(p0)
-
-    pb.line_to(p1)
-
-    if web_h != 0 and h_cut != 0:
-        pb.line_to(p2)
-
-        if r_cut == 0.0:
-            pb.line_to(p3)
-            pb.line_to(p4)
-        else:
-            pb.corner(p3, p4, r_cut)
-            pb.corner(p4, p5, r_cut)
-
-        pb.line_to(p5)
-
-    pb.line_to(p6)
-    pb.line_to(p7)
-    pb.close()
-
-    add_polyline(
-        model,
-        pb.vertices(),
-        layer_name="0",
-        closed=True,
-    )
-
-    # ------------------------------------------------------------------
-    # 3. Размеры
-    # ------------------------------------------------------------------
 
     x_min = cx - bridge_width / 2
     x_max = cx + bridge_width / 2
@@ -571,75 +520,86 @@ def build_type1(model, cfg: BridgeConfig):
 
     p_left_max = (x_min, y_max)
 
-    # габарит мостика — ширина
-    add_dimension(
-        adoc,
-        "H",
-        ensure_point_variant(p_left_max),
-        ensure_point_variant((x_max, y_max)),
-        offset=DEFAULT_DIM_OFFSET,
-    )
-
-    # габарит мостика — высота
-    add_dimension(
-        adoc,
-        "V",
-        ensure_point_variant((x_min, y_min)),
-        ensure_point_variant((x_min, y_max)),
-        offset=DEFAULT_DIM_OFFSET,
-    )
-
-    # ширина перемычки
-    add_dimension(
-        adoc,
-        "H",
-        ensure_point_variant(p1),
-        ensure_point_variant(p0),
-        offset=DEFAULT_DIM_OFFSET,
-    )
-
-    # высота перемычки
-    add_dimension(
-        adoc,
-        "V",
-        ensure_point_variant(p6),
-        ensure_point_variant(p1),
-        offset=DEFAULT_DIM_OFFSET,
-    )
+    add_dimension(adoc,"H", ensure_point_variant(p_left_max), ensure_point_variant((x_max, y_max)), offset=DEFAULT_DIM_OFFSET)
+    add_dimension(adoc,"V",ensure_point_variant((x_min, y_min)), ensure_point_variant((x_min, y_max)), offset=DEFAULT_DIM_OFFSET)
 
     # ------------------------------------------------------------------
-    # 4. Тексты на перемычке
+    # 3. Перемычка
     # ------------------------------------------------------------------
 
-    web_text_point = polar_point(p0, 10, 45)
+    web_l = cfg.length
+    web_h = cfg.parameter2
+    if web_l != 0 and web_h != 0:
+        h_cut = cfg.h_cut
+        web_h1 = (web_h - h_cut) / 2
+        web_l_cut = cfg.l_cut
+        r_cut = cfg.r_cut
 
-    add_text(
-        model=model,
-        point=web_text_point,
-        text=f"{cfg.order_number}",
-        layer_name=DEFAULT_TEXT_LAYER,
-        text_height=TEXT_HEIGHT_SMALL,
-        text_angle=math.radians(90),
-        text_alignment=6,
-    )
+        p0 = (cx + bridge_width / 2.0 + 100, cy - bridge_height / 2.0)
+        p1 = (p0[0] + web_l, p0[1])
+        p2 = (p1[0], p1[1] + web_h1)
+        p3 = (p2[0] - web_l_cut, p2[1])
+        p4 = (p3[0], p3[1] + h_cut)
+        p5 = (p2[0], p4[1])
+        p6 = (p1[0], p1[1] + web_h)
+        p7 = (p0[0], p6[1])
 
-    # лазерная маркировка
-    if cfg.material not in ("3.7035", "3.7235"):
+        pb = PolylineBuilder(p0)
+
+        pb.line_to(p1)
+
+        if web_h != 0 and h_cut != 0:
+            pb.line_to(p2)
+
+            if r_cut == 0.0:
+                pb.line_to(p3)
+                pb.line_to(p4)
+            else:
+                pb.corner(p3, p4, r_cut)
+                pb.corner(p4, p5, r_cut)
+
+            pb.line_to(p5)
+
+        pb.line_to(p6)
+        pb.line_to(p7)
+        pb.close()
+
+        add_polyline(model, pb.vertices(), layer_name="0", closed=True)
+
+        # Размеры на перемычке
+        add_dimension(adoc,"H", ensure_point_variant(p1), ensure_point_variant(p0), offset=DEFAULT_DIM_OFFSET)
+        add_dimension(adoc,"V", ensure_point_variant(p6), ensure_point_variant(p1), offset=DEFAULT_DIM_OFFSET)
+
+        # Тексты на перемычке
+        web_text_point = polar_point(p0, 10, 45)
+
         add_text(
             model=model,
             point=web_text_point,
-            text=cfg.order_number,
-            layer_name=DEFAULT_LASER_LAYER,
-            text_height=TEXT_HEIGHT_LASER,
-            text_angle=0,
-            text_alignment=0,
+            text=f"{cfg.order_number}",
+            layer_name=DEFAULT_TEXT_LAYER,
+            text_height=TEXT_HEIGHT_SMALL,
+            text_angle=math.radians(90),
+            text_alignment=6,
         )
+
+        # лазерная маркировка
+        if cfg.material not in ("3.7035", "3.7235"):
+            add_text(
+                model=model,
+                point=web_text_point,
+                text=cfg.order_number,
+                layer_name=DEFAULT_LASER_LAYER,
+                text_height=TEXT_HEIGHT_LASER,
+                text_angle=0,
+                text_alignment=0,
+            )
+    # --------------------------------------------------------------
 
     # Возвращаем ключевые точки для внешней логики
     text_insert_point = polar_point(p_left_max, TEXT_DISTANCE + DEFAULT_DIM_OFFSET, 90)
     return {
         "bridge_top_left": p_left_max,
-        "web_start": p0,
         "center": center_point,
         "accompany_text_point": text_insert_point,
     }
@@ -1325,37 +1285,37 @@ if __name__ == "__main__":
 
     np = NamePlate()
     bridge_data = {
-        "type": "type2",
+        "type": "type1",
         # --------------------------------------------------
         # Технологические параметры (обязательные)
         # --------------------------------------------------
-        "order_number": "20364",
-        "detail_number": "13",
+        "order_number": "20338",
+        "detail_number": "14",
         "material": "1.4571",
         "thickness": 3.0,
         # --------------------------------------------------
         # Геометрия мостика
         # --------------------------------------------------
         "center_point": [0, 0],
-        "width": 144.0,
-        "height": 117.0,
+        "width": 145.0,
+        "height": 120.0,
         "parameter1": 0.0,
-        "parameter2": 0,
-        "length": 25.0,
+        "parameter2": 100.0,
+        "length": 65.0,
         "angle": 0.0,
         # --------------------------------------------------
         # Геометрия выреза в мостике
         # --------------------------------------------------
-        "h_cut": 90.0,
-        "l_cut": 10.0,
-        "r_cut": 5.0,
+        "h_cut": 80.0,
+        "l_cut": 40.0,
+        "r_cut": 15.0,
         # --------------------------------------------------
         # Таблички
         # --------------------------------------------------
         "plates": [
             {
-                "name": "Haensel",  # имя из name_plates.json
-                "offset_top": 0.0 # отступ верхнего края таблички от верха мостика
+                "name": "B+H_gross",  # имя из name_plates.json
+                # "offset_top": 0.0 # отступ верхнего края таблички от верха мостика
             },
             # {"name": "GEA_klein"},
         ],

@@ -76,7 +76,35 @@ TRANSLATIONS = {
         "de": "Kegelpassung",
         "en": "Cone fitting"
     },
-    "at_vessel_name": {"ru": "Таблички", "en": "Name Plates", "de": "Typenschilder"}
+    "at_vessel_name": {"ru": "Таблички", "en": "Name Plates", "de": "Typenschilder"},
+    "footer_hint_default": {
+        "ru": "Выберите модуль для начала работы",
+        "de": "Wählen Sie ein Modul, um zu beginnen",
+        "en": "Select a module to start working"
+    },
+    "footer_hint_cone": {
+        "ru": "Построение развертки прямого и усеченного конуса",
+        "de": "Abwicklung eines geraden oder abgestumpften Kegels",
+        "en": "Development of a straight or truncated cone"
+    },
+
+    "footer_hint_shell": {
+        "ru": "Развертка цилиндрической обечайки",
+        "de": "Abwicklung eines zylindrischen Mantels",
+        "en": "Cylindrical shell development"
+    },
+
+    "footer_hint_plate": {
+        "ru": "Работа с плоскими листовыми заготовками",
+        "de": "Arbeiten mit ebenen Blechzuschnitten",
+        "en": "Flat plate operations"
+    },
+
+    "footer_hint_vessel_name": {
+        "ru": "Создание и управление табличками оборудования",
+        "de": "Erstellung und Verwaltung von Typenschildern",
+        "en": "Create and manage equipment name plates"
+    }
 }
 
 # Регистрируем локальные переводы
@@ -88,11 +116,13 @@ CONTENT_REGISTRY = {
     "cone": {
         "module": "windows.content_cone",
         "label": "at_run_cone",
+        "footer_hint": "footer_hint_cone",
         "build_module": "programs.at_run_cone"
     },
     "content_apps": {
         "module": "windows.content_apps",
-        "label": "apps_title"
+        "label": "apps_title",
+        "footer_hint": "footer_hint_default"
     },
     "rings": {
         "module": "windows.content_rings",
@@ -107,11 +137,13 @@ CONTENT_REGISTRY = {
     "plate": {
         "module": "windows.content_plate",
         "label": "at_run_plate",
+        "footer_hint": "footer_hint_plate",
         "build_module": "programs.at_run_plate"
     },
     "shell": {
         "module": "windows.content_shell",
         "label": "at_run_shell",
+        "footer_hint": "footer_hint_shell",
         "build_module": "programs.at_cylinder"
     },
     "nozzle": {
@@ -137,6 +169,7 @@ CONTENT_REGISTRY = {
     "vessel_name": {
         "module": "config.name_plates.nameplate_dialog",
         "label": "at_vessel_name",
+        "footer_hint": "footer_hint_vessel_name",
         "build_module": "config.name_plates.nameplate_dialog"
     },
 }

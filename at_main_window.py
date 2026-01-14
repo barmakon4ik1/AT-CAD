@@ -29,7 +29,7 @@ from config.at_config import (
 )
 from locales.at_translations import loc
 from windows.at_window_utils import load_last_position, save_last_position, get_button_font, fit_text_to_height, \
-    LANGUAGE_CHANGE_EVT_TYPE, LANGUAGE_CHANGE_EVT, style_gen_button, _normalize_color_to_hex
+    LANGUAGE_CHANGE_EVT_TYPE, LANGUAGE_CHANGE_EVT, style_gen_button, _normalize_color_to_hex, get_standard_font
 from windows.at_gui_utils import show_popup
 from windows.at_run_dialog_window import load_content, at_load_content
 from windows.at_content_registry import CONTENT_REGISTRY
@@ -63,9 +63,9 @@ TRANSLATIONS = {
         "en": "&Exit"
     },
     "btn_exit": {
-        "ru": "Выйти",
-        "de": "Beenden",
-        "en": "Exit"
+        "ru": "Завершение работы",
+        "de": "Programm Beenden",
+        "en": "Program Exit"
     },
     "copyright": {
         "ru": "Дизайн и разработка: А.Тутубалин © 2025",
@@ -248,13 +248,51 @@ class ATMainWindow(wx.Frame):
         self.current_content = None
         self.main_sizer.Add(self.content_panel, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
 
-        # Создание области кнопок
+        # Создание области кнопок (футер)
         self.button_panel = wx.Panel(self.panel)
-        self.button_panel.SetBackgroundColour(wx.Colour(self.settings.get("BACKGROUND_COLOR", DEFAULT_SETTINGS["BACKGROUND_COLOR"])))
+        self.button_panel.SetBackgroundColour(
+            wx.Colour(self.settings.get("BACKGROUND_COLOR", DEFAULT_SETTINGS["BACKGROUND_COLOR"]))
+        )
+
         self.button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        # --- Контекстная подсказка ---
+        self.footer_label = wx.StaticText(
+            self.button_panel,
+            label=loc.get(
+                "footer_hint_main",
+                "Выберите модуль для работы"
+            )
+        )
+
+        self.footer_label.SetForegroundColour(wx.Colour("white"))
+
+        font = wx.Font(
+            max(self.settings.get("FONT_SIZE", DEFAULT_SETTINGS["FONT_SIZE"]) - 1, 8),
+            wx.FONTFAMILY_DEFAULT,
+            wx.FONTSTYLE_NORMAL,
+            wx.FONTWEIGHT_NORMAL,
+            faceName=self.settings.get("FONT_NAME", DEFAULT_SETTINGS["FONT_NAME"]),
+        )
+        self.footer_label.SetFont(font)
+
+        self.button_sizer.Add(
+            self.footer_label,
+            proportion=1,
+            flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT,
+            border=10
+        )
+
+        # --- Кнопка выхода ---
         self.create_exit_button()
+
         self.button_panel.SetSizer(self.button_sizer)
-        self.main_sizer.Add(self.button_panel, proportion=0, flag=wx.EXPAND | wx.ALL, border=5)
+        self.main_sizer.Add(
+            self.button_panel,
+            proportion=0,
+            flag=wx.EXPAND | wx.ALL,
+            border=5
+        )
 
         # Создание строки статуса и копирайта
         self.create_status_bar()
@@ -289,6 +327,22 @@ class ATMainWindow(wx.Frame):
             image = image.Scale(width, height, wx.IMAGE_QUALITY_HIGH)
             return wx.Bitmap(image)
         return bitmap
+
+    def update_footer_hint(self, content_name: str) -> None:
+        info = CONTENT_REGISTRY.get(content_name, {})
+        hint_key = info.get("footer_hint", "footer_hint_default")
+        self.footer_label.SetLabel(loc.get(hint_key))
+
+    def update_current_footer_hint(self) -> None:
+        """
+        Обновляет текст футера в соответствии с текущим контентом и языком.
+        """
+        if self.current_content and hasattr(self.current_content, "content_name"):
+            content_name = self.current_content.content_name
+        else:
+            content_name = "content_apps"
+
+        self.update_footer_hint(content_name)
 
     def switch_content(self, content_name: str) -> None:
         """
@@ -354,6 +408,7 @@ class ATMainWindow(wx.Frame):
         self.content_panel.Refresh()
         self.content_panel.Update()
         self.update_ui(self.settings)
+        self.update_footer_hint(content_name)
 
     def on_language_change(self, new_lang: str) -> None:
         if not isinstance(new_lang, str):
@@ -362,6 +417,8 @@ class ATMainWindow(wx.Frame):
 
         self.update_language_icon(new_lang)
         self.update_ui(self.settings)
+        # 🔹 ОБНОВЛЯЕМ ФУТЕР
+        self.update_current_footer_hint()
 
         if self.current_content and hasattr(self.current_content, 'update_ui_language'):
             try:
@@ -381,6 +438,8 @@ class ATMainWindow(wx.Frame):
 
         self.update_language_icon(new_lang)
         self.update_ui(self.settings)
+        # 🔹 ОБНОВЛЯЕМ ФУТЕР
+        self.update_current_footer_hint()
 
         if self.current_content and hasattr(self.current_content, 'update_ui_language'):
             try:
@@ -620,7 +679,7 @@ class ATMainWindow(wx.Frame):
 
     # def create_exit_button(self) -> None:
     #     """
-    #     Создаёт кнопку выхода.
+    #     Создаёт кнопку выхода. Старый вариант - потом можно убрать, если приживется новый вариант
     #     """
     #     self.exit_button = wx.Button(self.button_panel, label=loc.get("button_exit", "Выход"))
     #     button_font = get_button_font()
@@ -648,37 +707,10 @@ class ATMainWindow(wx.Frame):
         """
         Создаёт кнопку выхода (GenButton) в фирменном стиле AT-CAD.
         """
-
-        label = loc.get("button_exit", "Выход")
-
-        self.exit_button = GenButton(
-            self.button_panel,
-            label=label,
-            size=(140, 30),
-        )
-
-        # raw_color = self.settings.get(
-        #     "EXIT_BUTTON_COLOR",
-        #     DEFAULT_SETTINGS["EXIT_BUTTON_COLOR"],
-        # )
-
-        # bg_color = _normalize_color_to_hex(raw_color)
-
-        style_gen_button(
-            self.exit_button,
-            normal_bg="#2c3e50",
-            font_size=14,
-            button_height=30,
-        )
-
+        label = loc.get("btn_exit", "Выход")
+        self.exit_button = GenButton(self.button_panel, label=label, size=(250, 35))
+        style_gen_button(self.exit_button, normal_bg="#2c3e50", font_size=14, button_height=30)
         self.exit_button.Bind(wx.EVT_BUTTON, self.on_exit)
-
-        # # автоподбор ширины
-        # dc = wx.ClientDC(self.exit_button)
-        # dc.SetFont(self.exit_button.GetFont())
-        # w, _ = dc.GetTextExtent(label)
-        # self.exit_button.SetMinSize((w + 24, 30))
-        #
         self.button_sizer.AddStretchSpacer()
         self.button_sizer.Add(self.exit_button, 0, wx.RIGHT, 5,)
 
@@ -805,10 +837,9 @@ class ATMainWindow(wx.Frame):
         if hasattr(self, "exit_button"):
             self.exit_button.SetBackgroundColour(wx.Colour(settings.get("EXIT_BUTTON_COLOR", DEFAULT_SETTINGS["EXIT_BUTTON_COLOR"])))
             self.exit_button.SetForegroundColour(wx.Colour(settings.get("BUTTON_FONT_COLOR", DEFAULT_SETTINGS["BUTTON_FONT_COLOR"])))
-            self.exit_button.SetLabel(loc.get("button_exit", "Выход"))
+            self.exit_button.SetLabel(loc.get("btn_exit", "Выход"))
             button_font = get_button_font()
             self.exit_button.SetFont(button_font)
-            logging.info(f"Обновлена кнопка выхода: текст={loc.get('button_exit', 'Выход')}")
 
         # Обновляем строку статуса и копирайт
         if hasattr(self, "status_text"):

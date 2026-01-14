@@ -177,7 +177,7 @@ def main(data: Dict[str, any], return_development_data: bool = False) -> tuple |
             },  # Строка К-№
             {
                 "point": ensure_point_variant(polar_point(text_point, distance=text_ab, alpha=-90, as_variant=False)),
-                "text": f"D = {diameter_base} {loc.get('mm', 'мм')}",
+                "text": f"D = {round(diameter_base, 2)} {loc.get('mm', 'мм')}",
                 "layer_name": "TEXT",
                 "text_height": text_h,
                 "text_angle": 0,
@@ -185,7 +185,7 @@ def main(data: Dict[str, any], return_development_data: bool = False) -> tuple |
             },
             {
                 "point": ensure_point_variant(polar_point(text_point, distance=2 * text_ab, alpha=-90, as_variant=False)),
-                "text": f"d = {diameter_top} {loc.get('mm', 'мм')}",
+                "text": f"d = {round(diameter_top, 2)} {loc.get('mm', 'мм')}",
                 "layer_name": "TEXT",
                 "text_height": text_h,
                 "text_angle": 0,
@@ -193,7 +193,7 @@ def main(data: Dict[str, any], return_development_data: bool = False) -> tuple |
             },
             {
                 "point": ensure_point_variant(polar_point(text_point, distance=3 * text_ab, alpha=-90, as_variant=False)),
-                "text": f"H = {height} {loc.get('mm', 'мм')}",
+                "text": f"H = {round(height, 1)} {loc.get('mm', 'мм')}",
                 "layer_name": "TEXT",
                 "text_height": text_h,
                 "text_angle": 0,

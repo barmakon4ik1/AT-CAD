@@ -1093,11 +1093,10 @@ def style_gen_button(btn: GenButton,
     btn.Bind(wx.EVT_LEFT_UP,     on_up)
 
 
-def create_standard_buttons(parent: wx.Window, on_ok, on_cancel, on_clear=None) -> list[GenButton]:
+def create_standard_buttons(parent: wx.Window, on_ok, on_cancel=None, on_clear=None) -> list[GenButton]:
     """
     Теперь возвращает GenButton вместо wx.Button
     """
-    button_font = get_button_font()   # предполагаем, что функция существует
     button_color = get_setting("BUTTON_FONT_COLOR") or "#ffffff"   # белый текст по умолчанию
 
     # OK — зелёный
@@ -1113,11 +1112,14 @@ def create_standard_buttons(parent: wx.Window, on_ok, on_cancel, on_clear=None) 
         clear_button.Bind(wx.EVT_BUTTON, on_clear)
 
     # Cancel — красный
-    cancel_button = GenButton(parent, label=loc.get("cancel_button"))
-    style_gen_button(cancel_button, normal_bg="#c0392b", text_color=button_color, bezel=1)
-    cancel_button.Bind(wx.EVT_BUTTON, on_cancel)
+    if on_cancel:
+        cancel_button = GenButton(parent, label=loc.get("cancel_button"))
+        style_gen_button(cancel_button, normal_bg="#c0392b", text_color=button_color, bezel=1)
+        cancel_button.Bind(wx.EVT_BUTTON, on_cancel)
 
-    buttons = [ok_button, cancel_button]
+    buttons = [ok_button]
+    if cancel_button:
+        buttons.insert(1, cancel_button)
     if clear_button:
         buttons.insert(1, clear_button)
 
