@@ -214,26 +214,6 @@ class RingsContentPanel(BaseContentPanel):
             if btn:
                 self.register_localizable(LocalizableButton(btn, key))
 
-    # # ------------------------------------------------------------------
-    # # Локализация
-    # # ------------------------------------------------------------------
-    #
-    # def update_ui_language(self) -> None:
-    #     """
-    #     Вызывается родительским окном при смене языка.
-    #     """
-    #     for fb in self._field_builders:
-    #         fb.update_language()
-    #
-    #     self._static_boxes["main_data"].SetLabel(loc.get("main_data_label"))
-    #     self._static_boxes["diameters"].SetLabel(loc.get("diameter_label"))
-    #
-    #     for i, key in enumerate(["ok_button", "clear_button", "cancel_button"]):
-    #         self._buttons[i].SetLabel(loc.get(key))
-    #
-    #     adjust_button_widths(self._buttons)
-    #     self.Layout()
-
     # ------------------------------------------------------------------
     # Сервис
     # ------------------------------------------------------------------
