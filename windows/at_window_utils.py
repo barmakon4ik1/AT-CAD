@@ -271,6 +271,23 @@ class BaseContentPanel(wx.Panel):
         """
         pass
 
+    def create_button_bar(self):
+        """Создаёт горизонтальный сайзер с кнопками OK / [Clear] / Cancel"""
+        buttons = create_standard_buttons(
+            self,
+            self.on_ok,
+            self.on_cancel,
+            getattr(self, 'on_clear', None)  # на случай, если on_clear не определён
+        )
+        adjust_button_widths(buttons)
+
+        # ← сохраняем ссылки на кнопки в экземпляр
+        self.buttons = buttons
+
+        sizer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer.AddMany([(btn, 0, wx.RIGHT, 5) for btn in buttons])
+        return sizer
+
 
 def load_common_data() -> Dict:
     """

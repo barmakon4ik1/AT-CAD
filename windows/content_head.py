@@ -240,14 +240,6 @@ class HeadContentPanel(BaseContentPanel):
         self.canvas = CanvasPanel(self, image_file=str(HEAD_IMAGE_PATH), size=(600, 400))
         self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
 
-        # Кнопки
-        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.buttons = create_standard_buttons(self, self.on_ok, self.on_cancel, self.on_clear)
-        for button in self.buttons:
-            button_sizer.Add(button, 0, wx.RIGHT, 5)
-        adjust_button_widths(self.buttons)
-        self.left_sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT | wx.ALL, 10)
-
         # Правая часть: поля ввода
         self.right_sizer = wx.BoxSizer(wx.VERTICAL)
         font = get_standard_font()
@@ -359,6 +351,8 @@ class HeadContentPanel(BaseContentPanel):
         params_sizer.Add(layer_sizer, 0, wx.ALL | wx.EXPAND, 5)
 
         self.right_sizer.Add(params_sizer, 0, wx.EXPAND | wx.ALL, 10)
+        self.right_sizer.AddStretchSpacer()
+        self.right_sizer.Add(self.create_button_bar(), 0, wx.ALIGN_RIGHT | wx.ALL, 5)
 
         main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
         main_sizer.Add(self.right_sizer, 0, wx.ALL | wx.EXPAND, 10)
@@ -646,9 +640,6 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Ошибка в тестовом запуске: {e}")
             logging.error(f"Ошибка в тестовом запуске: {e}")
-
-    # Привязываем тестовую функцию к кнопке "ОК"
-    panel.buttons[0].Bind(wx.EVT_BUTTON, on_ok_test)
 
     sizer = wx.BoxSizer(wx.VERTICAL)
     sizer.Add(panel, 1, wx.EXPAND)

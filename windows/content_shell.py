@@ -7,6 +7,9 @@ import wx
 import wx.grid
 from typing import Optional, Dict, List
 from pathlib import Path
+
+from wx.lib.buttons import GenButton
+
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programs.at_construction import at_diameter
@@ -15,7 +18,7 @@ from windows.at_window_utils import (
     CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel,
     create_standard_buttons, adjust_button_widths, BaseContentPanel,
     parse_float, load_common_data, style_label, style_textctrl,
-    style_combobox, style_radiobutton, style_staticbox, update_status_bar_point_selected
+    style_combobox, style_radiobutton, style_staticbox, update_status_bar_point_selected, style_gen_button
 )
 from config.at_config import SHELL_IMAGE_PATH, UNWRAPPER_PATH, DEFAULT_SETTINGS, get_setting
 
@@ -571,7 +574,6 @@ class BranchWindow(wx.Dialog):
             return
 
 
-
 class ShellContentPanel(BaseContentPanel):
     """
     Панель для настройки параметров оболочки в приложении AT-CAD.
@@ -588,6 +590,7 @@ class ShellContentPanel(BaseContentPanel):
             callback: Опциональная функция обратного вызова для передачи собранных данных.
         """
         super().__init__(parent)
+        self.branch_button = None
         self.on_submit_callback = callback
         self.parent = parent
         self.labels = {}
@@ -632,17 +635,13 @@ class ShellContentPanel(BaseContentPanel):
         self.canvas = CanvasPanel(self, image_file=image_path, size=(600, 400))
         self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
 
-        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.buttons = create_standard_buttons(self, self.on_ok, self.on_cancel, self.on_clear)
-        for button in self.buttons:
-            button_sizer.Add(button, 0, wx.RIGHT, 5)
-        adjust_button_widths(self.buttons)
-        self.left_sizer.Add(button_sizer, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
 
-        self.branch_button = wx.Button(self, label=loc.get("branch_button", "Наличие отвода"))
-        self.branch_button.SetBackgroundColour(wx.Colour(0, 102, 204))
-        self.branch_button.SetForegroundColour(wx.Colour(255, 255, 255))
-        self.branch_button.SetFont(get_standard_font())
+        # self.branch_button = wx.Button(self, label=loc.get("branch_button", "Наличие отвода"))
+        # self.branch_button.SetBackgroundColour(wx.Colour(0, 102, 204))
+        # self.branch_button.SetForegroundColour(wx.Colour(255, 255, 255))
+        # self.branch_button.SetFont(get_standard_font())
+        self.branch_button = GenButton(self, label=loc.get("branch_button", "Наличие отвода"), size=(240, 30))
+        style_gen_button(self.branch_button, "#3498db", font_size=14, button_height=30)
         self.left_sizer.Add(self.branch_button, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
 
         # Правый блок
@@ -850,6 +849,8 @@ class ShellContentPanel(BaseContentPanel):
         additional_sizer.Add(row9, 0, wx.EXPAND | wx.ALL, 5)
 
         self.right_sizer.Add(additional_sizer, 0, wx.EXPAND | wx.ALL, 10)
+        self.right_sizer.AddStretchSpacer()
+        self.right_sizer.Add(self.create_button_bar(), 0, wx.ALIGN_RIGHT | wx.ALL, 5)
 
         # Собираем общий макет
         main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
@@ -1159,8 +1160,6 @@ if __name__ == "__main__":
                 frame.Iconize(False)
                 frame.Raise()
                 frame.SetFocus()
-
-    panel.buttons[0].Bind(wx.EVT_BUTTON, on_ok_event)
 
     sizer = wx.BoxSizer(wx.VERTICAL)
     sizer.Add(panel, 1, wx.EXPAND)
