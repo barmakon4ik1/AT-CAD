@@ -25,7 +25,7 @@ File: programs/at_shell.py
 
 
 import math
-from typing import Dict
+from typing import Dict, Any
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programs.at_base import regen
@@ -66,7 +66,8 @@ loc.register_translations(TRANSLATIONS)
 def main(data):
     return at_shell(data)
 
-def at_shell(data: Dict[str, any]) -> bool:
+def at_shell(data: Dict[str, any]) -> dict[str, bool | list[list[float]] | dict[
+    str | Any, list[float] | float | str | Any]] | None:
     """
     Основная функция для построения развертки цилиндра (оболочки).
 

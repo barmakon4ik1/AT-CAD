@@ -1,324 +1,313 @@
 """
 windows/content_rings.py
-Модуль для создания панели для ввода параметров колец.
-Работает с AutoCAD через win32com.client.
+
+Панель ввода параметров колец.
+
+Поддерживает:
+- динамическую смену языка
+- централизованный UI через FieldBuilder
+- сбор и валидацию данных через FormBuilder
 """
 
 from typing import Optional, Dict
-import wx
-import win32com.client
 from config.at_config import *
 from locales.at_translations import loc
 from programs.at_input import at_get_point
+
+from windows.at_fields_builder import FieldBuilder, FormBuilder, LocalizableStaticBox, LocalizableButton
 from windows.at_window_utils import (
-    CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel,
-    create_standard_buttons, adjust_button_widths, update_status_bar_point_selected,
-    BaseContentPanel, BaseInputWindow, load_user_settings
+    CanvasPanel,
+    show_popup,
+    get_standard_font,
+    apply_styles_to_panel,
+    adjust_button_widths,
+    update_status_bar_point_selected,
+    BaseContentPanel,
+    BaseInputWindow,
+    load_user_settings,
 )
 
-# -----------------------------
-# Локальные переводы модуля
-# -----------------------------
+# ----------------------------------------------------------------------
+# Локальные переводы
+# ----------------------------------------------------------------------
+
 TRANSLATIONS = {
     "cancel_button": {"ru": "Возврат", "de": "Zurück", "en": "Return"},
     "clear_button": {"ru": "Очистить", "de": "Löschen", "en": "Clear"},
-    "diameter": {"ru": "Диаметр", "de": "Durchmesser", "en": "Diameter"},
-    "diameters": {"ru": "Диаметры", "de": "Durchmesser", "en": "Diameters"},
+    "ok_button": {"ru": "ОК", "de": "OK", "en": "OK"},
+
+    "main_data_label": {"ru": "Основные данные", "de": "Hauptdaten", "en": "Main data"},
+    "order_label": {"ru": "К-№", "de": "K-Nr.", "en": "K-no."},
+
     "diameter_label": {"ru": "Диаметры", "de": "Durchmesser", "en": "Diameters"},
     "diameters_label": {
         "ru": "Диаметры (через запятую)",
         "de": "Durchmesser (durch Kommas getrennt)",
         "en": "Diameters (separated by commas)",
     },
-    "error": {"ru": "Ошибка", "de": "Fehler", "en": "Error"},
-    "main_data_label": {"ru": "Основные данные", "de": "Hauptdaten", "en": "Main data"},
+
     "no_data_error": {
         "ru": "Необходимо ввести хотя бы один размер",
         "de": "Mindestens eine Abmessung muss eingegeben werden",
         "en": "At least one dimension must be entered",
     },
-    "ok_button": {"ru": "ОК", "de": "OK", "en": "OK"},
-    "order_label": {"ru": "К-№", "de": "K-Nr.", "en": "K-no."},
+
     "point_selection_error": {
-        "ru": "Ошибка выбора точки: {}. Пожалуйста, повторите ввод или отмените.",
-        "de": "Fehler bei der Punktauswahl: {}. Bitte wiederholen Sie die Eingabe oder brechen Sie ab.",
-        "en": "Point selection error: {}. Please retry or cancel.",
+        "ru": "Ошибка выбора точки: {}",
+        "de": "Fehler bei der Punktauswahl: {}",
+        "en": "Point selection error: {}",
     },
-    "prompt_select_point": {"ru": "Укажите точку: ", "de": "Punkt auswählen: ", "en": "Select point: "},
-    "point_selected": {
-        "ru": "Точка выбрана: x={0}, y={1}",
-        "en": "Point selected: x={0}, y={1}",
-        "de": "Punkt ausgewählt: x={0}, y={1}"
-    },
-    "data_collected": {
-        "ru": "Данные собраны: {}",
-        "de": "Daten gesammelt: {}",
-        "en": "Data collected: {}"
-    }
+
+    "error": {"ru": "Ошибка", "de": "Fehler", "en": "Error"},
 }
-# Регистрируем переводы сразу при загрузке модуля
+
 loc.register_translations(TRANSLATIONS)
 
+# ----------------------------------------------------------------------
+# Парсер диаметров
+# ----------------------------------------------------------------------
 
-def create_window(parent: wx.Window) -> wx.Panel:
-    """
-    Создаёт панель контента для ввода параметров колец.
+def parse_diameters(text: str) -> Dict[str, float]:
+    items = [s.strip() for s in text.split(",") if s.strip()]
+    if not items:
+        raise ValueError(loc.get("no_data_error"))
 
-    Args:
-        parent: Родительский wx.Window (например, content_panel).
+    result: Dict[str, float] = {}
+    for i, value in enumerate(items, start=1):
+        result[str(i)] = float(value.replace(",", "."))
+    return result
 
-    Returns:
-        wx.Panel: Панель RingsContentPanel или None при ошибке.
-    """
+
+# ----------------------------------------------------------------------
+# Factory
+# ----------------------------------------------------------------------
+
+def create_window(parent: wx.Window) -> wx.Panel | None:
     try:
         return RingsContentPanel(parent)
     except Exception as e:
-        show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
+        show_popup(f"{loc.get('error')}: {e}", popup_type="error")
         return None
 
 
+# ----------------------------------------------------------------------
+# Панель
+# ----------------------------------------------------------------------
+
 class RingsContentPanel(BaseContentPanel):
     """
-    Панель для ввода параметров колец.
+    Встраиваемая панель ввода параметров колец
+    с поддержкой динамической локализации.
     """
 
-    def __init__(self, parent, on_submit_callback=None):
-        """
-        Инициализирует панель, создаёт элементы управления.
-
-        Args:
-            parent: Родительский wx.Window (content_panel).
-            on_submit_callback: Функция обратного вызова для обработки данных (опционально).
-        """
+    def __init__(self, parent: wx.Window, on_submit_callback=None):
         super().__init__(parent)
+
         self.settings = load_user_settings()
-        self.SetBackgroundColour(self.settings.get("BACKGROUND_COLOR", DEFAULT_SETTINGS["BACKGROUND_COLOR"]))
-        self.parent = parent
+        self.SetBackgroundColour(
+            self.settings.get("BACKGROUND_COLOR", DEFAULT_SETTINGS["BACKGROUND_COLOR"])
+        )
+
         self.on_submit_callback = on_submit_callback
-        self.labels: Dict[str, wx.StaticText] = {}
-        self.static_boxes: Dict[str, wx.StaticBox] = {}
-        self.buttons: list[wx.Button] = []
+        self.form = FormBuilder(self)
         self.input_point = None
+
+        # ссылки для обновления языка
+        self._field_builders: list[FieldBuilder] = []
+        self._static_boxes: Dict[str, wx.StaticBox] = {}
+        self._buttons: list[wx.Button] = []
+
         self._build_ui()
-        self.order_input.SetFocus()
+        self._status_clear()
+
+    # ------------------------------------------------------------------
+    # UI
+    # ------------------------------------------------------------------
 
     def _build_ui(self) -> None:
-        """
-        Создаёт компоновку: слева изображение и кнопки, справа поля ввода.
-        """
         if self.GetSizer():
             self.GetSizer().Clear(True)
-        self.labels.clear()
-        self.static_boxes.clear()
-        self.buttons.clear()
+
+        self._field_builders.clear()
+        self._static_boxes.clear()
+        self._buttons.clear()
 
         main_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.left_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        # Изображение (из конфига: Path -> str)
-        image_path = str(RING_IMAGE_PATH)
-        self.canvas = CanvasPanel(self, image_file=image_path, size=(600, 400))
-        self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
+        # Левая часть
+        left = wx.BoxSizer(wx.VERTICAL)
+        self.canvas = CanvasPanel(self, str(RING_IMAGE_PATH), size=(600, 400))
+        left.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
 
-        # Правая часть: поля ввода
-        self.right_sizer = wx.BoxSizer(wx.VERTICAL)
+        # Правая часть
+        right = wx.BoxSizer(wx.VERTICAL)
         font = get_standard_font()
 
-        # Группа "Основные данные"
-        main_box = wx.StaticBox(self, label=loc.get("main_data_label", "Основные данные"))
+        # -------------------- Основные данные --------------------
+        main_box = wx.StaticBox(self, label=loc.get("main_data_label"))
         main_box.SetFont(font)
-        self.static_boxes["main_data"] = main_box
-        main_data_sizer = wx.StaticBoxSizer(main_box, wx.VERTICAL)
+        self._static_boxes["main_data"] = main_box
 
-        # К-№
-        order_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        order_label = wx.StaticText(main_box, label=loc.get("order_label", "К-№"))
-        order_label.SetFont(font)
-        self.labels["order"] = order_label
-        self.order_input = wx.TextCtrl(main_box, value="", size=INPUT_FIELD_SIZE)
-        self.order_input.SetFont(font)
-        order_sizer.AddStretchSpacer()
-        order_sizer.Add(order_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        order_sizer.Add(self.order_input, 0, wx.RIGHT, 10)
-        main_data_sizer.Add(order_sizer, 0, wx.ALL | wx.EXPAND, 5)
+        main_sizer_box = wx.StaticBoxSizer(main_box, wx.VERTICAL)
 
-        self.right_sizer.Add(main_data_sizer, 0, wx.EXPAND | wx.ALL, 10)
+        fb_main = FieldBuilder(
+            parent=main_box,
+            target_sizer=main_sizer_box,
+            form=self.form,
+            default_size=INPUT_FIELD_SIZE,
+        )
+        self._field_builders.append(fb_main)
 
-        # Группа "Диаметры"
-        diam_box = wx.StaticBox(self, label=loc.get("diameter_label", "Диаметры"))
+        fb_main.text(
+            name="work_number",
+            label_key="order_label",
+        )
+
+        right.Add(main_sizer_box, 0, wx.EXPAND | wx.ALL, 10)
+
+        # -------------------- Диаметры --------------------
+        diam_box = wx.StaticBox(self, label=loc.get("diameter_label"))
         diam_box.SetFont(font)
-        self.static_boxes["diameters"] = diam_box
-        diameters_sizer = wx.StaticBoxSizer(diam_box, wx.VERTICAL)
+        self._static_boxes["diameters"] = diam_box
 
-        # Ввод диаметров
-        di_inp_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        di_label = wx.StaticText(diam_box, label=loc.get("diameters_label", "Диаметры (через запятую)"))
-        di_label.SetFont(font)
-        self.labels["diameters"] = di_label
-        self.diameters_input = wx.TextCtrl(diam_box, value="", style=wx.TE_MULTILINE, size=(INPUT_FIELD_SIZE[0], 100))
-        self.diameters_input.SetFont(font)
-        di_inp_sizer.AddStretchSpacer()
-        di_inp_sizer.Add(di_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        di_inp_sizer.Add(self.diameters_input, 0, wx.ALL, 5)
-        diameters_sizer.Add(di_inp_sizer, 0, wx.ALL | wx.EXPAND, 5)
+        diam_sizer_box = wx.StaticBoxSizer(diam_box, wx.VERTICAL)
 
-        self.right_sizer.Add(diameters_sizer, 0, wx.EXPAND | wx.ALL, 10)
-        self.right_sizer.AddStretchSpacer()
-        self.right_sizer.Add(self.create_button_bar(), 0, wx.ALIGN_RIGHT | wx.ALL, 5)
+        fb_diam = FieldBuilder(
+            parent=diam_box,
+            target_sizer=diam_sizer_box,
+            form=self.form,
+            default_size=(INPUT_FIELD_SIZE[0], 100),
+        )
+        self._field_builders.append(fb_diam)
 
-        main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
-        main_sizer.Add(self.right_sizer, 0, wx.ALL | wx.EXPAND, 10)
+        fb_diam.multiline_text(
+            name="diameters",
+            label_key="diameters_label",
+            required=True,
+            parser=parse_diameters,
+            size=(INPUT_FIELD_SIZE[0], 100),
+        )
+
+        right.Add(diam_sizer_box, 0, wx.EXPAND | wx.ALL, 10)
+        right.AddStretchSpacer()
+
+        # -------------------- Кнопки --------------------
+        button_bar_sizer = self.create_button_bar()
+        self._buttons = self.buttons  # сохраняем ссылки на кнопки
+
+        right.Add(button_bar_sizer, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
+
+        # -------------------- Добавляем всё в главный сайзер --------------------
+        main_sizer.Add(left, 1, wx.EXPAND | wx.ALL, 10)
+        main_sizer.Add(right, 0, wx.EXPAND | wx.ALL, 10)
+
         self.SetSizer(main_sizer)
         apply_styles_to_panel(self)
         self.Layout()
-        self._status_clear()
+
+        # группы
+        for key, box in self._static_boxes.items():
+            self.register_localizable(LocalizableStaticBox(box, f"{key}_label"))
+
+        # кнопки
+        for btn, key in zip(self._buttons, ["ok_button", "clear_button", "cancel_button"]):
+            if btn:
+                self.register_localizable(LocalizableButton(btn, key))
+
+    # # ------------------------------------------------------------------
+    # # Локализация
+    # # ------------------------------------------------------------------
+    #
+    # def update_ui_language(self) -> None:
+    #     """
+    #     Вызывается родительским окном при смене языка.
+    #     """
+    #     for fb in self._field_builders:
+    #         fb.update_language()
+    #
+    #     self._static_boxes["main_data"].SetLabel(loc.get("main_data_label"))
+    #     self._static_boxes["diameters"].SetLabel(loc.get("diameter_label"))
+    #
+    #     for i, key in enumerate(["ok_button", "clear_button", "cancel_button"]):
+    #         self._buttons[i].SetLabel(loc.get(key))
+    #
+    #     adjust_button_widths(self._buttons)
+    #     self.Layout()
+
+    # ------------------------------------------------------------------
+    # Сервис
+    # ------------------------------------------------------------------
 
     def _status_clear(self):
-        """Сбрасывает статусную строку (точка не выбрана)."""
         update_status_bar_point_selected(self, None)
 
-    def update_ui_language(self):
-        """
-        Обновляет текст меток и групп при смене языка.
-        """
-        self.static_boxes["main_data"].SetLabel(loc.get("main_data_label", "Основные данные"))
-        self.static_boxes["diameters"].SetLabel(loc.get("diameter_label", "Диаметры"))
-        self.labels["order"].SetLabel(loc.get("order_label", "К-№"))
-        self.labels["diameters"].SetLabel(loc.get("diameters_label", "Диаметры (через запятую)"))
-        for i, key in enumerate(["ok_button", "clear_button", "cancel_button"]):
-            self.buttons[i].SetLabel(loc.get(key, ["ОК", "Очистить", "Возврат"][i]))
-        adjust_button_widths(self.buttons)
+    def clear_input_fields(self):
+        self.form.clear()
+        self.input_point = None
         self._status_clear()
-        self.Layout()
+
+    # ------------------------------------------------------------------
+    # Данные
+    # ------------------------------------------------------------------
 
     def collect_input_data(self) -> Optional[Dict]:
-        """
-        Собирает данные из полей ввода.
-        Возвращает словарь с данными: work_number, diameters, input_point.
-
-        Returns:
-            Optional[Dict]: Словарь с данными или None при ошибке.
-        """
         try:
-            diameters_text = self.diameters_input.GetValue().strip()
-            diameters: Dict[str, float] = {}
-            if diameters_text:
-                for i, value in enumerate(diameters_text.split(",")):
-                    val = float(value.strip().replace(",", "."))
-                    diameters[str(i + 1)] = val
-
-            data = {
-                "work_number": self.order_input.GetValue().strip(),
-                "diameters": diameters,
-                "input_point": self.input_point
-            }
-
+            data = self.form.collect()
+            data["input_point"] = self.input_point
             return data
         except Exception as e:
-            show_popup(loc.get("error", f"Ошибка при сборе данных: {str(e)}"), popup_type="error")
+            show_popup(str(e), popup_type="error")
             return None
 
-    def validate_input(self, data: Dict) -> bool:
-        """
-        Минимальная проверка UI-уровня: наличие хотя бы одного диаметра и точки.
+    # ------------------------------------------------------------------
+    # Кнопки
+    # ------------------------------------------------------------------
 
-        Args:
-            data: Словарь с данными ввода.
-
-        Returns:
-            bool: True, если данные валидны, иначе False.
-        """
-        if not data or not data.get("diameters"):
-            show_popup(loc.get("no_data_error", "Необходимо ввести хотя бы один размер"), popup_type="error")
-            return False
-        if not data.get("input_point"):
-            show_popup(loc.get("point_selection_error", "Ошибка выбора точки").format("None"), popup_type="error")
-            return False
-        return True
-
-    def on_ok(self, event: wx.Event, close_window: bool = False) -> None:
-        """
-        Обрабатывает нажатие кнопки OK: запрашивает точку, собирает данные, проверяет и передаёт их через callback.
-
-        Args:
-            event: Событие wxPython.
-            close_window: Если True, переключает на content_apps после успешной обработки.
-        """
+    def on_ok(self, event: wx.Event, close_window: bool = False):
         try:
-            # Запрос точки через AutoCAD
-            main_window = wx.GetTopLevelParent(self)
-            main_window.Iconize(True)
-            self.input_point = at_get_point(as_variant=False)  # Возвращаем список [x, y, z]
-            main_window.Iconize(False)
-            main_window.Raise()
-            main_window.SetFocus()
+            top = wx.GetTopLevelParent(self)
+            top.Iconize(True)
+
+            self.input_point = at_get_point(as_variant=False)
+
+            top.Iconize(False)
+            top.Raise()
             wx.Yield()
 
-            # Собираем данные
             data = self.collect_input_data()
             if not data:
+                return
+
+            if not data["input_point"]:
                 show_popup(
-                    loc.get("error", "Ошибка") + ": Данные не собраны",
-                    popup_type="error"
+                    loc.get("point_selection_error").format("None"),
+                    popup_type="error",
                 )
                 return
 
-            # Проверяем данные (включая точку)
-            if not self.validate_input(data):
-                return
-
-            # Вызываем callback, если он есть
             if self.on_submit_callback:
                 self.on_submit_callback(data)
-            else:
-                show_popup(
-                    loc.get("error", "Ошибка") + ": Callback не установлен",
-                    popup_type="error"
-                )
 
-            # Переключаем на content_apps, если нужно
             if close_window:
                 self.switch_content_panel("content_apps")
 
         except Exception as e:
-            show_popup(loc.get("error", f"Ошибка при обработке ввода: {str(e)}"), popup_type="error")
+            show_popup(str(e), popup_type="error")
 
-    def on_clear(self, event: wx.Event) -> None:
-        """
-        Очищает поля ввода и сбрасывает статусную строку.
-
-        Args:
-            event: Событие wxPython.
-        """
+    def on_clear(self, event: wx.Event):
         self.clear_input_fields()
 
-    def clear_input_fields(self) -> None:
-        """
-        Очищает поля ввода и сбрасывает выбранную точку.
-        """
-        self.order_input.SetValue("")
-        self.diameters_input.SetValue("")
-        self.input_point = None
-        self._status_clear()
-        self.order_input.SetFocus()
-
-    def on_cancel(self, event: wx.Event, switch_content: Optional[str] = "content_apps") -> None:
-        """
-        Переключает контент на указанную панель (по умолчанию content_apps).
-
-        Args:
-            event: Событие wxPython.
-            switch_content: Имя контента для переключения.
-        """
+    def on_cancel(self, event: wx.Event, switch_content="content_apps"):
         self.switch_content_panel(switch_content)
 
 
+# ----------------------------------------------------------------------
+# Тестовый запуск
+# ----------------------------------------------------------------------
+
 if __name__ == "__main__":
-    """
-    Тестовый запуск окна.
-    """
+
     def on_submit(data: Dict):
-        """Выводит полученные данные в консоль для проверки."""
         print("Полученные данные:")
         for k, v in data.items():
             print(f"{k}: {v}")
@@ -327,11 +316,13 @@ if __name__ == "__main__":
     frame = BaseInputWindow(
         title_key="test_rings_window",
         last_input_file=str(LAST_CONE_INPUT_FILE),
-        window_size=(900, 600)
+        window_size=(900, 600),
     )
+
     panel = RingsContentPanel(frame.panel, on_submit_callback=on_submit)
-    main_sizer = wx.BoxSizer(wx.VERTICAL)
-    main_sizer.Add(panel, 1, wx.EXPAND)
-    frame.panel.SetSizer(main_sizer)
+    sizer = wx.BoxSizer(wx.VERTICAL)
+    sizer.Add(panel, 1, wx.EXPAND)
+    frame.panel.SetSizer(sizer)
+
     frame.Show()
     app.MainLoop()

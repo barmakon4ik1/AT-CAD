@@ -12,7 +12,7 @@ import logging
 import os
 import json
 import wx
-from typing import Tuple, Dict, Optional, List
+from typing import Tuple, Dict, Optional, List, Any
 
 from wx.lib.buttons import GenButton
 
@@ -126,16 +126,62 @@ _common_data_cache = None
 
 class BaseContentPanel(wx.Panel):
     """
-    Базовый класс для панелей контента: AppsContentPanel, ConeContentPanel, RingsContentPanel, PlateContentPanel, HeadContentPanel.
+    Базовый класс всех content-панелей.
+    Поддерживает автоматическую смену языка UI.
     """
     def __init__(self, parent):
         super().__init__(parent)
+        self._localizables: list[Any] = []  # контролы/FieldBuilder, поддерживающие update_language
+        self._labels: dict[wx.Window, str] = {}  # StaticBox, Buttons и т.п
+
         self.settings = load_user_settings()
         background_color = self.settings.get("BACKGROUND_COLOR", DEFAULT_SETTINGS["BACKGROUND_COLOR"])
         self.SetBackgroundColour(wx.Colour(background_color))
         self.last_input_file = ""  # Для панелей ввода данных, устанавливается в дочерних классах
         self.insert_point = None  # Для панелей с выбором точки
         self.buttons = []  # Для панелей с кнопками
+
+        # 🔑 Реестр локализуемых объектов
+        self._localizables: list = []
+
+    # ------------------------------------------------------------------
+    # Регистрация локализуемых элементов
+    # ------------------------------------------------------------------
+
+    def register_localizable(self, obj):
+        """
+        Регистрирует объект, поддерживающий update_language().
+        (например: FieldBuilder)
+        """
+        if obj not in self._localizables:
+            self._localizables.append(obj)
+
+    def register_label(self, ctrl: wx.Window, label_key: str):
+        """
+        Регистрирует wx.StaticText / StaticBox / Button / GenButton
+        для автоматической локализации.
+        """
+        ctrl._label_key = label_key
+        if ctrl not in self._localizables:
+            self._localizables.append(ctrl)
+
+    # ------------------------------------------------------------------
+    # Локализация
+    # ------------------------------------------------------------------
+
+    def update_ui_language(self):
+        """Обновляет язык интерфейса на лету."""
+        # обновляем все локализуемые объекты (FieldBuilder и т.п.)
+        for obj in self._localizables:
+            if hasattr(obj, "update_language"):
+                obj.update_language()
+
+        # обновляем контролы с ключом
+        for ctrl, key in self._labels.items():
+            if isinstance(ctrl, wx.StaticBox) or isinstance(ctrl, wx.Button) or isinstance(ctrl, wx.StaticText):
+                ctrl.SetLabel(loc.get(key))
+
+        self.Layout()
 
     def switch_content_panel(self, content_name: str) -> None:
         """
@@ -265,11 +311,11 @@ class BaseContentPanel(wx.Panel):
         """
         pass
 
-    def update_ui_language(self) -> None:
-        """
-        Обновляет текст элементов интерфейса при смене языка.
-        """
-        pass
+    # def update_ui_language(self) -> None:
+    #     """
+    #     Обновляет текст элементов интерфейса при смене языка.
+    #     """
+    #     pass
 
     def create_button_bar(self):
         """Создаёт горизонтальный сайзер с кнопками OK / [Clear] / Cancel"""

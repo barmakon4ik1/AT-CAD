@@ -460,6 +460,10 @@ class BranchWindow(wx.Dialog):
         Returns:
             Optional[List[Dict]]: Список словарей с данными отводов или None, если данные невалидны или таблица пуста.
         """
+
+        def _grid_bool(val):
+            return val in ("1", "True", "true")
+
         cutouts = []
         for row in range(self.table.GetNumberRows()):
             diameter = parse_float(self.table.GetCellValue(row, 1))
@@ -486,12 +490,15 @@ class BranchWindow(wx.Dialog):
                     "diameter": diameter,
                     "contact_mode": self.table.GetCellValue(row, 7).upper(),  # Тип контакта (A, D, M, T)
                     "text": self.table.GetCellValue(row, 0),
-                    "steps": 180,  # Фиксированное значение
+                    "steps":  int(self.steps_combo.GetValue()),
+                    "mode": "polyline",  # bulge / polyline / spline
                     "layer_name": "0",  # Жестко заданный слой
                     "thickness": parse_float(self.table.GetCellValue(row, 5)) or 0.0,  # Толщина отвода
                     "height": parse_float(self.table.GetCellValue(row, 3)) or 0.0,  # Высота отвода
-                    "unroll_branch": self.table.GetCellValue(row, 8) == "1", # "" == "1" → False; "1" == "1" → True
-                    "flange_present": self.table.GetCellValue(row, 9) == "1", # "" == "1" → False; "1" == "1" → True
+                    "unroll_branch": _grid_bool(self.table.GetCellValue(row, 8)),
+                    "flange_present": _grid_bool(self.table.GetCellValue(row, 9)),
+                    # "unroll_branch": self.table.GetCellValue(row, 8) == "1",  # "" == "1" → False; "1" == "1" → True
+                    # "flange_present": self.table.GetCellValue(row, 9) == "1",  # "" == "1" → False; "1" == "1" → True
                     "weld_allowance": parse_float(self.table.GetCellValue(row, 10)) or 3.0,  # Припуск на сварку
                 }
             }
@@ -1014,6 +1021,7 @@ class ShellContentPanel(BaseContentPanel):
 
         except Exception as e:
             print(f"Ошибка в on_ok: {e}")
+
 
     def update_ui_language(self):
         """

@@ -276,7 +276,8 @@ class CylinderBuilder:
         radius = (float(params.get("diameter", 0.0)) - thickness) / 2.0 if thk_correction else float(params.get("diameter", 0.0)) / 2.0
 
         # length_full — высота развёртки с припуском
-        length_full = nozzle_length + weld_allowance
+        # length_full = nozzle_length + weld_allowance
+        length_full = nozzle_length
 
         # Для первого угла w0 = 2*pi, sin(2*pi) = 0 => упрощённая формула:
         # generatrix0 = length_full - sqrt((0.5*diameter_main)^2 - (offset)^2)
@@ -429,13 +430,18 @@ class CylinderBuilder:
                     continue
 
                 # корректировка диаметра отвода
-                diameter = params.get("diameter") - params.get("thickness")
+                # shell_data["diameter"] — СРЕДНИЙ диаметр обечайки
+                # at_nozzle требует НАРУЖНЫЙ диаметр обечайки
+                # Для технологической корректности используем ВНУТРЕННИЙ диаметр отвода
+                thk = params.get("thickness")
+                diameter = params.get("diameter") - thk
+                diameter_main = self.shell_data["diameter"] + thk # вернуть должно наружный диаметр!
 
                 # подготовка параметров для at_nozzle
                 nozzle_params = {
                     "insert_point": nozzle_insert,
                     "diameter": diameter,
-                    "diameter_main": float(self.shell_data.get("diameter", 0.0)),
+                    "diameter_main": diameter_main,
                     "length": float(height),
                     "thickness": float(thickness),
                     "layer_name": params.get("layer_name", "0"),
@@ -567,35 +573,35 @@ def at_cylinder(data: Dict) -> Dict:
 if __name__ == "__main__":
     cad = ATCadInit()
     shell_data = {
-        "diameter": 323.9,
-        "length": 1000,
+        "diameter": 219.1,
+        "length": 265,
         "insert_point": [0, 0, 0],
-        "angle": 0,
-        "clockwise": True,
-        "order_number": "ORD-001",
-        "detail_number": "DET-01",
-        "material": "1.4571",
-        "thickness": 5.0,
+        "angle": 270,
+        "clockwise": False,
+        "order_number": "20366-2",
+        "detail_number": "1",
+        "material": "1.4301",
+        "thickness": 3.0,
         "weld_allowance_top": 10,
-        "weld_allowance_bottom": 10,
+        "weld_allowance_bottom": 2,
         "axis": True,
-        "axis_marks": 0.0,
+        "axis_marks": 10.0,
         "layer_name": "0",
         # Можно задать per_nozzle_gap для изменения расстояния между развёртками
         "per_nozzle_gap": 350.0,
         "cutouts": [
             {
-                "angle_deg": 90,
-                "offset_axial": 200,
+                "angle_deg": 0,
+                "offset_axial": 130,
                 "axial_shift": 0.0,
                 "params": {
-                    "diameter": 108.0,
-                    "thickness": 4.0,
-                    "height": 300,
+                    "diameter": 168.3,
+                    "thickness": 3.0,
+                    "height": 225,
                     "angle_deg": 0.0,
                     "contact_mode": "A",
                     "text": "N1",
-                    "steps": 180,
+                    "steps": 360,
                     "layer_name": "0",
                     "unroll_branch": True,
                     "flange_present": False,
@@ -604,46 +610,46 @@ if __name__ == "__main__":
                     "material": "1.4301"
                 }
             },
-            {
-                "angle_deg": 180,
-                "offset_axial": 500,
-                "axial_shift": 0.0,
-                "params": {
-                    "diameter": 88.9,
-                    "thickness": 3.0,
-                    "height": 300.0,
-                    "angle_deg": 0.0,
-                    "contact_mode": "D",
-                    "text": "N2",
-                    "steps": 180,
-                    "layer_name": "0",
-                    "unroll_branch": True,
-                    "flange_present": False,
-                    "weld_allowance": 3.0,
-                    "mode": "polyline",
-                    "material": "1.4301"
-                }
-            },
-            {
-                "angle_deg": 270,
-                "offset_axial": 300,
-                "axial_shift": 0.0,
-                "params": {
-                    "diameter": 60.3,
-                    "thickness": 3.0,
-                    "height": 250.0,
-                    "angle_deg": 0.0,
-                    "contact_mode": "D",
-                    "text": "N3",
-                    "steps": 180,
-                    "layer_name": "0",
-                    "unroll_branch": True,
-                    "flange_present": False,
-                    "weld_allowance": 3.0,
-                    "mode": "polyline",
-                    "material": "1.4404"
-                }
-            }
+            # {
+            #     "angle_deg": 180,
+            #     "offset_axial": 500,
+            #     "axial_shift": 0.0,
+            #     "params": {
+            #         "diameter": 88.9,
+            #         "thickness": 3.0,
+            #         "height": 300.0,
+            #         "angle_deg": 0.0,
+            #         "contact_mode": "D",
+            #         "text": "N2",
+            #         "steps": 180,
+            #         "layer_name": "0",
+            #         "unroll_branch": True,
+            #         "flange_present": False,
+            #         "weld_allowance": 3.0,
+            #         "mode": "polyline",
+            #         "material": "1.4301"
+            #     }
+            # },
+            # {
+            #     "angle_deg": 270,
+            #     "offset_axial": 300,
+            #     "axial_shift": 0.0,
+            #     "params": {
+            #         "diameter": 60.3,
+            #         "thickness": 3.0,
+            #         "height": 250.0,
+            #         "angle_deg": 0.0,
+            #         "contact_mode": "D",
+            #         "text": "N3",
+            #         "steps": 180,
+            #         "layer_name": "0",
+            #         "unroll_branch": True,
+            #         "flange_present": False,
+            #         "weld_allowance": 3.0,
+            #         "mode": "polyline",
+            #         "material": "1.4404"
+            #     }
+            # }
         ]
     }
     # Тест для at_cylinder
