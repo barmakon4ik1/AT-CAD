@@ -405,6 +405,7 @@ class BridgeConfig:
     Он только:
     - извлекает данные из входного словаря
     - хранит их в логически разделённом виде
+    - предоставляет удобный доступ к данным через proxy-свойства
     """
 
     def __init__(self, data: dict):
@@ -415,14 +416,20 @@ class BridgeConfig:
         self.bridge_type: str = data["type"]
 
         # -------------------------------------------------
-        # Служебные / текстовые данные (НЕ геометрия)
+        # Технологические / текстовые данные
+        # (НЕ участвуют в расчётах геометрии)
         # -------------------------------------------------
-        self.meta: dict = data["meta"]
+        self.order_number: str = data["order_number"]
+        self.detail_number: str = data["detail_number"]
+        self.material: str = data["material"]
 
         # -------------------------------------------------
         # Геометрия мостика (обязательная)
         # -------------------------------------------------
-        self.geometry: dict = data["geometry"]
+        self.geometry: dict[str, float | list[float]] = data["geometry"]
+
+        # Толщина листа — участвует в геометрии!
+        self.thickness: float = float(data["thickness"])
 
         # -------------------------------------------------
         # Вырез в мостике (может отсутствовать)
@@ -440,26 +447,82 @@ class BridgeConfig:
         self.plates: list = data.get("plates", [])
         self.plates_gap: float = float(data.get("plates_gap", 5.0))
 
+    # =================================================
+    # Proxy-свойства: геометрия
+    # =================================================
+
+    @property
+    def center_point(self):
+        return self.geometry["center_point"]
+
+    @property
+    def width(self):
+        return self.geometry["width"]
+
+    @property
+    def height(self):
+        return self.geometry["height"]
+
+    @property
+    def length(self):
+        return self.geometry["length"]
+
+    # =================================================
+    # Proxy-свойства: вырез
+    # =================================================
+
+    @property
+    def h_cut(self):
+        if not self.cutout:
+            return 0.0
+        return self.cutout["height"]
+
+    @property
+    def l_cut(self):
+        if not self.cutout:
+            return 0.0
+        return self.cutout["length"]
+
+    @property
+    def r_cut(self):
+        if not self.cutout:
+            return 0.0
+        return self.cutout["radius"]
+
+    # =================================================
+    # Proxy-свойства: специфичные параметры
+    # =================================================
+    @property
+    def shell_diameter(self):
+        return self.specific["shell_diameter"]
+
+    @property
+    def angle(self):
+        """
+        Угол раскрытия / скоса боковин.
+        Используется в type3 / type5.
+        """
+        return self.specific["edge_angle"]
+
 
 def build_type1(model, cfg: BridgeConfig):
     """
     Тип 1 — плоский мостик с перемычкой.
-    Геометрия + размеры + тексты на перемычке.
     """
 
-    # ------------------------------------------------------------------
-    # Исходные данные (read-only)
-    # ------------------------------------------------------------------
+    # --------------------------------------------------
+    # Геометрия мостика
+    # --------------------------------------------------
+    center_point = cfg.geometry["center_point"]
+    bridge_width = cfg.geometry["width"]
+    bridge_height = cfg.geometry["height"]
 
-    center_point = cfg.center_point
-    bridge_width = cfg.width
-    bridge_height = cfg.height
-    radius = cfg.parameter1 / 2  # поведение углов мостика
+    # Радиус скругления углов мостика
+    radius = cfg.specific["corner_radius"]
 
-    # ------------------------------------------------------------------
-    # 1. Контур мостика
-    # ------------------------------------------------------------------
-
+    # --------------------------------------------------
+    # Контур мостика
+    # --------------------------------------------------
     add_rectangle(
         model=model,
         point=center_point,
@@ -470,11 +533,10 @@ def build_type1(model, cfg: BridgeConfig):
         radius=radius,
     )
 
-    # ------------------------------------------------------------------
-    # 2. Размеры
-    # ------------------------------------------------------------------
+    # --------------------------------------------------
+    # Размеры
+    # --------------------------------------------------
     cx, cy = center_point
-
     x_min = cx - bridge_width / 2
     x_max = cx + bridge_width / 2
     y_min = cy - bridge_height / 2
@@ -482,84 +544,65 @@ def build_type1(model, cfg: BridgeConfig):
 
     p_left_max = (x_min, y_max)
 
-    add_dimension(adoc,"H", ensure_point_variant(p_left_max), ensure_point_variant((x_max, y_max)), offset=DEFAULT_DIM_OFFSET)
-    add_dimension(adoc,"V",ensure_point_variant((x_min, y_min)), ensure_point_variant((x_min, y_max)), offset=DEFAULT_DIM_OFFSET)
+    add_dimension(adoc, "H",
+                  ensure_point_variant((x_min, y_max)),
+                  ensure_point_variant((x_max, y_max)),
+                  offset=DEFAULT_DIM_OFFSET)
 
-    # ------------------------------------------------------------------
-    # 3. Перемычка
-    # ------------------------------------------------------------------
+    add_dimension(adoc, "V",
+                  ensure_point_variant((x_min, y_min)),
+                  ensure_point_variant((x_min, y_max)),
+                  offset=DEFAULT_DIM_OFFSET)
 
-    web_l = cfg.length
-    web_h = cfg.parameter2
-    if web_l != 0 and web_h != 0:
-        h_cut = cfg.h_cut
-        web_h1 = (web_h - h_cut) / 2
-        web_l_cut = cfg.l_cut
-        r_cut = cfg.r_cut
+    # --------------------------------------------------
+    # Перемычка (специфика type1)
+    # --------------------------------------------------
+    web_length = cfg.geometry["length"]
+    web_height = cfg.specific["web_height"]
 
-        p0 = (cx + bridge_width / 2.0 + 100, cy - bridge_height / 2.0)
-        p1 = (p0[0] + web_l, p0[1])
+    if web_length > 0 and web_height > 0 and cfg.cutout:
+        h_cut = cfg.cutout["height"]
+        l_cut = cfg.cutout["length"]
+        r_cut = cfg.cutout["radius"]
+
+        web_h1 = (web_height - h_cut) / 2
+
+        p0 = (cx + bridge_width / 2 + 100, cy - bridge_height / 2)
+        p1 = (p0[0] + web_length, p0[1])
         p2 = (p1[0], p1[1] + web_h1)
-        p3 = (p2[0] - web_l_cut, p2[1])
+        p3 = (p2[0] - l_cut, p2[1])
         p4 = (p3[0], p3[1] + h_cut)
         p5 = (p2[0], p4[1])
-        p6 = (p1[0], p1[1] + web_h)
+        p6 = (p1[0], p1[1] + web_height)
         p7 = (p0[0], p6[1])
 
         pb = PolylineBuilder(p0)
-
         pb.line_to(p1)
+        pb.line_to(p2)
 
-        if web_h != 0 and h_cut != 0:
-            pb.line_to(p2)
+        if r_cut == 0.0:
+            pb.line_to(p3)
+            pb.line_to(p4)
+        else:
+            pb.corner(p3, p4, r_cut)
+            pb.corner(p4, p5, r_cut)
 
-            if r_cut == 0.0:
-                pb.line_to(p3)
-                pb.line_to(p4)
-            else:
-                pb.corner(p3, p4, r_cut)
-                pb.corner(p4, p5, r_cut)
-
-            pb.line_to(p5)
-
+        pb.line_to(p5)
         pb.line_to(p6)
         pb.line_to(p7)
         pb.close()
 
         add_polyline(model, pb.vertices(), layer_name="0", closed=True)
 
-        # Размеры на перемычке
-        add_dimension(adoc,"H", ensure_point_variant(p1), ensure_point_variant(p0), offset=DEFAULT_DIM_OFFSET)
-        add_dimension(adoc,"V", ensure_point_variant(p6), ensure_point_variant(p1), offset=DEFAULT_DIM_OFFSET)
+    # --------------------------------------------------
+    # Точка для сопроводительного текста
+    # --------------------------------------------------
+    text_insert_point = polar_point(
+        p_left_max,
+        TEXT_DISTANCE + DEFAULT_DIM_OFFSET,
+        90
+    )
 
-        # Тексты на перемычке
-        web_text_point = polar_point(p0, 10, 45)
-
-        add_text(
-            model=model,
-            point=web_text_point,
-            text=f"{cfg.order_number}",
-            layer_name=DEFAULT_TEXT_LAYER,
-            text_height=TEXT_HEIGHT_SMALL,
-            text_angle=math.radians(90),
-            text_alignment=6,
-        )
-
-        # лазерная маркировка
-        if cfg.material not in ("3.7035", "3.7235"):
-            add_text(
-                model=model,
-                point=web_text_point,
-                text=cfg.order_number,
-                layer_name=DEFAULT_LASER_LAYER,
-                text_height=TEXT_HEIGHT_LASER,
-                text_angle=0,
-                text_alignment=0,
-            )
-    # --------------------------------------------------------------
-
-    # Возвращаем ключевые точки для внешней логики
-    text_insert_point = polar_point(p_left_max, TEXT_DISTANCE + DEFAULT_DIM_OFFSET, 90)
     return {
         "bridge_top_left": p_left_max,
         "center": center_point,
@@ -571,38 +614,39 @@ def build_type2(model, cfg: BridgeConfig):
     """
     Построение развертки мостика типа BentStraight (type2).
     """
+    geom = cfg.geometry
+    cut = cfg.cutout
+    spec = cfg.specific
 
-    # ------------------------------------------------------------------
-    # Исходные данные (read-only из BridgeConfig)
-    # ------------------------------------------------------------------
-
-    center_point = cfg.center_point
-    width = cfg.width
-    bridge_height = cfg.height
-    length = cfg.length
+    center_point = geom["center_point"]
+    width = geom["width"]
+    bridge_height = geom["height"]
+    length = geom["length"]
     thickness = cfg.thickness
 
-    shell_radius = cfg.parameter1 / 2 if cfg.parameter1 else 0.0
+    shell_diameter = spec["shell_diameter"]
+    shell_radius = shell_diameter / 2 if shell_diameter else 0.0
 
-    h_cut = cfg.h_cut
-    h1_cut = (bridge_height - h_cut) / 2
-    l_cut = cfg.l_cut
-    r_cut = cfg.r_cut
+    if cut:
+        h_cut = cut["height"]
+        l_cut = cut["length"]
+        r_cut = cut["radius"]
+    else:
+        h_cut = l_cut = r_cut = 0.0
 
-    # ------------------------------------------------------------------
+    # --------------------------------------------------
     # Расчет полной длины
-    # ------------------------------------------------------------------
-
-    if shell_radius != 0.0:
-        length_full = (length + shell_radius - (shell_radius**2 - width**2 / 4) ** 0.5)
+    # --------------------------------------------------
+    if shell_radius:
+        length_full = length + shell_radius - (shell_radius ** 2 - width ** 2 / 4) ** 0.5
     else:
         length_full = length
 
-    # ------------------------------------------------------------------
-    # 1. Контур мостика
-    # ------------------------------------------------------------------
-
+    # --------------------------------------------------
+    # Геометрия
+    # --------------------------------------------------
     cx, cy = center_point
+    h1_cut = bridge_height - h_cut
 
     p0 = (cx + (0.5 * width - thickness), cy - (0.5 * bridge_height))
     p1 = (p0[0] + (length_full - thickness), p0[1])
@@ -703,30 +747,43 @@ def build_type2(model, cfg: BridgeConfig):
 
 def build_type3(model, cfg: BridgeConfig):
     """
-    Построение развертки мостика типа 3 - как на Cyba-Geige - скобой с двумя гибами по сторонам (type3).
+    Построение развертки мостика типа 3 —
+    скоба с двумя гибами по сторонам (как для Cyba-Geige).
     """
+
     # ------------------------------------------------------------------
-    # Исходные данные (read-only из BridgeConfig)
+    # Исходные данные (ТОЛЬКО чтение из BridgeConfig)
     # ------------------------------------------------------------------
 
-    center_point = cfg.center_point
-    width = cfg.width
-    bridge_height = cfg.height
-    length = cfg.length
+    geom = cfg.geometry
+    cut = cfg.cutout
+    spec = cfg.specific
+
+    center_point = geom["center_point"]
+    width = geom["width"]
+    bridge_height = geom["height"]
+    length = geom["length"]
     thickness = cfg.thickness
-    angle = cfg.angle
-    if angle <= 0:
-        angle = 90
-    parameter1 = cfg.parameter1
-    h_cut = cfg.h_cut
-    l_cut = cfg.l_cut
-    r_cut = cfg.r_cut
+
+    # Диаметр обечайки (обязателен для type3)
+    shell_diameter = spec["shell_diameter"]
+
+    # Угол открытия мостика
+    angle = spec["edge_angle"]
+
+    # Вырез
+    if cut:
+        h_cut = cut["height"]
+        l_cut = cut["length"]
+        r_cut = cut["radius"]
+    else:
+        h_cut = l_cut = r_cut = 0.0
 
     # ------------------------------------------------------------------
     # Расчетные данные
     # ------------------------------------------------------------------
     h1_cut = (bridge_height - h_cut) / 2
-    radius = parameter1 / 2.0
+    radius = shell_diameter / 2.0
     angle_rad = math.radians(angle)
     alpha_rad = (math.pi - angle_rad) / 2.0
     xs = thickness / math.sin(angle_rad / 2.0)
@@ -853,24 +910,35 @@ def build_type3(model, cfg: BridgeConfig):
 
 def build_type4(model, cfg: BridgeConfig):
     """
-    Построение развертки мостика типа BentStraight на трубу (type4).
+    Построение развертки мостика типа BentStraight
+    для посадки на горизонтальный цилиндр (type4).
     """
 
     # ------------------------------------------------------------------
     # Исходные данные (read-only из BridgeConfig)
     # ------------------------------------------------------------------
-    center_point = cfg.center_point
-    width = cfg.width
-    bridge_height = cfg.height
-    length = cfg.length
-    thickness = cfg.thickness
-    parameter2 = cfg.parameter2
+    geom = cfg.geometry
+    spec = cfg.specific
+    cut = cfg.cutout
 
-    h_cut = cfg.h_cut
-    l_cut = cfg.l_cut
-    # Если r_cut = 0 - сегмент будет повторять окружность цилиндра с вырезом,
-    # иначе - вертикальный прямой, но со скруглением (>0) или фаской abs(<0)
-    r_cut = cfg.r_cut
+    center_point = geom["center_point"]
+    width = geom["width"]
+    bridge_height = geom["height"]
+    length = geom["length"]
+    thickness = cfg.thickness
+
+    # Диаметр горизонтального цилиндра (обязательный для type4)
+    shell_diameter = spec["shell_diameter"]
+
+    # Параметры выреза
+    if cut:
+        h_cut = cut["height"]
+        l_cut = cut["length"]
+        # Если r_cut = 0 — повторяет окружность цилиндра,
+        # > 0 — скругление, < 0 — фаска
+        r_cut = cut["radius"]
+    else:
+        h_cut = l_cut = r_cut = 0.0
 
     # ------------------------------------------------------------------
     # Расчетные данные
@@ -878,7 +946,7 @@ def build_type4(model, cfg: BridgeConfig):
     h1_cut = (bridge_height - h_cut) / 2
     l1 = length - thickness
     w1 = 0.5 * width - thickness
-    r2 = parameter2 / 2.0
+    r2 = shell_diameter / 2.0
     a = bridge_height / 2 - h1_cut
     x = l1 + r2 - (r2 ** 2 - bridge_height ** 2 / 4) ** 0.5
     # alpha = math.atan(bridge_height / (2 * r2))
@@ -1000,34 +1068,44 @@ def build_type4(model, cfg: BridgeConfig):
 
 def build_type5(model, cfg: BridgeConfig):
     """
-    Построение развертки мостика со скошенными краями на трубу (type5).
+    Построение развертки мостика со скошенными краями
+    для посадки на горизонтальный цилиндр (type5).
     """
 
     # ------------------------------------------------------------------
     # Исходные данные (read-only из BridgeConfig)
     # ------------------------------------------------------------------
-    center_point = cfg.center_point
-    width = cfg.width
-    bridge_height = cfg.height
-    length = cfg.length
-    thickness = cfg.thickness
-    parameter2 = cfg.parameter2
-    angle = cfg.angle
+    geom = cfg.geometry
+    spec = cfg.specific
+    cut = cfg.cutout
 
-    h_cut = cfg.h_cut
-    l_cut = cfg.l_cut
-    # Если r_cut = 0 - сегмент будет повторять окружность цилиндра с вырезом,
-    # иначе - вертикальный прямой, но со скруглением (>0) или фаской abs(<0)
-    r_cut = cfg.r_cut
+    center_point = geom["center_point"]
+    width = geom["width"]
+    bridge_height = geom["height"]
+    length = geom["length"]
+    thickness = cfg.thickness
+
+    # Специфические параметры type5
+    shell_diameter = spec["shell_diameter"]
+    angle = spec["edge_angle"]
+
+    # Параметры выреза
+    if cut:
+        h_cut = cut["height"]
+        l_cut = cut["length"]
+        # r_cut = 0 — повтор окружности
+        # >0 — скругление, <0 — фаска
+        r_cut = cut["radius"]
+    else:
+        h_cut = l_cut = r_cut = 0.0
 
     # ------------------------------------------------------------------
     # Расчетные данные
     # ------------------------------------------------------------------
     angle_rad = math.radians(angle)
-    h1_cut = (bridge_height - h_cut) / 2
     l1 = length - thickness
     w1 = 0.5 * width - thickness
-    r2 = parameter2 / 2.0
+    r2 = shell_diameter / 2.0
     l_full = w1 + l1 + r2
     lx = bridge_height / (2 * math.tan(angle_rad / 2.0))
     l01 = l_full - lx
@@ -1148,8 +1226,6 @@ def build_type5(model, cfg: BridgeConfig):
     add_dimension(adoc, "V", p1415v, p89v, offset=DEFAULT_DIM_OFFSET + off_v_89_1415)
 
     # Возвращаем ключевые точки, если понадобятся дальше
-    # Габариты мостика
-
     text_insert_point = polar_point(p9, TEXT_DISTANCE + off_h_9_89 + 2 * DEFAULT_DIM_OFFSET, 90)
     return {
         "top_right": p6,
@@ -1162,6 +1238,12 @@ def build_type5(model, cfg: BridgeConfig):
 class BridgeBuilder:
     """
     Центральный класс построения развертки мостика.
+
+    Оркестрирует:
+    - построение геометрии
+    - тексты
+    - таблички
+    - сопроводительную информацию
     """
 
     def __init__(self, cfg: BridgeConfig, plates_data: dict):
@@ -1247,44 +1329,95 @@ if __name__ == "__main__":
 
     np = NamePlate()
     bridge_data = {
+        # --------------------------------------------------
+        # Тип мостика
+        # --------------------------------------------------
+        # "type1" | "type2" | "type3" | "type4" | "type5"
         "type": "type4",
+
         # --------------------------------------------------
         # Технологические параметры (обязательные)
+        # НЕ участвуют в геометрии, но нужны для сопровождения
         # --------------------------------------------------
         "order_number": "20366",
         "detail_number": "2-20",
         "material": "1.4301",
-        "thickness": 3.0,
-        # --------------------------------------------------
-        # Геометрия мостика
-        # --------------------------------------------------
-        "center_point": [0, 0],
-        "width": 125.0,
-        "height": 65.0,
-        "length": 70.0,
 
-        "parameter1": 0.0,
-        "parameter2": 219.1,
-        "angle": 0.0,
+        # Толщина листа — УЧАСТВУЕТ в геометрии (НЕ meta!)
+        "thickness": 3.0,
+
         # --------------------------------------------------
-        # Геометрия выреза в мостике
+        # Геометрия мостика (базовая)
         # --------------------------------------------------
-        "h_cut": 20.0,
-        "l_cut": 20.0,
-        "r_cut": 5.0,
+        "geometry": {
+            "center_point": [0.0, 0.0],  # базовая точка построения
+            "width": 125.0,  # ширина мостика
+            "height": 65.0,  # высота мостика
+            "length": 70.0,  # длина площадки
+        },
+
+        # --------------------------------------------------
+        # Специфические параметры типа мостика
+        # --------------------------------------------------
+        # ВНИМАНИЕ:
+        # - наличие параметра означает, что он ЗАДАН
+        # - отсутствие параметра означает, что он НЕ НУЖЕН
+        # - никаких значений "по умолчанию" тут быть не должно
+        # --------------------------------------------------
+        "specific": {
+            # --- Тип 1 ---
+            # Радиус скругления углов мостика
+            "corner_radius": 5.0,
+            # Высота перемычки (если отличается от height мостика)
+            "web_height": 40.0,
+
+            # --- Тип 3 / 4 / 5 ---
+            # Диаметр обечайки (вертикальной или горизонтальной)
+            "shell_diameter": 219.1,
+
+            # --- Тип 3 / 5 ---
+            # Угол раскрытия / скоса боковин
+            "edge_angle": 90.0,
+
+            # --- Будущее развитие ---
+            # Для посадки на конус, смещения от вершины и т.п.
+            # "cone_top_offset": 0.0,
+            # "cone_length": 0.0,
+            # "cone_diameter_top": 0.0,
+            # "cone_diameter_bottom": 0.0,
+        },
+
+        # --------------------------------------------------
+        # Геометрия выреза в мостике (если есть)
+        # --------------------------------------------------
+        # Если вырез НЕ нужен — секцию "cutout" УДАЛЯЕМ целиком
+        # --------------------------------------------------
+        "cutout": {
+            "height": 20.0,  # высота выреза
+            "length": 20.0,  # длина выреза
+            # r_cut:
+            #   = 0   → повторяет окружность цилиндра
+            #   > 0   → скругление
+            #   < 0   → фаска (abs)
+            "radius": 5.0,
+        },
+
         # --------------------------------------------------
         # Таблички
         # --------------------------------------------------
         "plates": [
             # {
-            #     "name": "GEA_gross",  # имя из name_plates.json
-            #     # "offset_top": 0.0 # отступ верхнего края таблички от верха мостика
+            #     "name": "GEA_gross",   # имя из name_plates.json
+            #     # "offset_top": 0.0    # отступ верхнего края от верха мостика
             # },
-            {"name": "GEA_klein"},
+            {
+                "name": "GEA_klein",
+            },
         ],
-        "plates_gap": 5.0,  # расстояние между краями табличек
-    }
 
+        # Расстояние между краями табличек
+        "plates_gap": 5.0,
+    }
 
     if model:
         cfg = BridgeConfig(bridge_data)
