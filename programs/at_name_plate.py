@@ -1,10 +1,21 @@
-# File: programs/at_name_plate.py
 """
-Модуль отрисовки таблички сосуда под давлением по заданным параметрам
+File: at_name_plate.py
+
+Назначение:
+    Построение разверток мостиков для табличек сосудов под давлением.
+
+Функциональность:
+    - геометрия мостиков различных типов (type1 … type5)
+    - вырезы в мостике (прямой / скругление / фаска)
+    - размещение табличек
+    - стандартные и сопроводительные тексты
+
+Примечание:
+    Модуль работает с входным словарем bridge_data,
+    структура которого описана в BridgeConfig.
 """
 
 from __future__ import annotations
-
 import json
 import math
 from typing import Dict, List
@@ -66,7 +77,6 @@ TRANSLATIONS = {
         ),
     },
 }
-
 
 loc.register_translations(TRANSLATIONS)
 
@@ -390,93 +400,45 @@ class PlateHoles:
 class BridgeConfig:
     """
     Read-only конфигурация мостика.
-    Все параметры извлекаются один раз из словаря GUI.
+
+    Класс НЕ выполняет расчёты.
+    Он только:
+    - извлекает данные из входного словаря
+    - хранит их в логически разделённом виде
     """
-
-    __slots__ = (
-        # main data
-        "order_number",
-        "detail_number",
-        "material",
-
-        # type
-        "bridge_type",
-
-        # insert point
-        "center_point",
-
-        # dimension
-        "thickness",
-        "width",
-        "height",
-        "length",
-        "parameter1",
-        "parameter2",
-        "angle",
-
-        # cut
-        "h_cut",
-        "l_cut",
-        "r_cut",
-
-        # plates and offsets
-        "plates",
-        "offset_top",
-        "plates_gap",
-    )
 
     def __init__(self, data: dict):
 
         # -------------------------------------------------
-        # main data
-        self.order_number = data["order_number"]
-        self.detail_number = data["detail_number"]
-        self.material = data["material"]
+        # Тип мостика
+        # -------------------------------------------------
+        self.bridge_type: str = data["type"]
 
         # -------------------------------------------------
-        # type
-        self.bridge_type = data["type"]
+        # Служебные / текстовые данные (НЕ геометрия)
+        # -------------------------------------------------
+        self.meta: dict = data["meta"]
 
         # -------------------------------------------------
-        # insert point
-        self.center_point = self._get_center_point(data)
+        # Геометрия мостика (обязательная)
+        # -------------------------------------------------
+        self.geometry: dict = data["geometry"]
 
         # -------------------------------------------------
-        # dimensions
-        self.thickness = float(data["thickness"])
-        self.width = float(data["width"])
-        self.height = float(data["height"])
-        self.length = float(data["length"])
-
-        self.parameter1 = float(data.get("parameter1", 0.0))
-        self.parameter2 = float(data.get("parameter2", 0.0))
-        self.angle = float(data.get("angle", 0))
+        # Вырез в мостике (может отсутствовать)
+        # -------------------------------------------------
+        self.cutout: dict | None = data.get("cutout")
 
         # -------------------------------------------------
-        # cut
-        self.h_cut = float(data["h_cut"])
-        self.l_cut = float(data["l_cut"])
-        self.r_cut = float(data["r_cut"])
+        # Специфичные параметры типа мостика
+        # -------------------------------------------------
+        self.specific: dict = data.get("specific", {})
 
         # -------------------------------------------------
-        # plates
-        self.plates = data.get("plates", [])
-        self.offset_top = float(data.get("offset_top", 0.0))
-        self.plates_gap = float(data.get("plates_gap", 5.0))
-
-    # =====================================================
-    # helpers
-    # =====================================================
-
-    @staticmethod
-    def _get_center_point(data: dict):
-        """
-        Возвращает точку вставки.
-        """
-        center_point = data.get("center_point")
-        if center_point is None:
-            return [0, 0]
-        return tuple(center_point)
+        # Таблички
+        # -------------------------------------------------
+        self.plates: list = data.get("plates", [])
+        self.plates_gap: float = float(data.get("plates_gap", 5.0))
 
 
 def build_type1(model, cfg: BridgeConfig):
@@ -1290,7 +1252,7 @@ if __name__ == "__main__":
         # Технологические параметры (обязательные)
         # --------------------------------------------------
         "order_number": "20366",
-        "detail_number": "1-21",
+        "detail_number": "2-20",
         "material": "1.4301",
         "thickness": 3.0,
         # --------------------------------------------------
@@ -1299,9 +1261,10 @@ if __name__ == "__main__":
         "center_point": [0, 0],
         "width": 125.0,
         "height": 65.0,
-        "parameter1": 0.0,
-        "parameter2": 273.0,
         "length": 70.0,
+
+        "parameter1": 0.0,
+        "parameter2": 219.1,
         "angle": 0.0,
         # --------------------------------------------------
         # Геометрия выреза в мостике
