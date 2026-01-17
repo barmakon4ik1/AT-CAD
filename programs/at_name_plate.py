@@ -1088,6 +1088,7 @@ def build_type5(model, cfg: BridgeConfig):
     # Специфические параметры type5
     shell_diameter = spec["shell_diameter"]
     angle = spec["edge_angle"]
+    variant = spec["variant"]
 
     # Параметры выреза
     if cut:
@@ -1102,54 +1103,86 @@ def build_type5(model, cfg: BridgeConfig):
     # ------------------------------------------------------------------
     # Расчетные данные
     # ------------------------------------------------------------------
-    angle_rad = math.radians(angle)
-    l1 = length - thickness
-    w1 = 0.5 * width - thickness
-    r2 = shell_diameter / 2.0
-    l_full = w1 + l1 + r2
-    lx = bridge_height / (2 * math.tan(angle_rad / 2.0))
-    l01 = l_full - lx
+    w1 = 0.5 * width - thickness # приводим к внутренней ширине для развертки
+    a = math.radians(angle) / 2.0 # половина угла в радианах
+    h1 = bridge_height / 2.0
+    r = shell_diameter / 2.0
+    h1_cut = h_cut / 2.0
+
+    cx, cy = center_point
+
+    # ------------------------------------------------------------------
+    # Расчет точек
+    # ------------------------------------------------------------------
+    p0 = (cx + w1, cy - h1)
+
+    if variant != "3":
+        l = length - thickness
+    else:
+        l = length - thickness # TODO найти формулу!
+
+    C = (cx + w1 + l + r, cy)
+    l1 = spec.get("l1", 0.0)
+    l2 = h1 / math.tan(a)
+
+    if l1 == 0.0:
+        l1 = l + r - l2
+    l01 = l1 - thickness # приводим к внутренней длине для развертки
+
+    p01 = (p0[0] + l01, p0[1])
+    p1 = (
+        cx + w1 + l + r * (1 + math.sin(a)),
+        cy - r * math.cos(a)
+    )
+
+    # Debug
+    add_circle(model, C, r, layer_name="AM_5")
+    add_circle(model, p1, 1.5, layer_name="AM_5")
+
+    l12 = math.sqrt(r * r - h1_cut * h1_cut)
+    p2 = (
+        2 * C[0] - p1[0],
+        p1[1]
+    )
+
+    p3 = (p2[0] - l_cut, p2[1])
+    p4 = (p3[0], p3[1] + h_cut)
+    p5 = (p2[0], cy + h1_cut)
+    p6 = (p1[0], cy + r * math.cos(a))
+    p67 = (p01[0], cy +h1)
+    p7 = (p0[0], p67[1])
+    p8 = (cx - w1, p7[1])
+    p89 = (p0[0] - l01, p67[1])
+    p15 = (p8[0], p7[1])
+    p1415 = (p89[0], p0[1])
+    p14 = (
+        cx - w1 - l - r * (1 + math.sin(a)),
+        cy - r * math.cos(a)
+    )
+    p9 = (p14[0], p6[1])
+    p13 = (p15[0] - l12, p5[1])
+    p10 = [p13[0], p5[1]]
+    p11 = (p10[0] + l_cut, p10[1])
+    p12 = (p11[0], p3[1])
+
+    chord = distance_2points(p1, p2)
+
+    if chord > 2 * r:
+        raise ValueError(
+            f"Invalid chord: {chord:.3f} > diameter {2 * r:.3f}\n"
+            f"p1={p1}, p2={p2}, r={r}"
+        )
 
     # ------------------------------------------------------------------
     # 1. Контур мостика
     # ------------------------------------------------------------------
-    cx, cy = center_point
-
-    p0 = (cx + w1, cy - bridge_height / 2.0)
-    p01 = (cx + l01, p0[1])
-    cp = (cx + w1 + l1 + r2, cy)
-    cp1 = (cx - w1 - l1 - r2, cy)
-    l1x = lx * r2 / (distance_2points(p01, cp))
-    h1x = math.sqrt(r2 * r2 - l1x * l1x)
-    p1 =(cp[0] - l1x , cp[1] - h1x)
-    p15 = (p0[0] - 2 * w1, p0[1])
-    p14 = (cp1[0] + l1x , cp[1] - h1x)
-    l2x = (math.sqrt(r2 * r2 - (h_cut / 2.0) ** 2))
-    p2 = (cp[0] - l2x, cy - h_cut / 2.0)
-    p3 = (p2[0] - l_cut, p2[1])
-    p4 = (p3[0], p3[1] + h_cut)
-    p5 = (p2[0], p4[1])
-
-    p6 = (p1[0], cp[1] + h1x)
-    p67 = (p01[0], p0[1] + bridge_height)
-    p7 = (p0[0], p67[1])
-    p8 = (p15[0], p67[1])
-    p89 = (cx - l01, p67[1])
-    p9 = (p14[0], p6[1])
-
-    p10 = (cp1[0] + l2x, cy + h_cut / 2.0)
-    p11 = (p10[0] + l_cut, p10[1])
-    p12 = (p11[0], p3[1])
-    p13 = (p10[0], p3[1])
-    p1415 = (p89[0], p0[1])
-
     pb = PolylineBuilder(p0)
 
     pb.line_to(p01)
     pb.line_to(p1)
     if l_cut != 0.0 and h_cut != 0.0:
-        bulge = bulge_chord(r2, distance_2points(p1, p2))
-        bulge1 = bulge_chord(r2 + r_cut, distance_2points(p3, p4))
+        bulge = bulge_chord(r, distance_2points(p1, p2))
+        bulge1 = bulge_chord(r + r_cut, distance_2points(p3, p4))
         pb.arc_to(p1, -bulge)
         pb.line_to(p2)
         if r_cut == 0.0:
@@ -1175,7 +1208,7 @@ def build_type5(model, cfg: BridgeConfig):
         pb.arc_to(p13, -bulge)
     else:
         chord = distance_2points(p1, p6)
-        bulge = bulge_chord(r2, chord)
+        bulge = bulge_chord(r, chord)
         pb.arc_to(p1, -bulge)
         pb.line_to(p6)
         pb.line_to(p67)
@@ -1333,7 +1366,7 @@ if __name__ == "__main__":
         # Тип мостика
         # --------------------------------------------------
         # "type1" | "type2" | "type3" | "type4" | "type5"
-        "type": "type4",
+        "type": "type5",
 
         # --------------------------------------------------
         # Технологические параметры (обязательные)
@@ -1351,9 +1384,9 @@ if __name__ == "__main__":
         # --------------------------------------------------
         "geometry": {
             "center_point": [0.0, 0.0],  # базовая точка построения
-            "width": 125.0,  # ширина мостика
-            "height": 65.0,  # высота мостика
-            "length": 70.0,  # длина площадки
+            "width": 170.0,  # ширина мостика
+            "height": 160.0,  # высота мостика
+            "length": 100.0,  # длина площадки
         },
 
         # --------------------------------------------------
@@ -1373,11 +1406,16 @@ if __name__ == "__main__":
 
             # --- Тип 3 / 4 / 5 ---
             # Диаметр обечайки (вертикальной или горизонтальной)
-            "shell_diameter": 219.1,
+            "shell_diameter": 120,
 
             # --- Тип 3 / 5 ---
             # Угол раскрытия / скоса боковин
             "edge_angle": 90.0,
+
+            # --- Тип 5 ---
+            # Вариант набора исходных данных
+            "variant": 1,
+            "l1": 40,
 
             # --- Будущее развитие ---
             # Для посадки на конус, смещения от вершины и т.п.
@@ -1393,26 +1431,26 @@ if __name__ == "__main__":
         # Если вырез НЕ нужен — секцию "cutout" УДАЛЯЕМ целиком
         # --------------------------------------------------
         "cutout": {
-            "height": 20.0,  # высота выреза
+            "height": 50.0,  # высота выреза
             "length": 20.0,  # длина выреза
             # r_cut:
             #   = 0   → повторяет окружность цилиндра
             #   > 0   → скругление
             #   < 0   → фаска (abs)
-            "radius": 5.0,
+            "radius": 0.0,
         },
 
         # --------------------------------------------------
         # Таблички
         # --------------------------------------------------
         "plates": [
-            # {
-            #     "name": "GEA_gross",   # имя из name_plates.json
-            #     # "offset_top": 0.0    # отступ верхнего края от верха мостика
-            # },
             {
-                "name": "GEA_klein",
+                "name": "GEA_gross",   # имя из name_plates.json
+                # "offset_top": 0.0    # отступ верхнего края от верха мостика
             },
+            # {
+            #     "name": "GEA_klein",
+            # },
         ],
 
         # Расстояние между краями табличек
