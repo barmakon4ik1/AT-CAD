@@ -29,7 +29,7 @@ from programs.at_construction import add_polyline, add_text, add_rectangle, add_
 from locales.at_translations import loc
 from programs.at_dimension import add_dimension
 from programs.at_geometry import polar_point, PolylineBuilder, ensure_point_variant, bulge_from_center, at_bulge, \
-    calculate_angles, distance_2points, bulge_chord
+    calculate_angles, distance_2points, bulge_chord, circle_line_intersection
 from windows.at_gui_utils import show_popup
 
 # ---------------------------------------------------------------------------
@@ -564,44 +564,97 @@ def build_type1(model, cfg: BridgeConfig):
         h_cut = cfg.cutout["height"]
         l_cut = cfg.cutout["length"]
         r_cut = cfg.cutout["radius"]
+    else:
+        h_cut = 0.0
+        l_cut = 0.0
+        r_cut = 0.0
 
-        web_h1 = (web_height - h_cut) / 2
+    web_h1 = (web_height - h_cut) / 2
 
-        p0 = (cx + bridge_width / 2 + 100, cy - bridge_height / 2)
-        p1 = (p0[0] + web_length, p0[1])
-        p2 = (p1[0], p1[1] + web_h1)
-        p3 = (p2[0] - l_cut, p2[1])
-        p4 = (p3[0], p3[1] + h_cut)
-        p5 = (p2[0], p4[1])
-        p6 = (p1[0], p1[1] + web_height)
-        p7 = (p0[0], p6[1])
+    p0 = (cx + bridge_width / 2 + 100, cy - bridge_height / 2)
+    p1 = (p0[0] + web_length, p0[1])
+    p2 = (p1[0], p1[1] + web_h1)
+    p3 = (p2[0] - l_cut, p2[1])
+    p4 = (p3[0], p3[1] + h_cut)
+    p5 = (p2[0], p4[1])
+    p6 = (p1[0], p1[1] + web_height)
+    p7 = (p0[0], p6[1])
 
-        pb = PolylineBuilder(p0)
-        pb.line_to(p1)
-        pb.line_to(p2)
+    pb = PolylineBuilder(p0)
+    pb.line_to(p1)
+    pb.line_to(p2)
 
-        if r_cut == 0.0:
-            pb.line_to(p3)
-            pb.line_to(p4)
-        else:
-            pb.corner(p3, p4, r_cut)
-            pb.corner(p4, p5, r_cut)
+    if r_cut == 0.0:
+        pb.line_to(p3)
+        pb.line_to(p4)
+    else:
+        pb.corner(p3, p4, r_cut)
+        pb.corner(p4, p5, r_cut)
 
-        pb.line_to(p5)
-        pb.line_to(p6)
-        pb.line_to(p7)
-        pb.close()
+    pb.line_to(p5)
+    pb.line_to(p6)
+    pb.line_to(p7)
+    pb.close()
 
-        add_polyline(model, pb.vertices(), layer_name="0", closed=True)
+    add_polyline(model, pb.vertices(), layer_name="0", closed=True)
+
+    # ширина перемычки
+    add_dimension(
+        adoc,
+        "H",
+        ensure_point_variant(p1),
+        ensure_point_variant(p0),
+        offset=DEFAULT_DIM_OFFSET,
+    )
+
+    # высота перемычки
+    add_dimension(
+        adoc,
+        "V",
+        ensure_point_variant(p6),
+        ensure_point_variant(p1),
+        offset=DEFAULT_DIM_OFFSET,
+    )
 
     # --------------------------------------------------
     # Точка для сопроводительного текста
     # --------------------------------------------------
-    text_insert_point = polar_point(
-        p_left_max,
-        TEXT_DISTANCE + DEFAULT_DIM_OFFSET,
-        90
+    text_insert_point = polar_point(p_left_max, TEXT_DISTANCE + DEFAULT_DIM_OFFSET,90)
+
+    # ------------------------------------------------------------------
+    # 4. Тексты на перемычке
+    # ------------------------------------------------------------------
+
+    web_text_point = polar_point(p0, 10, 45)
+    web_text = f'{cfg.order_number}-{cfg.specific["add_detail_number"]}'
+    if web_length < web_height:
+        text_angle = math.radians(90)
+        text_alignment = 6
+    else:
+        text_angle = math.radians(0)
+        text_alignment = 0
+
+    add_text(
+        model=model,
+        point=web_text_point,
+        text=web_text,
+        layer_name=DEFAULT_TEXT_LAYER,
+        text_height=TEXT_HEIGHT_SMALL,
+        text_angle=text_angle,
+        text_alignment=text_alignment
     )
+
+    # лазерная маркировка
+    if cfg.material not in ("3.7035", "3.7235"):
+        add_text(
+            model=model,
+            point=web_text_point,
+            text=cfg.order_number,
+            layer_name=DEFAULT_LASER_LAYER,
+            text_height=TEXT_HEIGHT_LASER,
+            text_angle=0,
+            text_alignment=0,
+        )
 
     return {
         "bridge_top_left": p_left_max,
@@ -624,7 +677,7 @@ def build_type2(model, cfg: BridgeConfig):
     length = geom["length"]
     thickness = cfg.thickness
 
-    shell_diameter = spec["shell_diameter"]
+    shell_diameter = spec["shell_diameter1"]
     shell_radius = shell_diameter / 2 if shell_diameter else 0.0
 
     if cut:
@@ -646,7 +699,7 @@ def build_type2(model, cfg: BridgeConfig):
     # Геометрия
     # --------------------------------------------------
     cx, cy = center_point
-    h1_cut = bridge_height - h_cut
+    h1_cut = (bridge_height - h_cut) / 2.0
 
     p0 = (cx + (0.5 * width - thickness), cy - (0.5 * bridge_height))
     p1 = (p0[0] + (length_full - thickness), p0[1])
@@ -766,7 +819,7 @@ def build_type3(model, cfg: BridgeConfig):
     thickness = cfg.thickness
 
     # Диаметр обечайки (обязателен для type3)
-    shell_diameter = spec["shell_diameter"]
+    shell_diameter = spec["shell_diameter1"]
 
     # Угол открытия мостика
     angle = spec["edge_angle"]
@@ -928,7 +981,7 @@ def build_type4(model, cfg: BridgeConfig):
     thickness = cfg.thickness
 
     # Диаметр горизонтального цилиндра (обязательный для type4)
-    shell_diameter = spec["shell_diameter"]
+    shell_diameter = spec["shell_diameter1"]
 
     # Параметры выреза
     if cut:
@@ -1086,9 +1139,12 @@ def build_type5(model, cfg: BridgeConfig):
     thickness = cfg.thickness
 
     # Специфические параметры type5
-    shell_diameter = spec["shell_diameter"]
+    shell_diameter1 = spec["shell_diameter1"]
+    shell_diameter2 = spec.get("shell_diameter2", shell_diameter1)
     angle = spec["edge_angle"]
     variant = spec["variant"]
+
+    l1 = spec.get("l1", 0.0) # длина полочки до скоса
 
     # Параметры выреза
     if cut:
@@ -1104,10 +1160,12 @@ def build_type5(model, cfg: BridgeConfig):
     # Расчетные данные
     # ------------------------------------------------------------------
     w1 = 0.5 * width - thickness # приводим к внутренней ширине для развертки
-    a = math.radians(angle) / 2.0 # половина угла в радианах
     h1 = bridge_height / 2.0
-    r = shell_diameter / 2.0
+    r1 = shell_diameter1 / 2.0
+    r2 = shell_diameter2 / 2.0
     h1_cut = h_cut / 2.0
+    a = math.radians(angle) / 2.0
+    l = length - thickness
 
     cx, cy = center_point
 
@@ -1116,73 +1174,80 @@ def build_type5(model, cfg: BridgeConfig):
     # ------------------------------------------------------------------
     p0 = (cx + w1, cy - h1)
 
-    if variant != "3":
-        l = length - thickness
+    center1 = (cx + w1 + l + r1, cy)
+    center2 = (cx - w1 - l - r2, cy)
+
+    # variant 1 - известны L, L1, D, A, H
+    # variant 2 - известны L, D, A, H, линия наклона проходит через центр окружности
+    # variant 3 - известны L2, L1, D, A, H
+    if variant == 1:
+        l01 = l1 - thickness # приводим к внутренней длине для развертки
+        p01 = (p0[0] + l01, p0[1])
+        p1, delta1 = circle_line_intersection(p01, center1, shell_diameter1, a)
+    elif variant == 2:
+        l01 = l + r1 - thickness - (h1 / math.tan(a))
+        p01 = (p0[0] + l01, p0[1])
+        p1, delta1 = circle_line_intersection(p01, center1, shell_diameter1, a)
+        pass
+    elif variant == 3:
+        l01 = l1 - thickness  # приводим к внутренней длине для развертки
+        p01 = (p0[0] + l01, p0[1])
+        p1 = (cx + w1 + l + r1, cy) # Здесь l = L2 - thickness -> Учесть в GUI!
     else:
-        l = length - thickness # TODO найти формулу!
+        raise ValueError("variant must be 1 - 3")
 
-    C = (cx + w1 + l + r, cy)
-    l1 = spec.get("l1", 0.0)
-    l2 = h1 / math.tan(a)
+    # Debug---------------------
+    add_circle(model, center1, r1, layer_name="AM_5")
+    add_circle(model, center2, r2, layer_name="AM_5")
 
-    if l1 == 0.0:
-        l1 = l + r - l2
-    l01 = l1 - thickness # приводим к внутренней длине для развертки
+    # --------------------------
 
-    p01 = (p0[0] + l01, p0[1])
-    p1 = (
-        cx + w1 + l + r * (1 + math.sin(a)),
-        cy - r * math.cos(a)
-    )
-
-    # Debug
-    add_circle(model, C, r, layer_name="AM_5")
-    add_circle(model, p1, 1.5, layer_name="AM_5")
-
-    l12 = math.sqrt(r * r - h1_cut * h1_cut)
-    p2 = (
-        2 * C[0] - p1[0],
-        p1[1]
-    )
-
+    p2 = (center1[0] - math.sqrt(r1 * r1 - h1_cut * h1_cut), cy - h1_cut)
     p3 = (p2[0] - l_cut, p2[1])
     p4 = (p3[0], p3[1] + h_cut)
     p5 = (p2[0], cy + h1_cut)
-    p6 = (p1[0], cy + r * math.cos(a))
-    p67 = (p01[0], cy +h1)
+    p6 = (p1[0], cy + (center1[1] - p1[1]))
+    p67 = (p01[0], cy + h1)
     p7 = (p0[0], p67[1])
+
     p8 = (cx - w1, p7[1])
-    p89 = (p0[0] - l01, p67[1])
-    p15 = (p8[0], p7[1])
-    p1415 = (p89[0], p0[1])
-    p14 = (
-        cx - w1 - l - r * (1 + math.sin(a)),
-        cy - r * math.cos(a)
-    )
-    p9 = (p14[0], p6[1])
-    p13 = (p15[0] - l12, p5[1])
+    p89 = (p8[0] - l01, p67[1])
+    p15 = (p8[0], p01[1])
+    p1415 = (p89[0], p01[1])
+
+    p14, delta2 = circle_line_intersection(p1415, center2, shell_diameter2, -a)
+    p9 = (p14[0], cy + (center2[1] - p14[1]))
+    p13 = (center2[0] + math.sqrt(r2 * r2 - h1_cut * h1_cut), cy - h1_cut)
     p10 = [p13[0], p5[1]]
     p11 = (p10[0] + l_cut, p10[1])
     p12 = (p11[0], p3[1])
 
-    chord = distance_2points(p1, p2)
+    chord1 = distance_2points(p1, p2)
 
-    if chord > 2 * r:
+    if chord1 > 2 * r1:
         raise ValueError(
-            f"Invalid chord: {chord:.3f} > diameter {2 * r:.3f}\n"
-            f"p1={p1}, p2={p2}, r={r}"
+            f"Invalid chord: {chord1:.3f} > diameter {2 * r1:.3f}\n"
+            f"p1={p1}, p2={p2}, r={r1}"
+        )
+
+    chord2 = distance_2points(p13, p14)
+
+    if chord1 > 2 * r2:
+        raise ValueError(
+            f"Invalid chord: {chord2:.3f} > diameter {2 * r2:.3f}\n"
+            f"p1={p13}, p2={p14}, r={r2}"
         )
 
     # ------------------------------------------------------------------
     # 1. Контур мостика
-    # ------------------------------------------------------------------
+    # # ------------------------------------------------------------------
     pb = PolylineBuilder(p0)
 
     pb.line_to(p01)
     pb.line_to(p1)
     if l_cut != 0.0 and h_cut != 0.0:
-        bulge = bulge_chord(r, distance_2points(p1, p2))
-        bulge1 = bulge_chord(r + r_cut, distance_2points(p3, p4))
+        bulge = bulge_chord(r1, distance_2points(p1, p2))
+        bulge1 = bulge_chord(r1 + r_cut, distance_2points(p3, p4))
         pb.arc_to(p1, -bulge)
         pb.line_to(p2)
         if r_cut == 0.0:
@@ -1197,25 +1262,29 @@ def build_type5(model, cfg: BridgeConfig):
         pb.line_to(p7)
         pb.line_to(p8)
         pb.line_to(p89)
-        pb.arc_to(p9, -bulge)
+        bulge2 = bulge_chord(r2, distance_2points(p13, p14))
+        bulge3 = bulge_chord(r2 + r_cut, distance_2points(p11, p12))
+        pb.arc_to(p9, -bulge2)
         pb.line_to(p10)
         if r_cut == 0.0:
-            pb.arc_to(p11, -bulge1)
+            pb.arc_to(p11, -bulge3)
             pb.line_to(p12)
         else:
             pb.corner(p11, p12, r_cut)
             pb.corner(p12, p13, r_cut)
         pb.arc_to(p13, -bulge)
     else:
-        chord = distance_2points(p1, p6)
-        bulge = bulge_chord(r, chord)
+        chord1 = distance_2points(p1, p6)
+        chord2 = distance_2points(p9, p14)
+        bulge = bulge_chord(r1, chord1)
+        bulge3 = bulge_chord(r2, chord2)
         pb.arc_to(p1, -bulge)
         pb.line_to(p6)
         pb.line_to(p67)
         pb.line_to(p7)
         pb.line_to(p8)
         pb.line_to(p89)
-        pb.arc_to(p9, -bulge)
+        pb.arc_to(p9, -bulge3)
 
     pb.line_to(p14)
     pb.line_to(p1415)
@@ -1366,7 +1435,7 @@ if __name__ == "__main__":
         # Тип мостика
         # --------------------------------------------------
         # "type1" | "type2" | "type3" | "type4" | "type5"
-        "type": "type5",
+        "type": "type2",
 
         # --------------------------------------------------
         # Технологические параметры (обязательные)
@@ -1386,7 +1455,7 @@ if __name__ == "__main__":
             "center_point": [0.0, 0.0],  # базовая точка построения
             "width": 170.0,  # ширина мостика
             "height": 160.0,  # высота мостика
-            "length": 100.0,  # длина площадки
+            "length": 70.0,  # длина площадки
         },
 
         # --------------------------------------------------
@@ -1401,12 +1470,15 @@ if __name__ == "__main__":
             # --- Тип 1 ---
             # Радиус скругления углов мостика
             "corner_radius": 5.0,
+            "add_detail_number": "21",
             # Высота перемычки (если отличается от height мостика)
-            "web_height": 40.0,
+            "web_height": 100.0,
 
-            # --- Тип 3 / 4 / 5 ---
+            # --- Тип 2 / 3 / 4 / 5 ---
             # Диаметр обечайки (вертикальной или горизонтальной)
-            "shell_diameter": 120,
+            # shell_diameter1 - основной, когда нужен только один диаметр
+            "shell_diameter1": 0,
+            "shell_diameter2": 90,
 
             # --- Тип 3 / 5 ---
             # Угол раскрытия / скоса боковин
@@ -1414,6 +1486,9 @@ if __name__ == "__main__":
 
             # --- Тип 5 ---
             # Вариант набора исходных данных
+            # variant 1 - известны L, L1, D, A, H, здесь L - расстояние от плоскости таблички до касания цилиндра
+            # variant 2 - известны L, D, A, H, линия наклона проходит через центр окружности, L как и в варианте 1
+            # variant 3 - известны L2, L1, D, A, H, здесь L2 - расстояние от плоскости таблички до точки пересечения скоса с цилиндром
             "variant": 1,
             "l1": 40,
 
@@ -1431,7 +1506,7 @@ if __name__ == "__main__":
         # Если вырез НЕ нужен — секцию "cutout" УДАЛЯЕМ целиком
         # --------------------------------------------------
         "cutout": {
-            "height": 50.0,  # высота выреза
+            "height": 30.0,  # высота выреза
             "length": 20.0,  # длина выреза
             # r_cut:
             #   = 0   → повторяет окружность цилиндра

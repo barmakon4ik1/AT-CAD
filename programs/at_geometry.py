@@ -855,6 +855,59 @@ class PolylineBuilder:
     def vertices(self) -> List[Vertex]:
         return self._vertices
 
+def circle_line_intersection(p01, C, D, A):
+        """
+        Функция нахождения точки пересечения окружности с наклонной линией
+        (точка p1 на развертке мостика типа 5)
+        p01 = (x01, y01)  координаты точки начала наклонной прямой
+        C   = (xc, yc)    координаты центра окружности
+        D   = диаметр окружности
+        A   = угол наклона прямой к горизонтали в радианах
 
+        Returns:
+            p1 (x1, y1),
+            (H  = yc - y1,
+            Lx = xc - x1,
+            Ld = abs(xc - x1)) - включить, если надо
+        """
+        x0, y0 = p01
+        xc, yc = C
+        R = D / 2.0
+
+        t = math.tan(A)
+
+        # квадратное уравнение: (1+t^2)x^2 - 2*(xc + t^2*x0 + t*(yc - y0))*x + (...) = 0
+        under_sqrt = R * R * (1 + t * t) - (yc - y0 - t * (xc - x0)) ** 2
+
+        if under_sqrt < 0:
+            raise ValueError("Нет допустимого пересечения")
+
+        sqrt_val = math.sqrt(under_sqrt)
+
+        # два решения для x
+        x1 = (xc + t * t * x0 + t * (yc - y0)) + sqrt_val
+        x2 = (xc + t * t * x0 + t * (yc - y0)) - sqrt_val
+
+        x1 /= (1 + t * t)
+        x2 /= (1 + t * t)
+
+        # соответствующие y
+        y1 = y0 + t * (x1 - x0)
+        y2 = y0 + t * (x2 - x0)
+
+        # выбираем точку, ближайшую к исходной точке
+        d1 = math.hypot(x1 - x0, y1 - y0)
+        d2 = math.hypot(x2 - x0, y2 - y0)
+
+        if d1 < d2:
+            x, y = x1, y1
+        else:
+            x, y = x2, y2
+
+        H = yc - y
+        ld = xc - x
+        # Lx = R - Ld
+
+        return (x, y), ld
 
 # Конец модуля
