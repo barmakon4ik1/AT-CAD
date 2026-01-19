@@ -905,9 +905,9 @@ def circle_line_intersection(p01, C, D, A):
             x, y = x2, y2
 
         H = yc - y
-        ld = xc - x
+        # ld = xc - x
         # Lx = R - Ld
 
-        return (x, y), ld
+        return x, y
 
 # Конец модуля

@@ -1124,6 +1124,12 @@ def build_type5(model, cfg: BridgeConfig):
     Построение развертки мостика со скошенными краями
     для посадки на горизонтальный цилиндр (type5).
     """
+    # TODO (GUI):
+    #   variant logic is temporary.
+    #   In GUI all type5 variants must be normalized to:
+    #       - L  (length)
+    #       - L1 (shelf length before bevel)
+    #   build_type5 must NOT contain variant-specific logic.
 
     # ------------------------------------------------------------------
     # Исходные данные (read-only из BridgeConfig)
@@ -1145,6 +1151,7 @@ def build_type5(model, cfg: BridgeConfig):
     variant = spec["variant"]
 
     l1 = spec.get("l1", 0.0) # длина полочки до скоса
+    l2 = spec.get("l2", 0.0) # длина полочки до пересечения с цилиндром
 
     # Параметры выреза
     if cut:
@@ -1164,7 +1171,7 @@ def build_type5(model, cfg: BridgeConfig):
     r1 = shell_diameter1 / 2.0
     r2 = shell_diameter2 / 2.0
     h1_cut = h_cut / 2.0
-    a = math.radians(angle) / 2.0
+    a = math.radians(angle) / 2.0 # половина угла скоса
     l = length - thickness
 
     cx, cy = center_point
@@ -1174,27 +1181,37 @@ def build_type5(model, cfg: BridgeConfig):
     # ------------------------------------------------------------------
     p0 = (cx + w1, cy - h1)
 
-    center1 = (cx + w1 + l + r1, cy)
-    center2 = (cx - w1 - l - r2, cy)
-
     # variant 1 - известны L, L1, D, A, H
     # variant 2 - известны L, D, A, H, линия наклона проходит через центр окружности
     # variant 3 - известны L2, L1, D, A, H
     if variant == 1:
         l01 = l1 - thickness # приводим к внутренней длине для развертки
-        p01 = (p0[0] + l01, p0[1])
-        p1, delta1 = circle_line_intersection(p01, center1, shell_diameter1, a)
+        dx = 0.0
     elif variant == 2:
-        l01 = l + r1 - thickness - (h1 / math.tan(a))
-        p01 = (p0[0] + l01, p0[1])
-        p1, delta1 = circle_line_intersection(p01, center1, shell_diameter1, a)
-        pass
+        l01 = l + r1 - (h1 / math.tan(a))
+        dx = 0.0
     elif variant == 3:
-        l01 = l1 - thickness  # приводим к внутренней длине для развертки
-        p01 = (p0[0] + l01, p0[1])
-        p1 = (cx + w1 + l + r1, cy) # Здесь l = L2 - thickness -> Учесть в GUI!
+        l2 -= thickness
+        l01 = l1 - thickness
+
+        # вертикальное смещение точки пересечения от оси цилиндра
+        dy = (l2 - l01) * math.tan(a)
+
+        if abs(dy) > r1:
+            raise ValueError("variant 3: dy > radius")
+
+        dx = r1 - math.sqrt(r1 * r1 - dy * dy)
     else:
-        raise ValueError("variant must be 1 - 3")
+        raise ValueError("variant must be 1, 2 or 3")
+
+    center1 = (cx + w1 + l + r1 - dx, cy)
+    center2 = (cx - w1 - l - r1 + dx, cy)
+
+    cx1, cy1 = center1
+    cx2, cy2 = center2
+
+    p01 = (p0[0] + l01, p0[1])
+    p1 = circle_line_intersection(p01, center1, shell_diameter1, a)
 
     # Debug---------------------
     add_circle(model, center1, r1, layer_name="AM_5")
@@ -1206,7 +1223,7 @@ def build_type5(model, cfg: BridgeConfig):
     p3 = (p2[0] - l_cut, p2[1])
     p4 = (p3[0], p3[1] + h_cut)
     p5 = (p2[0], cy + h1_cut)
-    p6 = (p1[0], cy + (center1[1] - p1[1]))
+    p6 = (p1[0], cy + (cy1 - p1[1]))
     p67 = (p01[0], cy + h1)
     p7 = (p0[0], p67[1])
 
@@ -1215,8 +1232,8 @@ def build_type5(model, cfg: BridgeConfig):
     p15 = (p8[0], p01[1])
     p1415 = (p89[0], p01[1])
 
-    p14, delta2 = circle_line_intersection(p1415, center2, shell_diameter2, -a)
-    p9 = (p14[0], cy + (center2[1] - p14[1]))
+    p14 = circle_line_intersection(p1415, center2, shell_diameter2, -a)
+    p9 = (p14[0], cy + (cy2 - p14[1]))
     p13 = (center2[0] + math.sqrt(r2 * r2 - h1_cut * h1_cut), cy - h1_cut)
     p10 = [p13[0], p5[1]]
     p11 = (p10[0] + l_cut, p10[1])
@@ -1232,7 +1249,7 @@ def build_type5(model, cfg: BridgeConfig):
 
     chord2 = distance_2points(p13, p14)
 
-    if chord1 > 2 * r2:
+    if chord2 > 2 * r2:
         raise ValueError(
             f"Invalid chord: {chord2:.3f} > diameter {2 * r2:.3f}\n"
             f"p1={p13}, p2={p14}, r={r2}"
@@ -1272,7 +1289,7 @@ def build_type5(model, cfg: BridgeConfig):
         else:
             pb.corner(p11, p12, r_cut)
             pb.corner(p12, p13, r_cut)
-        pb.arc_to(p13, -bulge)
+        pb.arc_to(p13, -bulge2)
     else:
         chord1 = distance_2points(p1, p6)
         chord2 = distance_2points(p9, p14)
@@ -1435,7 +1452,7 @@ if __name__ == "__main__":
         # Тип мостика
         # --------------------------------------------------
         # "type1" | "type2" | "type3" | "type4" | "type5"
-        "type": "type2",
+        "type": "type5",
 
         # --------------------------------------------------
         # Технологические параметры (обязательные)
@@ -1455,7 +1472,7 @@ if __name__ == "__main__":
             "center_point": [0.0, 0.0],  # базовая точка построения
             "width": 170.0,  # ширина мостика
             "height": 160.0,  # высота мостика
-            "length": 70.0,  # длина площадки
+            "length": 100.0,  # длина площадки
         },
 
         # --------------------------------------------------
@@ -1477,7 +1494,7 @@ if __name__ == "__main__":
             # --- Тип 2 / 3 / 4 / 5 ---
             # Диаметр обечайки (вертикальной или горизонтальной)
             # shell_diameter1 - основной, когда нужен только один диаметр
-            "shell_diameter1": 0,
+            "shell_diameter1": 80,
             "shell_diameter2": 90,
 
             # --- Тип 3 / 5 ---
@@ -1489,8 +1506,9 @@ if __name__ == "__main__":
             # variant 1 - известны L, L1, D, A, H, здесь L - расстояние от плоскости таблички до касания цилиндра
             # variant 2 - известны L, D, A, H, линия наклона проходит через центр окружности, L как и в варианте 1
             # variant 3 - известны L2, L1, D, A, H, здесь L2 - расстояние от плоскости таблички до точки пересечения скоса с цилиндром
-            "variant": 1,
-            "l1": 40,
+            "variant": 3,
+            "l1": 50,
+            "l2": 100,
 
             # --- Будущее развитие ---
             # Для посадки на конус, смещения от вершины и т.п.
