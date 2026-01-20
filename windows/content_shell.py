@@ -27,6 +27,11 @@ from config.at_config import SHELL_IMAGE_PATH, UNWRAPPER_PATH, DEFAULT_SETTINGS,
 # -----------------------------
 TRANSLATIONS = {
     "error": {"ru": "Ошибка", "de": "Fehler", "en": "Error"},
+    "point_prompt": {
+        "ru": "Введите точку вставки оболочки",
+        "de": "Einfügepunkt für Mantel eingeben",
+        "en": "Enter the shell insertion point",
+    },
     "main_data_label": {"ru": "Основные данные", "de": "Hauptdaten", "en": "Main Data"},
     "order_label": {"ru": "К-№", "de": "Auftragsnummer", "en": "Order No."},
     "material_label": {"ru": "Материал", "de": "Material", "en": "Material"},

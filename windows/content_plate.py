@@ -42,9 +42,9 @@ TRANSLATIONS = {
         "en": "Material"
     },
     "thickness_label": {
-        "ru": "Толщина S",
-        "de": "Dicke S",
-        "en": "Thickness S"
+        "ru": "Толщина S, мм",
+        "de": "Dicke S, mm",
+        "en": "Thickness S, mm"
     },
     "melt_no_label": {
         "ru": "Номер плавки",
@@ -583,5 +583,3 @@ if __name__ == "__main__":
     frame.Layout()
     frame.Show()
     app.MainLoop()
-
-
