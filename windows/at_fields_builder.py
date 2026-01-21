@@ -24,7 +24,7 @@
 | combo      | wx.ComboBox     | Нет          | "Default"             | None             |
 """
 
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict
 
 import wx
 from windows.at_window_utils import get_standard_font

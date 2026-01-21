@@ -345,20 +345,14 @@ class ATMainWindow(wx.Frame):
         self.update_footer_hint(content_name)
 
     def switch_content(self, content_name: str) -> None:
-        """
-        Переключает содержимое основной области на указанный контент.
-
-        Args:
-            content_name (str): Имя контента для отображения.
-        """
         if not isinstance(content_name, str):
             content_name = str(content_name)
 
-        # Очищаем текущий контент
+        # Уничтожаем старый контент, но не очищаем весь сайзер
         if self.current_content:
+            self.content_sizer.Hide(self.current_content)
             self.current_content.Destroy()
             self.current_content = None
-        self.content_sizer.Clear(True)
 
         try:
             new_content = at_load_content(content_name, self.content_panel)
@@ -366,10 +360,14 @@ class ATMainWindow(wx.Frame):
             if new_content and isinstance(new_content, wx.Window):
                 self.current_content = new_content
                 self.current_content.content_name = content_name
-                self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
 
-                # 🔹 Привязываем callback для отправки данных в build_module
-                if hasattr(self.current_content, "on_submit_callback"):
+                # Добавляем в существующий сайзер
+                self.content_sizer.Add(self.current_content, 1, wx.EXPAND | wx.ALL, 5)
+                self.content_panel.Layout()
+                self.content_panel.Refresh()
+
+                # Callback on_submit
+                if hasattr(new_content, "on_submit_callback"):
                     def on_submit(data):
                         from windows.at_content_registry import CONTENT_REGISTRY
                         import importlib
@@ -387,26 +385,33 @@ class ATMainWindow(wx.Frame):
                             print(f"[DEBUG] Ошибка при импорте/вызове {content_name}: {e}")
                         return False
 
-                    self.current_content.on_submit_callback = on_submit
+                    new_content.on_submit_callback = on_submit
 
-                # 🔹 форсируем обновление языка для новой панели
+                # Форсируем локализацию
                 if hasattr(new_content, 'update_ui_language'):
                     new_content.update_ui_language()
 
             else:
-                error_msg = f"Ошибка загрузки {content_name}"
-                self.current_content = wx.StaticText(self.content_panel, label=error_msg)
+                # Если не удалось создать
+                self.current_content = wx.StaticText(
+                    self.content_panel,
+                    label=f"Ошибка загрузки {content_name}"
+                )
                 self.current_content.content_name = content_name
-                self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
-        except Exception as e:
-            error_msg = f"Ошибка загрузки {content_name}: {str(e)}"
-            self.current_content = wx.StaticText(self.content_panel, label=error_msg)
-            self.current_content.content_name = content_name
-            self.content_sizer.Add(self.current_content, proportion=1, flag=wx.EXPAND | wx.ALL, border=5)
+                self.content_sizer.Add(self.current_content, 1, wx.EXPAND | wx.ALL, 5)
+                self.content_panel.Layout()
+                self.content_panel.Refresh()
 
-        self.content_panel.Layout()
-        self.content_panel.Refresh()
-        self.content_panel.Update()
+        except Exception as e:
+            self.current_content = wx.StaticText(
+                self.content_panel,
+                label=f"Ошибка загрузки {content_name}: {e}"
+            )
+            self.current_content.content_name = content_name
+            self.content_sizer.Add(self.current_content, 1, wx.EXPAND | wx.ALL, 5)
+            self.content_panel.Layout()
+            self.content_panel.Refresh()
+
         self.update_ui(self.settings)
         self.update_footer_hint(content_name)
 

@@ -1,0 +1,137 @@
+# Мини-чеклист для адаптации setup_ui()
+# 1 Инициализация формы
+# 1. Создать объект FormBuilder для текущей панели
+self.form = FormBuilder(self)
+
+# 2. Создать FieldBuilder с привязкой к правому sizer
+self.fb = FieldBuilder(
+    parent=self,
+    target_sizer=self.right_sizer,
+    form=self.form
+)
+
+# Комментарий:
+# self.form хранит все поля формы, умеет собирать и валидировать данные.
+# self.fb упрощает добавление полей с метками, StaticBox и поддерживает локализацию.
+
+# 2 Основные данные в StaticBox
+# 3. Создать StaticBox для группы "Основные данные"
+main_data_box = self.fb.static_box(
+    box_key="main_data",   # ключ локализации
+    orient=wx.VERTICAL,
+    proportion=0,
+    flag=wx.EXPAND | wx.ALL,
+    border=5
+)
+
+# Комментарий:
+# Всё, что будет добавляться в main_data_box, автоматически пойдёт внутрь этого бокса.
+# Можно использовать self.sizer для полей, но внутри StaticBox будет удобнее.
+
+# 3 Поля в группе "Основные данные
+# 4. Поле "Материал" — wx.Choice
+self.material_ctrl = self.fb.choice(
+    name="material",
+    label_key="material",
+    choices=material_options,  # список из common_data
+    required=True
+)
+
+# 5. Поле "Толщина" — wx.ComboBox
+self.thickness_ctrl = self.fb.combo(
+    name="thickness",
+    label_key="thickness",
+    choices=thickness_options,
+    value=default_thickness,
+    required=True
+)
+
+# 6. Поле "Номер плавки" — wx.TextCtrl
+self.melt_no_ctrl = self.fb.text(
+    name="melt_no",
+    label_key="melt_no",
+    required=False
+)
+
+# Комментарий:
+# choice автоматически создаёт локальный getter для правильного возврата выбранного текста.
+# combo возвращает GetValue() стандартно.
+# text и multiline_text возвращают текст из wx.TextCtrl.
+
+# 4 Группа "Размеры"
+# 7. StaticBox для размеров
+dimensions_box = self.fb.static_box(
+    box_key="dimensions",
+    orient=wx.VERTICAL,
+    proportion=0,
+    flag=wx.EXPAND | wx.ALL,
+    border=5
+)
+
+# 8. Выпадающий список размеров
+self.size_combo = self.fb.combo(
+    name="size",
+    label_key="size",
+    choices=size_options,
+    value=loc.get("manual_input_label", "Ручной ввод"),
+    required=True
+)
+
+# 9. Таблица ручного ввода (GridSizer)
+self.size_inputs = []
+self.size_grid_sizer = wx.GridSizer(rows=5, cols=2, vgap=5, hgap=1)
+for _ in range(5):
+    l_input = wx.TextCtrl(dimensions_box, value="", size=(200, -1))
+    h_input = wx.TextCtrl(dimensions_box, value="", size=(200, -1))
+    l_input.SetFont(self.fb.font)
+    h_input.SetFont(self.fb.font)
+    l_input.Enable(False)
+    h_input.Enable(False)
+    self.size_inputs.append((l_input, h_input))
+    self.size_grid_sizer.Add(l_input, 0, wx.ALL, 5)
+    self.size_grid_sizer.Add(h_input, 0, wx.ALL, 5)
+dimensions_box.Add(self.size_grid_sizer, 0, wx.ALL | wx.EXPAND, 5)
+
+# 10. Поле "Отступ от края"
+self.allowance_input = self.fb.text(
+    name="allowance",
+    label_key="allowance",
+    value="10",
+    required=True
+)
+
+# Комментарий:
+# Ставим StaticBox для логической группы «Размеры».
+# GridSizer для ручного ввода можно оставить как есть, он не требует FieldBuilder.
+# allowance_input через FieldBuilder, чтобы автоматически зарегистрировать в форме.
+
+# 5 Кнопки
+# 11. Панель кнопок (например, OK / Cancel)
+self.right_sizer.Add(self.create_button_bar(), 0, wx.ALIGN_RIGHT | wx.ALL, 5)
+
+#Комментарий:
+# Можно обернуть кнопки через LocalizableButton, если нужна динамическая локализация:
+# ok_btn = LocalizableButton(self.ok_button, "ok_label")
+# cancel_btn = LocalizableButton(self.cancel_button, "cancel_label")
+
+# 6 Завершение компоновки
+# 12. Добавляем левую и правую части
+main_sizer = wx.BoxSizer(wx.HORIZONTAL)
+main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
+main_sizer.Add(self.right_sizer, 0, wx.ALL | wx.EXPAND, 10)
+self.SetSizer(main_sizer)
+
+apply_styles_to_panel(self)
+self.Layout()
+
+# Комментарий:
+# После этого все поля формы зарегистрированы в self.form.
+# Чтобы получить данные: data = self.form.collect().
+# Для валидации обязательных полей — достаточно вызвать get_value() для каждого.
+
+"""Полезные советы
+Везде, где нужен текст с локализацией — использовать FieldBuilder (_create_label).
+Для групп полей — static_box + всё внутри него через FieldBuilder.
+Choice с текстом — всегда использовать getter локально.
+ComboBox для редактируемых полей — GetValue() стандартно.
+Документация и отладка — self.form.print_fields_table() покажет все поля."""
