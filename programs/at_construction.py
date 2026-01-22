@@ -777,7 +777,7 @@ class AccompanyText:
         """
         thickness = self.data["thickness"]
         material = self.data["material"]
-        text = f'{thickness} {loc.get("mm", "mm")} {material}'
+        text = f'{thickness}{loc.get("mm", "mm")} {material}'
 
         add_text(
             model=model,

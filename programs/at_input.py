@@ -170,7 +170,7 @@ def at_get_point(adoc: object = None,
         if prompt is None:
             prompt = loc.get("select_point_prompt")
 
-        # Вывод промпта и попытка фокусировки UI
+        # Вывод prompt и попытка фокусировки UI
         try:
             adoc.Utility.Prompt(prompt + "\n")
         except Exception:
