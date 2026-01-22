@@ -240,7 +240,7 @@ class PlateContentPanel(BaseContentPanel):
         self.size_combo.Bind(wx.EVT_COMBOBOX, self.on_size_combo_change)
         self.on_size_combo_change()
 
-    def on_size_combo_change(self) -> None:
+    def on_size_combo_change(self, event=None) -> None:
         """
         Обрабатывает изменение выбора в выпадающем списке размеров.
         """
@@ -249,6 +249,7 @@ class PlateContentPanel(BaseContentPanel):
         for l_input, h_input in self.size_inputs:
             l_input.Enable(is_manual)
             h_input.Enable(is_manual)
+        _ = event
 
     def clear_input_fields(self) -> None:
         """

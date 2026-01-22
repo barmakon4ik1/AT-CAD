@@ -5,14 +5,12 @@ windows/content_rings.py
 """
 
 import wx
-from typing import Optional, Dict, cast
-from config.at_cad_init import ATCadInit
+from typing import Optional
 from config.at_config import (
     RING_IMAGE_PATH,
-    DEFAULT_SETTINGS, INPUT_FIELD_SIZE,
+    DEFAULT_SETTINGS,
 )
 from locales.at_translations import loc
-from programs.at_input import at_get_point
 from windows.at_fields_builder import FieldBuilder, FormBuilder
 from windows.at_window_utils import (
     CanvasPanel,
@@ -43,19 +41,6 @@ TRANSLATIONS = {
     "error": {"ru": "Ошибка", "de": "Fehler", "en": "Error"},
 }
 loc.register_translations(TRANSLATIONS)
-
-
-# ----------------------------------------------------------------------
-# Парсер диаметров
-# ----------------------------------------------------------------------
-def parse_diameters(text: str) -> Dict[str, float]:
-    items = [s.strip() for s in text.split(",") if s.strip()]
-    if not items:
-        raise ValueError(loc.get("no_data_error"))
-    result: Dict[str, float] = {}
-    for i, value in enumerate(items, start=1):
-        result[str(i)] = float(value.replace(",", "."))
-    return result
 
 
 # ----------------------------------------------------------------------
@@ -101,11 +86,9 @@ class RingsContentPanel(BaseContentPanel):
         self.left_sizer: Optional[wx.BoxSizer] = None
         self.right_sizer: Optional[wx.BoxSizer] = None
         self.canvas: Optional[CanvasPanel] = None
-        self.form: Optional[FormBuilder] = None
-        self.fb: Optional[FieldBuilder] = None
-        self.material_ctrl: Optional[wx.Choice] = None
-        self.thickness_ctrl: Optional[wx.ComboBox] = None
-        self.diameter_inputs: list[wx.TextCtrl] = []
+        self.form = None
+        self.fb = None
+        self.diameter_inputs = []
 
     # ------------------------------------------------------------------
     # UI
@@ -139,11 +122,6 @@ class RingsContentPanel(BaseContentPanel):
         # Форма
         # ------------------------------------------------------------
         self.form = FormBuilder(self)
-        # fb_root = FieldBuilder(
-        #     parent=self,  # parent = self, не StaticBox
-        #     target_sizer=self.right_sizer,
-        #     form=self.form
-        # )
         self.fb = FieldBuilder(
             parent=self,
             target_sizer=self.right_sizer,
@@ -165,10 +143,8 @@ class RingsContentPanel(BaseContentPanel):
         # Order + Detail (одна строка)
         row = wx.BoxSizer(wx.HORIZONTAL)
 
-        lbl_order = fb_main._create_label("order_label")
+        lbl_order = fb_main.create_label("order_label")
         order_ctrl = wx.TextCtrl(self, size=wx.Size(150, -1))
-
-        # lbl_detail = fb_main._create_label("detail_label")
         detail_ctrl = wx.TextCtrl(self, size=wx.Size(150, -1))
 
         self.form.register("order", order_ctrl)
@@ -176,13 +152,12 @@ class RingsContentPanel(BaseContentPanel):
 
         row.Add(lbl_order, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
         row.Add(order_ctrl, 0, wx.RIGHT, 10)
-        # row.Add(lbl_detail, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
         row.Add(detail_ctrl, 1)
 
         main_data_sizer.Add(row, 0, wx.EXPAND | wx.ALL, 5)
 
         # Material
-        self.material_ctrl = fb_main.choice(
+        fb_main.choice(
             name="material",
             label_key="material_label",
             choices=material_options,
@@ -190,7 +165,7 @@ class RingsContentPanel(BaseContentPanel):
         )
 
         # Thickness
-        self.thickness_ctrl = fb_main.combo(
+        fb_main.combo(
             name="thickness",
             label_key="thickness_label",
             choices=thickness_options,
@@ -204,12 +179,11 @@ class RingsContentPanel(BaseContentPanel):
         self.static_boxes["diameters"] = diam_sizer.GetStaticBox()
 
         grid = wx.GridSizer(5, 1, 5, 5)
-        self.diameter_inputs = []
+        # self.diameter_inputs = []
 
         for i in range(5):
             ctrl = wx.TextCtrl(self, size=wx.Size(200, -1))
             self.form.register(f"diameter_{i + 1}", ctrl)
-            self.diameter_inputs.append(ctrl)
             grid.Add(ctrl, 0, wx.EXPAND)
 
         diam_sizer.Add(grid, 0, wx.ALL, 5)
@@ -236,71 +210,41 @@ class RingsContentPanel(BaseContentPanel):
     # ------------------------------------------------------------------
     def clear_input_fields(self):
         self.form.clear()
-        self.input_point = None
+        self.insert_point = None
         update_status_bar_point_selected(self, None)
 
     # ------------------------------------------------------------------
-    # Данные
-    # ------------------------------------------------------------------
-    def collect_input_data(self) -> Optional[Dict]:
-        """
-        Собирает данные из полей ввода панели RingsContentPanel.
-        """
-        try:
-            # Материал
-            material = self.material_ctrl.GetStringSelection() if self.material_ctrl else ""
-
-            # Толщина
-            try:
-                thickness = float(self.thickness_ctrl.GetValue()) if self.thickness_ctrl else 0.0
-            except ValueError:
-                show_popup(loc.get("invalid_number_format_error"), popup_type="error")
-                return None
-
-            diameters = self.diameter_inputs
-
-            return {
-                "insert_point": self.insert_point,
-                "material": material,
-                "thickness": thickness,
-                "diameters": diameters,
-            }
-
-        except Exception as e:
-            show_popup(loc.get("error") + f": {str(e)}", popup_type="error")
-            return None
-
-    # ------------------------------------------------------------------
-    # Кнопки
+    # Кнопки-
     # ------------------------------------------------------------------
     def on_ok(self, *args, **kwargs) -> None:
-        """
-        Обрабатывает нажатие кнопки "ОК", запрашивает точку и вызывает callback.
-        """
-        event = kwargs.get('event', None)  # если нужно использовать event
         try:
-            main_window = wx.GetTopLevelParent(self)
-            cast(wx.Frame, main_window).Iconize(True)
-            cad = ATCadInit()
-            point = at_get_point(cad.document, as_variant=False, prompt="Введите левый нижний угол листа")
-            cast(wx.Frame, main_window).Iconize(False)
-            main_window.Raise()
-            main_window.SetFocus()
-            wx.Yield()
-
-            if not isinstance(point, list) or len(point) != 3:
-                show_popup(loc.get("point_selection_error"), popup_type="error")
+            data = self.form.collect()
+            if not data:
+                show_popup(loc.get("no_data_error"), popup_type="error")
                 return
 
-            self.insert_point = point
-            update_status_bar_point_selected(self, point)
+            # диаметры
+            diameters = {
+                k.replace("diameter_", ""): float(v.replace(",", "."))
+                for k, v in data.items()
+                if k.startswith("diameter_") and str(v).strip()
+            }
 
-            data = self.collect_input_data()
-            if data and self.validate_input(data):
-                if self.on_submit_callback:
-                    self.on_submit_callback(data)
+            if not diameters:
+                show_popup(loc.get("no_data_error"), popup_type="error")
+                return
+
+            data["diameters"] = diameters
+
+            if not self.validate_input(data):
+                return
+
+            if self.on_submit_callback:
+                self.on_submit_callback(data)
+
+        except ValueError as e:
+            show_popup(str(e), popup_type="error")
         except Exception as e:
-            _ = event  # чтобы event считался использованным
             show_popup(loc.get("error") + f": {str(e)}", popup_type="error")
 
     def on_clear(self, event: Optional[wx.Event] = None):
@@ -310,6 +254,8 @@ class RingsContentPanel(BaseContentPanel):
     def on_cancel(self, event: Optional[wx.Event] = None, switch_content="content_apps"):
         _ = event
         self.switch_content_panel(switch_content)
+
+
 
 
 # ----------------------------------------------------------------------
@@ -324,22 +270,11 @@ if __name__ == "__main__":
     panel = RingsContentPanel(frame)
 
     def on_ok_test():
-        try:
-            # Тестовая точка для имитации ввода
-            cad = ATCadInit()
-            point = at_get_point(cad.document, as_variant=False, prompt="Введите левый нижний угол листа")
-            panel.insert_point = point  # Сохраняем точку как список [x, z, y]
-            update_status_bar_point_selected(panel, point)
+        data = panel.form.collect()
+        if data:
+            print("FORM DATA:", data)
+            main(data)
 
-            # Собираем данные, введённые пользователем
-            data = panel.collect_input_data()
-            if data:
-                print("Собранные данные:", data)
-                main(data)
-            else:
-                print("Ошибка: данные не собраны")
-        except Exception as e:
-            print(f"Ошибка в тестовом запуске: {e}")
 
     sizer = wx.BoxSizer(wx.VERTICAL)
     sizer.Add(panel, 1, wx.EXPAND)

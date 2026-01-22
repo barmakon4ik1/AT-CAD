@@ -17,16 +17,15 @@
 """
 import math
 import sys
-from typing import Optional, Any, List, Union, Tuple
+from typing import Optional, Any, List, Union
 import os
 import logging
 
-import win32com
 from win32com.client import VARIANT
 import pythoncom
 
 from config.at_cad_init import ATCadInit
-from config.at_config import DEFAULT_TEXT_LAYER, DEFAULT_DIM_OFFSET
+from config.at_config import DEFAULT_TEXT_LAYER, DEFAULT_DIM_OFFSET, TEXT_HEIGHT_BIG
 from programs.at_base import regen
 from programs.at_dimension import add_dimension
 from programs.at_geometry import add_rectangle_points, offset_point, polar_point, ensure_point_variant
@@ -163,7 +162,11 @@ TRANSLATIONS = {
         "en": "Error creating spline: {0}",
         "de": "Fehler beim Erstellen der Spline: {0}"
     },
-
+    "mm": {
+        "ru": "мм",
+        "de": "mm",
+        "en": "mm"
+    }
 }
 # Регистрируем переводы сразу при загрузке модуля
 loc.register_translations(TRANSLATIONS)
@@ -758,6 +761,33 @@ def add_text(
         logger.error(f"add_text failed: {str(e)}")
         show_popup(loc.get("text_error", f"Ошибка при создании текста: {str(e)}"), popup_type="error")
         return None
+
+
+class AccompanyText:
+    """
+    Сопроводительный текст с толщиной и маркой материала
+    """
+
+    def __init__(self, data: dict):
+        self.data = data
+
+    def draw(self, model, text_insert_point, text_alignment=0):
+        """
+        Отображение текста
+        """
+        thickness = self.data["thickness"]
+        material = self.data["material"]
+        text = f'{thickness} {loc.get("mm", "mm")} {material}'
+
+        add_text(
+            model=model,
+            point=text_insert_point,
+            text=text,
+            layer_name=DEFAULT_TEXT_LAYER,
+            text_height=TEXT_HEIGHT_BIG,
+            text_angle=0,
+            text_alignment=text_alignment,
+        )
 
 
 if __name__ == "__main__":

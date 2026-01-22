@@ -118,13 +118,24 @@ class FormBuilder:
             ctrl=ctrl,
             required=required,
             parser=parser,
-            default=default
+            default=default,
+            getter=getter
         )
         return ctrl
 
-    def collect(self) -> Dict[str, Any]:
+
+
+    def collect(self) -> dict:
         """Собирает значения всех полей формы в словарь."""
-        return {name: field.get_value() for name, field in self.fields.items()}
+        data = {}
+
+        for name, field in self.fields.items():
+            try:
+                data[name] = field.get_value()
+            except Exception as e:
+                raise ValueError(f"Error in field '{name}': {e}") from e
+
+        return data
 
     def clear(self):
         """Очищает все поля формы."""
@@ -266,6 +277,8 @@ class FieldBuilder:
     # ------------------------------------------------------------------
     # Создание контролов
     # ------------------------------------------------------------------
+    def create_label(self, label_key: str) -> wx.StaticText:
+        return self._create_label(label_key)
 
     def text(
         self,

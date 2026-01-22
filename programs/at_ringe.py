@@ -6,11 +6,12 @@ programs/at_ringe.py
 
 from win32com.client import VARIANT
 from config.at_cad_init import ATCadInit
-from config.at_config import DEFAULT_CIRCLE_LAYER
+from config.at_config import DEFAULT_CIRCLE_LAYER, DEFAULT_DIM_OFFSET
 from locales.at_translations import loc
-from programs.at_construction import add_circle, add_text
+from programs.at_construction import add_circle, add_text, AccompanyText
 from programs.at_base import layer_context, regen
 from programs.at_geometry import ensure_point_variant
+from programs.at_input import at_get_point
 from windows.at_gui_utils import show_popup
 
 # -----------------------------
@@ -46,6 +47,11 @@ TRANSLATIONS = {
         "ru": "Ошибка преобразования точки: {}",
         "de": "Fehler bei der Punktkonvertierung: {}",
         "en": "Point conversion error: {}"
+    },
+    "mm": {
+        "ru": "мм",
+        "de": "mm",
+        "en": "mm"
     }
 }
 # Регистрируем переводы сразу при загрузке модуля
@@ -66,21 +72,26 @@ def main(ring_data: dict = None) -> bool:
     cad = ATCadInit()
     adoc = cad.document
     model = cad.model_space
+    center = at_get_point(
+        adoc,
+        as_variant=False,
+        prompt="Выберите точку вставки"
+    )
 
     # Проверка данных
     if not ring_data:
         show_popup(loc.get("no_data_error", "Данные не введены"), popup_type="error")
         return None
 
+    ring_data["insert_point"] = center
     # Извлекаем данные
-    work_number = ring_data.get("work_number", "")
+    work_number = ring_data.get("order", "")
+    detail = ring_data.get("detail", "")
+    material = ring_data.get("material", "")
+    thickness = ring_data.get("thickness", "")
     diameters = ring_data.get("diameters", {})
-    center = ring_data.get("input_point")
     if not diameters:
         show_popup(loc.get("no_diameters", "Не указаны диаметры"), popup_type="error")
-        return None
-    if not center or not model:
-        show_popup(loc.get("no_center", "Не указана центральная точка или модель"), popup_type="error")
         return None
 
     # Преобразуем центр в VARIANT
@@ -116,12 +127,21 @@ def main(ring_data: dict = None) -> bool:
             y_offset = max_radius - (max_radius - second_radius) * 0.5
             p1 = [center[0], center[1] + y_offset, 0]
             p2 = [center[0], center[1] - y_offset, 0]
+            p3 = [center[0], center[1]  + max_radius + DEFAULT_DIM_OFFSET + 20, 0]
             p1_variant = ensure_point_variant(p1)
             p2_variant = ensure_point_variant(p2)
+            p3_variant = ensure_point_variant(p3)
 
             # Добавление текста с использованием add_text из at_construction.py
+            non_laser_text = f'{work_number}-{detail}'
             add_text(model, p1_variant, text=work_number, layer_name="LASER-TEXT", text_height=7)
-            add_text(model, p2_variant, text=work_number, layer_name="schrift", text_height=30)
+            add_text(model, p2_variant, text=non_laser_text, layer_name="schrift", text_height=30)
+
+            AccompanyText({
+                "thickness": thickness,
+                "material": material,
+            }).draw(model, p3_variant, text_alignment=4)
+
         except Exception as e:
             show_popup(loc.get("build_error", "Ошибка построения колец: {}").format(str(e)), popup_type="error")
             return None
@@ -138,7 +158,10 @@ if __name__ == "__main__":
     try:
         # Для тестирования можно передать тестовые данные
         test_data = {
-            "work_number": "TEST123",
+            "order": "TEST123",
+            "detail": "1",
+            "material": "1.4301",
+            "thickness": 3,
             "diameters": {"1": 100, "2": 200},
             "input_point": [0, 0, 0]  # Изменено с insert_point на input_point
         }

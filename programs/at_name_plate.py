@@ -25,7 +25,7 @@ from config.at_config import NAME_PLATES_FILE, DEFAULT_TEXT_LAYER, DEFAULT_LASER
     DEFAULT_ACCOMPANY_TEXT_LAYER, TEXT_HEIGHT_BIG, TEXT_HEIGHT_LASER, TEXT_HEIGHT_SMALL, TEXT_DISTANCE, \
     DEFAULT_CUTOUT_LAYER, DEFAULT_DIM_LAYER
 from programs.at_base import regen
-from programs.at_construction import add_polyline, add_text, add_rectangle, add_circle, add_line
+from programs.at_construction import add_polyline, add_text, add_rectangle, add_circle, add_line, AccompanyText
 from locales.at_translations import loc
 from programs.at_dimension import add_dimension
 from programs.at_geometry import polar_point, PolylineBuilder, ensure_point_variant, bulge_from_center, at_bulge, \
@@ -266,32 +266,6 @@ class BridgeTexts:
                 text_angle=0,
                 text_alignment=4,
             )
-
-
-class AccompanyText:
-    """
-    Сопроводительный текст с толщиной и маркой материала
-    """
-
-    def __init__(self, data: dict):
-        self.data = data
-
-    def draw(self, model, text_insert_point):
-        """
-        Отображение текста
-        """
-        thickness = self.data["thickness"]
-        material = self.data["material"]
-
-        add_text(
-            model=model,
-            point=text_insert_point,
-            text=f"{thickness}mm {material}",
-            layer_name=DEFAULT_TEXT_LAYER,
-            text_height=TEXT_HEIGHT_BIG,
-            text_angle=0,
-            text_alignment=0,
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -1452,15 +1426,15 @@ if __name__ == "__main__":
         # Тип мостика
         # --------------------------------------------------
         # "type1" | "type2" | "type3" | "type4" | "type5"
-        "type": "type5",
+        "type": "type4",
 
         # --------------------------------------------------
         # Технологические параметры (обязательные)
         # НЕ участвуют в геометрии, но нужны для сопровождения
         # --------------------------------------------------
-        "order_number": "20366",
-        "detail_number": "2-20",
-        "material": "1.4301",
+        "order_number": "20367-1",
+        "detail_number": "18",
+        "material": "1.0425",
 
         # Толщина листа — УЧАСТВУЕТ в геометрии (НЕ meta!)
         "thickness": 3.0,
@@ -1470,9 +1444,9 @@ if __name__ == "__main__":
         # --------------------------------------------------
         "geometry": {
             "center_point": [0.0, 0.0],  # базовая точка построения
-            "width": 170.0,  # ширина мостика
-            "height": 160.0,  # высота мостика
-            "length": 100.0,  # длина площадки
+            "width": 125.0,  # ширина мостика
+            "height": 65.0,  # высота мостика
+            "length": 70.0,  # длина площадки
         },
 
         # --------------------------------------------------
@@ -1494,8 +1468,8 @@ if __name__ == "__main__":
             # --- Тип 2 / 3 / 4 / 5 ---
             # Диаметр обечайки (вертикальной или горизонтальной)
             # shell_diameter1 - основной, когда нужен только один диаметр
-            "shell_diameter1": 80,
-            "shell_diameter2": 90,
+            "shell_diameter1": 219.1,
+            "shell_diameter2": 219.1,
 
             # --- Тип 3 / 5 ---
             # Угол раскрытия / скоса боковин
@@ -1506,7 +1480,7 @@ if __name__ == "__main__":
             # variant 1 - известны L, L1, D, A, H, здесь L - расстояние от плоскости таблички до касания цилиндра
             # variant 2 - известны L, D, A, H, линия наклона проходит через центр окружности, L как и в варианте 1
             # variant 3 - известны L2, L1, D, A, H, здесь L2 - расстояние от плоскости таблички до точки пересечения скоса с цилиндром
-            "variant": 3,
+            "variant": 1,
             "l1": 50,
             "l2": 100,
 
@@ -1530,20 +1504,20 @@ if __name__ == "__main__":
             #   = 0   → повторяет окружность цилиндра
             #   > 0   → скругление
             #   < 0   → фаска (abs)
-            "radius": 0.0,
+            "radius": 10.0,
         },
 
         # --------------------------------------------------
         # Таблички
         # --------------------------------------------------
         "plates": [
-            {
-                "name": "GEA_gross",   # имя из name_plates.json
-                # "offset_top": 0.0    # отступ верхнего края от верха мостика
-            },
             # {
-            #     "name": "GEA_klein",
+            #     "name": "GEA_gross",   # имя из name_plates.json
+            #     # "offset_top": 0.0    # отступ верхнего края от верха мостика
             # },
+            {
+                "name": "GEA_klein",
+            },
         ],
 
         # Расстояние между краями табличек
