@@ -17,13 +17,11 @@
 """
 import math
 import sys
-from typing import Optional, Any, List, Union
+from typing import Optional, Any, List, Union, Sequence
 import os
 import logging
-
 from win32com.client import VARIANT
 import pythoncom
-
 from config.at_cad_init import ATCadInit
 from config.at_config import DEFAULT_TEXT_LAYER, DEFAULT_DIM_OFFSET, TEXT_HEIGHT_BIG
 from programs.at_base import regen
@@ -187,6 +185,7 @@ if not any(isinstance(h, logging.FileHandler) and getattr(h, 'baseFilename', '')
     logger.addHandler(fh)
 logger.propagate = False
 
+PointLike = Union[Sequence[float], VARIANT]
 
 # -----------------------------
 # Вспомогательные методы
@@ -338,7 +337,7 @@ def at_cone_height(diameter_base: float, diameter_top: float = 0, steigung: Opti
         return None
 
 
-def at_cone_sheet(model: Any, input_point: Union[List[float], VARIANT], diameter_base: float,
+def at_cone_sheet(model: Any, input_point: PointLike, diameter_base: float,
                   diameter_top: float = 0, height: float = 0, layer_name: str = "0") -> Optional[tuple]:
     """
     Создаёт развертку конуса в модельном пространстве.
@@ -427,7 +426,7 @@ def at_cone_sheet(model: Any, input_point: Union[List[float], VARIANT], diameter
 # -----------------------------
 # Основные методы
 # -----------------------------
-def add_circle(model: Any, center: Union[List[float], VARIANT], radius: float,
+def add_circle(model: Any, center: PointLike, radius: float,
                layer_name: str = "0") -> Optional[Any]:
     """
     Создаёт окружность в модельном пространстве.
@@ -451,8 +450,8 @@ def add_circle(model: Any, center: Union[List[float], VARIANT], radius: float,
         return None
 
 
-def add_line(model: Any, point1: Union[List[float], VARIANT],
-             point2: Union[List[float], VARIANT],
+def add_line(model: Any, point1: PointLike,
+             point2: PointLike,
              layer_name: str = "0") -> Optional[Any]:
     """
     Создаёт линию в модельном пространстве.
@@ -718,7 +717,7 @@ def add_rectangle(
 
 def add_text(
         model: Any,
-        point: Union[List[float], VARIANT],
+        point: PointLike,
         text: str = "",
         layer_name: str = DEFAULT_TEXT_LAYER,
         text_height: float = 30,

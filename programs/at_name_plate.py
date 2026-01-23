@@ -1,5 +1,6 @@
+# noinspection SpellCheckingInspection
 """
-File: at_name_plate.py
+File: programs\at_name_plate.py
 
 Назначение:
     Построение разверток мостиков для табличек сосудов под давлением.
@@ -19,17 +20,16 @@ from __future__ import annotations
 import json
 import math
 from typing import Dict, List
-
 from config.at_cad_init import ATCadInit
 from config.at_config import NAME_PLATES_FILE, DEFAULT_TEXT_LAYER, DEFAULT_LASER_LAYER, DEFAULT_DIM_OFFSET, \
-    DEFAULT_ACCOMPANY_TEXT_LAYER, TEXT_HEIGHT_BIG, TEXT_HEIGHT_LASER, TEXT_HEIGHT_SMALL, TEXT_DISTANCE, \
+    TEXT_HEIGHT_LASER, TEXT_HEIGHT_SMALL, TEXT_DISTANCE, \
     DEFAULT_CUTOUT_LAYER, DEFAULT_DIM_LAYER
 from programs.at_base import regen
 from programs.at_construction import add_polyline, add_text, add_rectangle, add_circle, add_line, AccompanyText
 from locales.at_translations import loc
 from programs.at_dimension import add_dimension
-from programs.at_geometry import polar_point, PolylineBuilder, ensure_point_variant, bulge_from_center, at_bulge, \
-    calculate_angles, distance_2points, bulge_chord, circle_line_intersection
+from programs.at_geometry import polar_point, PolylineBuilder, ensure_point_variant, distance_2points, \
+    bulge_chord, circle_line_intersection
 from windows.at_gui_utils import show_popup
 
 # ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ TRANSLATIONS = {
     "cad_not_ready": {
         "ru": (
             "Невозможно выполнить тестовый запуск программы. "
-            "Автокад не запущен или нет доступа к пространству модели"
+            "AutoCAD не запущен или нет доступа к пространству модели"
         ),
         "de": (
             "Der Testlauf kann nicht ausgeführt werden. "
@@ -171,7 +171,14 @@ class PlateBlock:
         self.bridge_height = bridge_height
         self.plates_gap = plates_gap
 
-    def draw(self, model, center_point):
+    def draw(self, modelspace, center_point):
+        """
+            Отрисовка блока табличек и отверстий.
+
+            Args:
+                modelspace: Пространство модели AutoCAD.
+                center_point: Центральная точка мостика (x, y).
+        """
         if not self.plates:
             return
 
@@ -208,7 +215,7 @@ class PlateBlock:
 
             # --- контур таблички ---
             add_rectangle(
-                model=model,
+                model=modelspace,
                 point=plate_center,
                 width=float(plate_data["a1"]),
                 height=float(plate_data["b1"]),
@@ -218,7 +225,7 @@ class PlateBlock:
             )
 
             # --- отверстия ---
-            PlateHoles(plate_data).draw(model, plate_center)
+            PlateHoles(plate_data).draw(model_space, plate_center)
 
             # переход к следующей табличке
             if len(self.plates) > 1:
@@ -236,9 +243,13 @@ class BridgeTexts:
     def __init__(self, data: dict):
         self.data = data
 
-    def draw(self, model, center_point):
+    def draw(self, modelspace, center_point):
         """
-        Нанесение стандартных текстов мостика
+        Нанесение стандартных текстов мостика.
+
+        Args:
+            modelspace: Пространство модели AutoCAD.
+            center_point: Центральная точка мостика (x, y).
         """
         order_number = self.data["order_number"]
         detail_number = self.data["detail_number"]
@@ -246,7 +257,7 @@ class BridgeTexts:
 
         # основной текст
         add_text(
-            model=model,
+            model=modelspace,
             point=center_point,
             text=f"{order_number}-{detail_number}",
             layer_name=DEFAULT_TEXT_LAYER,
@@ -258,7 +269,7 @@ class BridgeTexts:
         # лазерная маркировка
         if material not in ("3.7035" , "3.7235"):
             add_text(
-                model=model,
+                model=modelspace,
                 point=center_point,
                 text=order_number,
                 layer_name=DEFAULT_LASER_LAYER,
@@ -308,7 +319,7 @@ class PlateLayoutVertical:
 # ---------------------------------------------------------------------------
 class PlateHoles:
     """
-    Генерирует и отрисовывает отверстия таблички
+    Генерирует и чертит отверстия таблички
     по параметрам a, b, d из JSON.
     """
 
@@ -355,13 +366,13 @@ class PlateHoles:
 
         return result
 
-    def draw(self, model, plate_center, layer_name="0"):
+    def draw(self, modelspace, plate_center, layer_name="0"):
         """
         Отрисовка отверстий.
         """
         for hole in self.get_global_positions(plate_center):
             add_circle(
-                model=model,
+                model=modelspace,
                 center=(hole["x"], hole["y"]),
                 radius=hole["d"] / 2.0,
                 layer_name=layer_name,
@@ -479,7 +490,7 @@ class BridgeConfig:
         return self.specific["edge_angle"]
 
 
-def build_type1(model, cfg: BridgeConfig):
+def build_type1(modelspace, cfg: BridgeConfig):
     """
     Тип 1 — плоский мостик с перемычкой.
     """
@@ -498,7 +509,7 @@ def build_type1(model, cfg: BridgeConfig):
     # Контур мостика
     # --------------------------------------------------
     add_rectangle(
-        model=model,
+        model=modelspace,
         point=center_point,
         width=bridge_width,
         height=bridge_height,
@@ -570,7 +581,7 @@ def build_type1(model, cfg: BridgeConfig):
     pb.line_to(p7)
     pb.close()
 
-    add_polyline(model, pb.vertices(), layer_name="0", closed=True)
+    add_polyline(modelspace, pb.vertices(), layer_name="0", closed=True)
 
     # ширина перемычки
     add_dimension(
@@ -609,7 +620,7 @@ def build_type1(model, cfg: BridgeConfig):
         text_alignment = 0
 
     add_text(
-        model=model,
+        model=modelspace,
         point=web_text_point,
         text=web_text,
         layer_name=DEFAULT_TEXT_LAYER,
@@ -621,7 +632,7 @@ def build_type1(model, cfg: BridgeConfig):
     # лазерная маркировка
     if cfg.material not in ("3.7035", "3.7235"):
         add_text(
-            model=model,
+            model=modelspace,
             point=web_text_point,
             text=cfg.order_number,
             layer_name=DEFAULT_LASER_LAYER,
@@ -637,7 +648,7 @@ def build_type1(model, cfg: BridgeConfig):
     }
 
 
-def build_type2(model, cfg: BridgeConfig):
+def build_type2(modelspace, cfg: BridgeConfig):
     """
     Построение развертки мостика типа BentStraight (type2).
     """
@@ -731,7 +742,7 @@ def build_type2(model, cfg: BridgeConfig):
 
     # Контур
     add_polyline(
-        model,
+        modelspace,
         pb.vertices(),
         layer_name=DEFAULT_CUTOUT_LAYER,
         closed=True,
@@ -741,8 +752,8 @@ def build_type2(model, cfg: BridgeConfig):
     # Линии гиба
     # ------------------------------------------------------------------
 
-    add_line(model, p0, p7, layer_name=DEFAULT_DIM_LAYER)
-    add_line(model, p15, p8, layer_name=DEFAULT_DIM_LAYER)
+    add_line(modelspace, p0, p7, layer_name=DEFAULT_DIM_LAYER)
+    add_line(modelspace, p15, p8, layer_name=DEFAULT_DIM_LAYER)
 
     # ------------------------------------------------------------------
     # Размеры
@@ -772,10 +783,10 @@ def build_type2(model, cfg: BridgeConfig):
     }
 
 
-def build_type3(model, cfg: BridgeConfig):
+def build_type3(modelspace, cfg: BridgeConfig):
     """
     Построение развертки мостика типа 3 —
-    скоба с двумя гибами по сторонам (как для Cyba-Geige).
+    скоба с двумя сгибами по сторонам (как для Cyba-Geige).
     """
 
     # ------------------------------------------------------------------
@@ -888,7 +899,7 @@ def build_type3(model, cfg: BridgeConfig):
 
     # Контур
     add_polyline(
-        model,
+        modelspace,
         pb.vertices(),
         layer_name=DEFAULT_CUTOUT_LAYER,
         closed=True,
@@ -898,10 +909,10 @@ def build_type3(model, cfg: BridgeConfig):
     # Линии сгиба
     # ------------------------------------------------------------------
 
-    add_line(model, p0, p7, layer_name=DEFAULT_DIM_LAYER)
-    add_line(model, p01, p67, layer_name=DEFAULT_DIM_LAYER)
-    add_line(model, p15, p8, layer_name=DEFAULT_DIM_LAYER)
-    add_line(model, p1415, p89, layer_name=DEFAULT_DIM_LAYER)
+    add_line(modelspace, p0, p7, layer_name=DEFAULT_DIM_LAYER)
+    add_line(modelspace, p01, p67, layer_name=DEFAULT_DIM_LAYER)
+    add_line(modelspace, p15, p8, layer_name=DEFAULT_DIM_LAYER)
+    add_line(modelspace, p1415, p89, layer_name=DEFAULT_DIM_LAYER)
 
     # ------------------------------------------------------------------
     # Размеры
@@ -935,10 +946,14 @@ def build_type3(model, cfg: BridgeConfig):
     }
 
 
-def build_type4(model, cfg: BridgeConfig):
+def build_type4(modelspace, cfg: BridgeConfig):
     """
     Построение развертки мостика типа BentStraight
     для посадки на горизонтальный цилиндр (type4).
+
+    Args:
+        modelspace (object): пространство модели
+        cfg: конфигурация мостика
     """
 
     # ------------------------------------------------------------------
@@ -976,7 +991,6 @@ def build_type4(model, cfg: BridgeConfig):
     r2 = shell_diameter / 2.0
     a = bridge_height / 2 - h1_cut
     x = l1 + r2 - (r2 ** 2 - bridge_height ** 2 / 4) ** 0.5
-    # alpha = math.atan(bridge_height / (2 * r2))
     l2 = math.sqrt(r2 ** 2 - a ** 2)
 
     # ------------------------------------------------------------------
@@ -1005,7 +1019,7 @@ def build_type4(model, cfg: BridgeConfig):
     p12 = (p11[0], p3[1])
     p13 = (p10[0], p3[1])
 
-    cp = (cx + w1 + l1 + r2, cy)
+    # cp = (cx + w1 + l1 + r2, cy) # На всякий случай, если где потребуется
 
     pb = PolylineBuilder(p0)
 
@@ -1052,7 +1066,7 @@ def build_type4(model, cfg: BridgeConfig):
 
     # Контур
     add_polyline(
-        model,
+        modelspace,
         pb.vertices(),
         layer_name=DEFAULT_CUTOUT_LAYER,
         closed=True,
@@ -1062,8 +1076,8 @@ def build_type4(model, cfg: BridgeConfig):
     # Линии сгиба
     # ------------------------------------------------------------------
 
-    add_line(model, p0, p7, layer_name=DEFAULT_DIM_LAYER)
-    add_line(model, p15, p8, layer_name=DEFAULT_DIM_LAYER)
+    add_line(modelspace, p0, p7, layer_name=DEFAULT_DIM_LAYER)
+    add_line(modelspace, p15, p8, layer_name=DEFAULT_DIM_LAYER)
 
     # ------------------------------------------------------------------
     # Размеры
@@ -1093,7 +1107,7 @@ def build_type4(model, cfg: BridgeConfig):
     }
 
 
-def build_type5(model, cfg: BridgeConfig):
+def build_type5(modelspace, cfg: BridgeConfig):
     """
     Построение развертки мостика со скошенными краями
     для посадки на горизонтальный цилиндр (type5).
@@ -1188,8 +1202,8 @@ def build_type5(model, cfg: BridgeConfig):
     p1 = circle_line_intersection(p01, center1, shell_diameter1, a)
 
     # Debug---------------------
-    add_circle(model, center1, r1, layer_name="AM_5")
-    add_circle(model, center2, r2, layer_name="AM_5")
+    add_circle(model_space, center1, r1, layer_name="AM_5")
+    add_circle(model_space, center2, r2, layer_name="AM_5")
 
     # --------------------------
 
@@ -1209,7 +1223,7 @@ def build_type5(model, cfg: BridgeConfig):
     p14 = circle_line_intersection(p1415, center2, shell_diameter2, -a)
     p9 = (p14[0], cy + (cy2 - p14[1]))
     p13 = (center2[0] + math.sqrt(r2 * r2 - h1_cut * h1_cut), cy - h1_cut)
-    p10 = [p13[0], p5[1]]
+    p10 = (p13[0], p5[1])
     p11 = (p10[0] + l_cut, p10[1])
     p12 = (p11[0], p3[1])
 
@@ -1286,7 +1300,7 @@ def build_type5(model, cfg: BridgeConfig):
 
     # Контур
     add_polyline(
-        model,
+        modelspace,
         pb.vertices(),
         layer_name=DEFAULT_CUTOUT_LAYER,
         closed=True,
@@ -1296,8 +1310,8 @@ def build_type5(model, cfg: BridgeConfig):
     # Линии сгиба
     # ------------------------------------------------------------------
 
-    add_line(model, p0, p7, layer_name=DEFAULT_DIM_LAYER)
-    add_line(model, p15, p8, layer_name=DEFAULT_DIM_LAYER)
+    add_line(modelspace, p0, p7, layer_name=DEFAULT_DIM_LAYER)
+    add_line(modelspace, p15, p8, layer_name=DEFAULT_DIM_LAYER)
 
     # ------------------------------------------------------------------
     # Размеры
@@ -1332,48 +1346,48 @@ class BridgeBuilder:
     """
     Центральный класс построения развертки мостика.
 
-    Оркестрирует:
-    - построение геометрии
-    - тексты
-    - таблички
-    - сопроводительную информацию
+    Дирижер для:
+    - построения геометрии
+    - текстов
+    - табличек
+    - сопроводительной информации
     """
 
     def __init__(self, cfg: BridgeConfig, plates_data: dict):
         self.cfg = cfg
         self.plates_data = plates_data
 
-    def build(self, model):
+    def build(self, modelspace):
 
         # 1. Геометрия мостика
-        key_points = self._build_unfold(model)
+        key_points = self._build_unfold(modelspace)
 
         # 2. Тексты на мостике
-        self._draw_texts(model)
+        self._draw_texts(modelspace)
 
         # 3. Таблички
-        self._draw_plates(model)
+        self._draw_plates(modelspace)
 
         # 4. Сопроводительный текст
         accompany_text_point = key_points.get("accompany_text_point")
         if accompany_text_point:
-            self._draw_accompany_text(model, accompany_text_point)
+            self._draw_accompany_text(modelspace, accompany_text_point)
 
     # -------------------------------------------------
 
-    def _build_unfold(self, model: object) -> dict:
+    def _build_unfold(self, modelspace: object) -> dict:
         bridge_type = self.cfg.bridge_type
 
         if bridge_type == "type1":
-            key_points = build_type1(model, self.cfg)
+            key_points = build_type1(modelspace, self.cfg)
         elif bridge_type == "type2":
-            key_points = build_type2(model, self.cfg)
+            key_points = build_type2(model_space, self.cfg)
         elif bridge_type == "type3":
-            key_points = build_type3(model, self.cfg)
+            key_points = build_type3(modelspace, self.cfg)
         elif bridge_type == "type4":
-            key_points = build_type4(model, self.cfg)
+            key_points = build_type4(modelspace, self.cfg)
         elif bridge_type == "type5":
-            key_points = build_type5(model, self.cfg)
+            key_points = build_type5(modelspace, self.cfg)
         else:
             raise ValueError(f"Unsupported bridge type: {bridge_type}")
 
@@ -1381,14 +1395,14 @@ class BridgeBuilder:
 
     # -------------------------------------------------
 
-    def _draw_texts(self, model):
+    def _draw_texts(self, modelspace):
         BridgeTexts({
             "order_number": self.cfg.order_number,
             "detail_number": self.cfg.detail_number,
             "material": self.cfg.material,
-        }).draw(model, self.cfg.center_point)
+        }).draw(modelspace, self.cfg.center_point)
 
-    def _draw_plates(self, model):
+    def _draw_plates(self, modelspace):
         if not self.cfg.plates:
             return
 
@@ -1397,16 +1411,16 @@ class BridgeBuilder:
             plates_data=self.plates_data,
             bridge_height=self.cfg.height,
             plates_gap=self.cfg.plates_gap,
-        ).draw(model, self.cfg.center_point)
+        ).draw(modelspace, self.cfg.center_point)
 
-    def _draw_accompany_text(self, model, text_point):
+    def _draw_accompany_text(self, modelspace, text_point):
         if not text_point:
             return
 
         AccompanyText({
             "thickness": self.cfg.thickness,
             "material": self.cfg.material,
-        }).draw(model, text_point)
+        }).draw(modelspace, text_point)
 
 
 # ---------------------------------------------------------------------------
@@ -1416,7 +1430,7 @@ if __name__ == "__main__":
 
     cad = ATCadInit()
     adoc = cad.document
-    model = cad.model_space
+    model_space = cad.model_space
 
     # pt = at_get_point(adoc, prompt="Введите точку", as_variant=False)
 
@@ -1524,10 +1538,10 @@ if __name__ == "__main__":
         "plates_gap": 5.0,
     }
 
-    if model:
-        cfg = BridgeConfig(bridge_data)
-        builder = BridgeBuilder(cfg, np.plates)
-        builder.build(model)
+    if model_space:
+        config = BridgeConfig(bridge_data)
+        builder = BridgeBuilder(config, np.plates)
+        builder.build(model_space)
 
         regen(adoc)
     else:
