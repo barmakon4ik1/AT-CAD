@@ -11,15 +11,16 @@
 Дата правки: 2025-10-16 (корректировки: локализация, вычисление точки гравировки, докстринги)
 """
 import math
-import json
 from typing import List, Tuple, Any, Dict
+
+import pywintypes
 
 # AutoCAD init & utilities
 from config.at_cad_init import ATCadInit
 from config.at_config import TEXT_HEIGHT_SMALL, TEXT_DISTANCE, TEXT_HEIGHT_BIG
 from programs.at_base import regen
 from programs.at_construction import add_polyline, add_spline, add_text
-from programs.at_geometry import find_intersection_points, bulge_from_center, polar_point, ensure_point_variant
+from programs.at_geometry import find_intersection_points, polar_point, ensure_point_variant
 from programs.at_input import at_get_point
 from locales.at_translations import loc
 from windows.at_gui_utils import show_popup
@@ -78,7 +79,7 @@ def safe_div(a: float, b: float, default: float = 0.0) -> float:
 # -------------------------------------------------------------
 # Построение половины развёртки (одна сторона вертикальна)
 # -------------------------------------------------------------
-def build_half_cone_unfold(D: float, H: float, n: int) -> List[Tuple[float, float]]:
+def build_half_cone_unfold(d: float, h: float, n: int) -> List[Tuple[float, float]]:
     """
     Строит половину развёртки (по одной стороне от оси).
     Возвращает список точек (x, y) в локальной системе координат развёртки.
@@ -89,24 +90,24 @@ def build_half_cone_unfold(D: float, H: float, n: int) -> List[Tuple[float, floa
     """
     points: List[Tuple[float, float]] = []
     apex = (0.0, 0.0)  # вершина (локально)
-    first_length = math.sqrt(D ** 2 + H ** 2)
+    first_length = math.sqrt(d ** 2 + h ** 2)
     base_point = (0.0, -first_length)
     points.append(base_point)
 
     # Длина дуги (ориентировочно) для шага; здесь упрощённый подход
-    arc_len = math.pi * D / n
+    arc_len = math.pi * d / n
     prev_point = base_point
 
     # формируем точки для половины дуги (от базовой точки к оси)
     for i in range(1, n // 2 + 1):
         angle_deg = i * 180.0 / n
-        L = math.sqrt((D * math.cos(math.radians(angle_deg))) ** 2 + H ** 2)
-        intersections = find_intersection_points(apex, L, prev_point, arc_len)
+        l = math.sqrt((d * math.cos(math.radians(angle_deg))) ** 2 + h ** 2)
+        intersections = find_intersection_points(apex, l, prev_point, arc_len)
         if not intersections:
             break
         p1, p2 = intersections
-        # выбираем точку с большим x (правую сторону половины)
-        new_point = p1 if p1[0] > p2[0] else p2
+        # выбираем точку с большим y
+        new_point = p1 if p1[1] > p2[1] else p2
         points.append(new_point)
         prev_point = new_point
     return points
@@ -152,8 +153,8 @@ def build_truncated_cone_from_halves(d1: float, d2: float, h: float, n: int, cur
 
     if curve_mode == "bulge":
         # длины образующих (как радиусы для дуг)
-        R_lower = math.sqrt(h_full ** 2 + (d2 / 2) ** 2) if h_full else 0.0
-        R_upper = math.sqrt((h_full - h) ** 2 + (d1 / 2) ** 2) if h_full - h else 0.0
+        # r_lower = math.sqrt(h_full ** 2 + (d2 / 2) ** 2) if h_full else 0.0
+        # r_upper = math.sqrt((h_full - h) ** 2 + (d1 / 2) ** 2) if h_full - h else 0.0
 
         phi_step_lower = math.pi / (len(lower_half) - 1) if len(lower_half) > 1 else 0.0
         phi_step_upper = math.pi / (len(upper_half) - 1) if len(upper_half) > 1 else 0.0
@@ -200,8 +201,8 @@ def at_eccentric_reducer(data: Dict[str, Any]) -> bool:
     """
     try:
         # --- подключение к AutoCAD
-        cad = ATCadInit()
-        adoc, model = cad.document, cad.model
+        acad = ATCadInit()
+        document_acad, modelspace = acad.document, acad.model_space
 
         if not data:
             show_popup(loc.get("no_data_error"), popup_type="error")
@@ -227,24 +228,28 @@ def at_eccentric_reducer(data: Dict[str, Any]) -> bool:
         # --- ввод точки вставки (если не передали)
         if not insert_point:
             # Запрашиваем точку у пользователя в AutoCAD
-            pt = at_get_point(adoc, prompt=loc.get("point_prompt", "Укажите вершину развертки"), as_variant=False)
+            pt = at_get_point(document_acad, prompt=loc.get("point_prompt", "Укажите вершину развертки"), as_variant=False)
             if not pt or not (isinstance(pt, (list, tuple)) and len(pt) >= 2):
                 show_popup(loc.get("point_selection_cancelled"), popup_type="error")
                 return False
+            # Debug
+            # if not pt:
+            #     return 0, 0
             insert_point = list(map(float, pt[:3]))
             data["insert_point"] = insert_point
         else:
             insert_point = list(map(float, insert_point[:3]))
             data["insert_point"] = insert_point
 
-        X0, Y0 = insert_point[0], insert_point[1]
+        y0: float
+        x0, y0 = insert_point[0], insert_point[1]
 
         # --- Построение контуров развёртки в локальных координатах
         contour_local, bulge_list, lower_path_local, upper_path_local, bulge_lower, bulge_upper = \
             build_truncated_cone_from_halves(d1, d2, h, n, curve_mode)
 
         # --- Сдвигаем локальные контуры в мировые (с учётом insert_point)
-        shift = lambda path: [(x + X0, y + Y0) for x, y in path]
+        shift = lambda path: [(x + x0, y + y0) for x, y in path]
         lower_path = shift(lower_path_local)
         upper_path = shift(upper_path_local)
         contour = shift(contour_local)
@@ -252,10 +257,10 @@ def at_eccentric_reducer(data: Dict[str, Any]) -> bool:
         # --- Строим в AutoCAD в зависимости от режима ---
         if curve_mode == "spline":
             # отдельные открытые сплайны для верхней и нижней кривых
-            add_spline(model, lower_path, layer_name="0", closed=False)
-            add_spline(model, upper_path, layer_name="0", closed=False)
-            add_polyline(model, [lower_path[0], upper_path[0]], layer_name="0")
-            add_polyline(model, [lower_path[-1], upper_path[-1]], layer_name="0")
+            add_spline(modelspace, lower_path, layer_name="0", closed=False)
+            add_spline(modelspace, upper_path, layer_name="0", closed=False)
+            add_polyline(modelspace, [lower_path[0], upper_path[0]], layer_name="0")
+            add_polyline(modelspace, [lower_path[-1], upper_path[-1]], layer_name="0")
 
         elif curve_mode == "bulge":
             # формируем единый замкнутый список точек и bulge'ей
@@ -272,50 +277,59 @@ def at_eccentric_reducer(data: Dict[str, Any]) -> bool:
                 list(reversed(bulge_upper)) +
                 [0.0, 0.0]
             )
-            add_polyline(model, all_points, layer_name="0", bulges=all_bulges, closed=True)
+            add_polyline(modelspace, all_points, layer_name="0", bulges=all_bulges, closed=True)
 
         else:
             # простой режим — замкнутая полилиния по общему контуру
-            add_polyline(model, contour, layer_name="0", closed=True)
+            add_polyline(modelspace, contour, layer_name="0", closed=True)
 
         # Попытка объединения (join) — если построили по частям (bulge/spline),
         # иначе — пропускаем
-        try:
-            if curve_mode in ["bulge", "spline"]:
+        if curve_mode in ["bulge", "spline"]:
+            try:
                 entities_to_join = []
                 for i in range(1, 5):
-                    ent = model.Item(model.Count - i)
+                    ent = modelspace.Item(modelspace.Count - i)
                     entities_to_join.append(ent)
+
                 base_ent = entities_to_join[0]
-                others = entities_to_join[1:]
-                base_ent.JoinEntities(others)
-                base_ent.Closed = True
-        except Exception:
-            # Join — необязательная операция, игнорируем ошибки
-            pass
+
+                if hasattr(base_ent, "JoinEntities"):
+                    base_ent.JoinEntities(entities_to_join[1:])
+                    base_ent.Closed = True
+
+            except pywintypes.com_error:
+                pass
 
         # ---------------------------------------------------------
         # Вычисление точек текста
         # ---------------------------------------------------------
+
+        # Значения по умолчанию (на случай пустого контура)
+        max_x = x0
+        max_y = y0
+
         # Берём bounding box локального контура и считаем центр:
         if contour_local:
             xs = [p[0] for p in contour_local]
             ys = [p[1] for p in contour_local]
             min_x, max_x = min(xs), max(xs)
             min_y, max_y = min(ys), max(ys)
+
             center_local_x = (min_x + max_x) / 2.0
             center_local_y = (min_y + max_y) / 2.0
+
             # Переводим локальный центр в мировые координаты
             text_point = (
-                center_local_x + X0,
-                center_local_y + Y0,
+                center_local_x + x0,
+                center_local_y + y0,
                 insert_point[2] if len(insert_point) > 2 else 0.0
             )
         else:
             # fallback: если контур пуст — используем insert_point
             text_point = (
-                X0,
-                Y0,
+                x0,
+                y0,
                 insert_point[2] if len(insert_point) > 2 else 0.0
             )
 
@@ -324,8 +338,8 @@ def at_eccentric_reducer(data: Dict[str, Any]) -> bool:
 
         # ✅ Точка для вывода пояснительного текста (в мировых координатах)
         acc_text_point = ensure_point_variant([
-            max_x + X0,
-            max_y + Y0,
+            max_x + x0,
+            max_y + y0,
             insert_point[2] if len(insert_point) > 2 else 0.0
         ])
 
@@ -341,9 +355,9 @@ def at_eccentric_reducer(data: Dict[str, Any]) -> bool:
         text_s = TEXT_HEIGHT_SMALL
 
         # Приводим численные значения к читаемому виду
-        # D = нижний (d2), d = верхний (d1)
-        D_label = d2
-        d_label = d1
+        # diameter_base_label = нижний (d2), diameter_top_label = верхний (d1)
+        diameter_base_label = d2
+        diameter_top_label = d1
 
         text_configs = [
             # Гравировка — в середине развертки
@@ -376,7 +390,7 @@ def at_eccentric_reducer(data: Dict[str, Any]) -> bool:
             # Подробная информация — смещаем вниз от acc_text_point
             {
                 "point": ensure_point_variant(polar_point(acc_text_point, distance=text_ab, alpha=-90, as_variant=False)),
-                "text": f"D = {D_label} {loc.get('mm', 'мм')}",
+                "text": f"D = {diameter_base_label} {loc.get('mm', 'мм')}",
                 "layer_name": "TEXT",
                 "text_height": text_h,
                 "text_angle": 0,
@@ -384,7 +398,7 @@ def at_eccentric_reducer(data: Dict[str, Any]) -> bool:
             },
             {
                 "point": ensure_point_variant(polar_point(acc_text_point, distance=2 * text_ab, alpha=-90, as_variant=False)),
-                "text": f"d = {d_label} {loc.get('mm', 'мм')}",
+                "text": f"d = {diameter_top_label} {loc.get('mm', 'мм')}",
                 "layer_name": "TEXT",
                 "text_height": text_h,
                 "text_angle": 0,

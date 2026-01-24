@@ -16,10 +16,6 @@
 
 import math
 from typing import Optional, List, Tuple, Union, Dict
-
-from config.at_cad_init import ATCadInit
-from programs.at_input import at_get_point
-from programs.at_utils import handle_errors
 from win32com.client import VARIANT
 import pythoncom
 from locales.at_translations import loc
