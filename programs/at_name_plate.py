@@ -30,6 +30,7 @@ from locales.at_translations import loc
 from programs.at_dimension import add_dimension
 from programs.at_geometry import polar_point, PolylineBuilder, ensure_point_variant, distance_2points, \
     bulge_chord, circle_line_intersection
+from programs.at_input import at_get_point
 from windows.at_gui_utils import show_popup
 
 # ---------------------------------------------------------------------------
@@ -182,7 +183,7 @@ class PlateBlock:
         if not self.plates:
             return
 
-        cx, cy = center_point
+        cx, cy = center_point[0], center_point[1]
         y_top_bridge = cy + self.bridge_height / 2
 
         heights = [
@@ -521,7 +522,7 @@ def build_type1(modelspace, cfg: BridgeConfig):
     # --------------------------------------------------
     # Размеры
     # --------------------------------------------------
-    cx, cy = center_point
+    cx, cy = center_point[0], center_point[1]
     x_min = cx - bridge_width / 2
     x_max = cx + bridge_width / 2
     y_min = cy - bridge_height / 2
@@ -683,7 +684,7 @@ def build_type2(modelspace, cfg: BridgeConfig):
     # --------------------------------------------------
     # Геометрия
     # --------------------------------------------------
-    cx, cy = center_point
+    cx, cy = center_point[0], center_point[1]
     h1_cut = (bridge_height - h_cut) / 2.0
 
     p0 = (cx + (0.5 * width - thickness), cy - (0.5 * bridge_height))
@@ -832,7 +833,7 @@ def build_type3(modelspace, cfg: BridgeConfig):
     # ------------------------------------------------------------------
     # 1. Контур мостика
     # ------------------------------------------------------------------
-    cx, cy = center_point
+    cx, cy = center_point[0], center_point[1]
 
     p0 = (cx + (0.5 * width - thickness), cy - (0.5 * bridge_height))
     p01 = (p0[0] + l2, p0[1])
@@ -996,7 +997,7 @@ def build_type4(modelspace, cfg: BridgeConfig):
     # ------------------------------------------------------------------
     # 1. Контур мостика
     # ------------------------------------------------------------------
-    cx, cy = center_point
+    cx, cy = center_point[0], center_point[1]
 
     p0 = (cx + w1, cy - bridge_height / 2.0)
     p1 =(p0[0] + x, p0[1])
@@ -1162,7 +1163,7 @@ def build_type5(modelspace, cfg: BridgeConfig):
     a = math.radians(angle) / 2.0 # половина угла скоса
     l = length - thickness
 
-    cx, cy = center_point
+    cx, cy = center_point[0], center_point[1]
 
     # ------------------------------------------------------------------
     # Расчет точек
@@ -1432,7 +1433,7 @@ if __name__ == "__main__":
     adoc = cad.document
     model_space = cad.model_space
 
-    # pt = at_get_point(adoc, prompt="Введите точку", as_variant=False)
+    pt = at_get_point(adoc, prompt="Введите точку", as_variant=False)
 
     np = NamePlate()
     bridge_data = {
@@ -1457,7 +1458,7 @@ if __name__ == "__main__":
         # Геометрия мостика (базовая)
         # --------------------------------------------------
         "geometry": {
-            "center_point": [0.0, 0.0],  # базовая точка построения
+            "center_point": pt,  # базовая точка построения
             "width": 125.0,  # ширина мостика
             "height": 65.0,  # высота мостика
             "length": 70.0,  # длина площадки

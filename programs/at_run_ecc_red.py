@@ -433,7 +433,7 @@ def at_eccentric_reducer(data: Dict[str, Any]) -> bool:
         # Добавляем текстовые объекты в модель
         for i, config in enumerate(text_configs):
             try:
-                add_text(model, **config)
+                add_text(modelspace, **config)
             except Exception as e:
                 # Формируем локализованное сообщение об ошибке
                 err_msg = loc.get("text_error_details", TRANSLATIONS["text_error_details"]["ru"]).format(i + 1, config.get('text', ''), str(e))
