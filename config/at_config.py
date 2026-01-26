@@ -66,6 +66,11 @@ WINDOW_SIZE: tuple[int, int] = (1280, 980)
 
 # --- Настройки по умолчанию ---
 DEFAULT_SETTINGS: dict[str, object] = {
+    "TITLE_FONT_NAME": "BUSE letters 16x8",
+    "TITLE_FONT_TYPE": "normal",
+    "TITLE_FONT_SIZE": 48,
+    "TITLE_FONT_WEIGHT": 30,
+    "TITLE_FONT_COLOR": "(0, 0, 0)",
     "FONT_NAME": "Times New Roman",
     "FONT_TYPE": "normal",
     "FONT_SIZE": 16,

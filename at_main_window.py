@@ -109,8 +109,8 @@ TRANSLATIONS = {
     },
     "program_title": {
         "ru": "Система автоматизации построения разверток",
-        "de": "Automatisiertes Profisystem für Metallabwicklung",
-        "en": "Metal Unfold Pro System"
+        "de": "System für automatisierte Abwicklungen",
+        "en": "Automated Sheet Metal Development System"
     },
     "settings_title": {
         "ru": "Настройки",
@@ -499,10 +499,10 @@ class ATMainWindow(wx.Frame):
 
         title_text = loc.get("program_title", "AT-CAD")
         style_flags = {
-            "style": wx.FONTSTYLE_NORMAL if self.settings.get("FONT_TYPE", "normal") == "normal" else wx.FONTSTYLE_ITALIC,
-            "weight": wx.FONTWEIGHT_BOLD if self.settings.get("FONT_TYPE", "normal") in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL
+            "style": wx.FONTSTYLE_NORMAL if self.settings.get("TITLE_FONT_TYPE", "normal") == "normal" else wx.FONTSTYLE_ITALIC,
+            "weight": wx.FONTWEIGHT_BOLD if self.settings.get("TITLE_FONT_TYPE", "normal") in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL
         }
-        optimal_size = fit_text_to_height(self.title, title_text, max_width, max_height, self.settings.get("FONT_NAME", DEFAULT_SETTINGS["FONT_NAME"]), style_flags)
+        optimal_size = fit_text_to_height(self.title, title_text, max_width, max_height, self.settings.get("TITLE_FONT_NAME", DEFAULT_SETTINGS["TITLE_FONT_NAME"]), style_flags)
 
         font = wx.Font(
             optimal_size,
@@ -510,14 +510,18 @@ class ATMainWindow(wx.Frame):
             style_flags["style"],
             style_flags["weight"],
             False,  # underline
-            self.settings.get("FONT_NAME", DEFAULT_SETTINGS["FONT_NAME"])  # faceName
+            self.settings.get("TITLE_FONT_NAME", DEFAULT_SETTINGS["TITLE_FONT_NAME"])  # faceName
         )
 
         self.title.SetFont(font)
         self.title.SetForegroundColour(wx.Colour(self.settings.get("BANNER_TEXT_COLOR", DEFAULT_SETTINGS["BANNER_TEXT_COLOR"])))
         self.title.SetLabel(title_text)
         self.title.Wrap(max_width)
-        logging.info(f"Заголовок баннера установлен: {title_text}, шрифт={self.settings.get('FONT_NAME', DEFAULT_SETTINGS['FONT_NAME'])}, размер={optimal_size}")
+        logging.info(
+            f"Заголовок баннера установлен: {title_text}, "
+            f"шрифт={self.settings.get('TITLE_FONT_NAME', DEFAULT_SETTINGS['TITLE_FONT_NAME'])}, "
+            f"размер={optimal_size}"
+        )
 
         banner_sizer.Add(self.title, proportion=0, flag=wx.ALIGN_CENTER | wx.ALL, border=10)
 
@@ -682,32 +686,6 @@ class ATMainWindow(wx.Frame):
         status_panel.SetSizer(status_sizer)
         self.main_sizer.Add(status_panel, proportion=0, flag=wx.EXPAND | wx.ALL, border=5)
 
-    # def create_exit_button(self) -> None:
-    #     """
-    #     Создаёт кнопку выхода. Старый вариант - потом можно убрать, если приживется новый вариант
-    #     """
-    #     self.exit_button = wx.Button(self.button_panel, label=loc.get("button_exit", "Выход"))
-    #     button_font = get_button_font()
-    #     self.exit_button.SetFont(button_font)
-    #     self.exit_button.SetBackgroundColour(
-    #         wx.Colour(self.settings.get("EXIT_BUTTON_COLOR", DEFAULT_SETTINGS["EXIT_BUTTON_COLOR"])))
-    #     self.exit_button.SetForegroundColour(
-    #         wx.Colour(self.settings.get("BUTTON_FONT_COLOR", DEFAULT_SETTINGS["BUTTON_FONT_COLOR"])))
-    #     self.exit_button.Bind(wx.EVT_BUTTON, self.on_exit)
-    #
-    #     # Рассчитываем минимальную ширину кнопки на основе текущего языка
-    #     label = loc.get("button_exit", "Выход")
-    #     dc = wx.ClientDC(self.exit_button)
-    #     dc.SetFont(button_font)
-    #     width, _ = dc.GetTextExtent(label)
-    #     max_width = width + 20
-    #     self.exit_button.SetMinSize((max_width, 30))
-    #
-    #     self.button_sizer.AddStretchSpacer()
-    #     self.button_sizer.Add(self.exit_button, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.ALL, border=10)
-    #     logging.info(
-    #         f"Кнопка выхода создана: текст={loc.get('button_exit', 'Выход')}, размер={max_width}x30")
-
     def create_exit_button(self) -> None:
         """
         Создаёт кнопку выхода (GenButton) в фирменном стиле AT-CAD.
@@ -813,16 +791,16 @@ class ATMainWindow(wx.Frame):
             max_width = WINDOW_SIZE[0] - 2 * LOGO_SIZE[0] - 50
             max_height = max(BANNER_HIGH, 20) - 20
             style_flags = {
-                "style": wx.FONTSTYLE_NORMAL if settings.get("FONT_TYPE", "normal") == "normal" else wx.FONTSTYLE_ITALIC,
-                "weight": wx.FONTWEIGHT_BOLD if settings.get("FONT_TYPE", "normal") in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL
+                "style": wx.FONTSTYLE_NORMAL if settings.get("TITLE_FONT_TYPE", "normal") == "normal" else wx.FONTSTYLE_ITALIC,
+                "weight": wx.FONTWEIGHT_BOLD if settings.get("TITLE_FONT_TYPE", "normal") in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL
             }
-            optimal_size = fit_text_to_height(self.title, title_text, max_width, max_height, settings.get("FONT_NAME", DEFAULT_SETTINGS["FONT_NAME"]), style_flags)
+            optimal_size = fit_text_to_height(self.title, title_text, max_width, max_height, settings.get("TITLE_FONT_NAME", DEFAULT_SETTINGS["TITLE_FONT_NAME"]), style_flags)
             font = wx.Font(
                 optimal_size,
                 wx.FONTFAMILY_DEFAULT,
                 style_flags["style"],
                 style_flags["weight"],
-                faceName=settings.get("FONT_NAME", DEFAULT_SETTINGS["FONT_NAME"])
+                faceName=settings.get("TITLE_FONT_NAME", DEFAULT_SETTINGS["TITLE_FONT_NAME"])
             )
             self.title.SetFont(font)
             self.title.SetForegroundColour(wx.Colour(settings.get("BANNER_TEXT_COLOR", DEFAULT_SETTINGS["BANNER_TEXT_COLOR"])))
