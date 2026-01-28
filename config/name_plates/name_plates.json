@@ -53,5 +53,27 @@
         "r": "0",
         "s": "2",
         "remark": "Hänsel Processing"
+    },
+    {
+        "name": "B+H_klein",
+        "a1": "68",
+        "b1": "63",
+        "a": "60",
+        "b": "55",
+        "d": "3.5",
+        "r": "4",
+        "s": "1",
+        "remark": "2-Room"
+    },
+    {
+        "name": "BASF_EQ",
+        "a1": "95",
+        "b1": "15",
+        "a": "80",
+        "b": "0",
+        "d": "5",
+        "r": "1",
+        "s": "1",
+        "remark": "BASF Equipment Plate"
     }
 ]
