@@ -403,6 +403,10 @@ class ATMainWindow(wx.Frame):
                 self.content_panel.Refresh()
 
         except Exception as e:
+            import traceback
+            err_msg = f"Ошибка загрузки {content_name}:\n{traceback.format_exc()}"
+            print(err_msg)
+
             self.current_content = wx.StaticText(
                 self.content_panel,
                 label=f"Ошибка загрузки {content_name}: {e}"
