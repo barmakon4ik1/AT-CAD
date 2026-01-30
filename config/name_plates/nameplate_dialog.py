@@ -52,10 +52,40 @@ loc.register_translations(TRANSLATIONS)# ---------------------------------------
 # Фабрика панели
 # ----------------------------------------------------------------------
 
-def create_window(parent: wx.Window) -> wx.Panel:
-    return NamePlateContentPanel(parent)# ----------------------------------------------------------------------
+# def create_window(parent: wx.Window) -> wx.Panel:
+#     return NamePlateContentPanel(parent)
+
+def create_window(parent: wx.Window) -> Optional[str]:
+    dlg = NamePlateDialog(parent)
+    result = dlg.ShowModal()
+
+    code = dlg.selected_code if result == wx.ID_OK else None
+    dlg.Destroy()
+    return code
+
+
+# ----------------------------------------------------------------------
 # Основная панель
 # ----------------------------------------------------------------------
+class NamePlateDialog(wx.Dialog):
+    def __init__(self, parent: wx.Window):
+        super().__init__(
+            parent,
+            title=loc.get("list_label"),
+            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
+            size=wx.Size(1200, 900),
+        )
+
+        self.selected_code: Optional[str] = None
+
+        self.panel = NamePlateContentPanel(self)
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self.panel, 1, wx.EXPAND)
+        self.SetSizer(sizer)
+
+        self.CentreOnParent()
+
 
 class NamePlateContentPanel(BaseContentPanel):
     """
@@ -74,7 +104,17 @@ class NamePlateContentPanel(BaseContentPanel):
         self.btn_delete.Disable()
         self._update_list()
 
-    # ------------------------------------------------------------------
+        wx.CallAfter(self._force_refresh_list)
+
+    def _force_refresh_list(self):
+        self.listbox.Clear()  # на всякий случай
+        for item in self.data:
+            self.listbox.Append(item.get("name", ""))
+        self.listbox.Refresh()
+        self.listbox.Update()
+        self.Refresh()  # иногда помогает
+
+        # ------------------------------------------------------------------
     # UI
     # ------------------------------------------------------------------
 
@@ -295,10 +335,23 @@ class NamePlateContentPanel(BaseContentPanel):
         else:
             event.Skip()
 
-    def on_ok(self, event=None, close_window: bool = False):
+    def on_ok(self, event=None, close_window: bool = True):
         parent = wx.GetTopLevelParent(self)
+
+        if self.current_index is not None:
+            # Передаём результат
+            parent.selected_code = self.data[self.current_index].get("name", "")
+
         if hasattr(parent, "switch_content"):
+            print("switch_content", parent.selected_code) # Debug
             parent.switch_content("content_apps")
+        elif isinstance(parent, wx.Dialog):
+            print("dialog", parent.selected_code) # Debug
+            parent.EndModal(wx.ID_OK)
+        else:
+            # запасной вариант — просто закрыть фрейм, если ничего не подошло
+            print("запасной вариант — просто закрыть фрейм, если ничего не подошло", parent.selected_code) # Debug
+            parent.Close()
 
 
 if __name__ == "__main__":
@@ -311,3 +364,10 @@ if __name__ == "__main__":
     frame.Show()
     app.MainLoop()
 
+
+"""
+plate_code = create_window(parent)
+
+if plate_code:
+    output_data["nameplate_code"] = plate_code
+"""

@@ -6,10 +6,7 @@
 import wx
 import wx.grid
 from typing import Optional, Dict, List
-from pathlib import Path
-
 from wx.lib.buttons import GenButton
-
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programs.at_construction import at_diameter
@@ -18,9 +15,9 @@ from windows.at_window_utils import (
     CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel,
     create_standard_buttons, adjust_button_widths, BaseContentPanel,
     parse_float, load_common_data, style_label, style_textctrl,
-    style_combobox, style_radiobutton, style_staticbox, update_status_bar_point_selected, style_gen_button
+    style_combobox, style_staticbox, style_gen_button
 )
-from config.at_config import SHELL_IMAGE_PATH, UNWRAPPER_PATH, DEFAULT_SETTINGS, get_setting
+from config.at_config import SHELL_IMAGE_PATH, UNWRAPPER_PATH, get_setting
 
 # -----------------------------
 # Локальные переводы модуля
@@ -29,7 +26,7 @@ TRANSLATIONS = {
     "error": {"ru": "Ошибка", "de": "Fehler", "en": "Error"},
     "point_prompt": {
         "ru": "Введите точку вставки оболочки",
-        "de": "Einfügepunkt für Mantel eingeben",
+        "de": "Einfügenpunkt für Mantel eingeben",
         "en": "Enter the shell insertion point",
     },
     "main_data_label": {"ru": "Основные данные", "de": "Hauptdaten", "en": "Main Data"},
@@ -134,11 +131,12 @@ class BranchWindow(wx.Dialog):
         super().__init__(
             parent,
             title=loc.get("branch_window_title", "Параметры отвода"),
-            size=(1600, 600),
+            size=wx.Size(1600, 600),
             style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER
         )
 
-        self.SetMinSize((1600, 600))
+        self.steps_combo = None
+        self.SetMinSize(wx.Size(1600, 600))
         self.SetBackgroundColour(wx.Colour(get_setting("BACKGROUND_COLOR")))
         self.parent = parent
         self.labels = {}
@@ -161,8 +159,8 @@ class BranchWindow(wx.Dialog):
         left_panel_container = wx.Panel(self)
         left_panel_sizer = wx.BoxSizer(wx.VERTICAL)
         left_panel_container.SetSizer(left_panel_sizer)
-        left_panel_container.SetMinSize((400, -1))
-        left_panel_container.SetMaxSize((400, -1))  # фиксированная ширина для левой панели
+        left_panel_container.SetMinSize(wx.Size(400, -1))
+        left_panel_container.SetMaxSize(wx.Size(400, -1))  # фиксированная ширина для левой панели
 
         right_panel_container = wx.Panel(self)
         right_panel_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -228,7 +226,6 @@ class BranchWindow(wx.Dialog):
 
         # Редакторы для choice-полей (ИЗМЕНЕНО: для 8 и 9 — BoolEditor вместо ChoiceEditor)
         contact_types = ["A", "D", "M", "T"]
-        # unroll_choices = ...  # ← УДАЛЕНО: больше не нужно
         for row in range(self.table.GetNumberRows()):
             self.table.SetCellEditor(row, 7, wx.grid.GridCellChoiceEditor(contact_types, allowOthers=False))
             self.table.SetCellEditor(row, 8, wx.grid.GridCellBoolEditor())  # ← ИЗМЕНЕНО: Bool для "развернуть"
@@ -253,7 +250,7 @@ class BranchWindow(wx.Dialog):
         branch_sizer.Add(self.table, 1, wx.EXPAND | wx.ALL, 5)
 
         # --- Строка с режимом, точностью и кнопкой добавления ---
-        field_size = (150, -1)
+        field_size = wx.Size(150, -1)
         row_controls = wx.BoxSizer(wx.HORIZONTAL)
 
         self.labels["mode"] = wx.StaticText(branch_box, label=loc.get("mode_label", "Режим построения"))
@@ -309,8 +306,8 @@ class BranchWindow(wx.Dialog):
         # Сначала подгоним по заголовкам/контенту, затем применим минимум
         try:
             self.table.AutoSizeColumns()
-        except Exception:
-            pass
+        except:
+            raise "Общая ошибка"
 
         for col in range(self.table.GetNumberCols()):
             if self.table.GetColSize(col) < min_char_width:
@@ -329,7 +326,7 @@ class BranchWindow(wx.Dialog):
         # Автоматическое перераспределение ширины столбцов при изменении окна
         self.Bind(wx.EVT_SIZE, self.on_resize)
 
-    def on_mode_change(self, event):
+    def on_mode_change(self, _):
         """Меняет список значений steps при смене режима построения."""
         mode_map = {
             loc.get("mode_bulge", "Bulge"): "bulge",
@@ -341,12 +338,9 @@ class BranchWindow(wx.Dialog):
         self.steps_combo.SetItems(options)
         self.steps_combo.SetValue(options[0])
 
-    def on_add_row(self, event: wx.Event):
+    def on_add_row(self, _):
         """
         Добавляет новую строку в таблицу.
-
-        Args:
-            event (wx.Event): Событие нажатия кнопки "Добавить строку".
         """
         self.table.AppendRows(1)
         row = self.table.GetNumberRows() - 1
@@ -530,13 +524,10 @@ class BranchWindow(wx.Dialog):
             self.table.SetCellAlignment(row, 8, wx.ALIGN_CENTER, wx.ALIGN_CENTER)
             self.table.SetCellAlignment(row, 9, wx.ALIGN_CENTER, wx.ALIGN_CENTER)
 
-    def on_ok(self, event: wx.Event):
+    def on_ok(self, _):
         """
         Обрабатывает нажатие кнопки "ОК".
         Собирает данные из таблицы и закрывает окно с результатом wx.ID_OK.
-
-        Args:
-            event (wx.Event): Событие нажатия кнопки.
         """
         data = self.collect_input_data()
         if data is None and any(self.table.GetCellValue(row, 1) for row in range(self.table.GetNumberRows())):
@@ -545,17 +536,14 @@ class BranchWindow(wx.Dialog):
         self.parent.branch_data = data  # Сохраняем данные в родительской панели
         self.EndModal(wx.ID_OK)
 
-    def on_clear(self, event: wx.Event):
+    def on_clear(self, _):
         """
         Обрабатывает нажатие кнопки "Очистить".
         Сбрасывает значения полей таблицы.
-
-        Args:
-            event (wx.Event): Событие нажатия кнопки.
         """
         self.clear_input_fields()
 
-    def on_cancel(self, event: wx.Event):
+    def on_cancel(self, _):
         """
         Обрабатывает нажатие кнопки "Возврат" или закрытие окна.
         Перед закрытием спрашивает подтверждение, чтобы избежать потери несохранённых данных.
@@ -659,8 +647,8 @@ class ShellContentPanel(BaseContentPanel):
         # Правый блок
         self.right_sizer = wx.BoxSizer(wx.VERTICAL)
         font = get_standard_font()
-        font_big = get_standard_font().Bold()
-        field_size = (150, -1)  # Единая ширина для всех полей ввода
+        # font_big = get_standard_font().Bold()
+        field_size = wx.Size(150, -1)  # Единая ширина для всех полей ввода
 
         # --- Основные данные ---
         main_data_box = wx.StaticBox(self, label=loc.get("main_data_label", "Основные данные"))
@@ -871,13 +859,10 @@ class ShellContentPanel(BaseContentPanel):
         apply_styles_to_panel(self)  # Применяем стили ко всем элементам
         self.Layout()
 
-    def on_branch(self, event: wx.Event):
+    def on_branch(self, _):
         """
         Обрабатывает нажатие кнопки "Наличие отвода".
         Создает и отображает модальное окно BranchWindow для ввода параметров отвода.
-
-        Args:
-            event (wx.Event): Событие нажатия кнопки.
         """
         dialog = BranchWindow(self)
         dialog.ShowModal()
@@ -1093,7 +1078,7 @@ if __name__ == "__main__":
     Выполняет явный вызов at_get_point для выбора точки в AutoCAD и выводит словарь данных в исходном виде.
     """
     app = wx.App(False)
-    frame = wx.Frame(None, title="Тест ShellContentPanel", size=(1000, 700))
+    frame = wx.Frame(None, title="Тест ShellContentPanel", size=wx.Size(1000, 700))
     panel = ShellContentPanel(frame)
 
     def on_ok_test(data):
@@ -1113,7 +1098,7 @@ if __name__ == "__main__":
             print(f"Ошибка в тестовом callback: {e}")
             show_popup(loc.get("error", f"Ошибка в тестовом callback: {str(e)}"), popup_type="error")
 
-    def on_ok_event(event):
+    def on_ok_event(_):
         """
         Тестовая функция для обработки нажатия 'ОК'.
         Выполняет выбор точки через at_get_point, проверяет валидацию данных,
@@ -1162,7 +1147,7 @@ if __name__ == "__main__":
             panel.on_submit_callback = on_ok_test
             if not panel.IsBeingDeleted():
                 wx.CallAfter(panel.process_input, data)  # Отложенный вызов callback
-                print("Данные переданы в callback отложенно")
+                print("Данные переданы в callback отложено")
             else:
                 print("Окно уничтожено после нажатия ОК")
         except Exception as e:

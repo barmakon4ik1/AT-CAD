@@ -105,10 +105,8 @@ def find_by_name(records: List[Dict], name: str) -> Dict | None:
         Найденная запись или None.
     """
     for record in records:
-        if record.get("name") == name:
-            return record
+        return record if record.get("name") == name else None
     return None
-
 
 def add_record(records: List[Dict], record: Dict) -> None:
     """

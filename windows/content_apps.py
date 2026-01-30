@@ -12,7 +12,6 @@
 - Локализация текста выполняется через loc.get и словарь TRANSLATIONS.
 """
 
-import logging
 import wx
 from windows.at_window_utils import BaseContentPanel, get_link_font
 from windows.at_run_dialog_window import load_content
@@ -142,7 +141,7 @@ class AppsContentPanel(BaseContentPanel):
     def update_ui_language(self):
         """
         Обновляет тексты интерфейса при смене языка.
-        Пересобирает список ссылок с новыми переводами.
+        Собирает список ссылок с новыми переводами.
         """
         self.setup_ui()
 
@@ -163,7 +162,7 @@ if __name__ == "__main__":
     Тестовый запуск для проверки панели.
     """
     app = wx.App(False)
-    frame = wx.Frame(None, title="Test AppsContentPanel", size=(800, 600))
+    frame = wx.Frame(None, title="Test AppsContentPanel", size=wx.Size(800, 600))
     loc.set_language("de")  # Тестируем с DE
     panel = AppsContentPanel(frame)
     sizer = wx.BoxSizer(wx.VERTICAL)

@@ -169,20 +169,20 @@ CONTENT_REGISTRY = {
     "vessel_name": {
         "module": "config.name_plates.nameplate_dialog",
         "label": "at_vessel_name",
-        "footer_hint": "footer_hint_vessel_name",
-        "build_module": "config.name_plates.nameplate_dialog"
+        # "footer_hint": "footer_hint_vessel_name",
+        "build_module": "config.name_plates.nameplate_dialog",
     },
 }
 
 
-def run_build(content_name: str, data=None):
+def run_build(content_name: str, data=None, parent=None):
     """
     Унифицированный запуск build_module для указанного контента.
 
     Args:
         content_name (str): Имя контента из CONTENT_REGISTRY.
         data: Данные для передачи в программу.
-
+        parent: Родительское окно
     Returns:
         object | None: Результат выполнения build_module или None при ошибке.
     """
@@ -192,13 +192,35 @@ def run_build(content_name: str, data=None):
         logging.error(loc.get("content_not_found", f"Content '{content_name}' not found").format(content_name))
         return None
 
-    build_module = info.get("build_module")
-    if not build_module:
-        logging.error(loc.get("no_build_module", f"No build_module specified for '{content_name}'").format(content_name))
+    # build_module = info.get("build_module")
+    # if not build_module:
+    #     logging.error(loc.get("no_build_module", f"No build_module specified for '{content_name}'").format(content_name))
+    #     return None
+    #
+    # try:
+    #     return run_program(build_module, data)
+    # except Exception as e:
+    #     logging.error(f"[at_content_registry] Ошибка при запуске {build_module}: {e}")
+    #     return None
+
+    content_type = info.get("type", "content")
+
+    # ====== КОНТЕНТ ======
+    if content_type == "content":
+        build_module = info.get("build_module")
+        if not build_module:
+            logging.error(loc.get("no_build_module").format(content_name))
+            return None
+        return run_program(build_module, data)
+   # ====== ДИАЛОГ ======
+    elif content_type == "dialog":
+        from importlib import import_module
+
+        mod = import_module(info["module"])
+        if not hasattr(mod, "open_dialog"):
+            raise RuntimeError(f"{info['module']} must define open_dialog(parent)")
+
+        return mod.open_dialog(parent)
+    else:
         return None
 
-    try:
-        return run_program(build_module, data)
-    except Exception as e:
-        logging.error(f"[at_content_registry] Ошибка при запуске {build_module}: {e}")
-        return None
