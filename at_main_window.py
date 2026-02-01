@@ -9,7 +9,6 @@
 
 import wx
 import os
-import sys
 import logging
 import json
 
@@ -24,29 +23,17 @@ from config.at_config import (
     LANGUAGE_ICONS,
     DEFAULT_SETTINGS,
     load_user_settings,
-    save_user_settings,
     USER_LANGUAGE_PATH,
 )
 from locales.at_translations import loc
 from windows.at_window_utils import load_last_position, save_last_position, get_button_font, fit_text_to_height, \
-    LANGUAGE_CHANGE_EVT_TYPE, LANGUAGE_CHANGE_EVT, style_gen_button, _normalize_color_to_hex, get_standard_font
+    style_gen_button, scale_bitmap
 from windows.at_gui_utils import show_popup
-from windows.at_run_dialog_window import load_content, at_load_content
+from windows.at_run_dialog_window import at_load_content
 from windows.at_content_registry import CONTENT_REGISTRY
 
 # Устанавливаем текущую рабочую директорию в корень проекта
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
-
-# Настройка логирования в консоль
-# print("Инициализация логирования в at_main_window.py")  # Временный print для проверки
-# logging.getLogger().handlers = []  # Очищаем существующие обработчики
-# logging.getLogger().setLevel(logging.INFO)
-# handler = logging.StreamHandler(sys.stdout)
-# handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-# logging.getLogger().addHandler(handler)
-#
-# # Проверяем sys.stdout
-# print(f"sys.stdout: {sys.stdout}")
 
 # -----------------------------
 # Локальные переводы модуля
@@ -126,6 +113,8 @@ TRANSLATIONS = {
 # Регистрируем переводы сразу при загрузке модуля (до любых вызовов loc.get)
 loc.register_translations(TRANSLATIONS)
 
+SUPPORTED_LANGS = ("ru", "en", "de")
+
 class ATMainWindow(wx.Frame):
     """
     Класс главного окна приложения AT-CAD.
@@ -166,7 +155,7 @@ class ATMainWindow(wx.Frame):
                 with open(USER_LANGUAGE_PATH, 'r', encoding='utf-8') as f:
                     lang_data = json.load(f)
                     lang = lang_data.get("language")
-                    if isinstance(lang, str) and lang in ["ru", "en", "de"]:
+                    if isinstance(lang, str) and lang in SUPPORTED_LANGS:
                         loc.set_language(lang)
                     else:
                         logging.warning(
@@ -188,6 +177,15 @@ class ATMainWindow(wx.Frame):
         self.exit_item = None
         self.about_item = None
         self.settings_item = None
+        self.logo: wx.StaticBitmap | None = None
+        self.title: wx.StaticText | None = None
+        self.flag_button: wx.BitmapButton | None = None
+        self.language_menu: wx.Menu | None = None
+        self.lang_items: dict[str, wx.MenuItem] = {}
+        self.status_text: wx.StaticText | None = None
+        self.copyright_text: wx.StaticText | None = None
+        self.exit_button: wx.Button | None = None
+        self.banner_panel: wx.Panel | None = None
 
         # Создание главной панели
         self.panel = wx.Panel(self)
@@ -200,7 +198,7 @@ class ATMainWindow(wx.Frame):
             try:
                 icon_bitmap = wx.Bitmap(icon_path, wx.BITMAP_TYPE_ANY)
                 if icon_bitmap.IsOk():
-                    icon_bitmap = self.scale_bitmap(icon_bitmap, 32, 32)
+                    icon_bitmap = scale_bitmap(icon_bitmap, 32, 32)
                     self.SetIcon(wx.Icon(icon_bitmap))
                     logging.info(f"Иконка приложения установлена: {icon_path}")
                 else:
@@ -310,23 +308,23 @@ class ATMainWindow(wx.Frame):
         # Обновление UI с текущими настройками
         self.update_ui(self.settings)
 
-    def scale_bitmap(self, bitmap: wx.Bitmap, width: int, height: int) -> wx.Bitmap:
-        """
-        Масштабирует изображение до заданных размеров.
-
-        Args:
-            bitmap (wx.Bitmap): Исходное изображение.
-            width (int): Целевая ширина.
-            height (int): Целевая высота.
-
-        Returns:
-            wx.Bitmap: Масштабированное изображение.
-        """
-        if bitmap.IsOk():
-            image = bitmap.ConvertToImage()
-            image = image.Scale(width, height, wx.IMAGE_QUALITY_HIGH)
-            return wx.Bitmap(image)
-        return bitmap
+    # def scale_bitmap(self, bitmap: wx.Bitmap, width: int, height: int) -> wx.Bitmap:
+    #     """
+    #     Масштабирует изображение до заданных размеров.
+    #
+    #     Args:
+    #         bitmap (wx.Bitmap): Исходное изображение.
+    #         width (int): Целевая ширина.
+    #         height (int): Целевая высота.
+    #
+    #     Returns:
+    #         wx.Bitmap: Масштабированное изображение.
+    #     """
+    #     if bitmap.IsOk():
+    #         image = bitmap.ConvertToImage()
+    #         image = image.Scale(width, height, wx.IMAGE_QUALITY_HIGH)
+    #         return wx.Bitmap(image)
+    #     return bitmap
 
     def update_footer_hint(self, content_name: str) -> None:
         info = CONTENT_REGISTRY.get(content_name, {})
@@ -345,12 +343,16 @@ class ATMainWindow(wx.Frame):
         self.update_footer_hint(content_name)
 
     def switch_content(self, content_name: str) -> None:
-        if not isinstance(content_name, str):
-            content_name = str(content_name)
+        # if not isinstance(content_name, str):
+        #     content_name = str(content_name)
 
         # Уничтожаем старый контент, но не очищаем весь сайзер
         if self.current_content:
-            self.content_sizer.Hide(self.current_content)
+            # self.content_sizer.Hide(self.current_content)
+            # Hide() перед Destroy() не нужен и иногда вызывает:
+            # лишний Layout
+            # предупреждения wxWidgets
+            # ✅ Безопасно оставить только:
             self.current_content.Destroy()
             self.current_content = None
 
@@ -381,15 +383,15 @@ class ATMainWindow(wx.Frame):
                             build_func = getattr(build_module, "main", None)
                             if build_func:
                                 return build_func(data)
-                        except Exception as e:
-                            print(f"[DEBUG] Ошибка при импорте/вызове {content_name}: {e}")
+                        except (ImportError, AttributeError, RuntimeError):
+                            logging.exception(f"Ошибка при импорте/вызове {content_name}")
                         return False
 
                     new_content.on_submit_callback = on_submit
 
                 # Форсируем локализацию
-                if hasattr(new_content, 'update_ui_language'):
-                    new_content.update_ui_language()
+                # if hasattr(new_content, 'update_ui_language'):
+                #     new_content.update_ui_language()
 
             else:
                 # Если не удалось создать
@@ -397,7 +399,10 @@ class ATMainWindow(wx.Frame):
                     self.content_panel,
                     label=f"Ошибка загрузки {content_name}"
                 )
-                self.current_content.content_name = content_name
+                # self.current_content.content_name = content_name
+                if not hasattr(self.current_content, "content_name"):
+                    self.current_content.content_name = content_name
+
                 self.content_sizer.Add(self.current_content, 1, wx.EXPAND | wx.ALL, 5)
                 self.content_panel.Layout()
                 self.content_panel.Refresh()
@@ -411,7 +416,9 @@ class ATMainWindow(wx.Frame):
                 self.content_panel,
                 label=f"Ошибка загрузки {content_name}: {e}"
             )
-            self.current_content.content_name = content_name
+            # self.current_content.content_name = content_name
+            if not hasattr(self.current_content, "content_name"):
+                self.current_content.content_name = content_name
             self.content_sizer.Add(self.current_content, 1, wx.EXPAND | wx.ALL, 5)
             self.content_panel.Layout()
             self.content_panel.Refresh()
@@ -419,43 +426,28 @@ class ATMainWindow(wx.Frame):
         self.update_ui(self.settings)
         self.update_footer_hint(content_name)
 
+    def _apply_language_change(self, new_lang: str) -> None:
+        loc.set_language(new_lang)
+        self.update_language_icon(new_lang)
+        self.update_ui(self.settings)
+        self.update_current_footer_hint()
+
+        if self.current_content and hasattr(self.current_content, 'update_ui_language'):
+            try:
+                if not self.current_content.IsBeingDeleted():
+                    self.current_content.update_ui_language()
+            except Exception as e:
+                show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
+
     def on_language_change(self, new_lang: str) -> None:
-        if not isinstance(new_lang, str):
-            return
-        loc.set_language(new_lang)
+        if isinstance(new_lang, str):
+            self._apply_language_change(new_lang)
 
-        self.update_language_icon(new_lang)
-        self.update_ui(self.settings)
-        # 🔹 ОБНОВЛЯЕМ ФУТЕР
-        self.update_current_footer_hint()
-
-        if self.current_content and hasattr(self.current_content, 'update_ui_language'):
-            try:
-                if not self.current_content.IsBeingDeleted():
-                    self.current_content.update_ui_language()
-            except Exception as e:
-                show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
-
-    def on_change_language(self, event) -> None:
-        current_langs = ["ru", "en", "de"]
-        if not isinstance(loc.language, str):
-            loc.language = "ru"
-        current_index = current_langs.index(loc.language) if loc.language in current_langs else 0
-        new_index = (current_index + 1) % len(current_langs)
-        new_lang = current_langs[new_index]
-        loc.set_language(new_lang)
-
-        self.update_language_icon(new_lang)
-        self.update_ui(self.settings)
-        # 🔹 ОБНОВЛЯЕМ ФУТЕР
-        self.update_current_footer_hint()
-
-        if self.current_content and hasattr(self.current_content, 'update_ui_language'):
-            try:
-                if not self.current_content.IsBeingDeleted():
-                    self.current_content.update_ui_language()
-            except Exception as e:
-                show_popup(loc.get("error", "Ошибка") + f": {str(e)}", popup_type="error")
+    def on_change_language(self, _) -> None:
+        langs = SUPPORTED_LANGS
+        current = loc.language if loc.language in langs else "ru"
+        new_lang = langs[(langs.index(current) + 1) % len(langs)]
+        self._apply_language_change(new_lang)
 
     def create_banner(self) -> None:
         """
@@ -477,7 +469,7 @@ class ATMainWindow(wx.Frame):
             try:
                 logo_bitmap = wx.Bitmap(logo_path, wx.BITMAP_TYPE_ANY)
                 if logo_bitmap.IsOk():
-                    logo_bitmap = self.scale_bitmap(logo_bitmap, LOGO_SIZE[0], LOGO_SIZE[1])
+                    logo_bitmap = scale_bitmap(logo_bitmap, LOGO_SIZE[0], LOGO_SIZE[1])
                     self.logo = wx.StaticBitmap(self.banner_panel, bitmap=logo_bitmap)
                     banner_sizer.Add(self.logo, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.LEFT, border=10)
                     logging.info(f"Логотип загружен: {logo_path}")
@@ -537,7 +529,7 @@ class ATMainWindow(wx.Frame):
             try:
                 flag_bitmap = wx.Bitmap(lang_icon_path, wx.BITMAP_TYPE_ANY)
                 if flag_bitmap.IsOk():
-                    flag_bitmap = self.scale_bitmap(flag_bitmap, banner_height - 10, banner_height - 10)
+                    flag_bitmap = scale_bitmap(flag_bitmap, banner_height - 10, banner_height - 10)
                     self.flag_button = wx.StaticBitmap(self.banner_panel, bitmap=flag_bitmap)
                     self.flag_button.Bind(wx.EVT_LEFT_DOWN, self.on_change_language)
                     banner_sizer.Add(self.flag_button, proportion=0, flag=wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, border=10)
@@ -572,7 +564,7 @@ class ATMainWindow(wx.Frame):
             try:
                 exit_bitmap = wx.Bitmap(exit_icon_path, wx.BITMAP_TYPE_ANY)
                 if exit_bitmap.IsOk():
-                    exit_bitmap = self.scale_bitmap(exit_bitmap, 16, 16)
+                    exit_bitmap = scale_bitmap(exit_bitmap, 16, 16)
                     self.exit_item.SetBitmap(exit_bitmap)
                     logging.info(f"Иконка выхода установлена: {exit_icon_path}")
                 else:
@@ -595,7 +587,7 @@ class ATMainWindow(wx.Frame):
                 try:
                     lang_bitmap = wx.Bitmap(lang_icon_path, wx.BITMAP_TYPE_ANY)
                     if lang_bitmap.IsOk():
-                        lang_bitmap = self.scale_bitmap(lang_bitmap, 16, 16)
+                        lang_bitmap = scale_bitmap(lang_bitmap, 16, 16)
                         item.SetBitmap(lang_bitmap)
                         logging.info(f"Иконка языка {lang} установлена: {lang_icon_path}")
                     else:
@@ -616,7 +608,7 @@ class ATMainWindow(wx.Frame):
             try:
                 about_bitmap = wx.Bitmap(about_icon_path, wx.BITMAP_TYPE_ANY)
                 if about_bitmap.IsOk():
-                    about_bitmap = self.scale_bitmap(about_bitmap, 16, 16)
+                    about_bitmap = scale_bitmap(about_bitmap, 16, 16)
                     self.about_item.SetBitmap(about_bitmap)
                     logging.info(f"Иконка 'О программе' установлена: {about_icon_path}")
                 else:
@@ -627,7 +619,7 @@ class ATMainWindow(wx.Frame):
             try:
                 settings_bitmap = wx.Bitmap(settings_icon_path, wx.BITMAP_TYPE_ANY)
                 if settings_bitmap.IsOk():
-                    settings_bitmap = self.scale_bitmap(settings_bitmap, 16, 16)
+                    settings_bitmap = scale_bitmap(settings_bitmap, 16, 16)
                     self.settings_item.SetBitmap(settings_bitmap)
                     logging.info(f"Иконка настроек установлена: {settings_icon_path}")
                 else:
@@ -645,7 +637,7 @@ class ATMainWindow(wx.Frame):
         for lang, item in self.lang_items.items():
             self.Bind(wx.EVT_MENU, lambda evt, l=lang: self.on_language_change(l), item)
 
-    def on_settings(self, event) -> None:
+    def on_settings(self, _) -> None:
         """
         Открывает окно настроек и обновляет настройки после закрытия.
         """
@@ -708,19 +700,13 @@ class ATMainWindow(wx.Frame):
         Args:
             new_lang (str): Код языка (ru, en, de).
         """
-        if not isinstance(new_lang, str):
-            logging.error(
-                f"Нестроковый new_lang в update_language_icon: {new_lang}, использование языка по умолчанию: ru")
-            new_lang = "ru"
-
         lang_icon_path = os.path.abspath(LANGUAGE_ICONS.get(new_lang, LANGUAGE_ICONS["ru"]))
         if os.path.exists(lang_icon_path):
             try:
                 flag_bitmap = wx.Bitmap(lang_icon_path, wx.BITMAP_TYPE_ANY)
                 if flag_bitmap.IsOk():
-                    flag_bitmap = self.scale_bitmap(flag_bitmap, BANNER_HIGH - 10, BANNER_HIGH - 10)
+                    flag_bitmap = scale_bitmap(flag_bitmap, BANNER_HIGH - 10, BANNER_HIGH - 10)
 
-                    # --- главное исправление ---
                     old_flag = self.flag_button
                     new_flag = wx.StaticBitmap(self.banner_panel, bitmap=flag_bitmap)
                     new_flag.Bind(wx.EVT_LEFT_DOWN, self.on_change_language)
@@ -762,7 +748,6 @@ class ATMainWindow(wx.Frame):
         new_flag.SetCursor(wx.Cursor(wx.CURSOR_HAND))
         new_flag.Bind(wx.EVT_LEFT_DOWN, self.on_change_language)
 
-        # --- главное исправление ---
         self.banner_panel.GetSizer().Replace(old_flag, new_flag)
         old_flag.Destroy()
         self.flag_button = new_flag
@@ -828,23 +813,25 @@ class ATMainWindow(wx.Frame):
             button_font = get_button_font()
             self.exit_button.SetFont(button_font)
 
+        status_font = wx.Font(
+            settings.get("STATUS_FONT_SIZE", DEFAULT_SETTINGS["STATUS_FONT_SIZE"]),
+            wx.FONTFAMILY_DEFAULT,
+            wx.FONTSTYLE_NORMAL if settings.get("FONT_TYPE", "normal") == "normal" else wx.FONTSTYLE_ITALIC,
+            wx.FONTWEIGHT_BOLD if settings.get("FONT_TYPE", "normal") in ["bold",
+                                                                          "bolditalic"] else wx.FONTWEIGHT_NORMAL,
+            faceName=settings.get("FONT_NAME", DEFAULT_SETTINGS["FONT_NAME"]),
+        )
         # Обновляем строку статуса и копирайт
         if hasattr(self, "status_text"):
             self.status_text.SetLabel(loc.get("status_ready", "Готово"))
-            font = wx.Font(
-                settings.get("STATUS_FONT_SIZE", DEFAULT_SETTINGS["STATUS_FONT_SIZE"]),
-                wx.FONTFAMILY_DEFAULT,
-                wx.FONTSTYLE_NORMAL if settings.get("FONT_TYPE", "normal") == "normal" else wx.FONTSTYLE_ITALIC,
-                wx.FONTWEIGHT_BOLD if settings.get("FONT_TYPE", "normal") in ["bold", "bolditalic"] else wx.FONTWEIGHT_NORMAL,
-                faceName=settings.get("FONT_NAME", DEFAULT_SETTINGS["FONT_NAME"]),
-            )
-            self.status_text.SetFont(font)
+
+            self.status_text.SetFont(status_font)
             self.status_text.SetForegroundColour(wx.Colour(settings.get("STATUS_TEXT_COLOR", DEFAULT_SETTINGS["STATUS_TEXT_COLOR"])))
             logging.info(f"Обновлена строка статуса: текст={loc.get('status_ready', 'Готово')}")
 
         if hasattr(self, "copyright_text"):
             self.copyright_text.SetLabel(loc.get("copyright", "© AT-CAD"))
-            self.copyright_text.SetFont(font)
+            self.copyright_text.SetFont(status_font)
             self.copyright_text.SetForegroundColour(wx.Colour(settings.get("STATUS_TEXT_COLOR", DEFAULT_SETTINGS["STATUS_TEXT_COLOR"])))
             logging.info(f"Обновлён копирайт: текст={loc.get('copyright', '© AT-CAD')}")
 
@@ -861,7 +848,7 @@ class ATMainWindow(wx.Frame):
                     try:
                         lang_bitmap = wx.Bitmap(lang_icon_path, wx.BITMAP_TYPE_ANY)
                         if lang_bitmap.IsOk():
-                            lang_bitmap = self.scale_bitmap(lang_bitmap, 16, 16)
+                            lang_bitmap = scale_bitmap(lang_bitmap, 16, 16)
                             item.SetBitmap(lang_bitmap)
                             logging.info(f"Обновлена иконка языка {lang}: {lang_icon_path}")
                         else:
@@ -902,14 +889,16 @@ class ATMainWindow(wx.Frame):
         self.Update()
         logging.info("Интерфейс главного окна полностью обновлён")
 
-    def on_about(self, event) -> None:
+    @staticmethod
+    def on_about(event) -> None:
         """
         Показывает информацию о программе.
         """
         show_popup(loc.get("about_text", "О программе AT-CAD"), title=loc.get("menu_about", "О программе"), popup_type="info")
         logging.info("Открыто окно 'О программе'")
+        _ = event
 
-    def on_exit(self, event) -> None:
+    def on_exit(self, _) -> None:
         """
         Закрывает приложение.
         """
@@ -926,7 +915,7 @@ class ATMainWindow(wx.Frame):
         # Сохранение текущего языка в user_language.json
         try:
             language = loc.language
-            if isinstance(language, str) and language in ["ru", "en", "de"]:
+            if isinstance(language, str) and language in SUPPORTED_LANGS:
                 with open(USER_LANGUAGE_PATH, 'w', encoding='utf-8') as f:
                     json.dump({"language": language}, f, indent=4, ensure_ascii=False)
                 logging.info(f"Язык сохранён в user_language.json: {language}")

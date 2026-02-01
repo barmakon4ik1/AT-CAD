@@ -125,217 +125,6 @@ logging.basicConfig(
 _common_data_cache = None
 
 
-# class BaseContentPanel(wx.Panel):
-#     """
-#     Базовый класс всех content-панелей.
-#     Поддерживает автоматическую смену языка UI.
-#     """
-#     def __init__(self, parent):
-#         super().__init__(parent)
-#         self._localizables: list[Any] = []  # контролы/FieldBuilder, поддерживающие update_language
-#         self._labels: dict[wx.Window, str] = {}  # StaticBox, Buttons и т.п
-#
-#         self.settings = load_user_settings()
-#         background_color = self.settings.get("BACKGROUND_COLOR", DEFAULT_SETTINGS["BACKGROUND_COLOR"])
-#         self.SetBackgroundColour(wx.Colour(background_color))
-#         self.last_input_file = ""  # Для панелей ввода данных, устанавливается в дочерних классах
-#         self.insert_point = None  # Для панелей с выбором точки
-#         self.buttons = []  # Для панелей с кнопками
-#
-#         # 🔑 Реестр локализуемых объектов
-#         self._localizables: list = []
-#
-#     # ------------------------------------------------------------------
-#     # Регистрация локализуемых элементов
-#     # ------------------------------------------------------------------
-#
-#     def register_localizable(self, obj):
-#         """
-#         Регистрирует объект, поддерживающий update_language().
-#         (например: FieldBuilder)
-#         """
-#         if obj not in self._localizables:
-#             self._localizables.append(obj)
-#
-#     def register_label(self, ctrl: wx.Window, label_key: str):
-#         """
-#         Регистрирует wx.StaticText / StaticBox / Button / GenButton
-#         для автоматической локализации.
-#         """
-#         ctrl._label_key = label_key
-#         if ctrl not in self._localizables:
-#             self._localizables.append(ctrl)
-#
-#     # ------------------------------------------------------------------
-#     # Локализация
-#     # ------------------------------------------------------------------
-#
-#     def update_ui_language(self):
-#         """Обновляет язык интерфейса на лету."""
-#         # обновляем все локализуемые объекты (FieldBuilder и т.п.)
-#         for obj in self._localizables:
-#             if hasattr(obj, "update_language"):
-#                 obj.update_language()
-#
-#         # обновляем контролы с ключом
-#         for ctrl, key in self._labels.items():
-#             if isinstance(ctrl, wx.StaticBox) or isinstance(ctrl, wx.Button) or isinstance(ctrl, wx.StaticText):
-#                 ctrl.SetLabel(loc.get(key))
-#
-#         self.Layout()
-#
-#     def switch_content_panel(self, content_name: str) -> None:
-#         """
-#         Переключает содержимое главного окна на указанную панель.
-#
-#         Args:
-#             content_name: Имя модуля контента для переключения.
-#         """
-#         try:
-#             main_window = wx.GetTopLevelParent(self)
-#             if hasattr(main_window, "switch_content"):
-#                 main_window.switch_content(content_name)
-#             else:
-#                 show_popup(loc.get("error", "Ошибка: невозможно переключить контент"), popup_type="error")
-#         except Exception as e:
-#             show_popup(loc.get("error", f"Ошибка переключения контента: {str(e)}"), popup_type="error")
-#
-#     def on_ok(self, event: wx.Event, close_window: bool = False) -> None:
-#         """
-#         Обрабатывает нажатие кнопки OK: собирает данные, проверяет их валидность, обрабатывает данные.
-#
-#         Args:
-#             event: Событие wxPython.
-#             close_window: Если True, переключает на content_apps после успешной обработки.
-#         """
-#         try:
-#             data = self.collect_input_data()
-#             if not self.validate_input(data):
-#                 show_popup(loc.get("error", "Некорректные входные данные"), popup_type="error")
-#                 return
-#             if not self.process_input(data):
-#                 show_popup(loc.get("error", "Ошибка обработки данных"), popup_type="error")
-#                 return
-#             if self.last_input_file:
-#                 save_last_input(self.last_input_file, data)
-#             if close_window:
-#                 self.switch_content_panel("content_apps")
-#         except Exception as e:
-#             show_popup(loc.get("error", f"Ошибка ввода: {str(e)}"), popup_type="error")
-#
-#     def on_clear(self, event: wx.Event) -> None:
-#         """
-#         Очищает все поля ввода и сбрасывает статусную строку.
-#
-#         Args:
-#             event: Событие wxPython.
-#         """
-#         try:
-#             self.clear_input_fields()
-#             update_status_bar_point_selected(self, None)
-#             if self.last_input_file:
-#                 save_last_input(self.last_input_file, self.collect_input_data())
-#         except Exception as e:
-#             show_popup(loc.get("error", f"Ошибка при очистке полей: {str(e)}"), popup_type="error")
-#
-#     def on_cancel(self, event: wx.Event, switch_content: Optional[str] = "content_apps") -> None:
-#         """
-#         Переключает контент на указанную панель с подтверждением (если отказ — остаёмся).
-#         Args:
-#             event: Событие wxPython.
-#             switch_content: Имя контента для переключения.
-#         """
-#         confirm_message = loc.get(
-#             "confirm_cancel_message",
-#             "Вы действительно хотите отменить? Данные не сохранятся!"
-#         )
-#         confirm_title = loc.get("cancel_button", "Отмена")
-#
-#         dlg = wx.MessageDialog(
-#             self,
-#             confirm_message,
-#             confirm_title,
-#             style=wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING
-#         )
-#
-#         try:
-#             result = dlg.ShowModal()
-#         finally:
-#             dlg.Destroy()
-#
-#         if result in (wx.ID_YES, wx.ID_OK):
-#             # Подтвердили — переключаем контент
-#             try:
-#                 self.switch_content_panel(switch_content)
-#             except Exception as e:
-#                 show_popup(loc.get("error", f"Ошибка переключения контента: {str(e)}"), popup_type="error")
-#         else:
-#             # Отказ пользователя — остаёмся на текущей панели
-#             return
-#
-#     def collect_input_data(self) -> Dict:
-#         """
-#         Собирает данные из полей ввода панели.
-#
-#         Returns:
-#             Dict: Словарь с данными из полей ввода.
-#         """
-#         return {}
-#
-#     def validate_input(self, data: Dict) -> bool:
-#         """
-#         Проверяет валидность введённых данных.
-#
-#         Args:
-#             data: Словарь с данными из полей ввода.
-#
-#         Returns:
-#             bool: True, если данные валидны, иначе False.
-#         """
-#         return True
-#
-#     def process_input(self, data: Dict) -> bool:
-#         """
-#         Обрабатывает собранные данные (например, выполняет расчёты или построение).
-#
-#         Args:
-#             data: Словарь с данными из полей ввода.
-#
-#         Returns:
-#             bool: True, если обработка успешна, иначе False.
-#         """
-#         return True
-#
-#     def clear_input_fields(self) -> None:
-#         """
-#         Очищает все поля ввода панели.
-#         """
-#         pass
-#
-#     # def update_ui_language(self) -> None:
-#     #     """
-#     #     Обновляет текст элементов интерфейса при смене языка.
-#     #     """
-#     #     pass
-#
-#     def create_button_bar(self):
-#         """Создаёт горизонтальный сайзер с кнопками OK / [Clear] / Cancel"""
-#         buttons = create_standard_buttons(
-#             self,
-#             self.on_ok,
-#             self.on_cancel,
-#             getattr(self, 'on_clear', None)  # на случай, если on_clear не определён
-#         )
-#         adjust_button_widths(buttons)
-#
-#         # ← сохраняем ссылки на кнопки в экземпляр
-#         self.buttons = buttons
-#
-#         sizer = wx.BoxSizer(wx.HORIZONTAL)
-#         sizer.AddMany([(btn, 0, wx.RIGHT, 5) for btn in buttons])
-#         return sizer
-
-
 def get_wx_color_from_value(value: Any, default: Union[str, Tuple[int, int, int]] = (255, 255, 255)) -> Colour:
     """
     Преобразует значение цвета в wx.Colour.
@@ -363,6 +152,24 @@ def get_wx_color_from_value(value: Any, default: Union[str, Tuple[int, int, int]
         elif isinstance(default, (tuple, list)) and len(default) == 3:
             return Colour(*default)
         return Colour(255, 255, 255)
+
+def scale_bitmap(bitmap: wx.Bitmap, width: int, height: int) -> wx.Bitmap:
+    """
+    Масштабирует изображение до заданных размеров.
+
+    Args:
+        bitmap (wx.Bitmap): Исходное изображение.
+        width (int): Целевая ширина.
+        height (int): Целевая высота.
+
+    Returns:
+        wx.Bitmap: Масштабированное изображение.
+    """
+    if bitmap.IsOk():
+        image = bitmap.ConvertToImage()
+        image = image.Scale(width, height, wx.IMAGE_QUALITY_HIGH)
+        return wx.Bitmap(image)
+    return bitmap
 
 
 class BaseContentPanel(wx.Panel):
@@ -396,13 +203,13 @@ class BaseContentPanel(wx.Panel):
     def update_ui_language(self) -> None:
         """
         Вызывается при смене языка приложения.
-        Полностью пересобирает интерфейс панели.
+        Полностью обновляет интерфейс панели.
         """
         self.Freeze()
         try:
-            sizer = self.GetSizer()
-            if sizer:
-                sizer.Clear(True)
+            language_sizer = self.GetSizer()
+            if language_sizer:
+                language_sizer.Clear(True)
             self.setup_ui()
         finally:
             self.Thaw()

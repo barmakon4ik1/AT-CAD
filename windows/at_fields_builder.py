@@ -85,7 +85,10 @@ class FormField:
         """
         raw = self.get_raw()
 
-        if not raw:
+        def is_empty(value):
+            return value is None or value == ""
+
+        if is_empty(raw):
             if self.default is not None:
                 return self.default
             if self.required:
@@ -178,7 +181,7 @@ class FormBuilder:
     def clear(self) -> None:
         """Очищает все поля формы безопасно, используя set_value()."""
         for field in self.fields.values():
-            field.set_value("")
+            field.set_value(field.default)
 
     # ------------------------------------------------------------------
     # Документация и отладка
