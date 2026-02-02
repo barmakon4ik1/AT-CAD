@@ -23,7 +23,8 @@ import logging
 from win32com.client import VARIANT
 import pythoncom
 from config.at_cad_init import ATCadInit
-from config.at_config import DEFAULT_TEXT_LAYER, DEFAULT_DIM_OFFSET, TEXT_HEIGHT_BIG
+from config.at_config import DEFAULT_TEXT_LAYER, DEFAULT_DIM_OFFSET, TEXT_HEIGHT_BIG, TEXT_HEIGHT_SMALL, \
+    TEXT_HEIGHT_LASER, DEFAULT_LASER_LAYER, MAIN_TEXT_OFFSET
 from programs.at_base import regen
 from programs.at_dimension import add_dimension
 from programs.at_geometry import add_rectangle_points, offset_point, polar_point, ensure_point_variant
@@ -770,7 +771,7 @@ class AccompanyText:
     def __init__(self, data: dict):
         self.data = data
 
-    def draw(self, model, text_insert_point, text_alignment=0):
+    def draw(self, ms, text_insert_point, text_alignment=0):
         """
         Отображение текста
         """
@@ -779,14 +780,69 @@ class AccompanyText:
         text = f'{thickness}{loc.get("mm", "mm")} {material}'
 
         add_text(
-            model=model,
-            point=text_insert_point,
+            model=ms,
+            point=ensure_point_variant(text_insert_point),
             text=text,
             layer_name=DEFAULT_TEXT_LAYER,
             text_height=TEXT_HEIGHT_BIG,
             text_angle=0,
             text_alignment=text_alignment,
         )
+
+
+class MainText:
+    """
+    Добавление текста Order+Detail  на развертку, с возможностью гравировки
+    """
+    def __init__(self, data: dict):
+        self.data = data
+
+    def draw(self, ms, text_insert_point, text_alignment=0, laser=True) -> None:
+        """
+        Отображение текстов на развертке
+        Args:
+            ms: пространство модели
+            text_insert_point: точка вставки текста (в виде списка или варианта)
+            text_alignment: выравнивание текста (см. add_text)
+            laser: лазерная гравировка на развертке - да/нет (True/False)
+        """
+        work_number = self.data["work_number"]
+        detail = self.data["detail"]
+
+        # Добавление текста
+        if work_number:  # Добавляем текст только если work_number не пустой
+            try:
+                full_text = f'{work_number}-{detail}' if detail else f'{work_number}'
+
+                if laser:
+                    # точка для гравировки
+                    point = polar_point(text_insert_point, MAIN_TEXT_OFFSET, 90, as_variant=True) # точка  основного текста
+                    laser_text = f'{work_number}'
+                    add_text(
+                        ms,
+                        text_insert_point,
+                        text=laser_text,
+                        layer_name=DEFAULT_LASER_LAYER,
+                        text_height=TEXT_HEIGHT_LASER,
+                        text_alignment=text_alignment
+                        )
+                else:
+                    point = text_insert_point
+
+                add_text(
+                    ms,
+                    point,
+                    text=full_text,
+                    layer_name=DEFAULT_TEXT_LAYER,
+                    text_height=TEXT_HEIGHT_SMALL,
+                    text_alignment=text_alignment
+                    )
+            except KeyError as e:
+                show_popup(loc.get("text_error", f"Отсутствует ключ: {e}"), popup_type="error")
+                raise
+            except Exception as e:
+                show_popup(loc.get("text_error", f"Ошибка создания текста: {e}"), popup_type="error")
+                raise
 
 
 if __name__ == "__main__":

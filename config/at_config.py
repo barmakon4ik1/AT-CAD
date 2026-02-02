@@ -131,6 +131,7 @@ TEXT_HEIGHT_BIG: int = 60
 TEXT_HEIGHT_SMALL: int = 30
 TEXT_HEIGHT_LASER: int = 7
 TEXT_DISTANCE: int = 80
+MAIN_TEXT_OFFSET: int = 10
 
 # --- Символы статусов ---
 CHECK_MARK: str = "✅"

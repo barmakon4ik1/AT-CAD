@@ -35,7 +35,7 @@ TRANSLATIONS = {
     "material_label": {"ru": "Материал", "de": "Material", "en": "Material"},
     "thickness_label": {"ru": "Толщина S, мм", "de": "Dicke S, mm", "en": "Thickness S, mm"},
     "diameter": {"ru": "Диаметры", "de": "Durchmesser", "en": "Diameters"},
-    "diameters": {"ru": "Диаметры (через запятую)", "de": "Durchmesser (durch Kommas getrennt)", "en": "Diameters (comma separated)"},
+    "diameters": {"ru": "Диаметр", "de": "Durchmesser", "en": "Diameter"},
     "no_data_error": {"ru": "Необходимо ввести хотя бы один размер", "de": "Mindestens eine Abmessung muss eingegeben werden", "en": "At least one dimension must be entered"},
     "point_selection_error": {"ru": "Ошибка выбора точки", "de": "Fehler bei der Punktauswahl", "en": "Point selection error"},
     "error": {"ru": "Ошибка", "de": "Fehler", "en": "Error"},

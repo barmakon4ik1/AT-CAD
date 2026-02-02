@@ -350,7 +350,7 @@ class NamePlateContentPanel(BaseContentPanel):
             parent.EndModal(wx.ID_OK)
         else:
             # запасной вариант — просто закрыть фрейм, если ничего не подошло
-            print("запасной вариант — просто закрыть фрейм, если ничего не подошло", parent.selected_code) # Debug
+            print("запасной вариант — просто закрыть фрейм, если ничего не подошло") # Debug
             parent.Close()
 
 
