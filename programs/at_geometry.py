@@ -15,11 +15,13 @@
 """
 
 import math
+from pprint import pprint
 from typing import Optional, List, Tuple, Union, Dict
 from win32com.client import VARIANT
 import pythoncom
 from locales.at_translations import loc
 from windows.at_gui_utils import show_popup
+from errors.at_errors import DataError, GeometryError
 
 # -----------------------------
 # Локальные переводы модуля
@@ -59,7 +61,7 @@ def safe_div(a: float, b: float, default: float = 0.0) -> float:
         if abs(b) < 1e-12:
             return default
         return a / b
-    except Exception:
+    except ZeroDivisionError:
         return default
 
 
@@ -90,9 +92,11 @@ def calculate_angles(angle: int, unit: int, A: Tuple[float, float], B: Tuple[flo
     Вычисляет углы треугольника по трём точкам.
 
     Args:
+        C: координата вершины треугольника.
+        B: координата вершины треугольника.
+        A: координата вершины треугольника.
         angle: 0 для возврата всех углов, 1–3 для возврата одного из углов.
         unit: 0 — результат в градусах, 1 — в радианах.
-        A, B, C: координаты вершин треугольника.
 
     Returns:
         Угол или кортеж углов в зависимости от параметра angle.
@@ -134,29 +138,29 @@ def calculate_angles(angle: int, unit: int, A: Tuple[float, float], B: Tuple[flo
     return (angle_A, angle_B, angle_C) if angle == 0 else [angle_A, angle_B, angle_C][angle - 1]
 
 
-def deg_to_rad(angle: float) -> Optional[float]:
-    """
-    Конвертирует угол из градусов в радианы.
-
-    Args:
-        angle: Угол в градусах.
-
-    Returns:
-        Угол в радианах.
-    """
-    return math.radians(angle)
-
-def rad_to_deg(angle: float) -> Optional[float]:
-    """
-    Конвертирует угол из радиан в градусы.
-
-    Args:
-        angle: Угол в радианах.
-
-    Returns:
-        Угол в градусах.
-    """
-    return math.degrees(angle)
+# def deg_to_rad(angle: float) -> Optional[float]:
+#     """
+#     Конвертирует угол из градусов в радианы.
+#
+#     Args:
+#         angle: Угол в градусах.
+#
+#     Returns:
+#         Угол в радианах.
+#     """
+#     return math.radians(angle)
+#
+# def rad_to_deg(angle: float) -> Optional[float]:
+#     """
+#     Конвертирует угол из радиан в градусы.
+#
+#     Args:
+#         angle: Угол в радианах.
+#
+#     Returns:
+#         Угол в градусах.
+#     """
+#     return math.degrees(angle)
 
 
 def circle_center_from_points(A: Tuple[float, float],
@@ -355,7 +359,7 @@ def find_intersection_points(pt1: Tuple[float, float], r1: float,
     return [(px1, py1), (px2, py2)]
 
 
-def add_rectangle_points(point:Union[List[float], Tuple[float, ...], VARIANT], width: float, height: float, point_direction: str = "left_bottom") -> VARIANT:
+def add_rectangle_points(point:Union[List[float], Tuple[float, ...], VARIANT], width: float, height: float, point_direction: str = "left_bottom") -> VARIANT | None:
     """
     Вычисляет координаты точек прямоугольника и возвращает COM VARIANT.
 
@@ -607,7 +611,7 @@ def get_insert_point_on_shell(
     """
     Возвращает точку вставки выреза на развертке цилиндра.
 
-    :param insert_point: базовая точка вставки прямоугольника оболочки [x, y, z]
+    :param insert_point: Базовая точка вставки прямоугольника оболочки [x, y, z]
     :param diameter: диаметр цилиндра (D)
     :param length: длина цилиндра (L)
     :param angle_deg: угол поворота (0° = X=0 на развёртке)
@@ -629,14 +633,14 @@ def get_insert_point_on_shell(
     # координата по оси (Y)
     Y = weld_allowance_bottom + offset_axial + axial_shift
 
-    return [x0 + X, y0 + Y, z0]
+    return x0 + X, y0 + Y, z0
 
 
 def angle_to_unroll_x(angle_deg, diameter, cut_angle_ref=0.0, unroll_dir="CW"):
     """
     Перевод угла окружности цилиндра в координату X на развёртке.
 
-    :param angle_deg: исходный угол (в системе цилиндра)
+    :param angle_deg: Исходный угол (в системе цилиндра)
     :param diameter: диаметр цилиндра
     :param cut_angle_ref: угол, по которому сделан разрез (левый край развёртки)
     :param unroll_dir: направление разворота: "CW" или "CCW"
@@ -715,10 +719,10 @@ def make_cone_arc_points(
         N          - количество делений дуги
 
     Возвращает:
-        Список из N+1 точек [(x0,y0), (x1,y1), ... , (xN,yN)]
+        Список из N+1 точек [(x0,y0), (x1,y1), ... , (xN, yN)]
     """
 
-    ax, ay, az = apex
+    ax, ay = apex
 
     # начальный угол (левая точка)
     angle_start = -theta_rad / 2
@@ -906,4 +910,289 @@ def circle_line_intersection(p01, C, D, A):
 
         return x, y
 
+
+def triangle(data: dict) -> dict:
+    """
+    Универсальный метод решения плоского треугольника.
+
+    ---------------------------
+    Геометрические обозначения
+    ---------------------------
+
+    Используется каноническая схема:
+
+                 γ
+                /|
+               / |
+            b /  | a
+             /   |
+            /____|
+           α  c  β
+
+    Соответствие сторон и углов:
+        • a  ↔  α (alpha) — угол, противолежащий стороне a
+        • b  ↔  β (beta)  — угол, противолежащий стороне b
+        • c  ↔  γ (gamma) — угол, противолежащий стороне c
+
+    ---------------------------
+    Входные данные
+    ---------------------------
+
+    Входной словарь может содержать любые из следующих ключей:
+        a, b, c            - длины сторон
+        alpha, beta, gamma - углы в ГРАДУСАХ
+
+    Неизвестные величины должны иметь значение None.
+
+    ---------------------------
+    Правила решения
+    ---------------------------
+
+    • Для решения необходимо минимум 3 независимые величины
+    • Комбинация AAA (три угла) недопустима — отсутствует масштаб
+    • Комбинации SSA допускаются только при однозначности решения
+    • При задании более 3 величин выполняется проверка согласованности
+
+    ---------------------------
+    Результат
+    ---------------------------
+
+    Возвращается словарь со ВСЕМИ величинами:
+        a, b, c,
+        alpha, beta, gamma (в градусах),
+        ha, hb, hc — высоты, опущенные на стороны a, b, c
+
+    В случае ошибки возбуждается DataError или GeometryError.
+    """
+
+    module = __name__
+    eps = 1e-6
+    pi = math.pi
+
+    # ------------------------------------------------------------
+    # ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+    # ------------------------------------------------------------
+
+    def rad(x): return math.radians(x)
+    def deg(x): return math.degrees(x)
+
+    def solve_SSS(a, b, c):
+        if a + b <= c or a + c <= b or b + c <= a:
+            raise GeometryError(module, ValueError("Нарушено неравенство треугольника"))
+        alpha = math.acos((b*b + c*c - a*a) / (2*b*c))
+        beta  = math.acos((a*a + c*c - b*b) / (2*a*c))
+        gamma = pi - alpha - beta
+        return a, b, c, alpha, beta, gamma
+
+    def side_by_cos(s1, s2, angle):
+        return math.sqrt(s1*s1 + s2*s2 - 2*s1*s2*math.cos(angle))
+
+    def side_by_sin(known_side, known_angle, target_angle):
+        return known_side * math.sin(target_angle) / math.sin(known_angle)
+
+    def canonical_SSA(b, c, beta):
+        """
+        Канонический SSA:
+            известны b, c и beta (напротив b)
+        """
+        x = c * math.sin(beta) / b
+        if x > 1 + eps:
+            raise GeometryError(module, ValueError("Треугольник не существует"))
+
+        gamma1 = math.asin(min(1.0, x))  # острый
+
+        # Проверка однозначности
+        if b < c:
+            raise GeometryError(
+                module,
+                ValueError("Двусмысленный случай SSA (два возможных треугольника)")
+            )
+
+        gamma = gamma1
+        alpha = pi - beta - gamma
+        if alpha <= 0:
+            raise GeometryError(module, ValueError("Невозможная конфигурация углов"))
+
+        a = side_by_sin(b, beta, alpha)
+        return a, b, c, alpha, beta, gamma
+
+    # ------------------------------------------------------------
+    # ИЗВЛЕЧЕНИЕ И НОРМАЛИЗАЦИЯ ДАННЫХ
+    # ------------------------------------------------------------
+
+    a = data.get('a')
+    b = data.get('b')
+    c = data.get('c')
+
+    alpha = rad(data['alpha']) if data.get('alpha') is not None else None
+    beta  = rad(data['beta'])  if data.get('beta')  is not None else None
+    gamma = rad(data['gamma']) if data.get('gamma') is not None else None
+
+    given = {k for k, v in {
+        'a': a, 'b': b, 'c': c,
+        'alpha': alpha, 'beta': beta, 'gamma': gamma
+    }.items() if v is not None}
+
+    n = len(given)
+
+    # ------------------------------------------------------------
+    # ПРОВЕРКИ КОЛИЧЕСТВА ДАННЫХ
+    # ------------------------------------------------------------
+
+    if n < 3:
+        raise DataError(module, ValueError("Недостаточно данных для решения треугольника"))
+
+    if given == {'alpha', 'beta', 'gamma'}:
+        raise DataError(module, ValueError("Комбинация AAA не определяет масштаб"))
+
+    # ------------------------------------------------------------
+    # ВОССТАНОВЛЕНИЕ УГЛОВ (если возможно)
+    # ------------------------------------------------------------
+
+    if alpha and beta and not gamma:
+        gamma = pi - alpha - beta
+    elif alpha and gamma and not beta:
+        beta = pi - alpha - gamma
+    elif beta and gamma and not alpha:
+        alpha = pi - beta - gamma
+
+    if alpha and beta and gamma:
+        if abs(alpha + beta + gamma - pi) > eps:
+            raise DataError(module, ValueError("Сумма углов не равна 180°"))
+
+    # ------------------------------------------------------------
+    # ОСНОВНОЕ РЕШЕНИЕ
+    # ------------------------------------------------------------
+
+    solved = False
+
+    # --- SSS
+    if a and b and c:
+        a, b, c, alpha, beta, gamma = solve_SSS(a, b, c)
+        solved = True
+
+    # --- SAS
+    elif a and b and gamma:
+        c = side_by_cos(a, b, gamma)
+        a, b, c, alpha, beta, gamma = solve_SSS(a, b, c)
+        solved = True
+
+    elif a and c and beta:
+        b = side_by_cos(a, c, beta)
+        a, b, c, alpha, beta, gamma = solve_SSS(a, b, c)
+        solved = True
+
+    elif b and c and alpha:
+        a = side_by_cos(b, c, alpha)
+        a, b, c, alpha, beta, gamma = solve_SSS(a, b, c)
+        solved = True
+
+    # --- ASA / AAS
+    elif alpha and beta and a:
+        b = side_by_sin(a, alpha, beta)
+        c = side_by_sin(a, alpha, gamma)
+        solved = True
+
+    elif alpha and gamma and a:
+        b = side_by_sin(a, alpha, beta)
+        c = side_by_sin(a, alpha, gamma)
+        solved = True
+
+    elif beta and gamma and b:
+        a = side_by_sin(b, beta, alpha)
+        c = side_by_sin(b, beta, gamma)
+        solved = True
+
+    # --- SSA (с канонизацией)
+    else:
+        # пробуем все циклические перестановки
+        perms = [
+            ('a', 'b', 'c', 'alpha', 'beta', 'gamma'),
+            ('b', 'c', 'a', 'beta', 'gamma', 'alpha'),
+            ('c', 'a', 'b', 'gamma', 'alpha', 'beta'),
+        ]
+
+        for sa, sb, sc, aa, ab, ag in perms:
+            if data.get(sb) and data.get(sc) and data.get(ab):
+                b0 = data[sb]
+                c0 = data[sc]
+                beta0 = rad(data[ab])
+
+                a0, b0, c0, alpha0, beta0, gamma0 = canonical_SSA(b0, c0, beta0)
+
+                # обратная подстановка
+                mapping = {
+                    sa: a0, sb: b0, sc: c0,
+                    aa: alpha0, ab: beta0, ag: gamma0
+                }
+
+                a = mapping['a']
+                b = mapping['b']
+                c = mapping['c']
+                alpha = mapping['alpha']
+                beta = mapping['beta']
+                gamma = mapping['gamma']
+
+                solved = True
+                break
+
+    if not solved:
+        raise DataError(
+            module,
+            ValueError("Недопустимая или неоднозначная комбинация исходных данных")
+        )
+
+    # ------------------------------------------------------------
+    # ПРОВЕРКА СОГЛАСОВАННОСТИ (>3 заданных)
+    # ------------------------------------------------------------
+
+    for key, val in data.items():
+        if val is None:
+            continue
+
+        if key in ('alpha', 'beta', 'gamma'):
+            if abs(rad(val) - locals()[key]) > eps:
+                raise DataError(
+                    module,
+                    ValueError(f"Противоречивое значение {key}")
+                )
+        else:
+            if abs(val - locals()[key]) > eps:
+                raise DataError(
+                    module,
+                    ValueError(f"Противоречивое значение {key}")
+                )
+
+    # ------------------------------------------------------------
+    # ВЫСОТЫ
+    # ------------------------------------------------------------
+
+    ha = b * math.sin(gamma)
+    hb = a * math.sin(gamma)
+    hc = a * math.sin(beta)
+
+    return {
+        'a': a,
+        'b': b,
+        'c': c,
+        'alpha': deg(alpha),
+        'beta':  deg(beta),
+        'gamma': deg(gamma),
+        'ha': ha,
+        'hb': hb,
+        'hc': hc,
+    }
+
+
 # Конец модуля
+
+if __name__ == '__main__':
+    data = {
+        'a': 45,
+        'b': 20,
+        'c': None,
+        'alpha': 45,
+        'beta': None,
+        'gamma': None,
+    }
+    pprint(triangle(data))
