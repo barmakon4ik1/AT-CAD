@@ -1188,11 +1188,11 @@ def triangle(data: dict) -> dict:
 
 if __name__ == '__main__':
     data = {
-        'a': 45,
-        'b': 20,
+        'a': None,
+        'b': 3.0,
         'c': None,
-        'alpha': 45,
-        'beta': None,
-        'gamma': None,
+        'alpha': None,
+        'beta': 45,
+        'gamma': 90.0,
     }
     pprint(triangle(data))

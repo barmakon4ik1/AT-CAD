@@ -167,10 +167,9 @@ CONTENT_REGISTRY = {
         "build_module": "programs.at_nozzle_cone"
     },
     "vessel_name": {
-        "module": "config.name_plates.nameplate_dialog",
+        "module": "windows.nameplate_dialog",
         "label": "at_vessel_name",
-        # "footer_hint": "footer_hint_vessel_name",
-        "build_module": "config.name_plates.nameplate_dialog",
+        # "build_module": "windows.nameplate_dialog",
     },
 }
 

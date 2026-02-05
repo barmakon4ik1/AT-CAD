@@ -19,6 +19,7 @@ File: programs\at_name_plate.py
 from __future__ import annotations
 import json
 import math
+from pprint import pprint
 from typing import Dict, List
 from config.at_cad_init import ATCadInit
 from config.at_config import NAME_PLATES_FILE, DEFAULT_TEXT_LAYER, DEFAULT_LASER_LAYER, DEFAULT_DIM_OFFSET, \
@@ -29,7 +30,7 @@ from programs.at_construction import add_polyline, add_text, add_rectangle, add_
 from locales.at_translations import loc
 from programs.at_dimension import add_dimension
 from programs.at_geometry import polar_point, PolylineBuilder, ensure_point_variant, distance_2points, \
-    bulge_chord, circle_line_intersection
+    bulge_chord, circle_line_intersection, triangle
 from programs.at_input import at_get_point
 from windows.at_gui_utils import show_popup
 
@@ -807,6 +808,8 @@ def build_type3(modelspace, cfg: BridgeConfig):
     # Диаметр обечайки (обязателен для type3)
     shell_diameter = spec["shell_diameter1"]
 
+    l1 = spec["l1"]
+
     # Угол открытия мостика
     angle = spec["edge_angle"]
 
@@ -817,18 +820,88 @@ def build_type3(modelspace, cfg: BridgeConfig):
         r_cut = cut["radius"]
     else:
         h_cut = l_cut = r_cut = 0.0
+    h1_cut = (bridge_height - h_cut) / 2
+
+    # # ------------------------------------------------------------------
+    # # Расчетные данные
+    # # ------------------------------------------------------------------
+    #
+    # radius = shell_diameter / 2.0
+    # angle_rad = math.radians(angle)
+    # alpha_rad = angle_rad / 2.0
+    # # xs = thickness / math.sin(angle_rad / 2.0)
+    # w1 = width - 2 * thickness
+    # ld = thickness / math.cos(0.5 * math.pi - alpha_rad)
+    #
+    # if l1 != 0:
+    #     # внутренняя величина L1 (коррекция на толщину):
+    #     l1 -= thickness + thickness * math.tan(alpha_rad / 2.0)
+    #     # Длина полная от оси цилиндра до точки внутреннего ребра L1:
+    #     c1 = w1 / (2 * math.tan(alpha_rad)) / math.sin(alpha_rad)
+    #     data2 = {
+    #         'a': radius,
+    #         'b': l1 + (0.5 * w1 / math.tan(alpha_rad)) - (length - thickness + radius),
+    #         'c': None,
+    #         'alpha': angle / 2.0,
+    #         'beta': None,
+    #         'gamma': None,
+    #     }
+    #     l2 = c1 - triangle(data2)["c"]
+    # else:
+    #     l_full_i = length + radius - thickness - (thickness / math.cos(alpha_rad))
+    #     l1 = l_full_i - (w1 / (2 * math.tan(alpha_rad)))
+    #     c1 = (l_full_i - l1) / math.sin(alpha_rad)
+    #     a0 = math.sqrt(radius * radius - thickness * thickness)
+    #     a1 = ld * math.sin(alpha_rad)
+    #     l2 = c1 - a0 + a1
+
+# РАСЧЕТ ТРЕБУЕТ ПРОВЕРКИ! ПРИ 90 ГРАДУСАХ УГЛА СЧИТАЕТ ВЕРНО, ПРИ 120 - НЕТ. ГДЕ ТО ПУТАННИЦА С УГЛАМИ!
 
     # ------------------------------------------------------------------
-    # Расчетные данные
+    # Предварительные вычисления
     # ------------------------------------------------------------------
-    h1_cut = (bridge_height - h_cut) / 2
-    radius = shell_diameter / 2.0
+    radius = shell_diameter * 0.5
+    w1 = width - 2.0 * thickness
+
     angle_rad = math.radians(angle)
-    alpha_rad = (math.pi - angle_rad) / 2.0
-    xs = thickness / math.sin(angle_rad / 2.0)
-    w1 = width - 2 * thickness
-    l1 = 0.5 * w1 / math.cos(alpha_rad) - (radius - ((xs - thickness) * (xs + thickness)) ** 0.5)
-    l2 = radius + (length - thickness) - 0.5 * w1 * math.tan(alpha_rad) - xs
+    alpha = 0.5 * angle_rad
+
+    sin_a = math.sin(alpha)
+    cos_a = math.cos(alpha)
+    tan_a = math.tan(alpha)
+
+    ld = thickness / math.sin(alpha)
+
+    # ------------------------------------------------------------------
+    # Расчет l1 и l2
+    # ------------------------------------------------------------------
+    if l1 != 0.0:
+        # Коррекция l1 на толщину
+        l1 -= thickness * (1.0 + math.tan(alpha * 0.5))
+
+        c1 = (w1 / (2.0 * tan_a)) / sin_a
+
+        data_tri = {
+            "a": radius,
+            "b": l1 + (0.5 * w1 / tan_a) - (length - thickness + radius),
+            "c": None,
+            "alpha": angle * 0.5,
+            "beta": None,
+            "gamma": None,
+        }
+
+        l2 = c1 - triangle(data_tri)["c"]
+
+    else:
+        l_full_i = length + radius - thickness - (thickness / cos_a)
+        l1 = l_full_i - (w1 / (2.0 * tan_a))
+
+        c1 = (l_full_i - l1) / sin_a
+
+        a0 = math.sqrt(radius * radius - thickness * thickness)
+        a1 = ld * sin_a
+
+        l2 = c1 - a0 + a1
 
     # ------------------------------------------------------------------
     # 1. Контур мостика
@@ -836,11 +909,11 @@ def build_type3(modelspace, cfg: BridgeConfig):
     cx, cy = center_point[0], center_point[1]
 
     p0 = (cx + (0.5 * width - thickness), cy - (0.5 * bridge_height))
-    p01 = (p0[0] + l2, p0[1])
-    p1 = (p01[0] + l1, p0[1])
+    p01 = (p0[0] + l1, p0[1])
+    p1 = (p01[0] + l2, p0[1])
     p15 = (cx - (0.5 * width - thickness), p0[1])
-    p1415 = (p15[0] - l2, p1[1])
-    p14 = (p1415[0] - l1, p1[1])
+    p1415 = (p15[0] - l1, p1[1])
+    p14 = (p1415[0] - l2, p1[1])
 
     p2 = (p1[0], p1[1] + h1_cut)
     p3 = (p2[0] - l_cut, p2[1])
@@ -1441,15 +1514,15 @@ if __name__ == "__main__":
         # Тип мостика
         # --------------------------------------------------
         # "type1" | "type2" | "type3" | "type4" | "type5"
-        "type": "type5",
+        "type": "type3",
 
         # --------------------------------------------------
         # Технологические параметры (обязательные)
         # НЕ участвуют в геометрии, но нужны для сопровождения
         # --------------------------------------------------
-        "order_number": "20377",
-        "detail_number": "",
-        "material": "1.4571",
+        "order_number": "20392",
+        "detail_number": "15",
+        "material": "1.4301",
 
         # Толщина листа — УЧАСТВУЕТ в геометрии (НЕ meta!)
         "thickness": 3.0,
@@ -1459,9 +1532,9 @@ if __name__ == "__main__":
         # --------------------------------------------------
         "geometry": {
             "center_point": pt,  # базовая точка построения
-            "width": 130.0,  # ширина мостика
-            "height": 122.0,  # высота мостика
-            "length": 80.0,  # длина площадки
+            "width": 170.0,  # ширина мостика
+            "height": 160.0,  # высота мостика
+            "length": 70.0,  # длина площадки, отступ L
         },
 
         # --------------------------------------------------
@@ -1483,20 +1556,20 @@ if __name__ == "__main__":
             # --- Тип 2 / 3 / 4 / 5 ---
             # Диаметр обечайки (вертикальной или горизонтальной)
             # shell_diameter1 - основной, когда нужен только один диаметр
-            "shell_diameter1": 114.3,
-            "shell_diameter2": 114.3,
+            "shell_diameter1": 90.0,
+            "shell_diameter2": 90.0,
 
             # --- Тип 3 / 5 ---
             # Угол раскрытия / скоса боковин
-            "edge_angle": 90.0,
+            "edge_angle": 120.0,
 
-            # --- Тип 5 ---
+            # --- Тип 5 / 3 (L1) ---
             # Вариант набора исходных данных
             # variant 1 - известны L, L1, D, A, H, здесь L - расстояние от плоскости таблички до касания цилиндра
             # variant 2 - известны L, D, A, H, линия наклона проходит через центр окружности, L как и в варианте 1
             # variant 3 - известны L2, L1, D, A, H, здесь L2 - расстояние от плоскости таблички до точки пересечения скоса с цилиндром
-            "variant": 2,
-            "l1": 0,
+            "variant": 1,
+            "l1": 50.0,
             "l2": 0,
 
             # --- Будущее развитие ---
@@ -1513,13 +1586,13 @@ if __name__ == "__main__":
         # Если вырез НЕ нужен — секцию "cutout" УДАЛЯЕМ целиком
         # --------------------------------------------------
         "cutout": {
-            "height": 42.0,  # высота выреза
-            "length": 30.0,  # длина выреза
+            "height": 50.0,  # высота выреза
+            "length": 20.0,  # длина выреза
             # r_cut:
             #   = 0   → повторяет окружность цилиндра
             #   > 0   → скругление
             #   < 0   → фаска (abs)
-            "radius": 0.0,
+            "radius": 5.0,
         },
 
         # --------------------------------------------------
@@ -1531,11 +1604,14 @@ if __name__ == "__main__":
             #     # "offset_top": 0.0    # отступ верхнего края от верха мостика
             # },
             {
-                "name": "GEA_klein",
+                "name": "GEA_gross",
             },
-            {
-                "name": "GEA_Firmenschild",
-            }
+            # {
+            #     "name": "GEA_klein",
+            # },
+            # {
+            #     "name": "GEA_Firmenschild",
+            # }
         ],
 
         # Расстояние между краями табличек

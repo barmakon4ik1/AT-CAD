@@ -11,6 +11,8 @@ import os
 import wx
 from typing import Dict, Optional
 from wx.lib.buttons import GenButton
+
+from config.at_config import NAME_PLATE_IMAGE_PATH
 from locales.at_translations import loc
 from windows.at_gui_utils import show_popup
 from windows.at_window_utils import (
@@ -23,7 +25,8 @@ from windows.at_window_utils import (
     style_gen_button,
 )
 from config.name_plates.nameplate_storage import load_nameplates, save_nameplates
-from config.name_plates.nameplate_validation import validate_record# ----------------------------------------------------------------------
+from config.name_plates.nameplate_validation import validate_record
+# ----------------------------------------------------------------------
 # Локализация
 # ----------------------------------------------------------------------
 
@@ -138,7 +141,7 @@ class NamePlateContentPanel(BaseContentPanel):
         # # ===== Левая часть =====
         left_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        image_path = os.path.join(os.path.dirname(__file__), "name_plate_image.png")
+        image_path = str(NAME_PLATE_IMAGE_PATH)
         self.canvas = CanvasPanel(self, image_file=image_path, size=(600, 400))
         left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
 
@@ -344,7 +347,7 @@ class NamePlateContentPanel(BaseContentPanel):
 
         if hasattr(parent, "switch_content"):
             print("switch_content", parent.selected_code) # Debug
-            parent.switch_content("content_apps")
+            # parent.switch_content("content_apps")
         elif isinstance(parent, wx.Dialog):
             print("dialog", parent.selected_code) # Debug
             parent.EndModal(wx.ID_OK)
