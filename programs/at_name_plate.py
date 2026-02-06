@@ -19,7 +19,6 @@ File: programs\at_name_plate.py
 from __future__ import annotations
 import json
 import math
-from pprint import pprint
 from typing import Dict, List
 from config.at_cad_init import ATCadInit
 from config.at_config import NAME_PLATES_FILE, DEFAULT_TEXT_LAYER, DEFAULT_LASER_LAYER, DEFAULT_DIM_OFFSET, \
@@ -822,86 +821,67 @@ def build_type3(modelspace, cfg: BridgeConfig):
         h_cut = l_cut = r_cut = 0.0
     h1_cut = (bridge_height - h_cut) / 2
 
-    # # ------------------------------------------------------------------
-    # # Расчетные данные
-    # # ------------------------------------------------------------------
-    #
-    # radius = shell_diameter / 2.0
-    # angle_rad = math.radians(angle)
-    # alpha_rad = angle_rad / 2.0
-    # # xs = thickness / math.sin(angle_rad / 2.0)
-    # w1 = width - 2 * thickness
-    # ld = thickness / math.cos(0.5 * math.pi - alpha_rad)
-    #
-    # if l1 != 0:
-    #     # внутренняя величина L1 (коррекция на толщину):
-    #     l1 -= thickness + thickness * math.tan(alpha_rad / 2.0)
-    #     # Длина полная от оси цилиндра до точки внутреннего ребра L1:
-    #     c1 = w1 / (2 * math.tan(alpha_rad)) / math.sin(alpha_rad)
-    #     data2 = {
-    #         'a': radius,
-    #         'b': l1 + (0.5 * w1 / math.tan(alpha_rad)) - (length - thickness + radius),
-    #         'c': None,
-    #         'alpha': angle / 2.0,
-    #         'beta': None,
-    #         'gamma': None,
-    #     }
-    #     l2 = c1 - triangle(data2)["c"]
-    # else:
-    #     l_full_i = length + radius - thickness - (thickness / math.cos(alpha_rad))
-    #     l1 = l_full_i - (w1 / (2 * math.tan(alpha_rad)))
-    #     c1 = (l_full_i - l1) / math.sin(alpha_rad)
-    #     a0 = math.sqrt(radius * radius - thickness * thickness)
-    #     a1 = ld * math.sin(alpha_rad)
-    #     l2 = c1 - a0 + a1
-
-# РАСЧЕТ ТРЕБУЕТ ПРОВЕРКИ! ПРИ 90 ГРАДУСАХ УГЛА СЧИТАЕТ ВЕРНО, ПРИ 120 - НЕТ. ГДЕ ТО ПУТАННИЦА С УГЛАМИ!
-
     # ------------------------------------------------------------------
     # Предварительные вычисления
     # ------------------------------------------------------------------
     radius = shell_diameter * 0.5
     w1 = width - 2.0 * thickness
+    w2 = w1 / 2.0
 
     angle_rad = math.radians(angle)
     alpha = 0.5 * angle_rad
+    beta = 0.5 * math.pi - alpha
 
     sin_a = math.sin(alpha)
-    cos_a = math.cos(alpha)
     tan_a = math.tan(alpha)
+    tan_b = math.tan(beta)
 
-    ld = thickness / math.sin(alpha)
+    c_full = w2 / sin_a
+    ld = thickness / sin_a
+    l_full_inside = length - thickness + radius
 
     # ------------------------------------------------------------------
     # Расчет l1 и l2
     # ------------------------------------------------------------------
     if l1 != 0.0:
         # Коррекция l1 на толщину
-        l1 -= thickness * (1.0 + math.tan(alpha * 0.5))
+        l1_i = l1 - thickness - thickness * math.tan(alpha / 2.0)
+        l_full_l1 = l1_i + w2 * tan_b
 
-        c1 = (w1 / (2.0 * tan_a)) / sin_a
+        delta = l_full_inside - l_full_l1
+        # delta < 0 → геометрия уходит "внутрь", острый треугольник
+        # delta > 0 → геометрия не дотягивает, тупой треугольник
 
-        data_tri = {
-            "a": radius,
-            "b": l1 + (0.5 * w1 / tan_a) - (length - thickness + radius),
-            "c": None,
-            "alpha": angle * 0.5,
-            "beta": None,
-            "gamma": None,
-        }
-
-        l2 = c1 - triangle(data_tri)["c"]
-
+        if abs(delta) < 1e-6:
+            c = radius - (thickness / tan_a) - (radius - math.sqrt(radius * radius - thickness * thickness))
+            l1 = l1_i
+        elif delta < 0:
+            data_tri = {
+                "a": radius,
+                "b": abs(delta),
+                "c": None,
+                "alpha": angle / 2.0,
+                "beta": None,
+                "gamma": None,
+            }
+            c = triangle(data_tri)["c"]
+            l1 = l1_i
+        else:
+            data_tri = {
+                "a": None,
+                "b": delta,
+                "c": radius,
+                "alpha": None,
+                "beta": None,
+                "gamma": 180 - angle / 2.0,
+            }
+            c = triangle(data_tri)["a"]
+            l1 = l1_i
     else:
-        l_full_i = length + radius - thickness - (thickness / cos_a)
-        l1 = l_full_i - (w1 / (2.0 * tan_a))
+        l1 = l_full_inside - w2 * tan_b - ld
+        c = radius - (thickness / tan_a) - (radius - math.sqrt(radius * radius - thickness * thickness))
 
-        c1 = (l_full_i - l1) / sin_a
-
-        a0 = math.sqrt(radius * radius - thickness * thickness)
-        a1 = ld * sin_a
-
-        l2 = c1 - a0 + a1
+    l2 = c_full - c
 
     # ------------------------------------------------------------------
     # 1. Контур мостика

@@ -1103,6 +1103,19 @@ def triangle(data: dict) -> dict:
         c = side_by_sin(b, beta, gamma)
         solved = True
 
+    # --- AAS (1 угол + противоположная сторона + любая сторона)
+    elif gamma and c and b:
+        beta = math.asin(b * math.sin(gamma) / c)
+        alpha = pi - beta - gamma
+        a = side_by_sin(c, gamma, alpha)
+        solved = True
+
+    elif gamma and c and a:
+        alpha = math.asin(a * math.sin(gamma) / c)
+        beta = pi - alpha - gamma
+        b = side_by_sin(c, gamma, beta)
+        solved = True
+
     # --- SSA (с канонизацией)
     else:
         # пробуем все циклические перестановки
@@ -1195,4 +1208,13 @@ if __name__ == '__main__':
         'beta': 45,
         'gamma': 90.0,
     }
-    pprint(triangle(data))
+    data_tri = {
+        "a": None,
+        "b": abs(-15.76),
+        "c": 45,
+        "alpha": None,
+        "beta": None,
+        "gamma": 180 - 45,
+    }
+    # pprint(triangle(data))
+    pprint(triangle(data_tri))
