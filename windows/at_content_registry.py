@@ -76,7 +76,7 @@ TRANSLATIONS = {
         "de": "Kegelpassung",
         "en": "Cone fitting"
     },
-    "at_vessel_name": {"ru": "Таблички", "en": "Name Plates", "de": "Typenschilder"},
+    "at_name_plate": {"ru": "Мостики для табличек", "en": "Name Plates Bracket", "de": "Typenschildträger"},
     "footer_hint_default": {
         "ru": "Выберите модуль для начала работы",
         "de": "Wählen Sie ein Modul, um zu beginnen",
@@ -167,8 +167,8 @@ CONTENT_REGISTRY = {
         "build_module": "programs.at_nozzle_cone"
     },
     "vessel_name": {
-        "module": "windows.nameplate_dialog",
-        "label": "at_vessel_name",
+        "module": "windows.content_bracket",
+        "label": "at_name_plate",
         # "build_module": "windows.nameplate_dialog",
     },
 }

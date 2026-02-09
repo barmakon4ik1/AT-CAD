@@ -11,6 +11,8 @@
 import logging
 import os
 import json
+from pathlib import Path
+
 import wx
 from typing import Tuple, Dict, Optional, List, Any, Union
 
@@ -473,6 +475,18 @@ def get_standard_font() -> wx.Font:
     return wx.Font(font_size, wx.FONTFAMILY_DEFAULT, style, weight, faceName=font_name)
 
 
+def get_textctrl_font(parent: wx.Window) -> wx.Font:
+    """
+    Возвращает шрифт, используемый в TextCtrl,
+    с учётом style_textctrl и user_settings.json
+    """
+    tmp = wx.TextCtrl(parent)
+    style_textctrl(tmp)
+    font = tmp.GetFont()
+    tmp.Destroy()
+    return font
+
+
 def get_button_font() -> wx.Font:
     """
     Возвращает шрифт для кнопок (на 2 пункта больше стандартного).
@@ -636,6 +650,26 @@ class CanvasPanel(wx.Panel):
         """
         self.Refresh()
         event.Skip()
+
+    def set_image(self, image_path: str | Path):
+        """
+        Обновляет изображение панели и перерисовывает её.
+        """
+        image_path = str(image_path)
+        # print(f"Set Canvas image: {image_path}")
+        try:
+            img = wx.Image(image_path, wx.BITMAP_TYPE_PNG)
+            if img.IsOk():
+                self.image = img
+            else:
+                logging.error(f"Некорректное изображение: {image_path}")
+                self.image = None
+        except Exception as e:
+            logging.error(f"Ошибка загрузки изображения {image_path}: {e}")
+            self.image = None
+
+        self.scaled_bitmap = None
+        self.Refresh()
 
 
 class BaseInputWindow(wx.Frame):

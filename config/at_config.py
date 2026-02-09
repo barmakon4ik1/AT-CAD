@@ -41,6 +41,11 @@ UNWRAPPER_PATH: Path = IMAGES_DIR / "unwrapper_image.png"
 ECCENTRIC_REDUCER_PATH: Path = IMAGES_DIR / "eccentric_reducer_image.png"
 CONE_PIPE_IMAGE_PATH: Path = IMAGES_DIR / "cone-pipe_image.png"
 NAME_PLATE_IMAGE_PATH: Path = IMAGES_DIR / "name_plate_image.png"
+BRACKET1_IMAGE_PATH: Path = IMAGES_DIR / "SB1.png"
+BRACKET2_IMAGE_PATH: Path = IMAGES_DIR / "SB2.png"
+BRACKET3_IMAGE_PATH: Path = IMAGES_DIR / "SB3.png"
+BRACKET4_IMAGE_PATH: Path = IMAGES_DIR / "SB4.png"
+BRACKET5_IMAGE_PATH: Path = IMAGES_DIR / "SB5.png"
 
 # --- Иконки языков ---
 LANGUAGE_ICONS: dict[str, Path] = {
