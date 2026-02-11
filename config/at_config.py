@@ -65,10 +65,19 @@ MENU_ICONS: dict[str, Path] = {
 }
 
 # --- Параметры интерфейса ---
-INPUT_FIELD_SIZE: tuple[int, int] = (200, -1)
+INPUT_FIELD_SIZE: tuple[int, int] = (150, -1)
 BANNER_HIGH: int = 100
 LOGO_SIZE: tuple[int, int] = (BANNER_HIGH - 10, BANNER_HIGH - 10)
 WINDOW_SIZE: tuple[int, int] = (1280, 980)
+# --- UI Layout ---
+FORM_CONFIG = {
+    "input_size": INPUT_FIELD_SIZE,
+    "row_border": 5,
+    "label_padding": 10,
+    "label_proportion": 0,
+    "field_proportion": 0,
+    "field_bg_color": (255, 255, 255)
+}
 
 # --- Настройки по умолчанию ---
 DEFAULT_SETTINGS: dict[str, object] = {
@@ -98,7 +107,7 @@ DEFAULT_SETTINGS: dict[str, object] = {
 
 # --- Режим взаимодействия с AutoCAD ---
 # Возможные значения: "COM" (через win32com) или "LISP" (через мост bridge.lsp)
-DEFAULT_AUTOCAD_MODE: str = "LISP"
+# DEFAULT_AUTOCAD_MODE: str = "LISP"
 
 # --- Предопределённые слои AutoCAD ---
 LAYER_DATA: list[dict[str, object]] = [
@@ -146,31 +155,31 @@ ERROR_MARK: str = "⚠️"
 # --- Кэш настроек пользователя ---
 _cached_settings: dict[str, object] | None = None
 
-def get_autocad_mode() -> str:
-    """
-    Возвращает текущий режим взаимодействия с AutoCAD: 'COM' или 'LISP'.
-    Значение берётся из user_settings.json, при отсутствии — используется DEFAULT_AUTOCAD_MODE.
-    """
-    try:
-        settings = load_user_settings()
-        mode = settings.get("AUTOCAD_INTERFACE_MODE", DEFAULT_AUTOCAD_MODE)
-        if mode not in ("COM", "LISP"):
-            mode = DEFAULT_AUTOCAD_MODE
-        return mode
-    except Exception:
-        return DEFAULT_AUTOCAD_MODE
+# def get_autocad_mode() -> str:
+#     """
+#     Возвращает текущий режим взаимодействия с AutoCAD: 'COM' или 'LISP'.
+#     Значение берётся из user_settings.json, при отсутствии — используется DEFAULT_AUTOCAD_MODE.
+#     """
+#     try:
+#         settings = load_user_settings()
+#         mode = settings.get("AUTOCAD_INTERFACE_MODE", DEFAULT_AUTOCAD_MODE)
+#         if mode not in ("COM", "LISP"):
+#             mode = DEFAULT_AUTOCAD_MODE
+#         return mode
+#     except Exception:
+#         return DEFAULT_AUTOCAD_MODE
 
 
-def set_autocad_mode(mode: str) -> None:
-    """
-    Устанавливает режим взаимодействия с AutoCAD ('COM' или 'LISP')
-    и сохраняет его в user_settings.json.
-    """
-    if mode not in ("COM", "LISP"):
-        return
-    settings = load_user_settings()
-    settings["AUTOCAD_INTERFACE_MODE"] = mode
-    save_user_settings(settings)
+# def set_autocad_mode(mode: str) -> None:
+#     """
+#     Устанавливает режим взаимодействия с AutoCAD ('COM' или 'LISP')
+#     и сохраняет его в user_settings.json.
+#     """
+#     if mode not in ("COM", "LISP"):
+#         return
+#     settings = load_user_settings()
+#     settings["AUTOCAD_INTERFACE_MODE"] = mode
+#     save_user_settings(settings)
 
 def load_user_settings() -> dict[str, object]:
     """

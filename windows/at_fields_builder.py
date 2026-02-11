@@ -1,63 +1,47 @@
 # windows/at_fields_builder.py
 # noinspection SpellCheckingInspection
+
 """
 Модуль: at_fields_builder.py
 
 Содержит классы и функции для построения форм в wxPython с поддержкой:
-- типовых полей (текстовые, многострочные, выбор из списка)
+- типовых полей (текстовые, многострочные, выбор из списка, комбобокс)
 - единообразного оформления
 - локализации на лету
 - валидации и парсинга данных
+- удобного создания строк с произвольными комбинациями элементов
 
 Основные классы:
 - FormField — описание одного поля формы
 - FormBuilder — сборка и управление формой
-- FieldBuilder — удобная обёртка для добавления полей с метками
-- LocalizableStaticBox / LocalizableButton — обёртки для локализации стандартных контролов
-
-Пример таблицы полей формы:
-
-| Имя поля   | Тип контрола    | Обязательное | Значение по умолчанию | Парсер           |
-|------------|----------------|--------------|-----------------------|-----------------|
-| username   | wx.TextCtrl     | Да           | None                  | str.strip       |
-| description| wx.TextCtrl     | Нет          | ""                    | None            |
-| choice     | wx.Choice       | Да           | "Option1"             | None            |
-| combo      | wx.ComboBox     | Нет          | "Default"             | None            |
+- FieldBuilder — удобная обёртка для добавления полей с метками и комбинированными строками
 """
 
-from typing import Any, Callable, Dict
+from __future__ import annotations
+from typing import Any, Callable, Dict, Optional, List, Union
 
 import wx
-from windows.at_window_utils import get_standard_font
+
+from config.at_config import FORM_CONFIG
 from locales.at_translations import loc
+from windows.at_gui_utils import get_standard_font
 
 
 # ----------------------------------------------------------------------
-# Формы и поля
+# FormField: описание поля формы
 # ----------------------------------------------------------------------
 class FormField:
-    """
-    Описание одного поля формы.
-
-    Атрибуты:
-        name: str — имя поля
-        ctrl: wx.Control — контрол для ввода данных
-        required: bool — обязательность заполнения
-        parser: Callable — функция преобразования значения
-        default: Any — значение по умолчанию
-        getter: Callable — пользовательская функция получения значения
-        setter: Callable — пользовательская функция установки значения
-    """
+    """Описание одного поля формы."""
 
     def __init__(
         self,
         name: str,
         ctrl: wx.Window,
         required: bool = False,
-        parser: Callable[[Any], Any] | None = None,
+        parser: Optional[Callable[[Any], Any]] = None,
         default: Any = None,
-        getter: Callable[[], Any] | None = None,
-        setter: Callable[[Any], None] | None = None,
+        getter: Optional[Callable[[], Any]] = None,
+        setter: Optional[Callable[[Any], None]] = None,
     ):
         self.name = name
         self.ctrl = ctrl
@@ -71,7 +55,7 @@ class FormField:
         """Возвращает сырое значение из контрола."""
         if self.getter:
             return self.getter()
-        elif hasattr(self.ctrl, "GetValue"):
+        if hasattr(self.ctrl, "GetValue"):
             return self.ctrl.GetValue()
         return None
 
@@ -84,11 +68,7 @@ class FormField:
         - иначе — сырое значение
         """
         raw = self.get_raw()
-
-        def is_empty(value):
-            return value is None or value == ""
-
-        if is_empty(raw):
+        if raw in (None, ""):
             if self.default is not None:
                 return self.default
             if self.required:
@@ -96,40 +76,30 @@ class FormField:
                     loc.get("no_data_error", f"Field '{self.name}' is required")
                 )
             return raw
-
         if self.parser:
             return self.parser(raw)
-
         return raw
 
     def set_value(self, value: Any) -> None:
-        """
-        Безопасно устанавливает значение поля.
-
-        Логика:
-        1. Если задан setter, используется он.
-        2. Если контрол имеет SetValue(), вызывается он.
-        3. Для wx.Choice и wx.ComboBox устанавливается выбор/текст.
-        4. Иначе значение игнорируется (например, кастомные контролы без setter).
-        """
+        """Устанавливает значение поля безопасно, через setter или стандартный контрол."""
         if self.setter:
             self.setter(value)
-        elif hasattr(self.ctrl, "SetValue"):
-            self.ctrl.SetValue(value)
-        elif isinstance(self.ctrl, wx.Choice):
+            return
+        if isinstance(self.ctrl, wx.Choice):
             if value in self.ctrl.GetItems():
                 self.ctrl.SetStringSelection(value)
             else:
                 self.ctrl.SetSelection(wx.NOT_FOUND)
-        elif isinstance(self.ctrl, wx.ComboBox):
-            self.ctrl.SetValue(str(value))
-        # кастомные контролы игнорируем
+            return
+        if hasattr(self.ctrl, "SetValue"):
+            self.ctrl.SetValue(value)
 
 
+# ----------------------------------------------------------------------
+# FormBuilder: управление формой и регистрация полей
+# ----------------------------------------------------------------------
 class FormBuilder:
-    """
-    Управление формой: регистрация полей, сбор данных, очистка и документация.
-    """
+    """Класс для регистрации полей формы и сбора данных."""
 
     def __init__(self, panel: wx.Window):
         self.panel = panel
@@ -140,23 +110,12 @@ class FormBuilder:
         name: str,
         ctrl: wx.Window,
         required: bool = False,
-        parser: Callable[[str], Any] | None = None,
+        parser: Optional[Callable[[Any], Any]] = None,
         default: Any = None,
-        getter: Callable[[], Any] | None = None,
-        setter: Callable[[Any], None] | None = None
+        getter: Optional[Callable[[], Any]] = None,
+        setter: Optional[Callable[[Any], None]] = None,
     ) -> wx.Window:
-        """
-        Регистрирует поле формы.
-
-        Аргументы:
-            name — имя поля
-            ctrl — контрол wx.Control
-            required — обязательность
-            parser — функция преобразования значения
-            default — значение по умолчанию
-            getter — пользовательская функция получения значения
-            setter — пользовательская функция установки значения
-        """
+        """Регистрирует поле формы."""
         self.fields[name] = FormField(
             name=name,
             ctrl=ctrl,
@@ -164,49 +123,24 @@ class FormBuilder:
             parser=parser,
             default=default,
             getter=getter,
-            setter=setter
+            setter=setter,
         )
         return ctrl
 
-    def collect(self) -> dict:
+    def collect(self) -> Dict[str, Any]:
         """Собирает значения всех полей формы в словарь."""
         data = {}
         for name, field in self.fields.items():
             try:
                 data[name] = field.get_value()
             except Exception as e:
-                raise ValueError(f"Error in field '{name}': {e}") from e
+                raise ValueError(f"Ошибка в поле '{name}': {e}") from e
         return data
 
     def clear(self) -> None:
         """Очищает все поля формы безопасно, используя set_value()."""
         for field in self.fields.values():
             field.set_value(field.default)
-
-    # ------------------------------------------------------------------
-    # Документация и отладка
-    # ------------------------------------------------------------------
-    def get_fields_table(self) -> str:
-        """Возвращает таблицу зарегистрированных полей в формате Markdown."""
-        lines = [
-            "| Имя поля | Тип контрола | Обязательное | Значение по умолчанию | Парсер |",
-            "|----------|-------------|--------------|------------------------|--------|",
-        ]
-        for name, field in self.fields.items():
-            ctrl_type = type(field.ctrl).__name__
-            required = "Да" if field.required else "Нет"
-            default = repr(field.default)
-            parser = (
-                field.parser.__name__
-                if callable(field.parser) and hasattr(field.parser, "__name__")
-                else repr(field.parser) if field.parser else ""
-            )
-            lines.append(f"| {name} | {ctrl_type} | {required} | {default} | {parser} |")
-        return "\n".join(lines)
-
-    def print_fields_table(self) -> None:
-        """Выводит таблицу полей в stdout."""
-        print(self.get_fields_table())
 
     def as_dict_schema(self) -> Dict[str, Dict[str, Any]]:
         """Возвращает словарь с описанием всех полей формы."""
@@ -222,235 +156,270 @@ class FormBuilder:
 
 
 # ----------------------------------------------------------------------
-# FieldBuilder: удобное создание полей + метки
+# FieldBuilder: создание элементов формы и комбинированных строк
 # ----------------------------------------------------------------------
 class FieldBuilder:
     """
-    Помощник для создания типовых строк формы: метка + контрол.
-
-    Поддерживает:
-    - единый стиль
-    - StretchSpacer для выравнивания
-    - локализацию всех локализуемых элементов (метки, заголовки, кнопки)
-    - автоматическую регистрацию в FormBuilder
+    Класс для построения элементов формы:
+    - типовые строки: метка + контрол
+    - комбинированные строки: метка + несколько контролов
+    - поддержка локализации, регистрации и единого стиля
     """
 
     def __init__(
         self,
         parent: wx.Window,
         target_sizer: wx.Sizer,
-        form: FormBuilder | None = None,
-        default_size=(150, -1),
-        label_right_padding=10,
-        row_border=5,
-        label_proportion=0,
-        field_proportion=0
+        form: Optional[FormBuilder] = None,
+        default_size: tuple[int, int] = FORM_CONFIG["input_size"],
+        label_right_padding: int = 10,
+        row_border: int = 5
     ):
         self.parent = parent
         self.sizer = target_sizer
         self.form = form
-
         self.font = get_standard_font()
         self.default_size = default_size
         self.label_pad = label_right_padding
         self.row_border = row_border
-        self.label_prop = label_proportion
-        self.field_prop = field_proportion
 
-        # Все локализуемые элементы (StaticText, StaticBox, Button и др.)
-        # хранятся здесь по ключу локализации
-        self._labels: Dict[str, wx.Window] = {}
+        # Словарь всех локализуемых элементов
+        self._localizables: Dict[str, wx.Window] = {}
 
     # ------------------------------------------------------------------
-    # Внутренние методы
+    # Вспомогательные методы
     # ------------------------------------------------------------------
 
-    def _create_label(self, label_key: str) -> wx.StaticText:
-        """Создаёт локализованную метку (StaticText) и сохраняет её для смены языка."""
-        lbl = wx.StaticText(self.parent, label=loc.get(label_key, label_key))
+    def _create_label(self, key: str) -> wx.StaticText:
+        """Создаёт локализованную метку и сохраняет её для смены языка."""
+        lbl = wx.StaticText(self.parent, label=loc.get(key, key))
         lbl.SetFont(self.font)
-        self._labels[label_key] = lbl
+        self._localizables[key] = lbl
         return lbl
 
-    def _add_row(self, label: wx.StaticText, ctrl: wx.Window, proportion=0):
-        """Добавляет строку в sizer: метка + контрол + выравнивание."""
+    def _add_row(self, items: List[Union[wx.Window, str]], spacing=True) -> wx.BoxSizer:
+        """
+        Универсальная строка с несколькими элементами.
+        Аргументы:
+            items — список элементов (контролов или ключей меток)
+            spacing — добавлять растягиватель между элементами для выравнивания
+        Возвращает созданный BoxSizer.
+        """
         row = wx.BoxSizer(wx.HORIZONTAL)
-        row.Add(label, self.label_prop, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, self.label_pad)
-        row.AddStretchSpacer()
-        row.Add(ctrl, self.field_prop, wx.ALIGN_CENTER_VERTICAL)
-        self.sizer.Add(row, proportion, wx.EXPAND | wx.ALL, self.row_border)
+        for i, item in enumerate(items):
+            if isinstance(item, str):
+                # строка = ключ локализации -> создаём StaticText
+                ctrl = self._create_label(item)
+            else:
+                ctrl = item
+                ctrl.SetFont(self.font)
+
+            row.Add(ctrl, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, self.label_pad)
+
+            # Добавляем растягиватель после всех кроме последнего
+            if spacing and i < len(items) - 1:
+                row.AddStretchSpacer()
+
+        self.sizer.Add(row, 0, wx.EXPAND | wx.ALL, self.row_border)
+        return row
 
     # ------------------------------------------------------------------
     # Локализация
     # ------------------------------------------------------------------
 
-    def update_language(self):
-        """
-        Обновляет подписи всех локализуемых элементов (StaticText, StaticBox, Button и др.).
-        """
-        for key, ctrl in self._labels.items():
+    def update_language(self) -> None:
+        """Обновляет подписи всех локализуемых элементов на текущий язык."""
+        for key, ctrl in self._localizables.items():
             if hasattr(ctrl, "SetLabel"):
                 ctrl.SetLabel(loc.get(key, key))
 
-    def register_button(self, button: wx.Button, key: str):
-        """Регистрирует кнопку для локализации через FieldBuilder."""
-        self._labels[key] = button
-        return button
-
-    def register_static_box(self, box: wx.StaticBox, key: str):
-        """Регистрирует StaticBox для локализации через FieldBuilder."""
-        self._labels[key] = box
-        return box
-
     # ------------------------------------------------------------------
-    # Создание элементов управления
+    # Методы создания стандартных контролов
     # ------------------------------------------------------------------
-
     def create_label(self, label_key: str) -> wx.StaticText:
         """Создаёт локализованную метку (StaticText)."""
         return self._create_label(label_key)
 
-    def text(self, name: str, label_key: str, value: str = "", required: bool = False,
-             parser: Callable[[str], Any] | None = None, default: Any = None,
-             size=None, proportion=0) -> wx.TextCtrl:
+    def text(self, name: str, label_key: str, value: str = "", required=False,
+             parser: Optional[Callable] = None, default: Any = None,
+             size=None) -> wx.TextCtrl:
         """Однострочное текстовое поле с меткой."""
-        ctrl = wx.TextCtrl(self.parent, value=str(value), size=size or self.default_size)
+        ctrl = wx.TextCtrl(self.parent, value=str(value),
+                           size=wx.Size(*(size or self.default_size)))
         ctrl.SetFont(self.font)
-        lbl = self._create_label(label_key)
-        self._add_row(lbl, ctrl, proportion)
-        if self.form:
-            self.form.register(name, ctrl, required, parser, default)
-        setattr(self.parent, name, ctrl)
+        self._register_field(name, ctrl, required, parser, default)
+        self._add_row([label_key, ctrl])
         return ctrl
 
-    def multiline_text(self, name: str, label_key: str, value: str = "", required: bool = False,
-                       parser: Callable[[str], Any] | None = None, default: Any = None,
-                       size=None, proportion=0) -> wx.TextCtrl:
+    def multiline_text(self, name: str, label_key: str, value: str = "", required=False,
+                       parser: Optional[Callable] = None, default: Any = None,
+                       size=None) -> wx.TextCtrl:
         """Многострочное текстовое поле с меткой."""
-        ctrl = wx.TextCtrl(self.parent, value=value, style=wx.TE_MULTILINE, size=size or self.default_size)
+        ctrl = wx.TextCtrl(self.parent, value=value, style=wx.TE_MULTILINE,
+                           size=wx.Size(*(size or self.default_size)))
         ctrl.SetFont(self.font)
-        lbl = self._create_label(label_key)
-        self._add_row(lbl, ctrl, proportion)
-        if self.form:
-            self.form.register(name, ctrl, required, parser, default)
-        setattr(self.parent, name, ctrl)
+        self._register_field(name, ctrl, required, parser, default)
+        self._add_row([label_key, ctrl])
         return ctrl
 
-    def _register_field(self, name: str, ctrl: wx.Window, required: bool, parser, default):
-        """Регистрация поля в FormBuilder."""
-        if self.form:
-            self.form.register(name, ctrl, required, parser, default)
-        setattr(self.parent, name, ctrl)
-
-    def choice(self, name: str, label_key: str, choices: list, selection: int = 0,
-               required: bool = False, parser: Callable[[Any], Any] | None = None,
-               default: Any = None, size=None, proportion=0) -> wx.Choice:
-        """Создаёт выбор из списка (wx.Choice) с меткой."""
-        ctrl = wx.Choice(self.parent, choices=choices, size=size or self.default_size)
+    def choice(self, name: str, label_key: str, choices: list[str],
+               selection: int = 0, required=False, parser: Optional[Callable] = None,
+               default: Any = None) -> wx.Choice:
+        """Выбор из списка (wx.Choice) с меткой."""
+        ctrl = wx.Choice(self.parent, choices=choices)
         ctrl.SetFont(self.font)
         if choices:
             ctrl.SetSelection(selection)
 
-        def value_getter():
+        def getter():
             idx = ctrl.GetSelection()
             if idx == wx.NOT_FOUND:
                 return ""
             return ctrl.GetString(idx)
 
-        lbl = self._create_label(label_key)
-        self._add_row(lbl, ctrl, proportion)
+        def setter(v):
+            if v in ctrl.GetItems():
+                ctrl.SetStringSelection(v)
+            else:
+                ctrl.SetSelection(wx.NOT_FOUND)
 
-        if self.form:
-            self.form.register(
-                name=name,
-                ctrl=ctrl,
-                required=required,
-                parser=parser,
-                default=default,
-                getter=value_getter,
-                setter=lambda v: ctrl.SetStringSelection(v) if v in ctrl.GetItems() else ctrl.SetSelection(wx.NOT_FOUND)
-            )
-
-        setattr(self.parent, name, ctrl)
+        self._register_field(name, ctrl, required, parser, default, getter, setter)
+        self._add_row([label_key, ctrl])
         return ctrl
 
-    def combo(self, name: str, label_key: str, choices: list, value: str = "",
-              required: bool = False, parser: Callable[[Any], Any] | None = None,
-              default: Any = None, style=wx.CB_DROPDOWN, size=None, proportion=0) -> wx.ComboBox:
-        """Создаёт комбинированный список (wx.ComboBox) с меткой."""
-        ctrl = wx.ComboBox(self.parent, choices=choices, value=str(value), style=style,
-                           size=size or self.default_size)
+    def combo(self, name: str, label_key: str, choices: list[str], value="",
+              required=False, parser: Optional[Callable] = None,
+              default: Any = None, style=wx.CB_DROPDOWN) -> wx.ComboBox:
+        """Комбинированный список (wx.ComboBox) с меткой."""
+        ctrl = wx.ComboBox(self.parent, choices=choices, value=str(value), style=style)
         ctrl.SetFont(self.font)
-        lbl = self._create_label(label_key)
-        self._add_row(lbl, ctrl, proportion)
         self._register_field(name, ctrl, required, parser, default)
+        self._add_row([label_key, ctrl])
         return ctrl
 
     # ------------------------------------------------------------------
-    # StaticBox (группы полей)
+    # Контейнеры и кнопки
     # ------------------------------------------------------------------
 
     def static_box(self, box_key: str, orient=wx.VERTICAL, proportion=0,
                    flag=wx.EXPAND | wx.ALL, border=5) -> wx.StaticBoxSizer:
-        """Создаёт StaticBoxSizer с локализуемым заголовком."""
+        """Создаёт StaticBox с локализуемым заголовком."""
         box = wx.StaticBox(self.parent, label=loc.get(box_key, box_key))
         box.SetFont(self.font)
-        self.register_static_box(box, box_key)
+        self._localizables[box_key] = box
         sizer = wx.StaticBoxSizer(box, orient)
         self.sizer.Add(sizer, proportion, flag, border)
         return sizer
 
     def button(self, label_key: str, style=0, size=None) -> wx.Button:
         """Создаёт кнопку и регистрирует для локализации."""
-        btn = wx.Button(self.parent, label=loc.get(label_key, label_key), style=style, size=size or self.default_size)
+        btn = wx.Button(self.parent, label=loc.get(label_key, label_key), style=style)
         btn.SetFont(self.font)
-        self.register_button(btn, label_key)
+        self._localizables[label_key] = btn
         return btn
 
+    def row_label_field_field(
+            self,
+            name1: str, label_key1: str, value1: str = "", required1=False,
+            parser1: Optional[Callable] = None, default1: Any = None,
+            name2: str = "", value2: str = "", required2=False,
+            parser2: Optional[Callable] = None, default2: Any = None,
+    ) -> tuple[wx.TextCtrl, wx.TextCtrl]:
+        """Создаёт строку: метка + поле + поле"""
+        ctrl1 = wx.TextCtrl(self.parent, value=str(value1),
+                            size=wx.Size(*self.default_size))
+        ctrl1.SetFont(self.font)
+        self._register_field(name1, ctrl1, required1, parser1, default1)
 
-# ----------------------------------------------------------------------
-# Локализуемые обёртки для стандартных элементов управления
-# ----------------------------------------------------------------------
-class LocalizableStaticBox:
-    """Обёртка для wx.StaticBox с поддержкой динамической локализации."""
-    def __init__(self, box: wx.StaticBox, key: str):
-        self.box = box
-        self.key = key
+        ctrl2 = wx.TextCtrl(self.parent, value=str(value2),
+                            size=wx.Size(*self.default_size))
+        ctrl2.SetFont(self.font)
+        if name2:
+            self._register_field(name2, ctrl2, required2, parser2, default2)
 
-    def update_language(self) -> None:
-        """Обновляет надпись StaticBox на текущий язык."""
-        self.box.SetLabel(loc.get(self.key))
+        self._add_row([label_key1, ctrl1, ctrl2])
+        return ctrl1, ctrl2
 
+    def row_label_combo_field(
+            self,
+            name_combo: str, label_key: str, choices: list[str], selection=0,
+            required_combo=False, parser_combo: Optional[Callable] = None,
+            default_combo: Any = None,
+            name_field: str = "", value_field: str = "",
+            required_field=False, parser_field: Optional[Callable] = None,
+            default_field: Any = None,
+    ) -> tuple[wx.ComboBox, wx.TextCtrl]:
+        """Создаёт строку: метка + комбобокс + поле"""
+        combo = wx.ComboBox(self.parent, choices=choices,
+                            value=choices[selection] if choices else "",
+                            style=wx.CB_DROPDOWN)
+        combo.SetFont(self.font)
+        self._register_field(name_combo, combo, required_combo, parser_combo, default_combo)
 
-class LocalizableButton:
-    """Обёртка для wx.Button с поддержкой динамической локализации."""
-    def __init__(self, button: wx.Button, key: str):
-        self.button = button
-        self.key = key
+        field = wx.TextCtrl(self.parent, value=value_field,
+                            size=wx.Size(*self.default_size))
+        field.SetFont(self.font)
+        if name_field:
+            self._register_field(name_field, field, required_field, parser_field, default_field)
 
-    def update_language(self) -> None:
-        """Обновляет надпись кнопки на текущий язык."""
-        self.button.SetLabel(loc.get(self.key))
+        self._add_row([label_key, combo, field])
+        return combo, field
 
+    def row_label_combo_combo(
+            self,
+            name1: str, name2: str, label_key: str,
+            choices1: list[str], choices2: list[str],
+            selection1=0, selection2=0,
+            required1=False, required2=False,
+            parser1: Optional[Callable] = None, parser2: Optional[Callable] = None,
+            default1: Any = None, default2: Any = None,
+    ) -> tuple[wx.ComboBox, wx.ComboBox]:
+        """Создаёт строку: метка + комбобокс + комбобокс"""
+        combo1 = wx.ComboBox(self.parent, choices=choices1,
+                             value=choices1[selection1] if choices1 else "",
+                             style=wx.CB_DROPDOWN)
+        combo1.SetFont(self.font)
+        self._register_field(name1, combo1, required1, parser1, default1)
 
-"""
-Пример использования:
+        combo2 = wx.ComboBox(self.parent, choices=choices2,
+                             value=choices2[selection2] if choices2 else "",
+                             style=wx.CB_DROPDOWN)
+        combo2.SetFont(self.font)
+        self._register_field(name2, combo2, required2, parser2, default2)
 
-form = FormBuilder(panel)
-fb = FieldBuilder(panel, sizer, form)
+        self._add_row([label_key, combo1, combo2])
+        return combo1, combo2
 
-fb.text("diameter", "diameter_lbl", required=True, parser=float)
-fb.choice("material", "material_lbl", ["Steel", "Al"], required=True)
-fb.combo("note", "note_lbl", [])
+    def row_label_field(
+            self,
+            name: str, label_key: str,
+            value: str = "", required=False,
+            parser: Optional[Callable] = None,
+            default: Any = None,
+    ) -> wx.TextCtrl:
+        """Создаёт строку: метка + поле с растягивателем"""
+        ctrl = wx.TextCtrl(self.parent, value=value,
+                           size=wx.Size(*self.default_size))
+        ctrl.SetFont(self.font)
+        self._register_field(name, ctrl, required, parser, default)
+        self._add_row([label_key, ctrl])
+        return ctrl
 
-# Во время разработки:
-form.print_fields_table()
+    def row_custom(self, items: List[Union[wx.Window, str]]) -> wx.BoxSizer:
+        """
+        Универсальная строка с произвольными элементами.
+        Позволяет комбинировать кнопки, поля, метки и др.
+        """
+        return self._add_row(items)
 
+    # ------------------------------------------------------------------
+    # Регистрация поля в форме
+    # ------------------------------------------------------------------
 
-Вывод ы консоль:
-| Имя поля | Тип контрола | Обязательное | Значение по умолчанию | Парсер |
-|----------|-------------|--------------|------------------------|--------|
-| diameter | TextCtrl    | Да           | None                   | float  |
-| material | Choice      | Да           | None                   |        |
-| note     | ComboBox    | Нет          | None                   |        |
-"""
+    def _register_field(self, name: str, ctrl: wx.Window, required=False,
+                        parser: Optional[Callable] = None, default: Any = None,
+                        getter: Optional[Callable] = None, setter: Optional[Callable] = None):
+        """Вспомогательный метод: регистрация поля в FormBuilder + setattr на parent."""
+        if self.form:
+            self.form.register(name, ctrl, required, parser, default, getter, setter)
+        setattr(self.parent, name, ctrl)

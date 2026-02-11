@@ -688,7 +688,7 @@ class ATMainWindow(wx.Frame):
         """
         label = loc.get("btn_exit", "Выход")
         self.exit_button = GenButton(self.button_panel, label=label, size=(250, 35))
-        style_gen_button(self.exit_button, normal_bg="#2c3e50", font_size=14, button_height=30)
+        style_gen_button(self.exit_button, normal_bg="#2c3e50", button_height=30)
         self.exit_button.Bind(wx.EVT_BUTTON, self.on_exit)
         self.button_sizer.AddStretchSpacer()
         self.button_sizer.Add(self.exit_button, 0, wx.RIGHT, 5,)

@@ -760,10 +760,3 @@ if __name__ == "__main__":
     frame.Layout()
     frame.Show()
     app.MainLoop()
-
-
-
-
-
-
-

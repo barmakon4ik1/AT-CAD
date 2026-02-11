@@ -9,7 +9,7 @@
 к изображениям из at_config.py.
 """
 
-from config.at_config import get_setting, IMAGES_DIR, DONE_ICON_PATH
+from config.at_config import get_setting, IMAGES_DIR, DONE_ICON_PATH, DEFAULT_SETTINGS
 from locales.at_localization_class import loc
 import wx
 import os
@@ -128,3 +128,49 @@ def show_popup(message: str, title: str = None, popup_type: str = "error", icon_
     dialog.Destroy()
 
     return 1 if result == wx.ID_OK else 0
+
+def get_standard_font() -> wx.Font:
+    """
+    Возвращает базовый шрифт интерфейса на основе user_settings.json.
+
+    Используется для:
+        - заголовков
+        - label'ов
+        - статусной строки
+        - большинства текстовых элементов
+
+    Настройки:
+        FONT_NAME
+        FONT_TYPE  (normal | italic | bold | bolditalic)
+        FONT_SIZE
+
+    Если параметр отсутствует в user_settings.json,
+    используется значение из DEFAULT_SETTINGS.
+
+    Returns:
+        wx.Font
+    """
+
+    font_name = get_setting("FONT_NAME") or DEFAULT_SETTINGS["FONT_NAME"]
+    font_type = (get_setting("FONT_TYPE") or DEFAULT_SETTINGS["FONT_TYPE"]).lower()
+    font_size = int(get_setting("FONT_SIZE") or DEFAULT_SETTINGS["FONT_SIZE"])
+
+    font_styles = {
+        "normal":     (wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL),
+        "italic":     (wx.FONTSTYLE_ITALIC, wx.FONTWEIGHT_NORMAL),
+        "bold":       (wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD),
+        "bolditalic": (wx.FONTSTYLE_ITALIC, wx.FONTWEIGHT_BOLD),
+    }
+
+    style, weight = font_styles.get(
+        font_type,
+        (wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+    )
+
+    return wx.Font(
+        font_size,
+        wx.FONTFAMILY_DEFAULT,
+        style,
+        weight,
+        faceName=font_name
+    )

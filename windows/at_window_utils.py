@@ -22,7 +22,7 @@ from wx.lib.buttons import GenButton
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programs.at_input import at_get_point
-from windows.at_gui_utils import show_popup
+from windows.at_gui_utils import show_popup, get_standard_font
 from windows.at_style import style_textctrl, style_combobox, style_radiobutton, style_staticbox, style_label
 from config.at_config import load_user_settings, DEFAULT_SETTINGS, get_setting, ICON_PATH, RESOURCE_DIR
 from config.at_last_input import save_last_input
@@ -456,25 +456,6 @@ def save_last_input(filename: str, data: Dict) -> None:
         logging.error(f"Ошибка сохранения {abs_path}: {e}")
 
 
-def get_standard_font() -> wx.Font:
-    """
-    Возвращает стандартный шрифт на основе конфигурации из user_settings.json.
-
-    Returns:
-        wx.Font: Объект шрифта с заданным размером, стилем и именем.
-    """
-    font_name = get_setting("FONT_NAME") or DEFAULT_SETTINGS["FONT_NAME"]
-    font_styles = {
-        "normal": (wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL),
-        "italic": (wx.FONTSTYLE_ITALIC, wx.FONTWEIGHT_NORMAL),
-        "bold": (wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD),
-        "bolditalic": (wx.FONTSTYLE_ITALIC, wx.FONTWEIGHT_BOLD),
-    }
-    style, weight = font_styles.get(get_setting("FONT_TYPE").lower(), (wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-    font_size = int(get_setting("FONT_SIZE") or DEFAULT_SETTINGS["FONT_SIZE"])
-    return wx.Font(font_size, wx.FONTFAMILY_DEFAULT, style, weight, faceName=font_name)
-
-
 def get_textctrl_font(parent: wx.Window) -> wx.Font:
     """
     Возвращает шрифт, используемый в TextCtrl,
@@ -489,39 +470,64 @@ def get_textctrl_font(parent: wx.Window) -> wx.Font:
 
 def get_button_font() -> wx.Font:
     """
-    Возвращает шрифт для кнопок (на 2 пункта больше стандартного).
+    Возвращает шрифт для кнопок.
+
+    Логика:
+        - берётся стандартный UI-шрифт
+        - увеличивается на +2 pt
+        - сохраняется стиль (bold/italic)
 
     Returns:
-        wx.Font: Объект шрифта для кнопок.
+        wx.Font
     """
-    font = get_standard_font()
-    font_size = int(get_setting("FONT_SIZE") or DEFAULT_SETTINGS["FONT_SIZE"]) + 2
-    font.SetPointSize(font_size)
+
+    base_font = get_standard_font()
+    font = wx.Font(base_font)
+
+    base_size = base_font.GetPointSize()
+    font.SetPointSize(base_size + 2)
+
     return font
 
 
 def get_link_font() -> wx.Font:
     """
-    Возвращает шрифт для текстовых ссылок на основе параметров из user_settings.json.
+    Возвращает шрифт для label/ссылок на основе LABEL_* настроек.
+
+    Настройки:
+        LABEL_FONT_NAME
+        LABEL_FONT_TYPE   (normal | italic | slant)
+        LABEL_FONT_WEIGHT (normal | bold | light)
+        LABEL_FONT_SIZE
 
     Returns:
-        wx.Font: Шрифт для ссылок.
+        wx.Font
     """
+
+    font_name = get_setting("LABEL_FONT_NAME") or DEFAULT_SETTINGS["LABEL_FONT_NAME"]
+    font_type = (get_setting("LABEL_FONT_TYPE") or DEFAULT_SETTINGS["LABEL_FONT_TYPE"]).lower()
+    font_weight_key = (get_setting("LABEL_FONT_WEIGHT") or DEFAULT_SETTINGS["LABEL_FONT_WEIGHT"]).lower()
+    font_size = int(get_setting("LABEL_FONT_SIZE") or DEFAULT_SETTINGS["LABEL_FONT_SIZE"])
+
     style_map = {
         "normal": wx.FONTSTYLE_NORMAL,
         "italic": wx.FONTSTYLE_ITALIC,
-        "slant": wx.FONTSTYLE_SLANT
+        "slant":  wx.FONTSTYLE_SLANT
     }
+
     weight_map = {
         "normal": wx.FONTWEIGHT_NORMAL,
-        "bold": wx.FONTWEIGHT_BOLD,
-        "light": wx.FONTWEIGHT_LIGHT
+        "bold":   wx.FONTWEIGHT_BOLD,
+        "light":  wx.FONTWEIGHT_LIGHT
     }
-    font_style = style_map.get(get_setting("LABEL_FONT_TYPE").lower(), wx.FONTSTYLE_NORMAL)
-    font_weight = weight_map.get(get_setting("LABEL_FONT_WEIGHT").lower(), wx.FONTWEIGHT_NORMAL)
-    font_size = int(get_setting("LABEL_FONT_SIZE") or DEFAULT_SETTINGS["LABEL_FONT_SIZE"])
-    font_name = get_setting("LABEL_FONT_NAME") or DEFAULT_SETTINGS["LABEL_FONT_NAME"]
-    return wx.Font(font_size, wx.FONTFAMILY_ROMAN, font_style, font_weight, faceName=font_name)
+
+    return wx.Font(
+        font_size,
+        wx.FONTFAMILY_DEFAULT,
+        style_map.get(font_type, wx.FONTSTYLE_NORMAL),
+        weight_map.get(font_weight_key, wx.FONTWEIGHT_NORMAL),
+        faceName=font_name
+    )
 
 
 def fit_text_to_height(ctrl: object, text: str, max_width: int, max_height: int, font_name: str, style_flags: Dict) -> int:
@@ -1125,12 +1131,31 @@ def lighten(hex_color: str, factor: float = 1.18) -> str:
     return f'#{lightened[0]:02x}{lightened[1]:02x}{lightened[2]:02x}'
 
 
-def style_gen_button(btn: GenButton,
-                     normal_bg: str,
-                     text_color: str = "#ffffff",
-                     bezel: int = 1,
-                     font_size: int = 14,  # ← новый параметр
-                     button_height: int = 0):  # 0 = авто, иначе принудительно
+def style_gen_button(
+        btn: GenButton,
+        normal_bg: str,
+        text_color: str = None,
+        bezel: int = 1,
+        button_height: int = 0,
+        font_size: int = None,
+):
+    """
+    Стилизует GenButton с учётом user_settings.json.
+
+    Параметры:
+        normal_bg      — основной цвет фона
+        text_color     — цвет текста (если None — берётся из настроек)
+        bezel          — толщина объёмной рамки
+        button_height  — фиксированная высота (0 = авто)
+
+    Поведение:
+        - hover = слегка светлее normal_bg
+        - pressed = темнее normal_bg
+        - шрифт берётся через get_button_font()
+    """
+
+    if text_color is None:
+        text_color = get_setting("BUTTON_FONT_COLOR") or DEFAULT_SETTINGS["BUTTON_FONT_COLOR"]
 
     hover_bg   = lighten(normal_bg, 1.15)
     pressed_bg = darken(normal_bg, 0.72)
@@ -1142,18 +1167,21 @@ def style_gen_button(btn: GenButton,
 
     btn.SetBackgroundColour(wx.Colour(normal_bg))
     btn.SetForegroundColour(wx.Colour(text_color))
-    btn.SetBezelWidth(bezel)               # 0 = совсем плоская, 1–2 = лёгкий объём
+    btn.SetBezelWidth(bezel) # 0 = совсем плоская, 1–2 = лёгкий объём
     btn.SetUseFocusIndicator(False)
 
-    # Шрифт
-    font = wx.Font(font_size, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
-    btn.SetFont(font)
+    # Шрифт берётся из глобальной настройки
+    if not font_size:
+        btn.SetFont(get_button_font())
+    else:
+        font = wx.Font(font_size, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        btn.SetFont(font)
 
     # Принудительный размер, если указан
     if button_height > 0:
         w, _ = btn.GetSize()
-        btn.SetMinSize((w, button_height))
-        btn.SetSize((w, button_height))  # иногда нужно оба вызова
+        btn.SetMinSize(wx.Size(w, button_height))
+        btn.SetSize(wx.Size(w, button_height))
 
     def update_bg(color: str):
         btn.current_bg = color
@@ -1177,14 +1205,14 @@ def style_gen_button(btn: GenButton,
     def on_up(evt):
         pos = evt.GetPosition()
         inside = btn.HitTest(pos) == wx.HT_WINDOW_INSIDE
-        new_color = btn.hover_bg if inside else btn.normal_bg
-        update_bg(new_color)
+        update_bg(btn.hover_bg if inside else btn.normal_bg)
         evt.Skip()
 
     btn.Bind(wx.EVT_ENTER_WINDOW, on_enter)
     btn.Bind(wx.EVT_LEAVE_WINDOW, on_leave)
     btn.Bind(wx.EVT_LEFT_DOWN,   on_down)
     btn.Bind(wx.EVT_LEFT_UP,     on_up)
+
 
 
 def create_standard_buttons(parent: wx.Window, on_ok, on_cancel=None, on_clear=None) -> list[GenButton]:
