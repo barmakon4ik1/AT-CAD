@@ -55,6 +55,16 @@ from programs.at_input import at_get_point
 # -----------------------------
 TRANSLATIONS = {
     "error": {"ru": "Ошибка", "de": "Fehler", "en": "Error"},
+    "order_label": {
+        "ru": "Номер заказа",
+        "de": "Auftragsnummer",
+        "en": "Order Number"
+    },
+    "detail_label": {
+        "ru": "Номер детали",
+        "de": "Teilenummer",
+        "en": "Part Number"
+    },
     "main_data": {"ru": "Основные данные", "de": "Hauptdaten", "en": "Main Data"},
     "dimensions_label": {"ru": "Размеры", "de": "Abmessungen", "en": "Dimensions"},
     "select_bridge_type": {"ru": "Выберите тип мостика", "de": "Wählen Sie den Brückentyp aus", "en": "Select the type of bracket"},
@@ -414,16 +424,13 @@ class BracketContentPanel(BaseContentPanel):
         fb_main = FieldBuilder(parent=self, target_sizer=main_data_sizer, form=self.form)
 
         # Номер заказа и номер детали
-        row = wx.BoxSizer(wx.HORIZONTAL)
-        lbl_order = fb_main.create_label("order_label")
-        order_ctrl = wx.TextCtrl(self, size=wx.Size(150, -1))
-        detail_ctrl = wx.TextCtrl(self, size=wx.Size(150, -1))
-        self.form.register("order", order_ctrl)
-        self.form.register("detail", detail_ctrl)
-        row.Add(lbl_order, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        row.Add(order_ctrl, 0, wx.RIGHT, 10)
-        row.Add(detail_ctrl, 1)
-        main_data_sizer.Add(row, 0, wx.EXPAND | wx.ALL, 5)
+        order_ctrl, detail_ctrl = fb_main.universal_row(
+            "order_label",
+            [
+                {"type": "text", "name": "order", "value": "", "required": False},
+                {"type": "text", "name": "detail", "value": "", "required": False},
+            ]
+        )
 
         # Материал и Толщина
         fb_main.combo(name="material", label_key="material_label", choices=material_options, required=True)
