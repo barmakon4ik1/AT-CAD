@@ -70,9 +70,10 @@ TRANSLATIONS = {
     "select_bridge_type": {"ru": "Выберите тип мостика", "de": "Wählen Sie den Brückentyp aus", "en": "Select the type of bracket"},
     "material_label": {"ru": "Материал", "de": "Material", "en": "Material"},
     "thickness_label": {"ru": "Толщина S, мм", "de": "Dicke S, mm", "en": "Thickness S, mm"},
-    "melt_no_label": {"ru": "Номер плавки", "de": "Schmelznummer", "en": "Melt Number"},
+    "bridge_geometry": {"ru": "Геометрия мостика", "de": "Schilderbrücke Geometry", "en": "Bracket geometry"},
     "size_label": {"ru": "Размер", "de": "Größe", "en": "Size"},
     "length_label": {"ru": "Длина L, мм", "de": "Länge L, mm", "en": "Length L, mm"},
+    "width_label": {"ru": "Ширина W, мм", "de": "Breite W, mm", "en": "Width W, mm"},
     "height_label": {"ru": "Высота H, мм", "de": "Höhe H, mm", "en": "Height H, mm"},
     "allowance_label": {"ru": "Отступ от края, мм", "de": "Randabstand, mm", "en": "Edge Allowance, mm"},
     "manual_input_label": {"ru": "Ручной ввод", "de": "Manuelle Eingabe", "en": "Manual Input"},
@@ -170,12 +171,11 @@ class BracketSpecificPanel(wx.Panel):
                     self,
                     choices=["Угол", "Скругление", "Фаска 45°"],
                     style=wx.CB_READONLY,
-                    size=(120, -1)
                 )
                 row_sizer.Add(combo, 0, wx.RIGHT, 5)
 
                 # Поле для ввода величины
-                value_ctrl = wx.TextCtrl(self, size=(80, -1))
+                value_ctrl = wx.TextCtrl(self)
                 row_sizer.Add(value_ctrl, 0)
 
                 # Регистрация контролов в form.fields
@@ -383,20 +383,28 @@ class BracketContentPanel(BaseContentPanel):
         # -----------------------------
         # Выбор типа мостика
         # -----------------------------
-        type_row = wx.BoxSizer(wx.HORIZONTAL)
-        type_label = wx.StaticText(self, label=loc.get("select_bridge_type"))
+        self.form = FormBuilder(self)
+        fb_left = FieldBuilder(self, self.left_sizer, form=self.form)
         self.bridge_type_choice = wx.ComboBox(
             self,
             choices=["1", "2", "3", "4", "5"],
             style=wx.CB_READONLY,
             size=wx.Size(60, -1)
         )
-        font = get_textctrl_font(self)
-        type_label.SetFont(font)
-        self.bridge_type_choice.SetFont(font)
-        type_row.Add(type_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
-        type_row.Add(self.bridge_type_choice, 0, wx.ALIGN_CENTER_VERTICAL)
-        self.left_sizer.Add(type_row, 0, wx.ALL, 10)
+        # Регистрируем с преобразованием
+        self.form.register(
+            name="type",
+            ctrl=self.bridge_type_choice,
+            required=True,
+            parser=lambda v: f"type{v}"
+        )
+
+        fb_left.row(
+            label_key="select_bridge_type",
+            controls=[self.bridge_type_choice],
+            spacing=8,
+            align_right=False
+        )
 
         # Canvas с изображением мостика
         default_image = BRIDGE_TYPE_IMAGES.get("1", "")
@@ -424,25 +432,48 @@ class BracketContentPanel(BaseContentPanel):
         fb_main = FieldBuilder(parent=self, target_sizer=main_data_sizer, form=self.form)
 
         # Номер заказа и номер детали
-        order_ctrl, detail_ctrl = fb_main.universal_row(
+        fb_main.universal_row(
             "order_label",
             [
-                {"type": "text", "name": "order", "value": "", "required": False},
-                {"type": "text", "name": "detail", "value": "", "required": False},
+                {"type": "text", "name": "order", "value": "", "required": False, "default": ""},
+                {"type": "text", "name": "detail", "value": "", "required": False, "default": ""},
             ]
         )
 
-        # Материал и Толщина
-        fb_main.combo(name="material", label_key="material_label", choices=material_options, required=True)
-        fb_main.combo(name="thickness", label_key="thickness_label", choices=thickness_options, required=True)
+        # Материал
+        fb_main.universal_row(
+            "material_label",
+            [
+                {"type": "combo", "name": "material", "choices": material_options, "value": "", "required": True, "default": "1.4301"}
+            ]
+        )
+
+        # Толщина
+        fb_main.universal_row(
+            "thickness_label",
+            [
+                {"type": "combo", "name": "thickness", "choices": thickness_options, "value": "", "required": True, "default": "3"}
+            ]
+        )
 
         # =============================
         # Базовая геометрия мостика
         # =============================
         bridge_geom_sizer = self.fb.static_box("bridge_geometry")
         fb_geom = FieldBuilder(parent=self, target_sizer=bridge_geom_sizer, form=self.form)
-        fb_geom.combo(name="width", label_key="bridge_width", choices=[], required=True)
-        fb_geom.combo(name="height", label_key="bridge_height", choices=[], required=True)
+
+        fb_geom.universal_row(
+            "width_label",
+            [
+                {"type": "text", "name": "width", "value": "", "required": True, "default": ""},
+            ]
+        )
+        fb_geom.universal_row(
+            "height_label",
+            [
+                {"type": "text", "name": "height", "value": "", "required": True, "default": ""},
+            ]
+        )
 
         # -----------------------------
         # Панели специфики
@@ -464,8 +495,8 @@ class BracketContentPanel(BaseContentPanel):
         # Кнопки управления
         # -----------------------------
         btn_specific = wx.Button(self, label=loc.get("dimensions_label"), size=wx.Size(150, -1))
-        btn_nameplates = wx.Button(self, label="Таблички", size=wx.Size(150, -1))
-        btn_cutout = wx.Button(self, label="Вырез", size=wx.Size(150, -1))
+        btn_nameplates = wx.Button(self, label="vessel_names", size=wx.Size(150, -1))
+        btn_cutout = wx.Button(self, label="cutout", size=wx.Size(150, -1))
 
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
         button_sizer.Add(btn_specific, 0, wx.RIGHT, 5)
@@ -516,32 +547,33 @@ class BracketContentPanel(BaseContentPanel):
         """
         bridge_data = self.form.collect()
 
-        # Специфические параметры
-        if self.specific_panel.IsShown():
-            # Сбор только специфических полей
-            spec_fields = ["corner_radius", "web_height", "detail_number"]  # пример для Type 1
-            specific_data = {}
-            for f in spec_fields:
-                if f in self.form.fields:
-                    specific_data[f] = self.form.fields[f].get_value()
-            bridge_data["specific"] = specific_data
-
-        # Таблички
-        if self.nameplate_panel.IsShown():
-            plates_data = self.nameplate_panel.get_data()
-            bridge_data["plates"] = [
-                {"name": plates_data.get(f"nameplate_{i + 1}", "")}
-                for i in range(self.nameplate_panel.MAX_PLATES)
-                if plates_data.get(f"nameplate_{i + 1}")
-            ]
-            bridge_data["plates_gap"] = float(plates_data.get("nameplate_spacing") or 0.0)
-            bridge_data["plates_offset_top"] = float(plates_data.get("nameplate_offset_top") or 0.0)
-
-        # Вырез
-        if self.cutout_panel.IsShown():
-            bridge_data["cutout"] = self.cutout_panel.get_data()
+        # # Специфические параметры
+        # if self.specific_panel.IsShown():
+        #     # Сбор только специфических полей
+        #     spec_fields = ["corner_radius", "web_height", "detail_number"]  # пример для Type 1
+        #     specific_data = {}
+        #     for f in spec_fields:
+        #         if f in self.form.fields:
+        #             specific_data[f] = self.form.fields[f].get_value()
+        #     bridge_data["specific"] = specific_data
+        #
+        # # Таблички
+        # if self.nameplate_panel.IsShown():
+        #     plates_data = self.nameplate_panel.get_data()
+        #     bridge_data["plates"] = [
+        #         {"name": plates_data.get(f"nameplate_{i + 1}", "")}
+        #         for i in range(self.nameplate_panel.MAX_PLATES)
+        #         if plates_data.get(f"nameplate_{i + 1}")
+        #     ]
+        #     bridge_data["plates_gap"] = float(plates_data.get("nameplate_spacing") or 0.0)
+        #     bridge_data["plates_offset_top"] = float(plates_data.get("nameplate_offset_top") or 0.0)
+        #
+        # # Вырез
+        # if self.cutout_panel.IsShown():
+        #     bridge_data["cutout"] = self.cutout_panel.get_data()
 
         # Передача в callback
+        print(bridge_data) # Debug
         if self.on_submit_callback:
             self.on_submit_callback(bridge_data)
 
@@ -723,9 +755,62 @@ class CutoutPanel(wx.Panel):
         box_sizer = fb.static_box("cutout_parameters")
         fb_box = FieldBuilder(parent=self, target_sizer=box_sizer, form=self.form)
 
-        fb_box.text(name="height", label_key="height_label", size=(100, -1), required=True, parser=float)
-        fb_box.text(name="length", label_key="length_label", size=(100, -1), required=True, parser=float)
-        fb_box.text(name="radius", label_key="allowance_label", size=(100, -1), required=True, parser=float)
+        fb_box.universal_row(
+            "height",
+            [
+                {"type": "text", "name": "height_label", "value": "", "required": True, "default": ""},
+            ]
+        )
+        fb_box.universal_row(
+            "length",
+            [
+                {"type": "text", "name": "length_label", "value": "", "required": True, "default": ""},
+            ]
+        )
+        # fb_box.text(name="height", label_key="height_label", required=True, parser=float)
+        # fb_box.text(name="length", label_key="length_label", required=True, parser=float)
+        # fb_box.text(name="radius", label_key="allowance_label", required=True, parser=float)
+
+        fb_box.universal_row(
+            "radius",
+            [
+            {"type": "combo", "name": "cutout_label", "value": "", "required": True, "default": ""},
+            {"type": "text", "name": "r_cut", "value": "", "required": True, "default": ""},
+            ]
+        )
+        # if radius == 0:
+        # row_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        # label = wx.StaticText(self, label="radius")
+        # row_sizer.Add(label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+        #
+        # # Комбобокс
+        # combo = wx.ComboBox(
+        #     self,
+        #     choices=["Угол", "Скругление", "Фаска 45°"],
+        #     style=wx.CB_READONLY,
+        # )
+        # row_sizer.Add(combo, 0, wx.RIGHT, 5)
+        #
+        # # Поле для ввода величины
+        # value_ctrl = wx.TextCtrl(self)
+        # row_sizer.Add(value_ctrl, 0)
+        #
+        # # Регистрация контролов в form.fields
+        # self.form.register("r_cut", combo)
+        # self.form.register("r_cut", value_ctrl)
+        #
+        # # Блокировка ввода, если выбран угол
+        # def on_combo_change(event):
+        #     selection = combo.GetStringSelection()
+        #     if selection == "Угол":
+        #         value_ctrl.Disable()
+        #         value_ctrl.SetValue("0")
+        #     else:
+        #         value_ctrl.Enable()
+        #
+        # combo.Bind(wx.EVT_COMBOBOX, on_combo_change)
+        #
+        # box_sizer.Add(row_sizer, 0, wx.ALL, 2)
 
         self.Layout()
 

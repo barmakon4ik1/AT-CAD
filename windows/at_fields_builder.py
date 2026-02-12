@@ -206,7 +206,8 @@ class FieldBuilder:
             controls: list[wx.Window],
             spacing: int = None,
             label_proportion: int = 0,
-            control_proportion: int = 0
+            control_proportion: int = 0,
+            align_right: bool = True
     ) -> wx.BoxSizer:
         """
         Универсальная строка: метка слева + любые контролы справа с растягивателем между.
@@ -216,6 +217,9 @@ class FieldBuilder:
         :param spacing: отступ между контролами
         :param label_proportion: пропорция для метки (BoxSizer)
         :param control_proportion: пропорция для контролов (BoxSizer)
+
+        Args:
+            align_right: True - выровнять справа / False - слева
         """
         spacing = spacing if spacing is not None else self.label_pad
         row = wx.BoxSizer(wx.HORIZONTAL)
@@ -225,7 +229,8 @@ class FieldBuilder:
         row.Add(lbl, label_proportion, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, spacing)
 
         # Растягиватель между меткой и контролами
-        row.AddStretchSpacer(1)
+        if align_right:
+            row.AddStretchSpacer(1)
 
         # Добавляем контролы справа с отступами
         for i, ctrl in enumerate(controls):
@@ -459,6 +464,3 @@ class FieldBuilder:
 
         self.sizer.Add(row, 0, wx.EXPAND | wx.ALL, self.row_border)
         return created_controls
-
-
-

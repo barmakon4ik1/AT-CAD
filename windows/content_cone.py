@@ -157,7 +157,7 @@ class ConeContentPanel(BaseContentPanel):
         self.static_boxes.clear()
         self.buttons.clear()
 
-        field_size = (150, -1)  # Единая ширина для всех полей ввода
+        field_size = INPUT_FIELD_SIZE  # Единая ширина для всех полей ввода
         main_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.left_sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -188,9 +188,9 @@ class ConeContentPanel(BaseContentPanel):
         order_label = wx.StaticText(main_data_box, label=loc.get("order_label", "К-№"))
         order_label.SetFont(font)
         self.labels["order"] = order_label
-        self.order_input = wx.TextCtrl(main_data_box, value="", size=field_size)
+        self.order_input = wx.TextCtrl(main_data_box, value="", size=wx.Size(field_size))
         self.order_input.SetFont(font)
-        self.detail_input = wx.TextCtrl(main_data_box, value="", size=field_size)
+        self.detail_input = wx.TextCtrl(main_data_box, value="", size=wx.Size(field_size))
         self.detail_input.SetFont(font)
         order_sizer.Add(order_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
         order_sizer.AddStretchSpacer()
