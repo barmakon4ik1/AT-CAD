@@ -568,12 +568,21 @@ def fit_text_to_height(ctrl: object, text: str, max_width: int, max_height: int,
 
 
 def parse_float(value: str) -> Optional[float]:
-    """Преобразует строку в число, заменяя запятую на точку."""
-    try:
-        cleaned_value = value.strip().replace(',', '.')
-        return float(cleaned_value) if cleaned_value else None
-    except (ValueError, TypeError):
+    """
+    Преобразует строку в float.
+    Поддерживает ',' и '.' как десятичный разделитель.
+    Возвращает None для пустой строки.
+    Вызывает ValueError при некорректном формате.
+    """
+    if value is None:
         return None
+
+    cleaned = value.strip().replace(",", ".")
+
+    if not cleaned:
+        return None
+
+    return float(cleaned)
 
 
 class CanvasPanel(wx.Panel):
@@ -684,7 +693,7 @@ class BaseInputWindow(wx.Frame):
 
     Обеспечивает унифицированную инициализацию, работу с AutoCAD, обработку событий и сохранение данных.
     """
-    def __init__(self, title_key: str, last_input_file: str, window_size: Tuple[int, int] = (1200, 650), parent=None):
+    def __init__(self, title_key: str, last_input_file: str, window_size: Tuple[int, int] = wx.Size(1200, 650), parent=None):
         """
         Инициализирует окно с заданным заголовком, файлом данных, размером и родительским окном.
 
@@ -908,48 +917,6 @@ def apply_styles_to_panel(panel: wx.Window) -> None:
         panel: Панель для стилизации.
     """
     apply_styles_recursively(panel)
-
-
-# def create_standard_buttons(parent: wx.Window, on_ok, on_cancel, on_clear=None) -> List[wx.Button]:
-#     """
-#     Создаёт стандартные кнопки (OK, Cancel, Clear) с привязкой событий.
-#
-#     Args:
-#         parent: Родительский элемент.
-#         on_ok: Обработчик для кнопки OK.
-#         on_cancel: Обработчик для кнопки Cancel.
-#         on_clear: Обработчик для кнопки Clear (опционально, если None, кнопка не создаётся).
-#
-#     Returns:
-#         List[wx.Button]: Список кнопок [ok_button, cancel_button, clear_button] (clear_button опционально).
-#     """
-#     button_font = get_button_font()
-#     button_color = get_setting("BUTTON_FONT_COLOR") or DEFAULT_SETTINGS["BUTTON_FONT_COLOR"]
-#
-#     ok_button = wx.Button(parent, label=loc.get("ok_button"))
-#     ok_button.SetFont(button_font)
-#     ok_button.SetBackgroundColour(wx.Colour(0, 128, 0))
-#     ok_button.SetForegroundColour(wx.Colour(button_color))
-#     ok_button.Bind(wx.EVT_BUTTON, on_ok)
-#
-#     clear_button = None
-#     if on_clear:
-#         clear_button = wx.Button(parent, label=loc.get("clear_button"))
-#         clear_button.SetFont(button_font)
-#         clear_button.SetBackgroundColour(wx.Colour(64, 64, 64))
-#         clear_button.SetForegroundColour(wx.Colour(button_color))
-#         clear_button.Bind(wx.EVT_BUTTON, on_clear)
-#
-#     cancel_button = wx.Button(parent, label=loc.get("cancel_button"))
-#     cancel_button.SetFont(button_font)
-#     cancel_button.SetBackgroundColour(wx.Colour(255, 0, 0))
-#     cancel_button.SetForegroundColour(wx.Colour(button_color))
-#     cancel_button.Bind(wx.EVT_BUTTON, on_cancel)
-#
-#     buttons = [ok_button, cancel_button]
-#     if clear_button:
-#         buttons.insert(1, clear_button)
-#     return buttons
 
 
 def adjust_button_widths(buttons: List[wx.Button]) -> None:

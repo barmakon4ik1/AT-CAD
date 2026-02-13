@@ -18,10 +18,9 @@
 """
 
 from __future__ import annotations
-from typing import Any, Callable, Dict, Optional, List, Union
-
+from typing import Any, Callable, Dict, Optional
 import wx
-
+from windows.at_window_utils import parse_float
 from config.at_config import FORM_CONFIG
 from locales.at_translations import loc
 from windows.at_gui_utils import get_standard_font
@@ -75,10 +74,16 @@ class FormField:
                 raise ValueError(
                     loc.get("no_data_error", f"Field '{self.name}' is required")
                 )
-            return raw
-        if self.parser:
-            return self.parser(raw)
-        return raw
+            return None
+
+        value = self.parser(raw) if self.parser else raw
+
+        if value is None and self.required:
+            raise ValueError(
+                loc.get("no_data_error", f"Field '{self.name}' is required")
+            )
+
+        return value
 
     def set_value(self, value: Any) -> None:
         """Устанавливает значение поля безопасно, через setter или стандартный контрол."""
@@ -92,7 +97,10 @@ class FormField:
                 self.ctrl.SetSelection(wx.NOT_FOUND)
             return
         if hasattr(self.ctrl, "SetValue"):
-            self.ctrl.SetValue(value)
+            if isinstance(self.ctrl, wx.TextCtrl):
+                self.ctrl.SetValue("" if value is None else str(value))
+            else:
+                self.ctrl.SetValue(value)
 
 
 # ----------------------------------------------------------------------
@@ -189,7 +197,6 @@ class FieldBuilder:
     # ------------------------------------------------------------------
     # Вспомогательные методы
     # ------------------------------------------------------------------
-
     def _create_label(self, key: str) -> wx.StaticText:
         """Создаёт локализованную метку и сохраняет её для смены языка."""
         lbl = wx.StaticText(self.parent, label=loc.get(key, key))
@@ -217,9 +224,7 @@ class FieldBuilder:
         :param spacing: отступ между контролами
         :param label_proportion: пропорция для метки (BoxSizer)
         :param control_proportion: пропорция для контролов (BoxSizer)
-
-        Args:
-            align_right: True - выровнять справа / False - слева
+        :param align_right: True - выровнять справа / False - слева
         """
         spacing = spacing if spacing is not None else self.label_pad
         row = wx.BoxSizer(wx.HORIZONTAL)
@@ -316,6 +321,20 @@ class FieldBuilder:
         self.sizer.Add(sizer, proportion, flag, border)
         return sizer
 
+    def text_column(self, names, width=200, default=""):
+        for name in names:
+            self.universal_row(
+                None,
+                [{
+                    "type": "float",
+                    "name": name,
+                    "value": default,
+                    "default": default,
+                    "required": False,
+                    "size": (width, -1)
+                }]
+            )
+
     # ------------------------------------------------------------------
     # Локализация
     # ------------------------------------------------------------------
@@ -364,10 +383,9 @@ class FieldBuilder:
     # ------------------------------------------------------------------
     def universal_row(
             self,
-            label_key: str,
+            label_key: str | None,
             elements: list[dict],
             spacing: int = None,
-            label_proportion: int = 0,
             element_proportion: int = 0
     ) -> list[wx.Window]:
         """
@@ -396,8 +414,9 @@ class FieldBuilder:
         row = wx.BoxSizer(wx.HORIZONTAL)
 
         # Метка слева
-        lbl = self._create_label(label_key)
-        row.Add(lbl, label_proportion, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, spacing)
+        if label_key:
+            lbl = self._create_label(label_key)
+            row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
 
         # Растягиватель между меткой и контролами
         row.AddStretchSpacer(1)
@@ -408,17 +427,28 @@ class FieldBuilder:
             elem_type = elem.get("type", "text")
             ctrl: Optional[wx.Window] = None
 
-            if elem_type == "text":
+            if elem_type in ("text", "float"):
                 ctrl = wx.TextCtrl(
                     self.parent,
                     value=str(elem.get("value", "")),
                     size=wx.Size(*self.default_size)
                 )
+
+                parser = elem.get("parser")
+
+                # если тип float и parser не задан — используем встроенный
+                if elem_type == "float" and parser is None:
+                    parser = parse_float
+
                 if "name" in elem and self.form:
                     self._register_field(
-                        elem["name"], ctrl, elem.get("required", False),
-                        elem.get("parser"), elem.get("default")
+                        elem["name"],
+                        ctrl,
+                        elem.get("required", False),
+                        parser,
+                        elem.get("default")
                     )
+
 
             elif elem_type in ("combo", "choice"):
                 choices = elem.get("choices", [])

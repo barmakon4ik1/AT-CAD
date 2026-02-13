@@ -42,7 +42,6 @@ TRANSLATIONS = {
 }
 loc.register_translations(TRANSLATIONS)
 
-
 # ----------------------------------------------------------------------
 # Factory
 # ----------------------------------------------------------------------
@@ -52,7 +51,6 @@ def create_window(parent: wx.Window) -> Optional[wx.Panel]:
     except Exception as e:
         show_popup(loc.get("error") + f": {str(e)}", popup_type="error")
         return None
-
 
 # ----------------------------------------------------------------------
 # Панель
@@ -132,44 +130,31 @@ class RingsContentPanel(BaseContentPanel):
         # ГРУППА: Основные данные
         # ============================================================
         main_data_sizer = self.fb.static_box("main_data")
-        self.static_boxes["main_data"] = main_data_sizer.GetStaticBox()
+        fb_main = FieldBuilder(parent=self, target_sizer=main_data_sizer, form=self.form)
 
-        fb_main = FieldBuilder(
-            parent=self,  # parent = self
-            target_sizer=main_data_sizer,
-            form=self.form
+        # Номер заказа и номер детали
+        fb_main.universal_row(
+            "order_label",
+            [
+                {"type": "text", "name": "order", "value": "", "required": False, "default": ""},
+                {"type": "text", "name": "detail", "value": "", "required": False, "default": ""},
+            ]
         )
 
-        # Order + Detail (одна строка)
-        row = wx.BoxSizer(wx.HORIZONTAL)
-
-        lbl_order = fb_main.create_label("order_label")
-        order_ctrl = wx.TextCtrl(self, size=wx.Size(150, -1))
-        detail_ctrl = wx.TextCtrl(self, size=wx.Size(150, -1))
-
-        self.form.register("order", order_ctrl)
-        self.form.register("detail", detail_ctrl)
-
-        row.Add(lbl_order, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        row.Add(order_ctrl, 0, wx.RIGHT, 10)
-        row.Add(detail_ctrl, 1)
-
-        main_data_sizer.Add(row, 0, wx.EXPAND | wx.ALL, 5)
-
-        # Material
-        fb_main.choice(
-            name="material",
-            label_key="material_label",
-            choices=material_options,
-            required=True
+        # Материал
+        fb_main.universal_row(
+            "material_label",
+            [
+                {"type": "combo", "name": "material", "choices": material_options, "value": "", "required": True, "default": "1.4301"}
+            ]
         )
 
-        # Thickness
-        fb_main.combo(
-            name="thickness",
-            label_key="thickness_label",
-            choices=thickness_options,
-            required=True
+        # Толщина
+        fb_main.universal_row(
+            "thickness_label",
+            [
+                {"type": "combo", "name": "thickness", "choices": thickness_options, "value": "", "required": True, "default": "3"}
+            ]
         )
 
         # ============================================================
@@ -178,15 +163,17 @@ class RingsContentPanel(BaseContentPanel):
         diam_sizer = self.fb.static_box("diameters")
         self.static_boxes["diameters"] = diam_sizer.GetStaticBox()
 
-        grid = wx.GridSizer(5, 1, 5, 5)
-        # self.diameter_inputs = []
+        fb_diam = FieldBuilder(
+            parent=self,
+            target_sizer=diam_sizer,
+            form=self.form
+        )
 
-        for i in range(5):
-            ctrl = wx.TextCtrl(self, size=wx.Size(200, -1))
-            self.form.register(f"diameter_{i + 1}", ctrl)
-            grid.Add(ctrl, 0, wx.EXPAND)
-
-        diam_sizer.Add(grid, 0, wx.ALL, 5)
+        fb_diam.text_column(
+            [f"diameter_{i + 1}" for i in range(5)],
+            width=200,
+            default=""
+        )
 
         # ------------------------------------------------------------
         # Кнопки
@@ -203,7 +190,6 @@ class RingsContentPanel(BaseContentPanel):
         self.SetSizer(main_sizer)
         apply_styles_to_panel(self)
         self.Layout()
-
 
     # ------------------------------------------------------------------
     # Сервис
@@ -225,9 +211,9 @@ class RingsContentPanel(BaseContentPanel):
 
             # диаметры
             diameters = {
-                k.replace("diameter_", ""): float(v.replace(",", "."))
+                k.replace("diameter_", ""): v
                 for k, v in data.items()
-                if k.startswith("diameter_") and str(v).strip()
+                if k.startswith("diameter_") and v not in ("", None)
             }
 
             if not diameters:
@@ -247,16 +233,13 @@ class RingsContentPanel(BaseContentPanel):
         except Exception as e:
             show_popup(loc.get("error") + f": {str(e)}", popup_type="error")
 
-    def on_clear(self, event: Optional[wx.Event] = None):
-        _ = event
-        self.clear_input_fields()
-
-    def on_cancel(self, event: Optional[wx.Event] = None, switch_content="content_apps"):
-        _ = event
-        self.switch_content_panel(switch_content)
-
-
-
+    # def on_clear(self, event: Optional[wx.Event] = None):
+    #     _ = event
+    #     self.clear_input_fields()
+    #
+    # def on_cancel(self, event: Optional[wx.Event] = None, switch_content="content_apps"):
+    #     _ = event
+    #     self.switch_content_panel(switch_content)
 
 # ----------------------------------------------------------------------
 # Тестовый запуск
