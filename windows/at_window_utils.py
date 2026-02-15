@@ -964,22 +964,47 @@ def update_status_bar_point_selected(window: wx.Window, insert_point: Optional[o
         else:
             main_window.GetStatusBar().SetStatusText(loc.get("point_not_selected", "Точка не выбрана"), 0)
 
-def _normalize_color_to_hex(color: str) -> str:
-        """
-        Приводит цвет из настроек к HEX-формату для style_gen_button.
-        """
-        if isinstance(color, str) and color.startswith("#"):
-            return color
+def _normalize_color_to_hex(color) -> str:
+    """
+    Приводит цвет к HEX-формату (#rrggbb).
+    Поддерживает:
+        - "#rrggbb"
+        - "red"
+        - (r, g, b)
+        - wx.Colour
+    """
 
-        wx_col = wx.Colour(color)
-        if not wx_col.IsOk():
-            return "#7f8c8d"  # безопасный fallback
+    # Уже HEX
+    if isinstance(color, str) and color.startswith("#"):
+        return color
 
+    # Tuple (r, g, b)
+    if isinstance(color, tuple) and len(color) == 3:
+        r, g, b = color
+        return "#{:02x}{:02x}{:02x}".format(r, g, b)
+
+    # wx.Colour
+    if isinstance(color, wx.Colour):
+        if not color.IsOk():
+            return "#7f8c8d"
         return "#{:02x}{:02x}{:02x}".format(
-            wx_col.Red(),
-            wx_col.Green(),
-            wx_col.Blue(),
+            color.Red(),
+            color.Green(),
+            color.Blue(),
         )
+
+    # Именованный цвет строкой ("red", "white" и т.д.)
+    if isinstance(color, str):
+        wx_col = wx.Colour(color)
+        if wx_col.IsOk():
+            return "#{:02x}{:02x}{:02x}".format(
+                wx_col.Red(),
+                wx_col.Green(),
+                wx_col.Blue(),
+            )
+
+    return "#7f8c8d"  # fallback
+
 
 # ---------------------------------------------------------
 # Улучшения кнопок
@@ -1121,8 +1146,10 @@ def style_gen_button(
         - шрифт берётся через get_button_font()
     """
 
-    if text_color is None:
-        text_color = get_setting("BUTTON_FONT_COLOR") or DEFAULT_SETTINGS["BUTTON_FONT_COLOR"]
+    normal_bg = _normalize_color_to_hex(normal_bg)
+
+    if text_color is not None:
+        text_color = _normalize_color_to_hex(text_color)
 
     hover_bg   = lighten(normal_bg, 1.15)
     pressed_bg = darken(normal_bg, 0.72)
@@ -1180,7 +1207,113 @@ def style_gen_button(
     btn.Bind(wx.EVT_LEFT_DOWN,   on_down)
     btn.Bind(wx.EVT_LEFT_UP,     on_up)
 
+def style_gen_button_v2(
+        btn: GenButton,
+        normal_bg,
+        text_color=None,
+        bezel: int = 1,
+        button_height: int = 0,
+        font_size: int = None,
+        toggle: bool = False,
+):
+    """
+    Улучшенная версия style_gen_button.
 
+    Возможности:
+        - поддержка toggle режима
+        - стабильная логика состояний
+        - нет сравнения цветов
+        - принимает любой формат цвета
+    """
+
+    # --- Нормализация цветов ---
+    normal_bg = _normalize_color_to_hex(normal_bg)
+
+    if text_color is None:
+        text_color = get_setting("BUTTON_FONT_COLOR") or DEFAULT_SETTINGS["BUTTON_FONT_COLOR"]
+
+    text_color = _normalize_color_to_hex(text_color)
+
+    hover_bg   = lighten(normal_bg, 1.12)
+    pressed_bg = darken(normal_bg, 0.75)
+
+    # --- Состояния ---
+    btn._is_pressed = False
+    btn._is_hover   = False
+    btn._is_toggle  = toggle
+    btn._is_active  = False  # для toggle
+
+    # --- Применение базового вида ---
+    btn.SetBackgroundColour(wx.Colour(normal_bg))
+    btn.SetForegroundColour(wx.Colour(text_color))
+    btn.SetBezelWidth(bezel)
+    btn.SetUseFocusIndicator(False)
+
+    if font_size:
+        font = wx.Font(font_size, wx.FONTFAMILY_DEFAULT,
+                       wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        btn.SetFont(font)
+    else:
+        btn.SetFont(get_button_font())
+
+    if button_height > 0:
+        btn.SetMinSize(wx.Size(-1, button_height))
+
+    # --- Вспомогательная функция ---
+    def apply_visual_state():
+        if btn._is_toggle and btn._is_active:
+            color = pressed_bg
+        elif btn._is_pressed:
+            color = pressed_bg
+        elif btn._is_hover:
+            color = hover_bg
+        else:
+            color = normal_bg
+
+        btn.SetBackgroundColour(wx.Colour(color))
+        btn.Refresh()
+
+    # --- События ---
+    def on_enter(evt):
+        btn._is_hover = True
+        apply_visual_state()
+        evt.Skip()
+
+    def on_leave(evt):
+        btn._is_hover = False
+        btn._is_pressed = False
+        apply_visual_state()
+        evt.Skip()
+
+    def on_left_down(evt):
+        btn._is_pressed = True
+        apply_visual_state()
+        evt.Skip()
+
+    def on_left_up(evt):
+        btn._is_pressed = False
+
+        if btn._is_toggle:
+            x, y = evt.GetPosition()
+            if btn.HitTest((x, y)) == wx.HT_WINDOW_INSIDE:
+                btn._is_active = not btn._is_active
+
+        apply_visual_state()
+        evt.Skip()
+
+    btn.Bind(wx.EVT_ENTER_WINDOW, on_enter)
+    btn.Bind(wx.EVT_LEAVE_WINDOW, on_leave)
+    btn.Bind(wx.EVT_LEFT_DOWN, on_left_down)
+    btn.Bind(wx.EVT_LEFT_UP, on_left_up)
+
+    # --- Публичный метод управления состоянием ---
+    def set_active(state: bool):
+        btn._is_active = state
+        apply_visual_state()
+
+    btn.set_active = set_active
+
+    apply_visual_state()
 
 def create_standard_buttons(parent: wx.Window, on_ok, on_cancel=None, on_clear=None) -> list[GenButton]:
     """
@@ -1213,6 +1346,31 @@ def create_standard_buttons(parent: wx.Window, on_ok, on_cancel=None, on_clear=N
         buttons.insert(1, clear_button)
 
     return buttons
+
+def apply_radio_group(buttons: list):
+    """
+    Делает toggle-кнопки взаимоисключающими.
+    Ожидается, что кнопки уже styled и имеют toggle=True.
+    """
+
+    def make_handler(active_btn):
+        def handler(evt):
+            for b in buttons:
+                if b is active_btn:
+                    b.toggled = True
+                    b.current_bg = b.pressed_bg
+                else:
+                    b.toggled = False
+                    b.current_bg = b.normal_bg
+
+                b.SetBackgroundColour(wx.Colour(b.current_bg))
+                b.Refresh()
+
+            evt.Skip()
+        return handler
+
+    for btn in buttons:
+        btn.Bind(wx.EVT_LEFT_UP, make_handler(btn))
 
 
 if __name__ == "__main__":

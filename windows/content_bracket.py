@@ -37,6 +37,9 @@ TODO:
 """
 
 from typing import Optional, Dict, cast
+
+from wx.lib.buttons import GenButton
+
 from config.at_cad_init import ATCadInit
 from config.at_config import *
 from config.name_plates.nameplate_storage import load_nameplates
@@ -46,7 +49,7 @@ from windows.at_window_utils import (
     CanvasPanel, show_popup, apply_styles_to_panel,
     update_status_bar_point_selected,
     BaseContentPanel, load_user_settings, load_common_data, get_wx_color_from_value, get_standard_font,
-    get_textctrl_font
+    get_textctrl_font, apply_radio_group
 )
 from programs.at_input import at_get_point
 
@@ -75,7 +78,7 @@ TRANSLATIONS = {
     "length_label": {"ru": "Длина L, мм", "de": "Länge L, mm", "en": "Length L, mm"},
     "width_label": {"ru": "Ширина W, мм", "de": "Breite W, mm", "en": "Width W, mm"},
     "height_label": {"ru": "Высота H, мм", "de": "Höhe H, mm", "en": "Height H, mm"},
-    "allowance_label": {"ru": "Отступ от края, мм", "de": "Randabstand, mm", "en": "Edge Allowance, mm"},
+    "cutout_label": {"ru": "Вырез", "de": "Ausschnitt", "en": "Cut out"},
     "manual_input_label": {"ru": "Ручной ввод", "de": "Manuelle Eingabe", "en": "Manual Input"},
     "ok_button": {"ru": "ОК", "de": "OK", "en": "OK"},
     "clear_button": {"ru": "Очистить", "de": "Zurücksetzen", "en": "Clear"},
@@ -85,7 +88,15 @@ TRANSLATIONS = {
     "size_positive_error": {"ru": "Размеры должны быть положительными", "de": "Größen müssen positiv sein", "en": "Sizes must be positive"},
     "invalid_number_format_error": {"ru": "Неверный формат числа", "de": "Ungültiges Zahlenformat", "en": "Invalid number format"},
     "offset_non_negative_error": {"ru": "Отступ не может быть отрицательным", "de": "Randabstand darf nicht negativ sein", "en": "Allowance cannot be negative"},
-    "point_selection_error": {"ru": "Ошибка выбора точки", "de": "Fehler bei der Punktauswahl", "en": "Point selection error"}
+    "vessel_label": {"ru": "Таблички", "de": "Schilder", "en": "Vessel names"},
+    "point_selection_error": {"ru": "Ошибка выбора точки", "de": "Fehler bei der Punktauswahl", "en": "Point selection error"},
+    "height_cut": {"ru": "Высота выреза Hc", "de": "Ausschnitthöhe Hc", "en": "Cutout height Hc"},
+    "length_cut": {"ru": "Глубина выреза Lc", "de": "Ausschnitttiefe Lc", "en": "Cutout length Lc"},
+    "cutout_parameters": {"ru": "Параметры выреза, мм", "de": "Ausschnittparameter, mm", "en": "Cutout parameters, mm"},
+    "cut_angle": {"ru": "Форма Rc", "de": "Form Rc", "en": "Form Rc"},
+    "cut": {"ru": "Срез (R=0)", "de": "Schnitt (R=0)", "en": "Cut (R=0)"},
+    "round": {"ru": "Скругление", "de": "Abrundung", "en": "Round"},
+    "chamber": {"ru": "Фаска 45°", "de": "Fase 45°", "en": "Chamfer 45°"}
 }
 loc.register_translations(TRANSLATIONS)
 
@@ -494,20 +505,40 @@ class BracketContentPanel(BaseContentPanel):
         # -----------------------------
         # Кнопки управления
         # -----------------------------
-        btn_specific = wx.Button(self, label=loc.get("dimensions_label"), size=wx.Size(150, -1))
-        btn_nameplates = wx.Button(self, label="vessel_names", size=wx.Size(150, -1))
-        btn_cutout = wx.Button(self, label="cutout", size=wx.Size(150, -1))
-
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        button_sizer.Add(btn_specific, 0, wx.RIGHT, 5)
-        button_sizer.Add(btn_nameplates, 0, wx.RIGHT, 5)
-        button_sizer.Add(btn_cutout, 0)
-        self.right_sizer.Add(button_sizer, 0, wx.ALL, 5)
+        fb_button = FieldBuilder(parent=self, target_sizer=button_sizer, form=self.form)
 
-        # Привязка событий
-        btn_specific.Bind(wx.EVT_BUTTON, self.on_toggle_specific)
-        btn_nameplates.Bind(wx.EVT_BUTTON, self.on_toggle_nameplates)
-        btn_cutout.Bind(wx.EVT_BUTTON, self.on_toggle_cutout)
+        fb_button.universal_row(
+            "",
+            [
+                {
+                    "type": "button",
+                    "label": loc.get("dimensions_label"),
+                    "callback": self.on_toggle_specific,
+                    "bg_color": "#27ae60",
+                    "toggle": True,
+                    "size": BUTTON_SIZE
+                },
+                {
+                    "type": "button",
+                    "label": loc.get("vessel_label"),
+                    "callback": self.on_toggle_nameplates,
+                    "bg_color": "#2980b9",
+                    "toggle": True,
+                    "size": BUTTON_SIZE
+                },
+                {
+                    "type": "button",
+                    "label": loc.get("cutout_label"),
+                    "callback": self.on_toggle_cutout,
+                    "bg_color": "#8e44ad",
+                    "toggle": True,
+                    "size": BUTTON_SIZE
+                }
+            ]
+        )
+
+        self.right_sizer.Add(button_sizer, 0, wx.ALL, 5)
 
         # -----------------------------
         # Кнопки действия (ОК/Отмена)
@@ -525,6 +556,38 @@ class BracketContentPanel(BaseContentPanel):
         # Инициализация дефолтного типа мостика
         self.bridge_type_choice.SetSelection(0)
         wx.CallAfter(self.on_bridge_type_changed)
+
+    # ------------------------------------------------------------------
+    # Сохранение/восстановление значений контролов панели
+    # ------------------------------------------------------------------
+    def _hide_panel(self, panel: wx.Panel):
+        """Сохраняет значения всех контролов панели и скрывает её."""
+        if not panel:
+            return
+        for attr_name in dir(panel):
+            ctrl = getattr(panel, attr_name)
+            if isinstance(ctrl, (wx.TextCtrl, wx.ComboBox)):
+                try:
+                    ctrl._saved_value = ctrl.GetValue()
+                except RuntimeError:
+                    # Если контрол уже удалён (защита от ошибок)
+                    continue
+        panel.Hide()
+
+    def _show_panel(self, panel: wx.Panel):
+        """Показывает панель и восстанавливает сохранённые значения контролов."""
+        if not panel:
+            return
+        panel.Show()
+        for attr_name in dir(panel):
+            ctrl = getattr(panel, attr_name)
+            if isinstance(ctrl, (wx.TextCtrl, wx.ComboBox)):
+                if hasattr(ctrl, "_saved_value"):
+                    try:
+                        ctrl.SetValue(ctrl._saved_value)
+                    except RuntimeError:
+                        continue
+
 
     # ------------------------------------------------------------------
     # Сервисные функции
@@ -545,35 +608,35 @@ class BracketContentPanel(BaseContentPanel):
         Формирует словарь bridge_data на основе введённых данных
         и передаёт его в callback.
         """
+        # Собираем базовые данные
         bridge_data = self.form.collect()
 
-        # # Специфические параметры
-        # if self.specific_panel.IsShown():
-        #     # Сбор только специфических полей
-        #     spec_fields = ["corner_radius", "web_height", "detail_number"]  # пример для Type 1
-        #     specific_data = {}
-        #     for f in spec_fields:
-        #         if f in self.form.fields:
-        #             specific_data[f] = self.form.fields[f].get_value()
-        #     bridge_data["specific"] = specific_data
-        #
-        # # Таблички
-        # if self.nameplate_panel.IsShown():
-        #     plates_data = self.nameplate_panel.get_data()
-        #     bridge_data["plates"] = [
-        #         {"name": plates_data.get(f"nameplate_{i + 1}", "")}
-        #         for i in range(self.nameplate_panel.MAX_PLATES)
-        #         if plates_data.get(f"nameplate_{i + 1}")
-        #     ]
-        #     bridge_data["plates_gap"] = float(plates_data.get("nameplate_spacing") or 0.0)
-        #     bridge_data["plates_offset_top"] = float(plates_data.get("nameplate_offset_top") or 0.0)
-        #
-        # # Вырез
-        # if self.cutout_panel.IsShown():
-        #     bridge_data["cutout"] = self.cutout_panel.get_data()
+        # --------------------------------------------------
+        # Пример: geometry уже есть в форме или задаём явно
+        # --------------------------------------------------
+        geometry = {
+            "center_point": bridge_data.get("center_point", (0, 0, 0)),
+            "width": bridge_data.get("width", 170.0),
+            "height": bridge_data.get("height", 160.0),
+            "length": bridge_data.get("length", 70.0),
+        }
 
+        # --------------------------------------------------
+        # Вырез (cutout)
+        # --------------------------------------------------
+        cutout_data = self.cutout_panel.get_data(
+            max_height=geometry["height"],
+            max_length=geometry["length"]
+        )
+
+        if cutout_data:
+            bridge_data.update(cutout_data)
+        # если cutout_data is None — секция выреза просто не добавляется
+
+        # --------------------------------------------------
         # Передача в callback
-        print(bridge_data) # Debug
+        # --------------------------------------------------
+        print(bridge_data)  # Debug
         if self.on_submit_callback:
             self.on_submit_callback(bridge_data)
 
@@ -591,45 +654,26 @@ class BracketContentPanel(BaseContentPanel):
     # Переключение видимости панелей
     # ------------------------------------------------------------------
     def on_toggle_specific(self, event):
-        if self.specific_panel.IsShown():
-            self.specific_panel.Hide()
-            self.Layout()
-        else:
-            bridge_type_num = self.bridge_type_choice.GetValue()  # "1", "2", ...
-            bridge_type = f"type{bridge_type_num}"  # "type1" …
-            self.specific_panel.rebuild(bridge_type)
-            self._show_section(self.specific_panel)
+        self._show_section(self.specific_panel)
 
     def on_toggle_nameplates(self, event):
-        if self.nameplate_panel.IsShown():
-            self.nameplate_panel.Hide()
-            self.Layout()
-        else:
-            self._show_section(self.nameplate_panel)
+        self._show_section(self.nameplate_panel)
 
     def on_toggle_cutout(self, event):
-        if self.cutout_panel.IsShown():
-            self.cutout_panel.Hide()
-            self.Layout()
-        else:
-            self._show_section(self.cutout_panel)
+        self._show_section(self.cutout_panel)
 
     def _hide_all_optional_panels(self):
-        if self.specific_panel:
-            self.specific_panel.Hide()
-        if self.nameplate_panel:
-            self.nameplate_panel.Hide()
-        if self.cutout_panel:
-            self.cutout_panel.Hide()
+        for panel in (self.specific_panel, self.nameplate_panel, self.cutout_panel):
+            self._hide_panel(panel)
 
     def _show_section(self, section: Optional[wx.Panel]):
+        # Сначала скрываем все остальные панели
         for panel in (self.specific_panel, self.nameplate_panel, self.cutout_panel):
-            if panel:
-                panel.Hide()
+            if panel and panel != section:
+                self._hide_panel(panel)
 
-        if section:
-            section.Show()
-
+        # Показываем нужную панель
+        self._show_panel(section)
         self.Layout()
 
 
@@ -752,87 +796,131 @@ class CutoutPanel(wx.Panel):
         Контролы регистрируются сразу в FormBuilder.
         """
         fb = FieldBuilder(parent=self, target_sizer=self.sizer, form=self.form)
-        box_sizer = fb.static_box("cutout_parameters")
+        box_sizer = fb.static_box(loc.get("cutout_parameters"))
         fb_box = FieldBuilder(parent=self, target_sizer=box_sizer, form=self.form)
 
         fb_box.universal_row(
-            "height",
+            loc.get("height_cut"),
             [
-                {"type": "text", "name": "height_label", "value": "", "required": True, "default": ""},
+                {
+                    "type": "text",
+                    "name": "height",
+                    "value": "",
+                    "required": True,
+                    "default": ""
+                },
             ]
         )
         fb_box.universal_row(
-            "length",
+            loc.get("length_cut"),
             [
-                {"type": "text", "name": "length_label", "value": "", "required": True, "default": ""},
+                {
+                    "type": "text",
+                    "name": "length",
+                    "value": "",
+                    "required": True,
+                    "default": ""
+                },
             ]
         )
-        # fb_box.text(name="height", label_key="height_label", required=True, parser=float)
-        # fb_box.text(name="length", label_key="length_label", required=True, parser=float)
-        # fb_box.text(name="radius", label_key="allowance_label", required=True, parser=float)
 
-        fb_box.universal_row(
-            "radius",
+        # Список вариантов для комбо
+        cut_options = [
+            loc.get("cut"),
+            loc.get("round"),
+            loc.get("chamber")
+        ]
+
+        # Создаём строку через universal_row
+        controls = fb_box.universal_row(
+            loc.get("cut_angle"),
             [
-            {"type": "combo", "name": "cutout_label", "value": "", "required": True, "default": ""},
-            {"type": "text", "name": "r_cut", "value": "", "required": True, "default": ""},
+                {
+                    "type": "combo",
+                    "name": "cutout_label",
+                    "value": "",
+                    "choices": cut_options,
+                    "required": True,
+                    "default": cut_options[0]
+                },
+                {
+                    "type": "text",
+                    "name": "r_cut",
+                    "value": "",
+                    "required": True,
+                    "default": ""
+                }
             ]
         )
-        # if radius == 0:
-        # row_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        # label = wx.StaticText(self, label="radius")
-        # row_sizer.Add(label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        #
-        # # Комбобокс
-        # combo = wx.ComboBox(
-        #     self,
-        #     choices=["Угол", "Скругление", "Фаска 45°"],
-        #     style=wx.CB_READONLY,
-        # )
-        # row_sizer.Add(combo, 0, wx.RIGHT, 5)
-        #
-        # # Поле для ввода величины
-        # value_ctrl = wx.TextCtrl(self)
-        # row_sizer.Add(value_ctrl, 0)
-        #
-        # # Регистрация контролов в form.fields
-        # self.form.register("r_cut", combo)
-        # self.form.register("r_cut", value_ctrl)
-        #
-        # # Блокировка ввода, если выбран угол
-        # def on_combo_change(event):
-        #     selection = combo.GetStringSelection()
-        #     if selection == "Угол":
-        #         value_ctrl.Disable()
-        #         value_ctrl.SetValue("0")
-        #     else:
-        #         value_ctrl.Enable()
-        #
-        # combo.Bind(wx.EVT_COMBOBOX, on_combo_change)
-        #
-        # box_sizer.Add(row_sizer, 0, wx.ALL, 2)
+
+        def update_r_cut(dependent, master):
+            if master.GetStringSelection() == loc.get("cut_angle"):
+                dependent.Disable()
+                dependent.SetValue("0")
+            else:
+                dependent.Enable()
+
+        controls[0].Bind(wx.EVT_COMBOBOX, lambda evt: update_r_cut(controls[1], controls[0]))
+
+        # Один раз вызываем, чтобы установить начальное состояние
+        update_r_cut(controls[1], controls[0])
 
         self.Layout()
 
-    def get_data(self) -> dict:
+    def get_data(self, max_height: float, max_length: float) -> dict | None:
         """
-        Возвращает словарь параметров выреза через form.collect():
-            {
-                "height": float,
-                "length": float,
-                "radius": float
-            }
+        Возвращает словарь параметров выреза в формате:
+            {"cutout": {"height": float, "length": float, "radius": float}}
+            radius корректируется в зависимости от выбранного типа выреза:
+                cut: 0
+                round: >0
+                chamfer: <0 (отрицательное значение)
+
+        Если высота или длина некорректны (0, None, пустая строка) — возвращается None.
+
+        :param max_height: ограничение по высоте выреза (от geometry)
+        :param max_length: ограничение по длине выреза (от geometry)
         """
-        # collect() возвращает все поля формы, включая остальные панели
-        # нужно взять только свои поля по имени
         data_raw = self.form.collect()
-        data = {}
-        for key in ("height", "length", "radius"):
-            try:
-                data[key] = float(data_raw.get(key, 0.0))
-            except (ValueError, TypeError):
-                data[key] = 0.0
-        return data
+
+        # Попытка конвертировать в float
+        try:
+            height = float(data_raw.get("height", 0.0))
+        except (ValueError, TypeError):
+            height = 0.0
+
+        try:
+            length = float(data_raw.get("length", 0.0))
+        except (ValueError, TypeError):
+            length = 0.0
+
+        try:
+            radius = float(data_raw.get("radius", 0.0))
+        except (ValueError, TypeError):
+            radius = 0.0
+
+        # Приводим max_height и max_length к float
+        try:
+            max_height = float(max_height)
+        except (ValueError, TypeError):
+            max_height = float("inf")
+
+        try:
+            max_length = float(max_length)
+        except (ValueError, TypeError):
+            max_length = float("inf")
+
+        # Проверка на валидность и границы
+        if height <= 0 or length <= 0 or height > max_height or length > max_length:
+            return None  # секция выреза не добавляется
+
+        return {
+            "cutout": {
+                "height": height,
+                "length": length,
+                "radius": radius
+            }
+        }
 
 
 # ----------------------------------------------------------------------

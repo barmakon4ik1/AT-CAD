@@ -66,6 +66,7 @@ MENU_ICONS: dict[str, Path] = {
 
 # --- Параметры интерфейса ---
 INPUT_FIELD_SIZE: tuple[int, int] = (150, -1)
+BUTTON_SIZE: tuple[int, int] = (150, -1)
 BANNER_HIGH: int = 100
 LOGO_SIZE: tuple[int, int] = (BANNER_HIGH - 10, BANNER_HIGH - 10)
 WINDOW_SIZE: tuple[int, int] = (1280, 980)

@@ -20,7 +20,9 @@
 from __future__ import annotations
 from typing import Any, Callable, Dict, Optional
 import wx
-from windows.at_window_utils import parse_float
+from wx.lib.buttons import GenButton
+
+from windows.at_window_utils import parse_float, style_gen_button, style_gen_button_v2
 from config.at_config import FORM_CONFIG
 from locales.at_translations import loc
 from windows.at_gui_utils import get_standard_font
@@ -44,19 +46,24 @@ class FormField:
     ):
         self.name = name
         self.ctrl = ctrl
+        self.value_cache = ctrl.GetValue() if hasattr(ctrl, "GetValue") else None
         self.required = required
         self.parser = parser
         self.default = default
         self.getter = getter
         self.setter = setter
 
-    def get_raw(self) -> Any:
-        """Возвращает сырое значение из контрола."""
-        if self.getter:
-            return self.getter()
-        if hasattr(self.ctrl, "GetValue"):
-            return self.ctrl.GetValue()
-        return None
+    def get_raw(self):
+        # если контрол живой — берём значение
+        if self.ctrl and hasattr(self.ctrl, "GetValue"):
+            try:
+                val = self.ctrl.GetValue()
+                self.value_cache = val  # обновляем кэш
+                return val
+            except RuntimeError:
+                pass
+        # если контрол удалён — возвращаем последнее сохранённое значение
+        return self.value_cache
 
     def get_value(self) -> Any:
         """
@@ -86,21 +93,22 @@ class FormField:
         return value
 
     def set_value(self, value: Any) -> None:
-        """Устанавливает значение поля безопасно, через setter или стандартный контрол."""
+        """
+        Устанавливает значение поля безопасно, через setter или стандартный контрол.
+
+        Работает для:
+            - wx.TextCtrl
+            - wx.ComboBox
+        Остальные контролы игнорируются.
+        """
         if self.setter:
             self.setter(value)
             return
-        if isinstance(self.ctrl, wx.Choice):
-            if value in self.ctrl.GetItems():
-                self.ctrl.SetStringSelection(value)
-            else:
-                self.ctrl.SetSelection(wx.NOT_FOUND)
+
+        # TextCtrl и ComboBox — передаем строку
+        if isinstance(self.ctrl, (wx.TextCtrl, wx.ComboBox)):
+            self.ctrl.SetValue("" if value is None else str(value))
             return
-        if hasattr(self.ctrl, "SetValue"):
-            if isinstance(self.ctrl, wx.TextCtrl):
-                self.ctrl.SetValue("" if value is None else str(value))
-            else:
-                self.ctrl.SetValue(value)
 
 
 # ----------------------------------------------------------------------
@@ -409,9 +417,13 @@ class FieldBuilder:
             default: значение по умолчанию
             label: текст кнопки/чекбокса
             callback: функция обработчика кнопки
+            - "depends_on": dict с ключами:
+            - "ctrl" — контрол, от которого зависит элемент
+            - "callback" — функция: (dependent_ctrl, master_ctrl) -> None
         """
         spacing = spacing if spacing is not None else self.label_pad
         row = wx.BoxSizer(wx.HORIZONTAL)
+        created_controls = []
 
         # Метка слева
         if label_key:
@@ -420,8 +432,6 @@ class FieldBuilder:
 
         # Растягиватель между меткой и контролами
         row.AddStretchSpacer(1)
-
-        created_controls = []
 
         for i, elem in enumerate(elements):
             elem_type = elem.get("type", "text")
@@ -468,12 +478,25 @@ class FieldBuilder:
                     )
 
             elif elem_type == "button":
-                ctrl = wx.Button(
+                ctrl = GenButton(
                     self.parent,
-                    label=elem.get("label", "")
+                    label=elem.get("label", ""),
+                    size=wx.Size(*elem["size"]) if "size" in elem else wx.DefaultSize
                 )
+
                 if "callback" in elem and callable(elem["callback"]):
                     ctrl.Bind(wx.EVT_BUTTON, elem["callback"])
+
+                # --- ВАЖНО: стиль ---
+                style_gen_button_v2(
+                    btn=ctrl,
+                    normal_bg=elem.get("bg_color", "#3498db"),
+                    text_color=elem.get("fg_color"),
+                    bezel=elem.get("bezel", 1),
+                    button_height=elem.get("height", 0),
+                    font_size=elem.get("font_size"),
+                    toggle=elem.get("toggle", False),
+                )
 
             elif elem_type == "checkbox":
                 ctrl = wx.CheckBox(
@@ -492,5 +515,15 @@ class FieldBuilder:
                 row.Add(ctrl, element_proportion, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, right_pad)
                 created_controls.append(ctrl)
 
+                # ── зависимость от другого контрола ──
+                depends = elem.get("depends_on")
+                if depends and "ctrl" in depends and "callback" in depends:
+                    master_ctrl = depends["ctrl"]
+                    cb = depends["callback"]
+                    master_ctrl.Bind(wx.EVT_COMBOBOX, lambda evt, d=ctrl, m=master_ctrl, f=cb:
+                    f(d, m))
+
         self.sizer.Add(row, 0, wx.EXPAND | wx.ALL, self.row_border)
         return created_controls
+
+
