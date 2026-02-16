@@ -394,7 +394,8 @@ class FieldBuilder:
             label_key: str | None,
             elements: list[dict],
             spacing: int = None,
-            element_proportion: int = 0
+            element_proportion: int = 0,
+            align_right: bool = True
     ) -> list[wx.Window]:
         """
         Универсальная строка: метка слева + любые элементы справа.
@@ -431,7 +432,8 @@ class FieldBuilder:
             row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
 
         # Растягиватель между меткой и контролами
-        row.AddStretchSpacer(1)
+        if align_right:
+            row.AddStretchSpacer(1)
 
         for i, elem in enumerate(elements):
             elem_type = elem.get("type", "text")

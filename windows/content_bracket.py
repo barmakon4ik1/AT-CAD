@@ -35,9 +35,11 @@ TODO:
     - валидация входных данных
     - привязка выбора точки вставки (AutoCAD)
 """
-
+from email.policy import default
+from pprint import pprint
 from typing import Optional, Dict, cast
 
+from docutils.nodes import ValidationError
 from wx.lib.buttons import GenButton
 
 from config.at_cad_init import ATCadInit
@@ -96,7 +98,18 @@ TRANSLATIONS = {
     "cut_angle": {"ru": "Форма Rc", "de": "Form Rc", "en": "Form Rc"},
     "cut": {"ru": "Срез (R=0)", "de": "Schnitt (R=0)", "en": "Cut (R=0)"},
     "round": {"ru": "Скругление", "de": "Abrundung", "en": "Round"},
-    "chamber": {"ru": "Фаска 45°", "de": "Fase 45°", "en": "Chamfer 45°"}
+    "chamber": {"ru": "Фаска 45°", "de": "Fase 45°", "en": "Chamfer 45°"},
+    "special_parameters": {"ru": "Специальные параметры", "de": "Spezielle Parameter", "en": "Special parameters"},
+    "add_detail_number": {"ru": "Номер детали перемычки", "de": "Steg Teilenummer", "en": "Web part number"},
+    "corner_label": {"ru": "Форма R", "de": "Form R", "en": "Form R"},
+    "web_height": {"ru": "Высота H1, мм", "de": "Höhe H1, mm", "en": "Height H1, mm"},
+    "shell_diameter": {"ru": "Диаметр D, мм", "de": "Durchmesser D, mm", "en": "Diameter D, mm"},
+    "shell_diameter1": {"ru": "Диаметр D1, мм", "de": "Durchmesser D1, mm", "en": "Diameter D1, mm"},
+    "shell_diameter2": {"ru": "Диаметр D2, мм", "de": "Durchmesser D2, mm", "en": "Diameter D2, mm"},
+    "length": {"ru": "Длина, мм", "de": "Länge, mm", "en": "Length, mm"},
+    "length1": {"ru": "Длина L1, мм", "de": "Länge L1, mm", "en": "Length L1, mm"},
+    "edge_angle_label": {"ru": "Угол A°", "de": "Winkel A°", "en": "Angle A°"},
+    "no": {"ru": "Неизвестно", "de": "Unbekannt", "en": "Unknown"},
 }
 loc.register_translations(TRANSLATIONS)
 
@@ -125,177 +138,6 @@ def create_window(parent: wx.Window) -> Optional[wx.Panel]:
     except Exception as e:
         show_popup(loc.get("error") + f": {str(e)}", popup_type="error")
         return None
-
-# ==========================================================
-# Специализированные окна
-# ==========================================================
-class BracketSpecificPanel(wx.Panel):
-    """
-    Панель специфических параметров мостика.
-    Управляет доступностью полей и собирает сырые данные для дальнейшей обработки.
-    """
-
-    # Схема полей по типам
-    BRIDGE_SPEC_FIELDS = {
-        "type1": ["add_detail_number", "length", "web_height", "corner_radius"],
-        "type2": ["shell_diameter1", "length"],  # L или L0, в словарь length
-        "type3": ["shell_diameter1", "length", "l1", "edge_angle"],
-        "type4": ["shell_diameter1", "length"],  # L или L0
-        "type5": ["shell_diameter1", "shell_diameter2", "length", "l1", "l2", "edge_angle"]
-    }
-
-    def __init__(self, parent, form: FormBuilder):
-        super().__init__(parent)
-        self.form = form
-        self.bridge_type: Optional[str] = None
-
-        self.sizer = wx.BoxSizer(wx.VERTICAL)
-        self.SetSizer(self.sizer)
-
-        self.fields_sizer = wx.BoxSizer(wx.VERTICAL)
-        self.sizer.Add(self.fields_sizer, 1, wx.EXPAND | wx.ALL, 5)
-
-        self.controls: dict[str, wx.Control] = {}
-
-    def rebuild(self, bridge_type: str):
-        """
-        Перестройка панели под указанный тип мостика.
-        """
-        self.bridge_type = bridge_type
-        self.fields_sizer.Clear(True)
-        self.controls.clear()
-
-        fb = FieldBuilder(parent=self, target_sizer=self.fields_sizer, form=self.form)
-
-        # --- список полей для текущего типа ---
-        fields = self.BRIDGE_SPEC_FIELDS.get(bridge_type, [])
-
-        for name in fields:
-            # Особый комбобокс для corner_radius
-            if bridge_type == "type1" and name == "corner_radius":
-                row_sizer = wx.BoxSizer(wx.HORIZONTAL)
-                label = wx.StaticText(self, label="Оформление краёв")
-                row_sizer.Add(label, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-
-                # Комбобокс
-                combo = wx.ComboBox(
-                    self,
-                    choices=["Угол", "Скругление", "Фаска 45°"],
-                    style=wx.CB_READONLY,
-                )
-                row_sizer.Add(combo, 0, wx.RIGHT, 5)
-
-                # Поле для ввода величины
-                value_ctrl = wx.TextCtrl(self)
-                row_sizer.Add(value_ctrl, 0)
-
-                # Регистрация контролов в form.fields
-                self.form.register("corner_radius_type", combo)
-                self.form.register("corner_radius_value", value_ctrl)
-
-                # Блокировка ввода, если выбран угол
-                def on_combo_change(event):
-                    selection = combo.GetStringSelection()
-                    if selection == "Угол":
-                        value_ctrl.Disable()
-                        value_ctrl.SetValue("0")
-                    else:
-                        value_ctrl.Enable()
-
-                combo.Bind(wx.EVT_COMBOBOX, on_combo_change)
-
-                self.fields_sizer.Add(row_sizer, 0, wx.ALL, 2)
-
-            # Для типов 2 и 4 обрабатываем L и L0
-            elif bridge_type in ("type2", "type4") and name in ("length", "l0"):
-                ctrl = fb.text(
-                    name=name,
-                    label_key=name,
-                    parser=float,
-                    required=True
-                )
-                # блокировка взаимозависимого поля через form.fields
-                other_name = "l0" if name == "length" else "length"
-                other_value = self.form.fields.get(other_name)
-                if other_value and other_value.get_value() is not None:
-                    ctrl.Disable()
-            else:
-                ctrl = fb.text(
-                    name=name,
-                    label_key=name,
-                    parser=float if "diameter" in name or "length" in name or "height" in name or "l" in name or "edge_angle" in name else str,
-                    required=name in ["shell_diameter1", "length", "edge_angle"]
-                )
-
-            self.controls[name] = ctrl
-
-        if bridge_type == "type5":
-            length_ctrl = self.controls.get("length")
-            l2_ctrl = self.controls.get("l2")
-            length_val = self.form.fields.get("length")
-            l2_val = self.form.fields.get("l2")
-            if l2_val and l2_val.get_value() is not None:
-                if length_ctrl:
-                    length_ctrl.Disable()
-            else:
-                if l2_ctrl:
-                    l2_ctrl.Disable()
-
-        # Обязательно перерисовываем Layout
-        self.Layout()
-
-    def get_raw_data(self) -> dict:
-        """
-        Возвращает все введенные значения. Для пустых полей возвращает None или 0.
-        """
-        data = {}
-        for name, ctrl in self.controls.items():
-            if ctrl is None:
-                continue
-
-            value = ctrl.get_value()
-            if value is None:
-                # для числовых полей возвращаем 0, для строковых None
-                if isinstance(ctrl, wx.TextCtrl):
-                    try:
-                        value = float(ctrl.GetValue())
-                    except ValueError:
-                        value = 0.0
-                else:
-                    value = None
-
-            # Преобразование corner_radius из комбобокса в число
-            if name == "corner_radius" and isinstance(ctrl, wx.ComboBox):
-                val_str = ctrl.GetValue()
-                if val_str == "угол":
-                    value = 0.0
-                elif val_str == "скругление":
-                    value = 5.0  # пример радиуса, можно задавать конкретно
-                elif val_str == "фаска 45°":
-                    value = -45.0
-
-            data[name] = value
-
-        # Для type5 вычисляем variant автоматически
-        if self.bridge_type == "type5":
-            length, l2 = data.get("length"), data.get("l2")
-            if l2 and l2 > 0:
-                data["variant"] = 3
-                data["length"] = 0  # length недоступен
-            elif length and length > 0:
-                data["variant"] = 1
-            else:
-                data["variant"] = 2
-                data["length"] = 0
-            if "l1" not in data:
-                data["l1"] = 0
-
-        # Для type3, если l1 не задан, ставим 0
-        if self.bridge_type == "type3" and "l1" not in data:
-            data["l1"] = 0
-
-        return data
-
 
 # ==========================================================
 # Главная панель
@@ -396,31 +238,36 @@ class BracketContentPanel(BaseContentPanel):
         # -----------------------------
         self.form = FormBuilder(self)
         fb_left = FieldBuilder(self, self.left_sizer, form=self.form)
-        self.bridge_type_choice = wx.ComboBox(
-            self,
-            choices=["1", "2", "3", "4", "5"],
-            style=wx.CB_READONLY,
-            size=wx.Size(60, -1)
-        )
-        # Регистрируем с преобразованием
-        self.form.register(
-            name="type",
-            ctrl=self.bridge_type_choice,
-            required=True,
-            parser=lambda v: f"type{v}"
+
+        bridge_type_choices = ["1", "2", "3", "4", "5"]
+
+        created = fb_left.universal_row(
+            label_key="select_bridge_type",
+            elements=[
+                {
+                    "type": "combo",
+                    "name": "type",
+                    "choices": bridge_type_choices,
+                    "value": bridge_type_choices[0],
+                    "required": True,
+                    "parser": lambda v: f"type{v}",
+                    "default": bridge_type_choices[0],
+                    "align_right": False,
+                }
+            ],
+            element_proportion=0,
+            spacing=8
         )
 
-        fb_left.row(
-            label_key="select_bridge_type",
-            controls=[self.bridge_type_choice],
-            spacing=8,
-            align_right=False
-        )
+        # universal_row возвращает список созданных контролов
+        self.bridge_type_choice = created[0]
 
         # Canvas с изображением мостика
         default_image = BRIDGE_TYPE_IMAGES.get("1", "")
         self.canvas = CanvasPanel(self, image_file=str(default_image), size=(600, 400))
         self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
+
+        # Событие
         self.bridge_type_choice.Bind(wx.EVT_COMBOBOX, self.on_bridge_type_changed)
 
         # -----------------------------
@@ -446,8 +293,8 @@ class BracketContentPanel(BaseContentPanel):
         fb_main.universal_row(
             "order_label",
             [
-                {"type": "text", "name": "order", "value": "", "required": False, "default": ""},
-                {"type": "text", "name": "detail", "value": "", "required": False, "default": ""},
+                {"type": "text", "name": "order_number", "value": "", "required": False, "default": ""},
+                {"type": "text", "name": "detail_number", "value": "", "required": False, "default": ""},
             ]
         )
 
@@ -605,38 +452,131 @@ class BracketContentPanel(BaseContentPanel):
     # ------------------------------------------------------------------
     def on_ok(self, *args, **kwargs):
         """
-        Формирует словарь bridge_data на основе введённых данных
+        Формирует строго структурированный словарь bridge_data
         и передаёт его в callback.
         """
-        # Собираем базовые данные
-        bridge_data = self.form.collect()
 
-        # --------------------------------------------------
-        # Пример: geometry уже есть в форме или задаём явно
-        # --------------------------------------------------
-        geometry = {
-            "center_point": bridge_data.get("center_point", (0, 0, 0)),
-            "width": bridge_data.get("width", 170.0),
-            "height": bridge_data.get("height", 160.0),
-            "length": bridge_data.get("length", 70.0),
+        raw = self.form.collect()
+        if not raw:
+            return
+
+        pprint(raw) # Debug
+        # ======================================================
+        # 1. Тип мостика
+        # ======================================================
+        bridge_type = raw.get("type")
+
+        # ======================================================
+        # 2. Технологические параметры (обязательные)
+        # ======================================================
+        bridge_data = {
+            "type": bridge_type,
+            "order_number": raw.get("order_number"),
+            "detail_number": raw.get("detail_number"),
+            "material": raw.get("material"),
+            "thickness": raw.get("thickness"),
+            "geometry": {
+                "center_point": raw.get("center_point"),
+                "height": raw.get("geometry_height"),
+                "width": raw.get("geometry_width"),
+            },
+            # "specific": self._collect_specific(bridge_type)
         }
 
-        # --------------------------------------------------
-        # Вырез (cutout)
-        # --------------------------------------------------
-        cutout_data = self.cutout_panel.get_data(
-            max_height=geometry["height"],
-            max_length=geometry["length"]
-        )
+        # ======================================================
+        # 3. Базовая геометрия
+        # ======================================================
+        # geometry = {
+        #     "center_point": raw.get("center_point"),
+        #     "width": raw.get("width"),
+        #     "height": raw.get("height"),
+        # }
+        #
+        # bridge_data["geometry"] = geometry
+        pprint(bridge_data) # Debug
 
-        if cutout_data:
-            bridge_data.update(cutout_data)
-        # если cutout_data is None — секция выреза просто не добавляется
+        # ======================================================
+        # 4. Specific (только явно заданные параметры)
+        # ======================================================
+        def _add_if_present(target, source, key):
+            value = source.get(key)
+            if value is not None:
+                target[key] = value
 
-        # --------------------------------------------------
-        # Передача в callback
-        # --------------------------------------------------
-        print(bridge_data)  # Debug
+        specific = {}
+
+        # Общие
+        _add_if_present(specific, raw, "length")
+        _add_if_present(specific, raw, "corner_radius")
+        _add_if_present(specific, raw, "add_detail_number")
+        _add_if_present(specific, raw, "web_height")
+
+        # Диаметры
+        _add_if_present(specific, raw, "shell_diameter1")
+        _add_if_present(specific, raw, "shell_diameter2")
+
+        # Угол
+        _add_if_present(specific, raw, "edge_angle")
+
+        # Вариант + L1/L2
+
+        if raw.get("variant") is not None:
+            specific["variant"] = raw["variant"]
+
+        if raw.get("l1") is not None:
+            specific["l1"] = raw["l1"]
+
+        if raw.get("l2") is not None:
+            specific["l2"] = raw["l2"]
+
+        # Добавляем specific только если он не пустой
+        if specific:
+            bridge_data["specific"] = specific
+
+        # ======================================================
+        # 5. Cutout (если есть)
+        # ======================================================
+        # cutout_data = self.cutout_panel.get_data(
+        #     max_height=geometry["height"],
+        #     max_length=specific["length"]
+        # )
+        #
+        # if cutout_data:
+        #     bridge_data["cutout"] = {
+        #         "height": cutout_data.get("height"),
+        #         "length": cutout_data.get("length"),
+        #         "radius": cutout_data.get("radius"),
+        #     }
+
+        # ======================================================
+        # 6. Таблички
+        # ======================================================
+        # plates = []
+        # selected_plates = self.nameplate_panel.get_selected()
+        #
+        # for plate in selected_plates:
+        #     plate_entry = {"name": plate["name"]}
+        #
+        #     if plate.get("offset_top") is not None:
+        #         plate_entry["offset_top"] = plate["offset_top"]
+        #
+        #     plates.append(plate_entry)
+        #
+        # if plates:
+        #     bridge_data["plates"] = plates
+        #
+        # # Расстояние между табличками
+        # if raw.get("plates_gap") is not None:
+        #     bridge_data["plates_gap"] = raw["plates_gap"]
+
+        # ======================================================
+        # Debug
+        # ======================================================
+        # pprint(bridge_data)
+
+        # ======================================================
+        # Callback
+        # ======================================================
         if self.on_submit_callback:
             self.on_submit_callback(bridge_data)
 
@@ -845,7 +785,7 @@ class CutoutPanel(wx.Panel):
                 },
                 {
                     "type": "text",
-                    "name": "r_cut",
+                    "name": "radius",
                     "value": "",
                     "required": True,
                     "default": ""
@@ -853,17 +793,17 @@ class CutoutPanel(wx.Panel):
             ]
         )
 
-        def update_r_cut(dependent, master):
-            if master.GetStringSelection() == loc.get("cut_angle"):
-                dependent.Disable()
-                dependent.SetValue("0")
-            else:
-                dependent.Enable()
-
-        controls[0].Bind(wx.EVT_COMBOBOX, lambda evt: update_r_cut(controls[1], controls[0]))
-
-        # Один раз вызываем, чтобы установить начальное состояние
-        update_r_cut(controls[1], controls[0])
+        # def update_r_cut(dependent, master):
+        #     if master.GetStringSelection() == loc.get("cut_angle"):
+        #         dependent.Disable()
+        #         dependent.SetValue("0")
+        #     else:
+        #         dependent.Enable()
+        #
+        # controls[0].Bind(wx.EVT_COMBOBOX, lambda evt: update_r_cut(controls[1], controls[0]))
+        #
+        # # Один раз вызываем, чтобы установить начальное состояние
+        # update_r_cut(controls[1], controls[0])
 
         self.Layout()
 
@@ -923,6 +863,445 @@ class CutoutPanel(wx.Panel):
         }
 
 
+class BracketSpecificPanel(wx.Panel):
+    """
+    Панель специфических параметров мостика.
+    Управляет доступностью полей и собирает сырые данные для дальнейшей обработки.
+    """
+
+    def __init__(self, parent, form: FormBuilder):
+        super().__init__(parent)
+        self.form = form
+        self.bridge_type: Optional[str] = None
+
+        self.sizer = wx.BoxSizer(wx.VERTICAL)
+        self.SetSizer(self.sizer)
+
+        self.fields_sizer = wx.BoxSizer(wx.VERTICAL)
+        self.sizer.Add(self.fields_sizer, 1, wx.EXPAND | wx.ALL, 5)
+
+        self.controls: dict[str, wx.Control] = {}
+
+    def rebuild(self, bridge_type: str):
+        """
+        Перестройка панели под указанный тип мостика.
+        """
+        self.bridge_type = bridge_type
+        self.fields_sizer.Clear(True)
+        self.controls.clear()
+
+        fb = FieldBuilder(parent=self, target_sizer=self.fields_sizer, form=self.form)
+        box_sizer = fb.static_box(loc.get("special_parameters"))
+        fb_box = FieldBuilder(parent=self, target_sizer=box_sizer, form=self.form)
+
+        if bridge_type == "type1":
+            fb_box.universal_row(
+                loc.get("add_detail_number"),
+                [
+                    {
+                        "type": "text",
+                        "name": "height",
+                        "value": "",
+                        "required": True,
+                        "default": ""
+                    },
+                ]
+            )
+
+            fb_box.universal_row(
+                loc.get("length"),
+                [
+                    {
+                        "type": "text",
+                        "name": "length",
+                        "value": "",
+                        "required": True,
+                        "default": ""
+                    },
+                ]
+            )
+
+            fb_box.universal_row(
+                loc.get("web_height"),
+                [
+                    {
+                        "type": "text",
+                        "name": "web_height",
+                        "value": "",
+                        "required": True,
+                        "default": ""
+                    },
+                ]
+            )
+
+            # Список вариантов для комбо
+            corner_options = [
+                loc.get("cut"),
+                loc.get("round"),
+                loc.get("chamber")
+            ]
+
+            # Создаём строку через universal_row
+            fb_box.universal_row(
+                loc.get("corner_label"),
+                [
+                    {
+                        "type": "combo",
+                        "name": "corner_options",
+                        "value": "",
+                        "choices": corner_options,
+                        "required": True,
+                        "default": corner_options[0]
+                    },
+                    {
+                        "type": "text",
+                        "name": "corner_radius",
+                        "value": "",
+                        "required": True,
+                        "default": ""
+                    }
+                ]
+            )
+
+        elif bridge_type == "type2" or bridge_type == "type4":
+            fb_box.universal_row(
+                loc.get("shell_diameter"),
+                [
+                    {
+                        "type": "text",
+                        "name": "shell_diameter1",
+                        "value": "",
+                        "required": True,
+                        "default": ""
+                    },
+                ]
+            )
+
+            # Список вариантов для комбо
+            length_option = ["L", "L0"]
+
+            # Создаём строку через universal_row
+            fb_box.universal_row(
+                loc.get("length"),
+                [
+                    {
+                        "type": "combo",
+                        "name": "length_option",
+                        "value": "",
+                        "choices": length_option,
+                        "required": True,
+                        "default": length_option[0]
+                    },
+                    {
+                        "type": "text",
+                        "name": "length",
+                        "value": "",
+                        "required": True,
+                        "default": ""
+                    }
+                ]
+            )
+
+        elif bridge_type == "type3":
+            fb_box.universal_row(
+                loc.get("shell_diameter"),
+                [
+                    {
+                        "type": "text",
+                        "name": "shell_diameter1",
+                        "value": "",
+                        "required": True,
+                        "default": ""
+                    },
+                ]
+            )
+
+            fb_box.universal_row(
+                loc.get("length_label"),
+                [
+                    {
+                        "type": "text",
+                        "name": "length",
+                        "value": "",
+                        "required": True,
+                        "default": ""
+                    }
+                ]
+            )
+
+            # Список вариантов для комбо
+            length_option = [loc.get("no")]
+
+            # Создаём строку через universal_row
+            fb_box.universal_row(
+                loc.get("length1"),
+                [
+                    {
+                        "type": "combo",
+                        "name": "l1",
+                        "value": "",
+                        "choices": length_option,
+                        "required": True,
+                        "default": length_option[0]
+                    }
+                ]
+            )
+
+            angle_option = ["90", "120"]
+            fb_box.universal_row(
+                loc.get("edge_angle_label"),
+                [
+                    {
+                        "type": "combo",
+                        "name": "edge_angle",
+                        "value": "",
+                        "choices": angle_option,
+                        "required": True,
+                        "default": angle_option[0]
+                    }
+                ]
+            )
+
+        elif bridge_type == "type5":
+            fb_box.universal_row(
+                loc.get("shell_diameter1"),
+                [
+                    {
+                        "type": "text",
+                        "name": "shell_diameter1",
+                        "value": "",
+                        "required": True,
+                        "default": ""
+                    },
+                ]
+            )
+            fb_box.universal_row(
+                loc.get("shell_diameter2"),
+                [
+                    {
+                        "type": "text",
+                        "name": "shell_diameter2",
+                        "value": "",
+                        "required": True,
+                        "default": ""
+                    },
+                ]
+            )
+            # Список вариантов для комбо
+            length_option = ["L", "L1", "L2", loc.get("no")]
+
+            # Создаём строку через universal_row
+            fb_box.universal_row(
+                loc.get("length"),
+                [
+                    {
+                        "type": "combo",
+                        "name": "length_option",
+                        "value": "",
+                        "choices": length_option,
+                        "required": True,
+                        "default": length_option[0]
+                    },
+                    {
+                        "type": "text",
+                        "name": "length",
+                        "value": "",
+                        "required": True,
+                        "default": ""
+                    }
+                ]
+            )
+
+            # Создаём строку через universal_row
+            fb_box.universal_row(
+                loc.get("length"),
+                [
+                    {
+                        "type": "combo",
+                        "name": "length_option1",
+                        "value": "",
+                        "choices": length_option,
+                        "required": True,
+                        "default": length_option[0]
+                    },
+                    {
+                        "type": "text",
+                        "name": "l1",
+                        "value": "",
+                        "required": True,
+                        "default": ""
+                    }
+                ]
+            )
+
+            angle_option = ["90", "120"]
+            fb_box.universal_row(
+                loc.get("edge_angle_label"),
+                [
+                    {
+                        "type": "combo",
+                        "name": "edge_angle",
+                        "value": "",
+                        "choices": angle_option,
+                        "required": True,
+                        "default": angle_option[0]
+                    }
+                ]
+            )
+
+        apply_styles_to_panel(self)
+        # Обязательно перерисовываем Layout
+        self.Layout()
+
+    def get_specific_data(self, geometry: dict) -> dict | None:
+        """
+        Возвращает секцию {"specific": {...}} либо None.
+        geometry: {"width": float, "height": float}
+        """
+        if not self.bridge_type:
+            return None
+
+        raw = self.form.collect()
+
+        try:
+            if self.bridge_type == "type1":
+                specific = self._build_type1_specific(raw, geometry)
+            elif self.bridge_type == "type5":
+                specific = self._build_type5_specific(raw, geometry)
+            else:
+                return None
+
+        except ValidationError as e:
+            wx.MessageBox(str(e), "Validation error", wx.OK | wx.ICON_ERROR)
+            return None
+
+        return {"specific": specific}
+
+    def _require_positive_float(self, raw, key, message):
+        try:
+            value = float(raw.get(key))
+        except (TypeError, ValueError):
+            raise ValidationError(message)
+
+        if value <= 0:
+            raise ValidationError(message)
+
+        return value
+
+    def _build_type1_specific(self, raw: dict, geometry: dict) -> dict | None:
+        specific = {}
+
+        try:
+            # ---- Доп. номер детали ----
+            add_detail = raw.get("add_detail_number", "").strip()
+            if add_detail:
+                specific["add_detail_number"] = add_detail
+
+            # ---- Длина ----
+            length = self._require_positive_float(raw, "length", "Длина должна быть больше 0")
+
+            # ---- Высота перемычки ----
+            web_height = self._require_positive_float(raw, "web_height",
+                                                      "Высота перемычки должна быть > 0")
+
+            if web_height > geometry["height"]:
+                raise ValidationError("Высота перемычки больше высоты мостика")
+
+
+            # ---- Углы ----
+            corner_type = raw.get("corner_options")
+            radius_raw = float(raw.get("corner_radius", 0))
+
+            if corner_type == loc.get("cut"):
+                specific["corner_radius"] = 0.0
+            elif corner_type == loc.get("round"):
+                specific["corner_radius"] = abs(radius_raw)
+            elif corner_type == loc.get("chamber"):
+                specific["corner_radius"] = -abs(radius_raw)
+            else:
+                return None
+
+        except (ValueError, TypeError):
+            return None
+
+        return specific
+
+    def _build_type5_specific(self, raw: dict, geometry: dict) -> dict | None:
+        specific = {}
+
+        try:
+            # ---- Диаметры ----
+            d1 = float(raw.get("shell_diameter1", 0))
+            if d1 <= 0:
+                return None
+            specific["shell_diameter1"] = d1
+
+            d2_raw = raw.get("shell_diameter2")
+            if d2_raw:
+                d2 = float(d2_raw)
+                if d2 > 0:
+                    specific["shell_diameter2"] = d2
+
+            # ---- Угол ----
+            angle = float(raw.get("edge_angle", 0))
+            if angle not in (90.0, 120.0):
+                return None
+            specific["edge_angle"] = angle
+
+            # ---- Длины ----
+            length_option = raw.get("length_option")
+            length_option1 = raw.get("length_option1")
+
+            L = raw.get("length")
+            L1 = raw.get("l1")
+
+            L = float(L) if L else 0
+            L1 = float(L1) if L1 else 0
+
+            # --- Определение варианта ---
+            if length_option == "L" and length_option1 == "L1":
+                # Variant 1
+                if L <= 0 or L1 <= 0:
+                    return None
+                specific["variant"] = 1
+                specific["length"] = L
+                specific["l1"] = L1
+
+            elif length_option == "L" and length_option1 == loc.get("no"):
+                # Variant 2
+                if L <= 0:
+                    return None
+                specific["variant"] = 2
+                specific["length"] = L
+
+            elif length_option == "L2":
+                # Variant 3
+                L2 = float(raw.get("length", 0))
+                if L2 <= 0 or L1 <= 0:
+                    return None
+                specific["variant"] = 3
+                specific["l2"] = L2
+                specific["l1"] = L1
+
+            else:
+                return None
+
+        except (ValueError, TypeError):
+            return None
+
+        return specific
+
+    def _length_calc(self, raw: dict, geometry: dict) -> float:
+        radius = float(raw.get("radius", 0))
+        length = float(raw.get("length", 0))
+        width = float(raw.get("width", 0))
+        if radius > 0:
+            delta_length = radius - (radius ** 2 - width ** 2 / 4) ** 0.5
+        else:
+            delta_length = 0
+        return length + delta_length
+
+
 # ----------------------------------------------------------------------
 # Тестовый запуск
 # ----------------------------------------------------------------------
@@ -931,9 +1310,6 @@ if __name__ == "__main__":
     app = wx.App(False)
     frame = wx.Frame(None, title="test_rings_window", size=wx.Size(1500, 700))
     panel = BracketContentPanel(frame)
-
-
-
     sizer = wx.BoxSizer(wx.VERTICAL)
     sizer.Add(panel, 1, wx.EXPAND)
     frame.SetSizer(sizer)

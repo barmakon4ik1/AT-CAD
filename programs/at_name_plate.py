@@ -543,7 +543,7 @@ def build_type1(modelspace, cfg: BridgeConfig):
     # --------------------------------------------------
     # Перемычка (специфика type1)
     # --------------------------------------------------
-    web_length = cfg.geometry["length"]
+    web_length = cfg.specific["length"]
     web_height = cfg.specific["web_height"]
 
     if web_length > 0 and web_height > 0 and cfg.cutout:
@@ -660,7 +660,7 @@ def build_type2(modelspace, cfg: BridgeConfig):
     center_point = geom["center_point"]
     width = geom["width"]
     bridge_height = geom["height"]
-    length = geom["length"]
+    length = spec["length"]
     thickness = cfg.thickness
 
     shell_diameter = spec["shell_diameter1"]
@@ -801,7 +801,7 @@ def build_type3(modelspace, cfg: BridgeConfig):
     center_point = geom["center_point"]
     width = geom["width"]
     bridge_height = geom["height"]
-    length = geom["length"]
+    length = spec["length"]
     thickness = cfg.thickness
 
     # Диаметр обечайки (обязателен для type3)
@@ -1020,7 +1020,7 @@ def build_type4(modelspace, cfg: BridgeConfig):
     center_point = geom["center_point"]
     width = geom["width"]
     bridge_height = geom["height"]
-    length = geom["length"]
+    length = spec["length"]
     thickness = cfg.thickness
 
     # Диаметр горизонтального цилиндра (обязательный для type4)
@@ -1183,7 +1183,7 @@ def build_type5(modelspace, cfg: BridgeConfig):
     center_point = geom["center_point"]
     width = geom["width"]
     bridge_height = geom["height"]
-    length = geom["length"]
+    length = spec["length"]
     thickness = cfg.thickness
 
     # Специфические параметры type5
@@ -1514,7 +1514,6 @@ if __name__ == "__main__":
             "center_point": pt,  # базовая точка построения
             "width": 170.0,  # ширина мостика
             "height": 160.0,  # высота мостика
-            "length": 70.0,  # длина площадки, отступ L
         },
 
         # --------------------------------------------------
@@ -1526,6 +1525,7 @@ if __name__ == "__main__":
         # - никаких значений "по умолчанию" тут быть не должно
         # --------------------------------------------------
         "specific": {
+            "length": 70.0,  # длина площадки, отступ L
             # --- Тип 1 ---
             # Радиус скругления углов мостика
             "corner_radius": 0.0,
