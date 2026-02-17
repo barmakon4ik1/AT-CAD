@@ -577,7 +577,7 @@ def parse_float(value: str) -> Optional[float]:
     if value is None:
         return None
 
-    cleaned = value.strip().replace(",", ".")
+    cleaned = str(value).strip().replace(",", ".")
 
     if not cleaned:
         return None

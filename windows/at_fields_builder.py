@@ -54,15 +54,25 @@ class FormField:
         self.setter = setter
 
     def get_raw(self):
-        # если контрол живой — берём значение
+        # 1️⃣ если есть кастомный getter — используем его
+        if self.getter:
+            try:
+                val = self.getter()
+                self.value_cache = val
+                return val
+            except RuntimeError:
+                return self.value_cache
+
+        # 2️⃣ стандартный GetValue
         if self.ctrl and hasattr(self.ctrl, "GetValue"):
             try:
                 val = self.ctrl.GetValue()
-                self.value_cache = val  # обновляем кэш
+                self.value_cache = val
                 return val
             except RuntimeError:
                 pass
-        # если контрол удалён — возвращаем последнее сохранённое значение
+
+        # 3️⃣ fallback
         return self.value_cache
 
     def get_value(self) -> Any:
@@ -101,14 +111,23 @@ class FormField:
             - wx.ComboBox
         Остальные контролы игнорируются.
         """
-        if self.setter:
-            self.setter(value)
+        if not self.ctrl:
             return
 
-        # TextCtrl и ComboBox — передаем строку
-        if isinstance(self.ctrl, (wx.TextCtrl, wx.ComboBox)):
-            self.ctrl.SetValue("" if value is None else str(value))
+        # 1️⃣ кастомный setter приоритетен
+        if self.setter:
+            try:
+                self.setter(value)
+            except RuntimeError:
+                pass
             return
+
+        # 2️⃣ стандартные контролы
+        try:
+            if isinstance(self.ctrl, (wx.TextCtrl, wx.ComboBox)):
+                self.ctrl.SetValue("" if value is None else str(value))
+        except RuntimeError:
+            pass
 
 
 # ----------------------------------------------------------------------
@@ -132,6 +151,7 @@ class FormBuilder:
         setter: Optional[Callable[[Any], None]] = None,
     ) -> wx.Window:
         """Регистрирует поле формы."""
+        self._purge_dead_fields()
         self.fields[name] = FormField(
             name=name,
             ctrl=ctrl,
@@ -143,20 +163,34 @@ class FormBuilder:
         )
         return ctrl
 
-    def collect(self) -> Dict[str, Any]:
+    def collect(self) -> dict[Any, Any] | None:
         """Собирает значения всех полей формы в словарь."""
+        self._purge_dead_fields()
+
         data = {}
+
         for name, field in self.fields.items():
             try:
-                data[name] = field.get_value()
-            except Exception as e:
-                raise ValueError(f"Ошибка в поле '{name}': {e}") from e
+                value = field.get_value()
+            except ValueError as e:
+                wx.MessageBox(str(e), "Validation error", wx.OK | wx.ICON_ERROR)
+                return None
+
+            data[name] = value
+
         return data
 
-    def clear(self) -> None:
-        """Очищает все поля формы безопасно, используя set_value()."""
+    def clear(self):
+        """
+        Сброс формы к значениям по умолчанию.
+        """
+        self._purge_dead_fields()
+
         for field in self.fields.values():
-            field.set_value(field.default)
+            if field.default is not None:
+                field.set_value(field.default)
+            else:
+                field.set_value("")
 
     def as_dict_schema(self) -> Dict[str, Dict[str, Any]]:
         """Возвращает словарь с описанием всех полей формы."""
@@ -169,6 +203,33 @@ class FormBuilder:
             }
             for name, field in self.fields.items()
         }
+
+    def _ctrl_alive(self, ctrl) -> bool:
+        """
+        Проверяет, существует ли wx-контрол.
+        Безопасно для уже уничтоженных C++ объектов.
+        """
+        if not ctrl:
+            return False
+        try:
+            if ctrl.IsBeingDeleted():
+                return False
+            ctrl.GetId()
+            return True
+        except RuntimeError:
+            return False
+
+    def _purge_dead_fields(self):
+        """
+        Удаляет из формы поля, чьи контролы уже уничтожены.
+        """
+        alive_fields = {}
+
+        for name, field in self.fields.items():
+            if self._ctrl_alive(field.ctrl):
+                alive_fields[name] = field
+
+        self.fields = alive_fields
 
 
 # ----------------------------------------------------------------------

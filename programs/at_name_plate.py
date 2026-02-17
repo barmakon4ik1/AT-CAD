@@ -547,9 +547,9 @@ def build_type1(modelspace, cfg: BridgeConfig):
     web_height = cfg.specific["web_height"]
 
     if web_length > 0 and web_height > 0 and cfg.cutout:
-        h_cut = cfg.cutout["height"]
-        l_cut = cfg.cutout["length"]
-        r_cut = cfg.cutout["radius"]
+        h_cut = cfg.cutout["height_cut"]
+        l_cut = cfg.cutout["length_cut"]
+        r_cut = cfg.cutout["radius_cut"]
     else:
         h_cut = 0.0
         l_cut = 0.0
@@ -667,9 +667,9 @@ def build_type2(modelspace, cfg: BridgeConfig):
     shell_radius = shell_diameter / 2 if shell_diameter else 0.0
 
     if cut:
-        h_cut = cut["height"]
-        l_cut = cut["length"]
-        r_cut = cut["radius"]
+        h_cut = cut["height_cut"]
+        l_cut = cut["length_cut"]
+        r_cut = cut["radius_cut"]
     else:
         h_cut = l_cut = r_cut = 0.0
 
@@ -814,9 +814,9 @@ def build_type3(modelspace, cfg: BridgeConfig):
 
     # Вырез
     if cut:
-        h_cut = cut["height"]
-        l_cut = cut["length"]
-        r_cut = cut["radius"]
+        h_cut = cut["height_cut"]
+        l_cut = cut["length_cut"]
+        r_cut = cut["radius_cut"]
     else:
         h_cut = l_cut = r_cut = 0.0
     h1_cut = (bridge_height - h_cut) / 2
@@ -1028,11 +1028,11 @@ def build_type4(modelspace, cfg: BridgeConfig):
 
     # Параметры выреза
     if cut:
-        h_cut = cut["height"]
-        l_cut = cut["length"]
+        h_cut = cut["height_cut"]
+        l_cut = cut["length_cut"]
         # Если r_cut = 0 — повторяет окружность цилиндра,
         # > 0 — скругление, < 0 — фаска
-        r_cut = cut["radius"]
+        r_cut = cut["radius_cut"]
     else:
         h_cut = l_cut = r_cut = 0.0
 
@@ -1197,11 +1197,11 @@ def build_type5(modelspace, cfg: BridgeConfig):
 
     # Параметры выреза
     if cut:
-        h_cut = cut["height"]
-        l_cut = cut["length"]
+        h_cut = cut["height_cut"]
+        l_cut = cut["length_cut"]
         # r_cut = 0 — повтор окружности
         # >0 — скругление, <0 — фаска
-        r_cut = cut["radius"]
+        r_cut = cut["radius_cut"]
     else:
         h_cut = l_cut = r_cut = 0.0
 
@@ -1566,13 +1566,13 @@ if __name__ == "__main__":
         # Если вырез НЕ нужен — секцию "cutout" УДАЛЯЕМ целиком
         # --------------------------------------------------
         "cutout": {
-            "height": 0.0,  # высота выреза
-            "length": 15.0,  # длина выреза
+            "height_cut": 0.0,  # высота выреза
+            "length_cut": 15.0,  # длина выреза
             # radius:
             #   = 0   → повторяет окружность цилиндра
             #   > 0   → скругление
             #   < 0   → фаска (abs)
-            "radius": 5.0,
+            "radius_cut": 5.0,
         },
 
         # --------------------------------------------------
