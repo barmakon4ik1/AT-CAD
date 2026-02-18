@@ -499,12 +499,15 @@ class FieldBuilder:
         for i, elem in enumerate(elements):
             elem_type = elem.get("type", "text")
             ctrl: Optional[wx.Window] = None
+            size = elem.get("size", self.default_size)
+            if isinstance(size, tuple):
+                size = wx.Size(*size)
 
             if elem_type in ("text", "float"):
                 ctrl = wx.TextCtrl(
                     self.parent,
                     value=str(elem.get("value", "")),
-                    size=wx.Size(*self.default_size)
+                    size=size
                 )
 
                 parser = elem.get("parser")
@@ -527,12 +530,15 @@ class FieldBuilder:
                 choices = elem.get("choices", [])
                 value = elem.get("value", choices[0] if choices else "")
                 style = wx.CB_DROPDOWN if elem_type == "combo" else 0
+                size = elem.get("size", self.default_size)
+                if isinstance(size, tuple):
+                    size = wx.Size(*size)
                 ctrl = wx.ComboBox(
                     self.parent,
                     choices=choices,
                     value=str(value),
                     style=style,
-                    size=wx.Size(*self.default_size)
+                    size=size
                 )
                 if "name" in elem and self.form:
                     self._register_field(

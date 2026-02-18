@@ -38,6 +38,8 @@ from config.at_cad_init import ATCadInit
 from config.at_config import *
 from config.name_plates.nameplate_storage import load_nameplates
 from locales.at_translations import loc
+from programs.at_base import regen
+from programs.at_name_plate import BridgeConfig, BridgeBuilder, NamePlate
 from windows.at_fields_builder import FormBuilder, FieldBuilder
 from windows.at_window_utils import (
     CanvasPanel, show_popup, apply_styles_to_panel,
@@ -102,6 +104,8 @@ TRANSLATIONS = {
     "length1": {"ru": "Длина L1, мм", "de": "Länge L1, mm", "en": "Length L1, mm"},
     "edge_angle_label": {"ru": "Угол A°", "de": "Winkel A°", "en": "Angle A°"},
     "no": {"ru": "Неизвестно", "de": "Unbekannt", "en": "Unknown"},
+    "auto": {"ru": "автоматически", "de": "automatisch", "en": "automatically"},
+    "select": {"ru": "Выбрать", "de": "Auswählen", "en": "Select"},
     "bridge_type_not_selected": {
         "ru": "Не выбран тип мостика",
         "de": "Brückentyp nicht ausgewählt",
@@ -128,9 +132,9 @@ TRANSLATIONS = {
         "en": "Invalid bridge width"
     },
     "width_exceeds_diameter": {
-        "ru": "Ширина мостика больше диаметра. Выберите тип 3 или 5.",
-        "de": "Brückenbreite größer als Durchmesser. Typ 3 oder 5 wählen.",
-        "en": "Bridge width exceeds diameter. Choose type 3 or 5."
+        "ru": "Ширина или высота мостика больше диаметра. Выберите тип 3 или 5.",
+        "de": "Brückenbreite oder Brückenhöhe größer als Durchmesser. Typ 3 oder 5 wählen.",
+        "en": "Bridge width or height exceeds diameter. Choose type 3 or 5."
     },
     "geometry_compensation_error": {
         "ru": "Геометрическая ошибка вычисления компенсации",
@@ -146,7 +150,24 @@ TRANSLATIONS = {
         "ru": "Недопустимое значение угла",
         "de": "Ungültiger Winkel",
         "en": "Invalid angle"
-    }
+    },
+    "name_plates": {"ru": "Таблички", "de": "Schilder", "en": "Name plates"},
+    "name_plate": {"ru": "Табличка", "de": "Schilder", "en": "Name plate"},
+    "point_prompt": {
+        "ru": "Укажите центр вставки развертки мостика",
+        "de": "Geben Sie die Mitte der Schilderbrücken Abwicklung an",
+        "en": "Specify the center of the bridge scan insertion"
+    },
+    "plates_gap_label": {
+        "ru": "Интервал табличек Hz, мм",
+        "de": "Schildabstand Hz, mm",
+        "en": "Plate Spacing Hz, mm"
+    },
+    "offset_top_label": {
+        "ru": "Верхний отступ Ho, мм",
+        "de": "Oberer Randabstand Ho, mm",
+        "en": "Top Offset Ho, mm"
+    },
 }
 loc.register_translations(TRANSLATIONS)
 
@@ -340,7 +361,13 @@ class BracketContentPanel(BaseContentPanel):
         fb_main.universal_row(
             "material_label",
             [
-                {"type": "combo", "name": "material", "choices": material_options, "value": "", "required": True, "default": "1.4301"}
+                {"type": "combo",
+                 "name": "material",
+                 "choices": material_options,
+                 "value": "",
+                 "required": True,
+                 "default": "1.4301",
+                 "size": (310, -1),}
             ]
         )
 
@@ -508,8 +535,8 @@ class BracketContentPanel(BaseContentPanel):
 
         geometry = {
             "center_point": raw.get("center_point"),
-            "width": raw.get("width"),
-            "height": raw.get("height"),
+            "width": parse_float(raw.get("width")),
+            "height": parse_float(raw.get("height")),
         }
 
         bridge_data = {
@@ -542,13 +569,65 @@ class BracketContentPanel(BaseContentPanel):
         # ======================================================
         # Debug
         # ======================================================
-        pprint(bridge_data)
+        # pprint(bridge_data)
 
         # ======================================================
-        # Callback
+        # Обработка
         # ======================================================
-        if self.on_submit_callback:
-            self.on_submit_callback(bridge_data)
+        try:
+            # Получаем главное окно
+            main_window = wx.GetTopLevelParent(self)
+
+            # Инициализация CAD и выбор точки
+            cad = ATCadInit()
+            adoc = cad.document
+            model_space = cad.model_space
+
+            if not cad.is_initialized():
+                show_popup(loc.get("cad_not_ready"), popup_type="error")
+                return
+
+            if not model_space:
+                show_popup(loc.get("cad_not_ready"), popup_type="error")
+                return
+
+            # Сворачиваем окно перед выбором точки
+            main_window.Hide()
+
+            pt = at_get_point(
+                cad.document,
+                prompt=loc.get("point_prompt", "Укажите центр мостика"),
+                as_variant=False
+            )
+
+            if not pt:
+                show_popup(loc.get("point_selection_error", "Точка не выбрана"), popup_type="error")
+                return
+
+            # Разворачиваем окно обратно
+            main_window.Show()
+            main_window.Raise()
+            main_window.SetFocus()
+
+            # Сохраняем точку и обновляем словарь
+            self.insert_point = pt
+            bridge_data["geometry"]["center_point"] = pt
+
+            np = NamePlate()
+
+            pprint(bridge_data) # Debug
+
+            # # Передаем данные дальше через callback
+            # if self.on_submit_callback:
+            #     self.on_submit_callback(bridge_data)
+
+            config = BridgeConfig(adoc, bridge_data)
+            builder = BridgeBuilder(config, np.plates)
+            builder.build(model_space)
+            cad.regen_doc()
+
+        except Exception as e:
+            show_popup(f"{loc.get('error', 'Ошибка')}: {e}", popup_type="error")
 
     def on_clear(self, event: Optional[wx.Event] = None):
         """Очистка полей по кнопке Clear."""
@@ -589,108 +668,236 @@ class BracketContentPanel(BaseContentPanel):
 
 class NamePlateSelectionPanel(wx.Panel):
     """
-    Панель выбора до 3 табличек и управления отступами.
+    Панель выбора до MAX_PLATES табличек и управления их расположением.
+
+    Логика работы:
+    --------------
+    1. Доступна первая табличка.
+    2. Вторая становится доступной только если выбрана первая.
+    3. Третья становится доступной только если выбрана вторая.
+    4. Поле plates_gap активно только если выбрано более одной таблички (>1).
+    5. Поле offset_top относится только к первой табличке и активно,
+       если выбрана первая табличка.
+    6. Выбор таблички возможен:
+       - из выпадающего списка
+       - через диалог выбора (NamePlateDialog)
+
+    Возвращаемая структура данных:
+    -------------------------------
+    {
+        "plates": [
+            {"name": "B+H_Ustamp_1Room", "offset_top": 7.0},
+            {"name": "GEA_gross"}
+        ],
+        "plates_gap": 6.0
+    }
     """
+
     MAX_PLATES = 3
 
     def __init__(self, parent, form: FormBuilder):
         super().__init__(parent)
+
         self.form = form
         self.sizer = wx.BoxSizer(wx.VERTICAL)
         self.SetSizer(self.sizer)
 
-        self.plate_choices: list[wx.ComboBox] = []
-        self.spacing_ctrl: Optional[wx.TextCtrl] = None
-        self.offset_top_ctrl: Optional[wx.TextCtrl] = None
+        # Список словарей вида:
+        # [{"combo": wx.ComboBox, "button": wx.Button}, ...]
+        self.plates: list[dict] = []
+
+        self.plates_gap_ctrl: wx.TextCtrl | None = None
+        self.offset_top_ctrl: wx.TextCtrl | None = None
 
         self._build_ui()
+        self._update_enable_state()
+
+    # ------------------------------------------------------------------
+    # Построение интерфейса
+    # ------------------------------------------------------------------
 
     def _build_ui(self):
-        # Загружаем список табличек
+        """
+        Создаёт интерфейс панели:
+        - строки выбора табличек
+        - поле межтабличного расстояния
+        - поле верхнего отступа
+        """
+
         nameplates_list = load_nameplates()
         codes = [rec["name"] for rec in nameplates_list]
 
+        fb = FieldBuilder(parent=self, target_sizer=self.sizer, form=self.form)
+        box_sizer = fb.static_box(loc.get("name_plates"))
+        fb_box = FieldBuilder(parent=self, target_sizer=box_sizer, form=self.form)
+
+        # --- Строки выбора табличек ---
         for i in range(self.MAX_PLATES):
-            row_sizer = wx.BoxSizer(wx.HORIZONTAL)
-            lbl = wx.StaticText(self, label=f"Табличка {i+1}")
-            ctrl = wx.ComboBox(
-                self,
-                choices=codes,
-                style=wx.CB_READONLY,
-                size=wx.Size(200, -1)
+            controls = fb_box.universal_row(
+                f"{i+1}:",
+                [
+                    {
+                        "type": "combo",
+                        "name": f"name_plate_{i+1}",
+                        "choices": codes,
+                        "value": "",
+                        "size": (210, -1)
+                    },
+                    {
+                        "type": "button",
+                        "label": loc.get("select") if loc.get("select") else "Выбрать",
+                        "callback": lambda evt, idx=i: self._on_select_dialog(idx),
+                        "bg_color": "#00BFFF",
+                        "toggle": False
+                    },
+                ]
             )
-            row_sizer.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-            row_sizer.Add(ctrl, 0, wx.ALIGN_CENTER_VERTICAL)
-            self.sizer.Add(row_sizer, 0, wx.ALL, 2)
 
-            ctrl.Bind(wx.EVT_COMBOBOX, self._on_plate_changed)
-            self.plate_choices.append(ctrl)
+            combo, button = controls
 
-            # Скрываем все кроме первой
-            if i != 0:
-                ctrl.Disable()
+            combo.Bind(wx.EVT_COMBOBOX,
+                       lambda evt, idx=i: self._on_combo_changed(idx))
 
-        # Поле для расстояния между табличками
-        row_spacing = wx.BoxSizer(wx.HORIZONTAL)
-        lbl_spacing = wx.StaticText(self, label="Расстояние между табличками, мм")
-        self.spacing_ctrl = wx.TextCtrl(self, size=(100, -1))
-        row_spacing.Add(lbl_spacing, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        row_spacing.Add(self.spacing_ctrl, 0, wx.ALIGN_CENTER_VERTICAL)
-        self.sizer.Add(row_spacing, 0, wx.ALL, 5)
+            self.plates.append({
+                "combo": combo,
+                "button": button
+            })
 
-        # Поле отступа от верхнего края мостика
-        row_offset = wx.BoxSizer(wx.HORIZONTAL)
-        lbl_offset = wx.StaticText(self, label="Отступ от верхнего края мостика, мм")
-        self.offset_top_ctrl = wx.TextCtrl(self, size=(100, -1))
-        row_offset.Add(lbl_offset, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        row_offset.Add(self.offset_top_ctrl, 0, wx.ALIGN_CENTER_VERTICAL)
-        self.sizer.Add(row_offset, 0, wx.ALL, 5)
+        # --- Расстояние между табличками ---
+        gap_ctrl = fb_box.universal_row(
+            loc.get("plates_gap_label"),
+            [{
+                "type": "text",
+                "name": "plates_gap",
+                "value": "5"
+            }]
+        )
+        self.plates_gap_ctrl = gap_ctrl[0]
 
-        # Скрываем поле отступа пока нет первой таблички
-        self.offset_top_ctrl.Disable()
+        # --- Отступ верхнего края ---
+        offset_ctrl = fb_box.universal_row(
+            loc.get("offset_top_label"),
+            [{
+                "type": "text",
+                "name": "offset_top",
+                "value": loc.get("auto")
+            }]
+        )
+        self.offset_top_ctrl = offset_ctrl[0]
 
-    def _on_plate_changed(self, event):
-        # Активируем следующий комбобокс, если есть
-        for i, ctrl in enumerate(self.plate_choices):
-            if ctrl.GetValue() == "" or i < len(self.plate_choices) - 1 and self.plate_choices[i+1].IsEnabled():
-                continue
-            if i < len(self.plate_choices) - 1:
-                self.plate_choices[i+1].Enable()
+    # ------------------------------------------------------------------
+    # Логика выбора
+    # ------------------------------------------------------------------
 
-        # Активируем поле отступа только если выбрана первая табличка
-        if self.plate_choices[0].GetValue():
-            self.offset_top_ctrl.Enable()
-        else:
-            self.offset_top_ctrl.Disable()
-            self.offset_top_ctrl.SetValue("")
+    def _on_combo_changed(self, idx: int):
+        """Обработчик изменения выбора в ComboBox."""
+        self._update_enable_state()
+
+    def _on_select_dialog(self, idx: int):
+        """
+        Открывает диалог выбора таблички.
+        Возвращённый код записывается в соответствующий ComboBox.
+        """
+        from windows.nameplate_dialog import create_window
+
+        code = create_window(self)
+        if code:
+            self.plates[idx]["combo"].SetValue(code)
+            self._update_enable_state()
+
+    # ------------------------------------------------------------------
+    # Управление доступностью элементов
+    # ------------------------------------------------------------------
+
+    def _update_enable_state(self):
+        """
+        Централизованная логика включения/отключения элементов.
+        """
+
+        selected_count = 0
+
+        for i, plate in enumerate(self.plates):
+            combo = plate["combo"]
+            button = plate["button"]
+
+            if i == 0:
+                combo.Enable()
+                button.Enable()
+            else:
+                prev_selected = bool(self.plates[i - 1]["combo"].GetValue())
+                combo.Enable(prev_selected)
+                button.Enable(prev_selected)
+
+                if not prev_selected:
+                    combo.SetValue("")
+
+            if combo.GetValue():
+                selected_count += 1
+
+        # plates_gap активен только если выбрано > 1
+        self.plates_gap_ctrl.Enable(selected_count > 1)
+
+        # offset_top активен только если выбрана первая
+        self.offset_top_ctrl.Enable(
+            bool(self.plates[0]["combo"].GetValue())
+        )
+
+    # ------------------------------------------------------------------
+    # Получение данных
+    # ------------------------------------------------------------------
 
     def get_data(self) -> dict:
         """
-        Возвращает словарь с выбранными табличками и отступами.
-        """
-        data = {}
-        for i, ctrl in enumerate(self.plate_choices, start=1):
-            key = f"nameplate_{i}"
-            value = ctrl.GetValue()
-            if value:
-                data[key] = value
-        spacing = self.spacing_ctrl.GetValue()
-        offset = self.offset_top_ctrl.GetValue()
-        if spacing:
-            try:
-                data["nameplate_spacing"] = parse_float(spacing)
-            except ValueError:
-                show_popup(loc.get("invalid_number_format_error"), popup_type="error")
-                return {}
+        Формирует итоговую структуру данных.
 
-        if offset:
-            try:
-                data["nameplate_offset_top"] = parse_float(offset)
-            except ValueError:
-                show_popup(loc.get("invalid_number_format_error"), popup_type="error")
-                return {}
-        else:
+        Возвращает:
+        ----------
+        dict — структура для дальнейшей обработки
+        """
+
+        plates_data = []
+
+        for i, plate in enumerate(self.plates):
+            name = plate["combo"].GetValue()
+            if not name:
+                continue
+
+            entry = {"name": name}
+
+            # offset_top только для первой таблички
+            if i == 0 and self.offset_top_ctrl.IsEnabled():
+                offset_value = self.offset_top_ctrl.GetValue()
+                if offset_value and offset_value != loc.get("auto"):
+                    try:
+                        entry["offset_top"] = parse_float(offset_value)
+                    except ValueError:
+                        show_popup(
+                            loc.get("invalid_number_format_error"),
+                            popup_type="error"
+                        )
+                        return {}
+
+            plates_data.append(entry)
+
+        if not plates_data:
             return {}
+
+        result = {"plates": plates_data}
+
+        # plates_gap только если >1
+        if len(plates_data) > 1:
+            gap_value = self.plates_gap_ctrl.GetValue()
+            if gap_value:
+                try:
+                    result["plates_gap"] = parse_float(gap_value)
+                except ValueError:
+                    show_popup(
+                        loc.get("invalid_number_format_error"),
+                        popup_type="error"
+                    )
+                    return {}
+
+        return result
 
 
 class CutoutPanel(wx.Panel):
@@ -1027,6 +1234,7 @@ class BracketSpecificPanel(wx.Panel):
             # --- Тип 1 ---
             if self.bridge_type == "type1":
                 specific["add_detail_number"] = raw.get("add_detail_number", "").strip()
+                specific["length"] = parse_float(raw.get("length"))
                 specific["web_height"] = self._require_positive_float(raw, "web_height", "Высота перемычки должна быть > 0")
                 corner_type = raw.get("corner_options")
                 try:
@@ -1157,7 +1365,7 @@ class BracketSpecificPanel(wx.Panel):
 if __name__ == "__main__":
 
     app = wx.App(False)
-    frame = wx.Frame(None, title="test_rings_window", size=wx.Size(1500, 700))
+    frame = wx.Frame(None, title="test_bracket_window", size=wx.Size(1500, 800))
     panel = BracketContentPanel(frame)
     sizer = wx.BoxSizer(wx.VERTICAL)
     sizer.Add(panel, 1, wx.EXPAND)

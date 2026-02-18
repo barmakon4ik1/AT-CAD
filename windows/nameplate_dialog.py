@@ -368,11 +368,3 @@ if __name__ == "__main__":
     frame.SetSizer(sizer)
     frame.Show()
     app.MainLoop()
-
-
-"""
-plate_code = create_window(parent)
-
-if plate_code:
-    output_data["nameplate_code"] = plate_code
-"""

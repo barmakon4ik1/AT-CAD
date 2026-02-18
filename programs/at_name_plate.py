@@ -19,7 +19,10 @@ File: programs\at_name_plate.py
 from __future__ import annotations
 import json
 import math
-from typing import Dict, List
+from typing import Dict, List, Optional
+
+from win32com.client import CDispatch
+
 from config.at_cad_init import ATCadInit
 from config.at_config import NAME_PLATES_FILE, DEFAULT_TEXT_LAYER, DEFAULT_LASER_LAYER, DEFAULT_DIM_OFFSET, \
     TEXT_HEIGHT_LASER, TEXT_HEIGHT_SMALL, TEXT_DISTANCE, \
@@ -226,7 +229,9 @@ class PlateBlock:
             )
 
             # --- отверстия ---
-            PlateHoles(plate_data).draw(model_space, plate_center)
+            # PlateHoles(plate_data).draw(model_space, plate_center)
+            holes = PlateHoles(plate_data)
+            holes.draw(modelspace, plate_center)
 
             # переход к следующей табличке
             if len(self.plates) > 1:
@@ -394,8 +399,11 @@ class BridgeConfig:
     - предоставляет удобный доступ к данным через proxy-свойства
     """
 
-    def __init__(self, data: dict):
+    def __init__(self, adoc, data: dict):
+        self.adoc = adoc  # храним документ напрямую
 
+        # Словарь мостиков
+        self.data = data
         # -------------------------------------------------
         # Тип мостика
         # -------------------------------------------------
@@ -461,19 +469,19 @@ class BridgeConfig:
     def h_cut(self):
         if not self.cutout:
             return 0.0
-        return self.cutout["height"]
+        return self.cutout["height_cut"]
 
     @property
     def l_cut(self):
         if not self.cutout:
             return 0.0
-        return self.cutout["length"]
+        return self.cutout["length_cut"]
 
     @property
     def r_cut(self):
         if not self.cutout:
             return 0.0
-        return self.cutout["radius"]
+        return self.cutout["radius_cut"]
 
     # =================================================
     # Proxy-свойства: специфичные параметры
@@ -495,6 +503,7 @@ def build_type1(modelspace, cfg: BridgeConfig):
     """
     Тип 1 — плоский мостик с перемычкой.
     """
+    adoc = cfg.adoc
 
     # --------------------------------------------------
     # Геометрия мостика
@@ -653,6 +662,7 @@ def build_type2(modelspace, cfg: BridgeConfig):
     """
     Построение развертки мостика типа BentStraight (type2).
     """
+    adoc = cfg.adoc
     geom = cfg.geometry
     cut = cfg.cutout
     spec = cfg.specific
@@ -793,7 +803,7 @@ def build_type3(modelspace, cfg: BridgeConfig):
     # ------------------------------------------------------------------
     # Исходные данные (ТОЛЬКО чтение из BridgeConfig)
     # ------------------------------------------------------------------
-
+    adoc = cfg.adoc
     geom = cfg.geometry
     cut = cfg.cutout
     spec = cfg.specific
@@ -1013,6 +1023,7 @@ def build_type4(modelspace, cfg: BridgeConfig):
     # ------------------------------------------------------------------
     # Исходные данные (read-only из BridgeConfig)
     # ------------------------------------------------------------------
+    adoc = cfg.adoc
     geom = cfg.geometry
     spec = cfg.specific
     cut = cfg.cutout
@@ -1176,6 +1187,7 @@ def build_type5(modelspace, cfg: BridgeConfig):
     # ------------------------------------------------------------------
     # Исходные данные (read-only из BridgeConfig)
     # ------------------------------------------------------------------
+    adoc = cfg.adoc
     geom = cfg.geometry
     spec = cfg.specific
     cut = cfg.cutout
@@ -1189,6 +1201,8 @@ def build_type5(modelspace, cfg: BridgeConfig):
     # Специфические параметры type5
     shell_diameter1 = spec["shell_diameter1"]
     shell_diameter2 = spec.get("shell_diameter2", shell_diameter1)
+    if shell_diameter2 == 0.0:
+        shell_diameter2 = shell_diameter1
     angle = spec["edge_angle"]
     variant = spec["variant"]
 
@@ -1256,8 +1270,8 @@ def build_type5(modelspace, cfg: BridgeConfig):
     p1 = circle_line_intersection(p01, center1, shell_diameter1, a)
 
     # Debug---------------------
-    add_circle(model_space, center1, r1, layer_name="AM_5")
-    add_circle(model_space, center2, r2, layer_name="AM_5")
+    add_circle(modelspace, center1, r1, layer_name="AM_5")
+    add_circle(modelspace, center2, r2, layer_name="AM_5")
 
     # --------------------------
 
@@ -1411,21 +1425,25 @@ class BridgeBuilder:
         self.cfg = cfg
         self.plates_data = plates_data
 
+        self._adoc = cfg.adoc  # если надо хранить на уровне экземпляра
+        self._modelspace: Optional[CDispatch] = None # ← объявляем поле явно
+
     def build(self, modelspace):
+        self._modelspace = modelspace
 
         # 1. Геометрия мостика
-        key_points = self._build_unfold(modelspace)
+        key_points = self._build_unfold(self._modelspace)
 
         # 2. Тексты на мостике
-        self._draw_texts(modelspace)
+        self._draw_texts(self._modelspace)
 
         # 3. Таблички
-        self._draw_plates(modelspace)
+        self._draw_plates(self._modelspace)
 
         # 4. Сопроводительный текст
         accompany_text_point = key_points.get("accompany_text_point")
         if accompany_text_point:
-            self._draw_accompany_text(modelspace, accompany_text_point)
+            self._draw_accompany_text(self._modelspace, accompany_text_point)
 
     # -------------------------------------------------
 
@@ -1435,7 +1453,7 @@ class BridgeBuilder:
         if bridge_type == "type1":
             key_points = build_type1(modelspace, self.cfg)
         elif bridge_type == "type2":
-            key_points = build_type2(model_space, self.cfg)
+            key_points = build_type2(modelspace, self.cfg)
         elif bridge_type == "type3":
             key_points = build_type3(modelspace, self.cfg)
         elif bridge_type == "type4":
@@ -1486,124 +1504,145 @@ if __name__ == "__main__":
     adoc = cad.document
     model_space = cad.model_space
 
-    pt = at_get_point(adoc, prompt="Введите точку", as_variant=False)
+    # pt = at_get_point(adoc, prompt="Введите точку", as_variant=False)
 
     np = NamePlate()
-    bridge_data = {
-        # --------------------------------------------------
-        # Тип мостика
-        # --------------------------------------------------
-        # "type1" | "type2" | "type3" | "type4" | "type5"
-        "type": "type5",
+    # bridge_data = {
+    #     # --------------------------------------------------
+    #     # Тип мостика
+    #     # --------------------------------------------------
+    #     # "type1" | "type2" | "type3" | "type4" | "type5"
+    #     "type": "type5",
+    #
+    #     # --------------------------------------------------
+    #     # Технологические параметры (обязательные)
+    #     # НЕ участвуют в геометрии, но нужны для сопровождения
+    #     # --------------------------------------------------
+    #     "order_number": "20402",
+    #     "detail_number": "9",
+    #     "material": "1.4404",
+    #
+    #     # Толщина листа — УЧАСТВУЕТ в геометрии (НЕ meta!)
+    #     "thickness": 3.0,
+    #
+    #     # --------------------------------------------------
+    #     # Геометрия мостика (базовая)
+    #     # --------------------------------------------------
+    #     "geometry": {
+    #         "center_point": pt,  # базовая точка построения
+    #         "width": 170.0,  # ширина мостика
+    #         "height": 160.0,  # высота мостика
+    #     },
+    #
+    #     # --------------------------------------------------
+    #     # Специфические параметры типа мостика
+    #     # --------------------------------------------------
+    #     # ВНИМАНИЕ:
+    #     # - наличие параметра означает, что он ЗАДАН
+    #     # - отсутствие параметра означает, что он НЕ НУЖЕН
+    #     # - никаких значений "по умолчанию" тут быть не должно
+    #     # --------------------------------------------------
+    #     "specific": {
+    #         "length": 70.0,  # длина площадки, отступ L
+    #         # --- Тип 1 ---
+    #         # Радиус скругления углов мостика
+    #         "corner_radius": 0.0,
+    #         "add_detail_number": "10",
+    #         # Высота перемычки (если отличается от height мостика)
+    #         "web_height": 80.0,
+    #
+    #         # --- Тип 2 / 3 / 4 / 5 ---
+    #         # Диаметр обечайки (вертикальной или горизонтальной)
+    #         # shell_diameter1 - основной, когда нужен только один диаметр
+    #         "shell_diameter1": 88.9,
+    #         "shell_diameter2": 88.9,
+    #
+    #         # --- Тип 3 / 5 ---
+    #         # Угол раскрытия / скоса боковин
+    #         "edge_angle": 90.0,
+    #
+    #         # --- Тип 5 / 3 (L1) ---
+    #         # Вариант набора исходных данных
+    #         # variant 1 - известны L, L1, D, A, H, здесь L - расстояние от плоскости таблички до касания цилиндра
+    #         # variant 2 - известны L, D, A, H, линия наклона проходит через центр окружности, L как и в варианте 1
+    #         # variant 3 - известны L2, L1, D, A, H, здесь L2 - расстояние от плоскости таблички до точки пересечения скоса с цилиндром
+    #         "variant": 1,
+    #         "l1": 40.0,
+    #         "l2": 0,
+    #
+    #         # --- Будущее развитие ---
+    #         # Для посадки на конус, смещения от вершины и т.п.
+    #         # "cone_top_offset": 0.0,
+    #         # "cone_length": 0.0,
+    #         # "cone_diameter_top": 0.0,
+    #         # "cone_diameter_bottom": 0.0,
+    #     },
+    #
+    #     # --------------------------------------------------
+    #     # Геометрия выреза в мостике (если есть)
+    #     # --------------------------------------------------
+    #     # Если вырез НЕ нужен — секцию "cutout" УДАЛЯЕМ целиком
+    #     # --------------------------------------------------
+    #     "cutout": {
+    #         "height_cut": 0.0,  # высота выреза
+    #         "length_cut": 15.0,  # длина выреза
+    #         # radius:
+    #         #   = 0   → повторяет окружность цилиндра
+    #         #   > 0   → скругление
+    #         #   < 0   → фаска (abs)
+    #         "radius_cut": 5.0,
+    #     },
+    #
+    #     # --------------------------------------------------
+    #     # Таблички
+    #     # --------------------------------------------------
+    #     "plates": [
+    #         # {
+    #         #     "name": "B+H_Ustamp_1Room",   # имя из name_plates.json
+    #         #     # "offset_top": 0.0    # отступ верхнего края от верха мостика
+    #         # },
+    #         {
+    #             "name": "GEA_gross",
+    #         },
+    #         # {
+    #         #     "name": "GEA_klein",
+    #         # },
+    #         # {
+    #         #     "name": "B+H_ASME_klein",  # имя из name_plates.json
+    #         #     "offset_top": 7.0    # отступ верхнего края от верха мостика
+    #         # },
+    #         # {
+    #         #     "name": "GEA_Firmenschild",
+    #         # }
+    #     ],
+    #
+    #     # Расстояние между краями табличек
+    #     "plates_gap": 6.0,
+    # }
 
-        # --------------------------------------------------
-        # Технологические параметры (обязательные)
-        # НЕ участвуют в геометрии, но нужны для сопровождения
-        # --------------------------------------------------
-        "order_number": "20402",
-        "detail_number": "9",
-        "material": "1.4404",
-
-        # Толщина листа — УЧАСТВУЕТ в геометрии (НЕ meta!)
-        "thickness": 3.0,
-
-        # --------------------------------------------------
-        # Геометрия мостика (базовая)
-        # --------------------------------------------------
-        "geometry": {
-            "center_point": pt,  # базовая точка построения
-            "width": 170.0,  # ширина мостика
-            "height": 160.0,  # высота мостика
-        },
-
-        # --------------------------------------------------
-        # Специфические параметры типа мостика
-        # --------------------------------------------------
-        # ВНИМАНИЕ:
-        # - наличие параметра означает, что он ЗАДАН
-        # - отсутствие параметра означает, что он НЕ НУЖЕН
-        # - никаких значений "по умолчанию" тут быть не должно
-        # --------------------------------------------------
-        "specific": {
-            "length": 70.0,  # длина площадки, отступ L
-            # --- Тип 1 ---
-            # Радиус скругления углов мостика
-            "corner_radius": 0.0,
-            "add_detail_number": "10",
-            # Высота перемычки (если отличается от height мостика)
-            "web_height": 80.0,
-
-            # --- Тип 2 / 3 / 4 / 5 ---
-            # Диаметр обечайки (вертикальной или горизонтальной)
-            # shell_diameter1 - основной, когда нужен только один диаметр
-            "shell_diameter1": 88.9,
-            "shell_diameter2": 88.9,
-
-            # --- Тип 3 / 5 ---
-            # Угол раскрытия / скоса боковин
-            "edge_angle": 90.0,
-
-            # --- Тип 5 / 3 (L1) ---
-            # Вариант набора исходных данных
-            # variant 1 - известны L, L1, D, A, H, здесь L - расстояние от плоскости таблички до касания цилиндра
-            # variant 2 - известны L, D, A, H, линия наклона проходит через центр окружности, L как и в варианте 1
-            # variant 3 - известны L2, L1, D, A, H, здесь L2 - расстояние от плоскости таблички до точки пересечения скоса с цилиндром
-            "variant": 1,
-            "l1": 40.0,
-            "l2": 0,
-
-            # --- Будущее развитие ---
-            # Для посадки на конус, смещения от вершины и т.п.
-            # "cone_top_offset": 0.0,
-            # "cone_length": 0.0,
-            # "cone_diameter_top": 0.0,
-            # "cone_diameter_bottom": 0.0,
-        },
-
-        # --------------------------------------------------
-        # Геометрия выреза в мостике (если есть)
-        # --------------------------------------------------
-        # Если вырез НЕ нужен — секцию "cutout" УДАЛЯЕМ целиком
-        # --------------------------------------------------
-        "cutout": {
-            "height_cut": 0.0,  # высота выреза
-            "length_cut": 15.0,  # длина выреза
-            # radius:
-            #   = 0   → повторяет окружность цилиндра
-            #   > 0   → скругление
-            #   < 0   → фаска (abs)
-            "radius_cut": 5.0,
-        },
-
-        # --------------------------------------------------
-        # Таблички
-        # --------------------------------------------------
-        "plates": [
-            # {
-            #     "name": "B+H_Ustamp_1Room",   # имя из name_plates.json
-            #     # "offset_top": 0.0    # отступ верхнего края от верха мостика
-            # },
-            {
-                "name": "GEA_gross",
-            },
-            # {
-            #     "name": "GEA_klein",
-            # },
-            # {
-            #     "name": "B+H_ASME_klein",  # имя из name_plates.json
-            #     "offset_top": 7.0    # отступ верхнего края от верха мостика
-            # },
-            # {
-            #     "name": "GEA_Firmenschild",
-            # }
-        ],
-
-        # Расстояние между краями табличек
-        "plates_gap": 6.0,
-    }
+    bridge_data = {'cutout': {'height_cut': 0.0, 'length_cut': 0.0, 'radius_cut': 0.0},
+ 'detail_number': '55',
+ 'geometry': {'center_point': [-761.7488925013749, -463.77467980701476, 0.0],
+              'height': 160.0,
+              'width': 170.0},
+ 'material': '1.4301',
+ 'order_number': '55555',
+ 'plates': [{'name': 'GEA_gross'}],
+ 'specific': {'add_detail_number': '',
+              'corner_radius': 0.0,
+              'edge_angle': 90.0,
+              'l1': 0.0,
+              'l2': 0.0,
+              'length': 70.0,
+              'shell_diameter1': 88.9,
+              'shell_diameter2': 88.9,
+              'variant': 2,
+              'web_height': 0.0},
+ 'thickness': '3',
+ 'type': 'type5'}
 
     if model_space:
-        config = BridgeConfig(bridge_data)
+        config = BridgeConfig(adoc, bridge_data)
         builder = BridgeBuilder(config, np.plates)
         builder.build(model_space)
 
