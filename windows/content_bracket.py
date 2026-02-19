@@ -30,6 +30,7 @@ windows/content_bracket.py
     windows.nameplate_dialog      — выбор табличек
     windows.content_bracket       — панель ввода и специфики мостиков
 """
+import math
 from pprint import pprint
 from typing import Optional, Dict, cast
 from docutils.nodes import ValidationError
@@ -39,6 +40,7 @@ from config.at_config import *
 from config.name_plates.nameplate_storage import load_nameplates
 from locales.at_translations import loc
 from programs.at_base import regen
+from programs.at_geometry import diameter_cone_offset
 from programs.at_name_plate import BridgeConfig, BridgeBuilder, NamePlate
 from windows.at_fields_builder import FormBuilder, FieldBuilder
 from windows.at_window_utils import (
@@ -102,6 +104,7 @@ TRANSLATIONS = {
     "shell_diameter2": {"ru": "Диаметр D2, мм", "de": "Durchmesser D2, mm", "en": "Diameter D2, mm"},
     "length": {"ru": "Длина, мм", "de": "Länge, mm", "en": "Length, mm"},
     "length1": {"ru": "Длина L1, мм", "de": "Länge L1, mm", "en": "Length L1, mm"},
+    "calculate": {"ru": "Рассчитать", "de": "Berechnen", "en": "Calculate"},
     "edge_angle_label": {"ru": "Угол A°", "de": "Winkel A°", "en": "Angle A°"},
     "no": {"ru": "Неизвестно", "de": "Unbekannt", "en": "Unknown"},
     "auto": {"ru": "автоматически", "de": "automatisch", "en": "automatically"},
@@ -168,6 +171,27 @@ TRANSLATIONS = {
         "de": "Oberer Randabstand Ho, mm",
         "en": "Top Offset Ho, mm"
     },
+    "diameter_dialog_title": {
+        "ru": "Диаметры конуса",
+        "de": "Kegeldurchmesser",
+        "en": "Cone Diameters"
+    },
+
+    "diameter_type_inner": {
+        "ru": "Внутренний",
+        "de": "Innendurchmesser",
+        "en": "Inner"
+    },
+    "diameter_type_middle": {
+        "ru": "Средний",
+        "de": "Mittlerer Durchmesser",
+        "en": "Middle"
+    },
+    "diameter_type_outer": {
+        "ru": "Наружный",
+        "de": "Außendurchmesser",
+        "en": "Outer"
+    }
 }
 loc.register_translations(TRANSLATIONS)
 
@@ -1154,12 +1178,29 @@ class BracketSpecificPanel(wx.Panel):
         elif bridge_type == "type5":
             fb_box.universal_row(
                 loc.get("shell_diameter1"),
-                [{"type": "text", "name": "shell_diameter1", "value": "", "required": True, "default": ""}]
+                [{"type": "text", "name": "shell_diameter1", "value": "", "required": True, "default": ""},
+                    {
+                        "type": "button",
+                        "label": loc.get("calculate"),
+                        "callback": self.on_calculate_cone_forward,
+                        "bg_color": "#008080",
+                        "toggle": False
+                    },
+                ]
             )
             fb_box.universal_row(
                 loc.get("shell_diameter2"),
-                [{"type": "text", "name": "shell_diameter2", "value": "", "required": True, "default": ""}]
+                [{"type": "text", "name": "shell_diameter2", "value": "", "required": True, "default": ""},
+                     {
+                         "type": "button",
+                         "label": loc.get("calculate"),
+                         "callback": self.on_calculate_cone_reverse,
+                         "bg_color": "#008080",
+                         "toggle": False
+                     },
+                 ]
             )
+
             length_option1 = ["L", "L2"]
             fb_box.universal_row(
                 loc.get("length"),
@@ -1183,6 +1224,55 @@ class BracketSpecificPanel(wx.Panel):
 
         apply_styles_to_panel(self)
         self.Layout()
+
+    def on_calculate_cone_forward(self, event):
+        self._open_cone_dialog(mode="forward")
+
+    def on_calculate_cone_reverse(self, event):
+        self._open_cone_dialog(mode="reverse")
+
+    def on_select_diameter(self, event):
+
+        dlg = ConeOffsetDialog(self, self.form)
+
+        if dlg.ShowModal() == wx.ID_OK:
+            d_outer = dlg.get_result()
+            if d_outer:
+                self.form.set_value("shell_diameter1", f"{d_outer:.3f}")
+
+        dlg.Destroy()
+
+    def _open_cone_dialog(self, mode: str):
+
+        raw = self.form.collect()
+
+        try:
+            width = parse_float(raw.get("width"))
+            thickness = parse_float(raw.get("thickness"))
+        except (TypeError, ValueError):
+            show_popup(
+                message=loc.get("invalid_number_format_error"),
+                popup_type="error"
+            )
+            return
+
+        dlg = ConeOffsetDialog(
+            parent=self,
+            width=width,
+            thickness=thickness
+        )
+
+        if dlg.ShowModal() == wx.ID_OK:
+            d1, d2 = dlg.get_result()
+
+            if mode == "forward":
+                self.form.set_value("shell_diameter1", f"{d1:.3f}")
+                self.form.set_value("shell_diameter2", f"{d2:.3f}")
+            else:
+                self.form.set_value("shell_diameter2", f"{d1:.3f}")
+                self.form.set_value("shell_diameter1", f"{d2:.3f}")
+
+        dlg.Destroy()
 
     def get_specific_data(self, geometry: dict) -> dict | None:
         """
@@ -1280,7 +1370,7 @@ class BracketSpecificPanel(wx.Panel):
                     specific["length"] = length_input
 
                 elif length_option == "L0":
-                    under_root = radius ** 2 - (width ** 2) / 4.0
+                    under_root = math.sqrt(radius ** 2 - (width ** 2) / 4.0)
 
                     if under_root < 0:
                         raise ValidationError(loc.get("geometry_compensation_error"))
@@ -1299,8 +1389,11 @@ class BracketSpecificPanel(wx.Panel):
                 specific["edge_angle"] = parse_float(raw.get("edge_angle"))
                 if specific["edge_angle"] not in (90.0, 120.0):
                     raise ValidationError(loc.get("invalid_angle_error"))
-                specific["l1"] = parse_float(raw.get("l1"))
-                specific["variant"] = 1 if specific["l1"] > 0 else 0
+                if specific["l1"] == "no":
+                    specific["l1"] = 0.0
+                else:
+                    specific["l1"] = parse_float(raw.get("l1"))
+                # specific["variant"] = 1 if specific["l1"] > 0 else 0
 
             # --- Тип 5 ---
             elif self.bridge_type == "type5":
@@ -1332,6 +1425,11 @@ class BracketSpecificPanel(wx.Panel):
                     specific["l2"] = L2
                     specific["l1"] = L1
 
+                if specific["l1"] is None:
+                    specific["l1"] = 0.0
+                if specific["l2"] is None:
+                    specific["l2"] = 0.0
+
         except ValidationError as e:
             show_popup(
                 message=str(e),
@@ -1343,7 +1441,8 @@ class BracketSpecificPanel(wx.Panel):
 
         return {"specific": specific}
 
-    def _require_positive_float(self, raw, key, message):
+    @staticmethod
+    def _require_positive_float(raw, key, message):
         """
         Преобразует значение из raw в положительное float, иначе выбрасывает ValidationError.
         """
@@ -1358,6 +1457,131 @@ class BracketSpecificPanel(wx.Panel):
             raise ValidationError(message)
 
         return value
+#---------------------------------------------------------
+# TODO ConeOffsetDialog
+# Класс совсем недоделан!
+# --------------------------------------------------------
+
+class ConeOffsetDialog(wx.Dialog):
+
+    def __init__(self, parent, width: float, thickness: float):
+        super().__init__(parent, title=loc.get("diameter_dialog_title"))
+
+        self.width = width
+        self.thickness = thickness
+        self.result = None
+
+        main_sizer = wx.BoxSizer(wx.HORIZONTAL)
+
+        # --- Левая часть (картинка)
+        # bmp = wx.Bitmap(BRACKET5_IMAGE_PATH, wx.BITMAP_TYPE_ANY)
+        # left = wx.StaticBitmap(self, bitmap=bmp)
+        left = wx.StaticBitmap(self)
+        main_sizer.Add(left, 0, wx.ALL, 10)
+
+        # --- Правая часть
+        right_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        # D1
+        self.d1 = wx.TextCtrl(self)
+        self.d1_type = wx.ComboBox(
+            self,
+            choices=[
+                loc.get("diameter_type_inner"),
+                loc.get("diameter_type_middle"),
+                loc.get("diameter_type_outer"),
+            ],
+            style=wx.CB_READONLY
+        )
+        self.d1_type.SetSelection(0)
+
+        row1 = wx.BoxSizer(wx.HORIZONTAL)
+        row1.Add(wx.StaticText(self, label=loc.get("shell_diameter1")), 0, wx.RIGHT, 5)
+        row1.Add(self.d1, 1, wx.RIGHT, 5)
+        row1.Add(self.d1_type, 0)
+        right_sizer.Add(row1, 0, wx.ALL | wx.EXPAND, 5)
+
+        # D2
+        self.d2 = wx.TextCtrl(self)
+        self.d2_type = wx.ComboBox(
+            self,
+            choices=[
+                loc.get("diameter_type_inner"),
+                loc.get("diameter_type_middle"),
+                loc.get("diameter_type_outer"),
+            ],
+            style=wx.CB_READONLY
+        )
+        self.d2_type.SetSelection(0)
+
+        row2 = wx.BoxSizer(wx.HORIZONTAL)
+        row2.Add(wx.StaticText(self, label=loc.get("shell_diameter2")), 0, wx.RIGHT, 5)
+        row2.Add(self.d2, 1, wx.RIGHT, 5)
+        row2.Add(self.d2_type, 0)
+        right_sizer.Add(row2, 0, wx.ALL | wx.EXPAND, 5)
+
+        # L
+        self.length = wx.TextCtrl(self)
+        row3 = wx.BoxSizer(wx.HORIZONTAL)
+        row3.Add(wx.StaticText(self, label=loc.get("length")), 0, wx.RIGHT, 5)
+        row3.Add(self.length, 1)
+        right_sizer.Add(row3, 0, wx.ALL | wx.EXPAND, 5)
+
+        # L1
+        self.length1 = wx.TextCtrl(self)
+        row4 = wx.BoxSizer(wx.HORIZONTAL)
+        row4.Add(wx.StaticText(self, label=loc.get("length1")), 0, wx.RIGHT, 5)
+        row4.Add(self.length1, 1)
+        right_sizer.Add(row4, 0, wx.ALL | wx.EXPAND, 5)
+
+        # Кнопки
+        btn_sizer = wx.StdDialogButtonSizer()
+
+        ok_btn = wx.Button(self, wx.ID_OK, loc.get("ok_button"))
+        clear_btn = wx.Button(self, wx.ID_CLEAR, loc.get("clear_button"))
+        cancel_btn = wx.Button(self, wx.ID_CANCEL, loc.get("cancel_button"))
+
+        btn_sizer.AddButton(ok_btn)
+        btn_sizer.AddButton(clear_btn)
+        btn_sizer.AddButton(cancel_btn)
+        btn_sizer.Realize()
+
+        right_sizer.Add(btn_sizer, 0, wx.ALL | wx.ALIGN_RIGHT, 5)
+
+        main_sizer.Add(right_sizer, 1, wx.ALL | wx.EXPAND, 10)
+
+        self.SetSizer(main_sizer)
+        self.Fit()
+
+        ok_btn.Bind(wx.EVT_BUTTON, self.on_ok)
+        clear_btn.Bind(wx.EVT_BUTTON, self.on_clear)
+
+    def on_clear(self, event):
+        self.d1.SetValue("")
+        self.d2.SetValue("")
+        self.length.SetValue("")
+        self.length1.SetValue("")
+
+    def on_ok(self, event):
+        try:
+            d1 = float(self.d1.GetValue())
+            d2 = float(self.d2.GetValue())
+            L = float(self.length.GetValue())
+            L1 = float(self.length1.GetValue())
+        except ValueError:
+            show_popup(loc.get("invalid_number_format_error"), popup_type="error")
+            return
+
+        d1_new, d2_new = diameter_cone_offset(
+            length=L,
+            length1=L1,
+            diameter1=d1,
+            diameter2=d2
+        )
+
+        self.result = (d1_new, d2_new)
+        self.EndModal(wx.ID_OK)
+
 
 # ----------------------------------------------------------------------
 # Тестовый запуск

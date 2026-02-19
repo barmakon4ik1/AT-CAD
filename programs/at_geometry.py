@@ -1197,6 +1197,24 @@ def triangle(data: dict) -> dict:
     }
 
 
+def diameter_cone_offset(length: float, length1: float, diameter1: float, diameter2: float) -> float:
+    """
+    Функция нахождения диаметра сечения конуса на расстоянии length1 от верхнего основания конуса.
+    Сечение параллельно основаниям прямого конуса.
+    Args:
+        length: полная длина конуса
+        length1: расстояние от верхнего основания до плоскости сечения конуса
+        diameter1: диаметр верхнего основания конуса
+        diameter2: диаметр нижнего основания конуса
+    Returns:
+        диаметр сечения конуса на расстоянии length1 от его верхнего основания
+    """
+    if diameter1 > diameter2:
+        diameter1, diameter2 = diameter2, diameter1
+    a = (diameter2 - diameter1) / 2.0
+    ax = a * length1 / length
+    return diameter1 + (2 * ax)
+
 # Конец модуля
 
 if __name__ == '__main__':
