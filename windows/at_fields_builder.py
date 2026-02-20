@@ -231,6 +231,31 @@ class FormBuilder:
 
         self.fields = alive_fields
 
+    def set_value(self, name: str, value) -> None:
+        """
+        Установка значения контрола по имени.
+        """
+        field = self.fields.get(name)
+        if field is None:
+            raise KeyError(f"Field '{name}' not found.")
+
+        ctrl: wx.Window = field.ctrl  # <-- берём контрол из FormField
+
+        if isinstance(ctrl, wx.TextCtrl):
+            ctrl.SetValue(str(value))
+
+        elif isinstance(ctrl, wx.ComboBox):
+            ctrl.SetValue(str(value))
+
+        elif isinstance(ctrl, wx.CheckBox):
+            ctrl.SetValue(bool(value))
+
+        else:
+            if hasattr(ctrl, "SetValue"):
+                ctrl.SetValue(value)
+            else:
+                raise TypeError(f"Unsupported control type for '{name}'")
+
 
 # ----------------------------------------------------------------------
 # FieldBuilder: создание элементов формы и комбинированных строк

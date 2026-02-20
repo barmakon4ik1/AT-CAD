@@ -46,6 +46,7 @@ BRACKET2_IMAGE_PATH: Path = IMAGES_DIR / "SB2.png"
 BRACKET3_IMAGE_PATH: Path = IMAGES_DIR / "SB3.png"
 BRACKET4_IMAGE_PATH: Path = IMAGES_DIR / "SB4.png"
 BRACKET5_IMAGE_PATH: Path = IMAGES_DIR / "SB5.png"
+BRACKET5_CONE_IMAGE_PATH: Path = IMAGES_DIR / "SB_cone.png"
 
 # --- Иконки языков ---
 LANGUAGE_ICONS: dict[str, Path] = {
