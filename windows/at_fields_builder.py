@@ -572,10 +572,17 @@ class FieldBuilder:
                     )
 
             elif elem_type == "button":
-                ctrl = GenButton(
+                base_size = elem.get("size", self.default_size)
+                if isinstance(base_size, tuple):
+                    base_size = wx.Size(*base_size)
+
+                rows = elem.get("rows", 1)  # ← новое
+                height = base_size.height * rows if base_size.height > 0 else -1
+
+                ctrl = wx.Button(
                     self.parent,
                     label=elem.get("label", ""),
-                    size=wx.Size(*elem["size"]) if "size" in elem else wx.DefaultSize
+                    size=size
                 )
 
                 if "callback" in elem and callable(elem["callback"]):
@@ -590,6 +597,10 @@ class FieldBuilder:
                     button_height=elem.get("height", 0),
                     font_size=elem.get("font_size"),
                     toggle=elem.get("toggle", False),
+                )
+                ctrl.Bind(
+                    wx.EVT_SIZE,
+                    lambda evt, b=ctrl: (wrap_button_label(b), evt.Skip())
                 )
 
             elif elem_type == "checkbox":
@@ -606,7 +617,14 @@ class FieldBuilder:
             if ctrl:
                 ctrl.SetFont(self.font)
                 right_pad = spacing if i < len(elements) - 1 else 0
-                row.Add(ctrl, element_proportion, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, right_pad)
+                flags = wx.RIGHT
+
+                if elem.get("rows", 1) > 1:
+                    flags |= wx.EXPAND
+                else:
+                    flags |= wx.ALIGN_CENTER_VERTICAL
+
+                row.Add(ctrl, element_proportion, flags, right_pad)
                 created_controls.append(ctrl)
 
                 # ── зависимость от другого контрола ──
@@ -618,6 +636,44 @@ class FieldBuilder:
                     f(d, m))
 
         self.sizer.Add(row, 0, wx.EXPAND | wx.ALL, self.row_border)
+
+        # --- ВАЖНО: сначала делаем Layout ---
+        self.parent.Layout()
+
+        # --- Затем выполняем перенос текста для кнопок ---
+        for ctrl in created_controls:
+            if isinstance(ctrl, wx.Button):
+                wrap_button_label(ctrl)
+
         return created_controls
 
+def wrap_button_label(btn: wx.Button, padding: int = 10):
+    """
+    Делает перенос текста по ширине кнопки.
+    Работает после Layout().
+    """
+    label = btn.GetLabel()
+    width = btn.GetClientSize().width - padding
 
+    dc = wx.ClientDC(btn)
+    dc.SetFont(btn.GetFont())
+
+    words = label.split()
+    lines = []
+    current = ""
+
+    for word in words:
+        test = f"{current} {word}".strip()
+        w, _ = dc.GetTextExtent(test)
+
+        if w <= width:
+            current = test
+        else:
+            if current:
+                lines.append(current)
+            current = word
+
+    if current:
+        lines.append(current)
+
+    btn.SetLabel("\n".join(lines))

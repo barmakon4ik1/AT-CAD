@@ -33,7 +33,6 @@ windows/content_bracket.py
 import math
 from pprint import pprint
 from typing import Optional, Dict, cast
-from docutils.nodes import ValidationError
 from wx.lib.buttons import GenButton
 from config.at_cad_init import ATCadInit
 from config.at_config import *
@@ -192,7 +191,8 @@ TRANSLATIONS = {
         "ru": "Наружный",
         "de": "Außendurchmesser",
         "en": "Outer"
-    }
+    },
+    "list_label": {"ru": "Посадка на конус", "de": "Lage auf dem Kegel", "en": "Location on the cone"}
 }
 loc.register_translations(TRANSLATIONS)
 
@@ -1140,7 +1140,7 @@ class BracketSpecificPanel(wx.Panel):
                     {
                         "type": "combo",
                         "name": "length_option",
-                        "value": length_option[0],
+                        "value": "",
                         "choices": length_option,
                         "required": True,
                         "default": length_option[0],
@@ -1201,16 +1201,27 @@ class BracketSpecificPanel(wx.Panel):
             # Добавляем левую часть
             diameters_row.Add(left_sizer, 1, wx.EXPAND | wx.RIGHT, 10)
 
-            # --- Правая часть (одна кнопка на 2 строки)
-            btn = wx.Button(
-                self,
-                label=loc.get("bracket_offset")  # например "Посадка на конус"
+            # --- Правая часть (кнопка на 2 строки)
+            fb_right = FieldBuilder(
+                parent=self,
+                target_sizer=diameters_row,
+                form=self.form
             )
 
-            btn.Bind(wx.EVT_BUTTON, self.on_open_cone_offset_dialog)
-
-            # Добавляем правую часть
-            diameters_row.Add(btn, 0, wx.EXPAND)
+            fb_right.universal_row(
+                None,
+                [
+                    {
+                        "type": "button",
+                        "label": loc.get("list_label"),
+                        "callback": self.on_open_cone_offset_dialog,
+                        "rows": 2,
+                        "size": (120, -1),
+                        "bg_color": "#27ae60"
+                    }
+                ],
+                align_right=False
+            )
 
             # Добавляем весь горизонтальный блок в box_sizer
             box_sizer.Add(diameters_row, 0, wx.EXPAND | wx.ALL, 5)
@@ -1219,7 +1230,7 @@ class BracketSpecificPanel(wx.Panel):
             fb_box.universal_row(
                 loc.get("length"),
                 [
-                    {"type": "combo", "name": "length_option", "value": length_option1[0], "choices": length_option1, "required": True, "default": length_option1[0]},
+                    {"type": "combo", "name": "length_option", "value": "", "choices": length_option1, "required": True, "default": length_option1[0]},
                     {"type": "text", "name": "length", "value": "", "required": True, "default": ""}
                 ]
             )
@@ -1227,7 +1238,7 @@ class BracketSpecificPanel(wx.Panel):
             fb_box.universal_row(
                 loc.get("length"),
                 [
-                    {"type": "combo", "name": "length_option1", "value": length_option2[0], "choices": length_option2, "required": True, "default": length_option2[0]},
+                    {"type": "combo", "name": "length_option1", "value": "", "choices": length_option2, "required": True, "default": length_option2[0]},
                     {"type": "text", "name": "l1", "value": "", "required": True, "default": ""}
                 ]
             )
@@ -1309,14 +1320,14 @@ class BracketSpecificPanel(wx.Panel):
                 try:
                     corner_radius = parse_float(raw.get("corner_radius"))
                 except (TypeError, ValueError):
-                    raise ValidationError(loc.get("invalid_number_format_error"))
+                    raise loc.get("invalid_number_format_error")
                 specific["corner_radius"] = corner_radius
                 if corner_type == loc.get("round"):
                     specific["corner_radius"] = abs(corner_radius)
                 elif corner_type == loc.get("chamber"):
                     specific["corner_radius"] = -abs(corner_radius)
                 else:
-                    raise ValidationError("Неверный тип угла для мостика")
+                    raise "Неверный тип угла для мостика"
 
             # --- Тип 2 / 4 ---
             elif self.bridge_type in ("type2", "type4"):
@@ -1338,12 +1349,12 @@ class BracketSpecificPanel(wx.Panel):
                 try:
                     width = parse_float(geometry.get("width"))
                 except (TypeError, ValueError):
-                    raise ValidationError(loc.get("invalid_width_error"))
+                    raise loc.get("invalid_width_error")
 
                 radius = diameter / 2.0
 
                 if width > diameter:
-                    raise ValidationError(loc.get("width_exceeds_diameter"))
+                    raise loc.get("width_exceeds_diameter")
 
                 if length_option == "L":
                     specific["length"] = length_input
@@ -1352,13 +1363,13 @@ class BracketSpecificPanel(wx.Panel):
                     under_root = math.sqrt(radius ** 2 - (width ** 2) / 4.0)
 
                     if under_root < 0:
-                        raise ValidationError(loc.get("geometry_compensation_error"))
+                        raise loc.get("geometry_compensation_error")
 
                     delta = radius - (under_root ** 0.5)
                     specific["length"] = length_input + delta
 
                 else:
-                    raise ValidationError(loc.get("invalid_length_option"))
+                    raise loc.get("invalid_length_option")
 
                 specific["shell_diameter1"] = diameter
 
@@ -1367,7 +1378,7 @@ class BracketSpecificPanel(wx.Panel):
                 specific["shell_diameter1"] = self._require_positive_float(raw, "shell_diameter1", "Диаметр > 0")
                 specific["edge_angle"] = parse_float(raw.get("edge_angle"))
                 if specific["edge_angle"] not in (90.0, 120.0):
-                    raise ValidationError(loc.get("invalid_angle_error"))
+                    raise loc.get("invalid_angle_error")
                 if specific["l1"] == "no":
                     specific["l1"] = 0.0
                 else:
@@ -1383,8 +1394,6 @@ class BracketSpecificPanel(wx.Panel):
                     if d2 > 0:
                         specific["shell_diameter2"] = d2
                 specific["edge_angle"] = parse_float(raw.get("edge_angle"))
-                if specific["edge_angle"] not in (90.0, 120.0):
-                    raise ValidationError(loc.get("invalid_angle_error"))
 
                 L = parse_float(raw.get("length"))
                 L1 = parse_float(raw.get("l1"))
@@ -1409,14 +1418,8 @@ class BracketSpecificPanel(wx.Panel):
                 if specific["l2"] is None:
                     specific["l2"] = 0.0
 
-        except ValidationError as e:
-            show_popup(
-                message=str(e),
-                title=loc.get("validation_error"),
-                popup_type="error"
-            )
-
-            return None
+        except:
+            raise loc.get("validation_error")
 
         return {"specific": specific}
 
@@ -1430,141 +1433,11 @@ class BracketSpecificPanel(wx.Panel):
         try:
             value = parse_float(value_raw)
         except ValueError:
-            raise ValidationError(loc.get("invalid_number_format_error"))
+            raise loc.get("invalid_number_format_error")
 
-        if value is None or value <= 0:
-            raise ValidationError(message)
 
         return value
-#---------------------------------------------------------
-# TODO ConeOffsetDialog
-# Класс совсем недоделан!
-# --------------------------------------------------------
 
-# class ConeOffsetDialog(wx.Dialog):
-#
-#     def __init__(self, parent, width: float, thickness: float):
-#         super().__init__(parent, title=loc.get("diameter_dialog_title"))
-#
-#         self.width = width
-#         self.thickness = thickness
-#         self.result = None
-#
-#         main_sizer = wx.BoxSizer(wx.HORIZONTAL)
-#
-#         # --- Левая часть (картинка)
-#         # bmp = wx.Bitmap(BRACKET5_IMAGE_PATH, wx.BITMAP_TYPE_ANY)
-#         # left = wx.StaticBitmap(self, bitmap=bmp)
-#         left = wx.StaticBitmap(self)
-#         main_sizer.Add(left, 0, wx.ALL, 10)
-#
-#         # --- Правая часть
-#         right_sizer = wx.BoxSizer(wx.VERTICAL)
-#
-#         # D1
-#         self.d1 = wx.TextCtrl(self)
-#         self.d1_type = wx.ComboBox(
-#             self,
-#             choices=[
-#                 loc.get("diameter_type_inner"),
-#                 loc.get("diameter_type_middle"),
-#                 loc.get("diameter_type_outer"),
-#             ],
-#             style=wx.CB_READONLY
-#         )
-#         self.d1_type.SetSelection(0)
-#
-#         row1 = wx.BoxSizer(wx.HORIZONTAL)
-#         row1.Add(wx.StaticText(self, label=loc.get("shell_diameter1")), 0, wx.RIGHT, 5)
-#         row1.Add(self.d1, 1, wx.RIGHT, 5)
-#         row1.Add(self.d1_type, 0)
-#         right_sizer.Add(row1, 0, wx.ALL | wx.EXPAND, 5)
-#
-#         # D2
-#         self.d2 = wx.TextCtrl(self)
-#         self.d2_type = wx.ComboBox(
-#             self,
-#             choices=[
-#                 loc.get("diameter_type_inner"),
-#                 loc.get("diameter_type_middle"),
-#                 loc.get("diameter_type_outer"),
-#             ],
-#             style=wx.CB_READONLY
-#         )
-#         self.d2_type.SetSelection(0)
-#
-#         row2 = wx.BoxSizer(wx.HORIZONTAL)
-#         row2.Add(wx.StaticText(self, label=loc.get("shell_diameter2")), 0, wx.RIGHT, 5)
-#         row2.Add(self.d2, 1, wx.RIGHT, 5)
-#         row2.Add(self.d2_type, 0)
-#         right_sizer.Add(row2, 0, wx.ALL | wx.EXPAND, 5)
-#
-#         # L
-#         self.length = wx.TextCtrl(self)
-#         row3 = wx.BoxSizer(wx.HORIZONTAL)
-#         row3.Add(wx.StaticText(self, label=loc.get("length")), 0, wx.RIGHT, 5)
-#         row3.Add(self.length, 1)
-#         right_sizer.Add(row3, 0, wx.ALL | wx.EXPAND, 5)
-#
-#         # L1
-#         self.length1 = wx.TextCtrl(self)
-#         row4 = wx.BoxSizer(wx.HORIZONTAL)
-#         row4.Add(wx.StaticText(self, label=loc.get("length1")), 0, wx.RIGHT, 5)
-#         row4.Add(self.length1, 1)
-#         right_sizer.Add(row4, 0, wx.ALL | wx.EXPAND, 5)
-#
-#         # Кнопки
-#         btn_sizer = wx.StdDialogButtonSizer()
-#
-#         ok_btn = wx.Button(self, wx.ID_OK, loc.get("ok_button"))
-#         clear_btn = wx.Button(self, wx.ID_CLEAR, loc.get("clear_button"))
-#         cancel_btn = wx.Button(self, wx.ID_CANCEL, loc.get("cancel_button"))
-#
-#         btn_sizer.AddButton(ok_btn)
-#         btn_sizer.AddButton(clear_btn)
-#         btn_sizer.AddButton(cancel_btn)
-#         btn_sizer.Realize()
-#
-#         right_sizer.Add(btn_sizer, 0, wx.ALL | wx.ALIGN_RIGHT, 5)
-#
-#         main_sizer.Add(right_sizer, 1, wx.ALL | wx.EXPAND, 10)
-#
-#         self.SetSizer(main_sizer)
-#         self.Fit()
-#
-#         ok_btn.Bind(wx.EVT_BUTTON, self.on_ok)
-#         clear_btn.Bind(wx.EVT_BUTTON, self.on_clear)
-#
-#     def on_clear(self, event):
-#         self.d1.SetValue("")
-#         self.d2.SetValue("")
-#         self.length.SetValue("")
-#         self.length1.SetValue("")
-#
-#     def on_ok(self, event):
-#         try:
-#             d1 = float(self.d1.GetValue())
-#             d2 = float(self.d2.GetValue())
-#             L = float(self.length.GetValue())
-#             L1 = float(self.length1.GetValue())
-#         except ValueError:
-#             show_popup(loc.get("invalid_number_format_error"), popup_type="error")
-#             return
-#
-#         d1_new, d2_new = diameter_cone_offset(
-#             length=L,
-#             length1=L1,
-#             diameter1=d1,
-#             diameter2=d2
-#         )
-#
-#         self.result = (d1_new, d2_new)
-#         self.EndModal(wx.ID_OK)
-
-
-# ----------------------------------------------------------------------
-# Тестовый запуск
-# ----------------------------------------------------------------------
 if __name__ == "__main__":
 
     app = wx.App(False)

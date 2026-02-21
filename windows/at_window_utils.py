@@ -1208,7 +1208,7 @@ def style_gen_button(
     btn.Bind(wx.EVT_LEFT_UP,     on_up)
 
 def style_gen_button_v2(
-        btn: GenButton,
+        btn,
         normal_bg,
         text_color=None,
         bezel: int = 1,
@@ -1217,13 +1217,8 @@ def style_gen_button_v2(
         toggle: bool = False,
 ):
     """
-    Улучшенная версия style_gen_button.
-
-    Возможности:
-        - поддержка toggle режима
-        - стабильная логика состояний
-        - нет сравнения цветов
-        - принимает любой формат цвета
+    Универсальный стиль:
+    работает и с GenButton и с wx.Button
     """
 
     # --- Нормализация цветов ---
@@ -1237,17 +1232,21 @@ def style_gen_button_v2(
     hover_bg   = lighten(normal_bg, 1.12)
     pressed_bg = darken(normal_bg, 0.75)
 
+    is_gen = isinstance(btn, GenButton)
+
     # --- Состояния ---
     btn._is_pressed = False
     btn._is_hover   = False
     btn._is_toggle  = toggle
-    btn._is_active  = False  # для toggle
+    btn._is_active  = False
 
-    # --- Применение базового вида ---
+    # --- Базовый вид ---
     btn.SetBackgroundColour(wx.Colour(normal_bg))
     btn.SetForegroundColour(wx.Colour(text_color))
-    btn.SetBezelWidth(bezel)
-    btn.SetUseFocusIndicator(False)
+
+    if is_gen:
+        btn.SetBezelWidth(bezel)
+        btn.SetUseFocusIndicator(False)
 
     if font_size:
         font = wx.Font(font_size, wx.FONTFAMILY_DEFAULT,
@@ -1259,7 +1258,7 @@ def style_gen_button_v2(
     if button_height > 0:
         btn.SetMinSize(wx.Size(-1, button_height))
 
-    # --- Вспомогательная функция ---
+    # --- Визуальное состояние ---
     def apply_visual_state():
         if btn._is_toggle and btn._is_active:
             color = pressed_bg
@@ -1306,7 +1305,6 @@ def style_gen_button_v2(
     btn.Bind(wx.EVT_LEFT_DOWN, on_left_down)
     btn.Bind(wx.EVT_LEFT_UP, on_left_up)
 
-    # --- Публичный метод управления состоянием ---
     def set_active(state: bool):
         btn._is_active = state
         apply_visual_state()
