@@ -1,6 +1,6 @@
 {
-    "order_number": "20408",
-    "material": "1.0425 (P265GH)",
-    "thickness": 4.0,
-    "weld_allowance": 3.0
+    "order_number": "20409",
+    "material": "1.4301",
+    "thickness": 3.0,
+    "weld_allowance": 1.0
 }

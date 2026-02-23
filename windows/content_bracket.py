@@ -31,22 +31,16 @@ windows/content_bracket.py
     windows.content_bracket       — панель ввода и специфики мостиков
 """
 import math
-from pprint import pprint
-from typing import Optional, Dict, cast
-from wx.lib.buttons import GenButton
+from typing import Optional, Any
 from config.at_cad_init import ATCadInit
 from config.at_config import *
 from config.name_plates.nameplate_storage import load_nameplates
 from locales.at_translations import loc
-from programs.at_base import regen
-from programs.at_geometry import diameter_cone_offset
 from programs.at_name_plate import BridgeConfig, BridgeBuilder, NamePlate
 from windows.at_fields_builder import FormBuilder, FieldBuilder
 from windows.at_window_utils import (
     CanvasPanel, show_popup, apply_styles_to_panel,
-    update_status_bar_point_selected,
-    BaseContentPanel, load_user_settings, load_common_data, get_wx_color_from_value, get_standard_font,
-    get_textctrl_font, apply_radio_group, parse_float
+    BaseContentPanel, load_user_settings, load_common_data, get_wx_color_from_value, parse_float
 )
 from programs.at_input import at_get_point
 from windows.cone_offset_dialog import ConeOffsetDialog
@@ -148,6 +142,11 @@ TRANSLATIONS = {
         "ru": "Неверный параметр длины",
         "de": "Ungültige Längenoption",
         "en": "Invalid length option"
+    },
+    "invalid_height_error": {
+        "ru": "Неверный параметр высоты",
+        "de": "Ungültiger Höhenparameter",
+        "en": "Invalid height parameter"
     },
     "invalid_angle_error": {
         "ru": "Недопустимое значение угла",
@@ -280,7 +279,7 @@ class BracketContentPanel(BaseContentPanel):
     # Обновление изображения мостика при выборе типа
     # ------------------------------------------------------------------
 
-    def on_bridge_type_changed(self, event: Optional[wx.Event] = None):
+    def on_bridge_type_changed(self, _event: Optional[wx.Event] = None):
         """
         Обновляет картинку мостика в CanvasPanel при изменении типа мостика.
         """
@@ -400,7 +399,12 @@ class BracketContentPanel(BaseContentPanel):
         fb_main.universal_row(
             "thickness_label",
             [
-                {"type": "combo", "name": "thickness", "choices": thickness_options, "value": "", "required": True, "default": "3"}
+                {"type": "combo",
+                 "name": "thickness",
+                 "choices": thickness_options,
+                 "value": "",
+                 "required": True,
+                 "default": "3"}
             ]
         )
 
@@ -496,31 +500,33 @@ class BracketContentPanel(BaseContentPanel):
     # ------------------------------------------------------------------
     # Сохранение/восстановление значений контролов панели
     # ------------------------------------------------------------------
-    def _hide_panel(self, panel: wx.Panel):
+    @staticmethod
+    def _hide_panel(panel_to_hide: wx.Panel):
         """Сохраняет значения всех контролов панели и скрывает её."""
-        if not panel:
+        if not panel_to_hide:
             return
-        for attr_name in dir(panel):
-            ctrl = getattr(panel, attr_name)
+        for attr_name in dir(panel_to_hide):
+            ctrl = getattr(panel_to_hide, attr_name)
             if isinstance(ctrl, (wx.TextCtrl, wx.ComboBox)):
                 try:
                     ctrl._saved_value = ctrl.GetValue()
                 except RuntimeError:
                     # Если контрол уже удалён (защита от ошибок)
                     continue
-        panel.Hide()
+        panel_to_hide.Hide()
 
-    def _show_panel(self, panel: wx.Panel):
+    @staticmethod
+    def _show_panel(panel_to_show: wx.Panel):
         """Показывает панель и восстанавливает сохранённые значения контролов."""
-        if not panel:
+        if not panel_to_show:
             return
-        panel.Show()
-        for attr_name in dir(panel):
-            ctrl = getattr(panel, attr_name)
+        panel_to_show.Show()
+        for attr_name in dir(panel_to_show):
+            ctrl = getattr(panel_to_show, attr_name)
             if isinstance(ctrl, (wx.TextCtrl, wx.ComboBox)):
-                if hasattr(ctrl, "_saved_value"):
+                if hasattr(ctrl, "saved_value"):
                     try:
-                        ctrl.SetValue(ctrl._saved_value)
+                        ctrl.SetValue(ctrl.saved_value)
                     except RuntimeError:
                         continue
 
@@ -640,12 +646,6 @@ class BracketContentPanel(BaseContentPanel):
 
             np = NamePlate()
 
-            pprint(bridge_data) # Debug
-
-            # # Передаем данные дальше через callback
-            # if self.on_submit_callback:
-            #     self.on_submit_callback(bridge_data)
-
             config = BridgeConfig(adoc, bridge_data)
             builder = BridgeBuilder(config, np.plates)
             builder.build(model_space)
@@ -667,24 +667,24 @@ class BracketContentPanel(BaseContentPanel):
     # ------------------------------------------------------------------
     # Переключение видимости панелей
     # ------------------------------------------------------------------
-    def on_toggle_specific(self, event):
+    def on_toggle_specific(self, _event):
         self._show_section(self.specific_panel)
 
-    def on_toggle_nameplates(self, event):
+    def on_toggle_nameplates(self, _event):
         self._show_section(self.nameplate_panel)
 
-    def on_toggle_cutout(self, event):
+    def on_toggle_cutout(self, _event):
         self._show_section(self.cutout_panel)
 
     def _hide_all_optional_panels(self):
-        for panel in (self.specific_panel, self.nameplate_panel, self.cutout_panel):
-            self._hide_panel(panel)
+        for hide_panel in (self.specific_panel, self.nameplate_panel, self.cutout_panel):
+            self._hide_panel(hide_panel)
 
     def _show_section(self, section: Optional[wx.Panel]):
         # Сначала скрываем все остальные панели
-        for panel in (self.specific_panel, self.nameplate_panel, self.cutout_panel):
-            if panel and panel != section:
-                self._hide_panel(panel)
+        for show_panel in (self.specific_panel, self.nameplate_panel, self.cutout_panel):
+            if show_panel and show_panel != section:
+                self._hide_panel(show_panel)
 
         # Показываем нужную панель
         self._show_panel(section)
@@ -814,7 +814,7 @@ class NamePlateSelectionPanel(wx.Panel):
     # Логика выбора
     # ------------------------------------------------------------------
 
-    def _on_combo_changed(self, idx: int):
+    def _on_combo_changed(self, _idx: int):
         """Обработчик изменения выбора в ComboBox."""
         self._update_enable_state()
 
@@ -879,7 +879,6 @@ class NamePlateSelectionPanel(wx.Panel):
         ----------
         dict — структура для дальнейшей обработки
         """
-
         plates_data = []
 
         for i, plate in enumerate(self.plates):
@@ -907,7 +906,7 @@ class NamePlateSelectionPanel(wx.Panel):
         if not plates_data:
             return {}
 
-        result = {"plates": plates_data}
+        result: dict[str, Any] = {"plates": plates_data}
 
         # plates_gap только если >1
         if len(plates_data) > 1:
@@ -921,9 +920,7 @@ class NamePlateSelectionPanel(wx.Panel):
                         popup_type="error"
                     )
                     return {}
-
         return result
-
 
 class CutoutPanel(wx.Panel):
     """
@@ -994,14 +991,6 @@ class CutoutPanel(wx.Panel):
         # Приводим элементы к конкретным типам для IDE и mypy
         from typing import cast
         combo_ctrl = cast(wx.ComboBox, controls[0])
-        radius_ctrl = cast(wx.TextCtrl, controls[1])
-
-        # ------------------------
-        # Функция безопасного получения значения ComboBox
-        # ------------------------
-        def get_combo_value(ctrl: wx.ComboBox) -> str:
-            idx = ctrl.GetSelection()
-            return ctrl.GetString(idx) if idx != wx.NOT_FOUND else ""
 
         # Вызываем один раз на старте, чтобы корректно выставить состояние
         combo_ctrl.SetSelection(cut_options.index(loc.get("round")))
@@ -1250,7 +1239,7 @@ class BracketSpecificPanel(wx.Panel):
         apply_styles_to_panel(self)
         self.Layout()
 
-    def on_open_cone_offset_dialog(self, event):
+    def on_open_cone_offset_dialog(self, _event):
         dialog = ConeOffsetDialog(self)
 
         if dialog.ShowModal() == wx.ID_OK:
@@ -1329,8 +1318,8 @@ class BracketSpecificPanel(wx.Panel):
                 else:
                     raise "Неверный тип угла для мостика"
 
-            # --- Тип 2 / 4 ---
-            elif self.bridge_type in ("type2", "type4"):
+            # --- Тип 2 ---
+            elif self.bridge_type == "type2":
 
                 diameter = self._require_positive_float(
                     raw,
@@ -1356,10 +1345,10 @@ class BracketSpecificPanel(wx.Panel):
                 if width > diameter:
                     raise loc.get("width_exceeds_diameter")
 
-                if length_option == "L":
+                if length_option == "L0":
                     specific["length"] = length_input
 
-                elif length_option == "L0":
+                elif length_option == "L":
                     under_root = math.sqrt(radius ** 2 - (width ** 2) / 4.0)
 
                     if under_root < 0:
@@ -1384,6 +1373,50 @@ class BracketSpecificPanel(wx.Panel):
                 else:
                     specific["l1"] = parse_float(raw.get("l1"))
                 # specific["variant"] = 1 if specific["l1"] > 0 else 0
+
+                # --- Тип 4 ---
+            elif self.bridge_type == "type4":
+
+                diameter = self._require_positive_float(
+                    raw,
+                    "shell_diameter1",
+                    loc.get("diameter_positive_error")
+                )
+
+                length_input = self._require_positive_float(
+                    raw,
+                    "length",
+                    loc.get("length_positive_error")
+                )
+
+                length_option = raw.get("length_option")
+
+                try:
+                    height = parse_float(geometry.get("height"))
+                except (TypeError, ValueError):
+                    raise loc.get("invalid_height_error")
+
+                radius = diameter / 2.0
+
+                if height > diameter:
+                    raise loc.get("width_exceeds_diameter")
+
+                if length_option == "L0":
+                    specific["length"] = length_input
+
+                elif length_option == "L":
+                    under_root = math.sqrt(radius ** 2 - (height ** 2) / 4.0)
+
+                    if under_root < 0:
+                        raise loc.get("geometry_compensation_error")
+
+                    delta = radius - (under_root ** 0.5)
+                    specific["length"] = length_input + delta
+
+                else:
+                    raise loc.get("invalid_length_option")
+
+                specific["shell_diameter1"] = diameter
 
             # --- Тип 5 ---
             elif self.bridge_type == "type5":
@@ -1424,7 +1457,7 @@ class BracketSpecificPanel(wx.Panel):
         return {"specific": specific}
 
     @staticmethod
-    def _require_positive_float(raw, key, message):
+    def _require_positive_float(raw, key, _message):
         """
         Преобразует значение из raw в положительное float, иначе выбрасывает ValidationError.
         """

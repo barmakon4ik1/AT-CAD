@@ -36,7 +36,6 @@ from locales.at_translations import loc
 from programs.at_dimension import add_dimension
 from programs.at_geometry import polar_point, PolylineBuilder, ensure_point_variant, distance_2points, \
     bulge_chord, circle_line_intersection, triangle
-from programs.at_input import at_get_point
 from windows.at_gui_utils import show_popup
 
 # ---------------------------------------------------------------------------
@@ -402,8 +401,8 @@ class BridgeConfig:
     - предоставляет удобный доступ к данным через proxy-свойства
     """
 
-    def __init__(self, adoc, data: dict):
-        self.adoc = adoc  # храним документ напрямую
+    def __init__(self, document, data: dict):
+        self.adoc = document  # храним документ напрямую
 
         # Словарь мостиков
         self.data = data
@@ -506,7 +505,7 @@ def build_type1(modelspace, cfg: BridgeConfig):
     """
     Тип 1 — плоский мостик с перемычкой.
     """
-    adoc = cfg.adoc
+    document = cfg.adoc
 
     # --------------------------------------------------
     # Геометрия мостика
@@ -542,12 +541,12 @@ def build_type1(modelspace, cfg: BridgeConfig):
 
     p_left_max = (x_min, y_max)
 
-    add_dimension(adoc, "H",
+    add_dimension(document, "H",
                   ensure_point_variant((x_min, y_max)),
                   ensure_point_variant((x_max, y_max)),
                   offset=DEFAULT_DIM_OFFSET)
 
-    add_dimension(adoc, "V",
+    add_dimension(document, "V",
                   ensure_point_variant((x_min, y_min)),
                   ensure_point_variant((x_min, y_max)),
                   offset=DEFAULT_DIM_OFFSET)
@@ -598,7 +597,7 @@ def build_type1(modelspace, cfg: BridgeConfig):
 
     # ширина перемычки
     add_dimension(
-        adoc,
+        document,
         "H",
         ensure_point_variant(p1),
         ensure_point_variant(p0),
@@ -607,7 +606,7 @@ def build_type1(modelspace, cfg: BridgeConfig):
 
     # высота перемычки
     add_dimension(
-        adoc,
+        document,
         "V",
         ensure_point_variant(p6),
         ensure_point_variant(p1),
@@ -665,7 +664,7 @@ def build_type2(modelspace, cfg: BridgeConfig):
     """
     Построение развертки мостика типа BentStraight (type2).
     """
-    adoc = cfg.adoc
+    document = cfg.adoc
     geom = cfg.geometry
     cut = cfg.cutout
     spec = cfg.specific
@@ -779,11 +778,11 @@ def build_type2(modelspace, cfg: BridgeConfig):
     p6v = ensure_point_variant(p6)
     p14v = ensure_point_variant(p14)
 
-    add_dimension(adoc, "H", p9v, p8v, offset=DEFAULT_DIM_OFFSET)
-    add_dimension(adoc, "H", p8v, p7v, offset=DEFAULT_DIM_OFFSET)
-    add_dimension(adoc, "H", p7v, p6v, offset=DEFAULT_DIM_OFFSET)
-    add_dimension(adoc, "H", p9v, p6v, offset=2 * DEFAULT_DIM_OFFSET)
-    add_dimension(adoc, "V", p14v, p9v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(document, "H", p9v, p8v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(document, "H", p8v, p7v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(document, "H", p7v, p6v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(document, "H", p9v, p6v, offset=2 * DEFAULT_DIM_OFFSET)
+    add_dimension(document, "V", p14v, p9v, offset=DEFAULT_DIM_OFFSET)
 
     # Возвращаем ключевые точки, если понадобятся дальше
     # Габариты мостика
@@ -806,7 +805,7 @@ def build_type3(modelspace, cfg: BridgeConfig):
     # ------------------------------------------------------------------
     # Исходные данные (ТОЛЬКО чтение из BridgeConfig)
     # ------------------------------------------------------------------
-    adoc = cfg.adoc
+    document = cfg.adoc
     geom = cfg.geometry
     cut = cfg.cutout
     spec = cfg.specific
@@ -993,13 +992,13 @@ def build_type3(modelspace, cfg: BridgeConfig):
     p6v = ensure_point_variant(p6)
     p14v = ensure_point_variant(p14)
 
-    add_dimension(adoc, "H", p9v, p89v, offset=DEFAULT_DIM_OFFSET)
-    add_dimension(adoc, "H", p89v, p8v, offset=DEFAULT_DIM_OFFSET)
-    add_dimension(adoc, "H", p8v, p7v, offset=DEFAULT_DIM_OFFSET)
-    add_dimension(adoc, "H", p7v, p67v, offset=DEFAULT_DIM_OFFSET)
-    add_dimension(adoc, "H", p67v, p6v, offset=DEFAULT_DIM_OFFSET)
-    add_dimension(adoc, "H", p9v, p6v, offset=2 * DEFAULT_DIM_OFFSET)
-    add_dimension(adoc, "V", p14v, p9v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(document, "H", p9v, p89v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(document, "H", p89v, p8v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(document, "H", p8v, p7v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(document, "H", p7v, p67v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(document, "H", p67v, p6v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(document, "H", p9v, p6v, offset=2 * DEFAULT_DIM_OFFSET)
+    add_dimension(document, "V", p14v, p9v, offset=DEFAULT_DIM_OFFSET)
 
     # Возвращаем ключевые точки, если понадобятся дальше
     # Габариты мостика
@@ -1026,7 +1025,7 @@ def build_type4(modelspace, cfg: BridgeConfig):
     # ------------------------------------------------------------------
     # Исходные данные (read-only из BridgeConfig)
     # ------------------------------------------------------------------
-    adoc = cfg.adoc
+    document = cfg.adoc
     geom = cfg.geometry
     spec = cfg.specific
     cut = cfg.cutout
@@ -1157,11 +1156,11 @@ def build_type4(modelspace, cfg: BridgeConfig):
     p6v = ensure_point_variant(p6)
     p14v = ensure_point_variant(p14)
 
-    add_dimension(adoc, "H", p9v, p8v, offset=DEFAULT_DIM_OFFSET)
-    add_dimension(adoc, "H", p8v, p7v, offset=DEFAULT_DIM_OFFSET)
-    add_dimension(adoc, "H", p7v, p6v, offset=DEFAULT_DIM_OFFSET)
-    add_dimension(adoc, "H", p9v, p6v, offset=2 * DEFAULT_DIM_OFFSET)
-    add_dimension(adoc, "V", p14v, p9v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(document, "H", p9v, p8v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(document, "H", p8v, p7v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(document, "H", p7v, p6v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(document, "H", p9v, p6v, offset=2 * DEFAULT_DIM_OFFSET)
+    add_dimension(document, "V", p14v, p9v, offset=DEFAULT_DIM_OFFSET)
 
     # Возвращаем ключевые точки, если понадобятся дальше
     # Габариты мостика
@@ -1180,17 +1179,10 @@ def build_type5(modelspace, cfg: BridgeConfig):
     Построение развертки мостика со скошенными краями
     для посадки на горизонтальный цилиндр (type5).
     """
-    # TODO (GUI):
-    #   variant logic is temporary.
-    #   In GUI all type5 variants must be normalized to:
-    #       - L  (length)
-    #       - L1 (shelf length before bevel)
-    #   build_type5 must NOT contain variant-specific logic.
-
     # ------------------------------------------------------------------
     # Исходные данные (read-only из BridgeConfig)
     # ------------------------------------------------------------------
-    adoc = cfg.adoc
+    document = cfg.adoc
     geom = cfg.geometry
     spec = cfg.specific
     cut = cfg.cutout
@@ -1397,11 +1389,11 @@ def build_type5(modelspace, cfg: BridgeConfig):
     off_v_89_1415 = abs(p9[0] - p89[0])
     off_h_9_89 = abs(p89[1] - p9[1])
 
-    add_dimension(adoc, "H", p9v, p8v, offset=DEFAULT_DIM_OFFSET)
-    add_dimension(adoc, "H", p8v, p7v, offset=DEFAULT_DIM_OFFSET)
-    add_dimension(adoc, "H", p7v, p6v, offset=DEFAULT_DIM_OFFSET)
-    add_dimension(adoc, "H", p9v, p6v, offset=2 * DEFAULT_DIM_OFFSET + off_h_9_89)
-    add_dimension(adoc, "V", p1415v, p89v, offset=DEFAULT_DIM_OFFSET + off_v_89_1415)
+    add_dimension(document, "H", p9v, p8v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(document, "H", p8v, p7v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(document, "H", p7v, p6v, offset=DEFAULT_DIM_OFFSET)
+    add_dimension(document, "H", p9v, p6v, offset=2 * DEFAULT_DIM_OFFSET + off_h_9_89)
+    add_dimension(document, "V", p1415v, p89v, offset=DEFAULT_DIM_OFFSET + off_v_89_1415)
 
     # Возвращаем ключевые точки, если понадобятся дальше
     text_insert_point = polar_point(p9, TEXT_DISTANCE + off_h_9_89 + 2 * DEFAULT_DIM_OFFSET, 90)
@@ -1540,11 +1532,6 @@ if __name__ == "__main__":
     #     # --------------------------------------------------
     #     # Специфические параметры типа мостика
     #     # --------------------------------------------------
-    #     # ВНИМАНИЕ:
-    #     # - наличие параметра означает, что он ЗАДАН
-    #     # - отсутствие параметра означает, что он НЕ НУЖЕН
-    #     # - никаких значений "по умолчанию" тут быть не должно
-    #     # --------------------------------------------------
     #     "specific": {
     #         "length": 70.0,  # длина площадки, отступ L
     #         # --- Тип 1 ---
@@ -1572,14 +1559,6 @@ if __name__ == "__main__":
     #         "variant": 1,
     #         "l1": 40.0,
     #         "l2": 0,
-    #
-    #         # --- Будущее развитие ---
-    #         # Для посадки на конус, смещения от вершины и т.п.
-    #         # "cone_top_offset": 0.0,
-    #         # "cone_length": 0.0,
-    #         # "cone_diameter_top": 0.0,
-    #         # "cone_diameter_bottom": 0.0,
-    #     },
     #
     #     # --------------------------------------------------
     #     # Геометрия выреза в мостике (если есть)

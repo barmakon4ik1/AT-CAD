@@ -124,7 +124,7 @@ logging.basicConfig(
 )
 
 # Кэш для данных из JSON-файлов
-_common_data_cache = None
+_common_data_cache: dict[str, Any] | None = None
 
 
 def get_wx_color_from_value(value: Any, default: Union[str, Tuple[int, int, int]] = (255, 255, 255)) -> Colour:
@@ -144,7 +144,7 @@ def get_wx_color_from_value(value: Any, default: Union[str, Tuple[int, int, int]
     if isinstance(value, str):
         try:
             return Colour(value)
-        except Exception:
+        except (RuntimeError, AttributeError):
             return Colour(*default if isinstance(default, (tuple, list)) else (255, 255, 255))
     elif isinstance(value, (tuple, list)) and len(value) == 3:
         return Colour(*value)
@@ -196,7 +196,7 @@ class BaseContentPanel(wx.Panel):
 
         self.last_input_file = ""
         self.insert_point = None
-        self.buttons = []
+        self.buttons: list[GenButton] = []
 
     # ------------------------------------------------------------------
     # Локализация
@@ -233,7 +233,7 @@ class BaseContentPanel(wx.Panel):
                     loc.get("error", "Ошибка: невозможно переключить контент"),
                     popup_type="error"
                 )
-        except Exception as e:
+        except (RuntimeError, ValueError) as e:
             show_popup(
                 loc.get("error", f"Ошибка переключения контента: {str(e)}"),
                 popup_type="error"
@@ -247,18 +247,22 @@ class BaseContentPanel(wx.Panel):
         """
         Создаёт стандартную панель кнопок OK / Clear / Cancel.
         """
-        buttons = create_standard_buttons(
+        button_list = create_standard_buttons(
             self,
             self.on_ok,
             self.on_cancel,
-            getattr(self, "on_clear", None)
+            getattr(self, "on_clear", None),
         )
-        adjust_button_widths(buttons)
-        self.buttons = buttons
 
-        sizer = wx.BoxSizer(wx.HORIZONTAL)
-        sizer.AddMany([(btn, 0, wx.RIGHT, 5) for btn in buttons])
-        return sizer
+        adjust_button_widths(button_list)
+        self.buttons = button_list
+
+        button_bar_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        button_bar_sizer.AddMany(
+            [(btn, 0, wx.RIGHT, 5) for btn in button_list]
+        )
+
+        return button_bar_sizer
 
     # ------------------------------------------------------------------
     # Интерфейс для переопределения в дочерних классах
@@ -271,10 +275,10 @@ class BaseContentPanel(wx.Panel):
         """
         raise NotImplementedError
 
-    def collect_input_data(self) -> Dict:
+    def collect_input_data(self) -> dict[str, Any]:
         return {}
 
-    def validate_input(self, data: Dict) -> bool:
+    def validate_input(self, data: dict[str, Any]) -> bool:
         return True
 
     def process_input(self, data: Dict) -> bool:
@@ -298,14 +302,14 @@ class BaseContentPanel(wx.Panel):
                 save_last_input(self.last_input_file, data)
             if close_window:
                 self.switch_content_panel("content_apps")
-        except Exception as e:
+        except (ValueError, RuntimeError) as e:
             show_popup(loc.get("error", f"Ошибка ввода: {str(e)}"), popup_type="error")
 
     def on_clear(self, event: wx.Event) -> None:
         try:
             self.clear_input_fields()
             update_status_bar_point_selected(self, None)
-        except Exception as e:
+        except (ValueError, RuntimeError) as e:
             show_popup(
                 loc.get("error", f"Ошибка при очистке: {str(e)}"),
                 popup_type="error"
@@ -415,13 +419,15 @@ def load_last_position() -> Tuple[int, int]:
     try:
         with config_path.open("r", encoding='utf-8') as f:
             data = json.load(f)
-            return (data.get("x", -1), data.get("y", -1))
+            x = int(data.get("x", -1))
+            y = int(data.get("y", -1))
+            return x, y
     except (FileNotFoundError, json.JSONDecodeError) as e:
         logging.error(f"Ошибка загрузки {config_path}: {e}")
-        return (-1, -1)
+        return -1, -1
 
 
-def load_last_input(filename: str) -> Dict:
+def load_last_input(filename: str) -> dict[str, Any]:
     """
     Загружает последние введённые данные из указанного файла.
 
@@ -438,22 +444,21 @@ def load_last_input(filename: str) -> Dict:
         logging.error(f"Ошибка загрузки {filename}: {e}")
         return {}
 
-
-def save_last_input(filename: str, data: Dict) -> None:
-    """
-    Сохраняет введённые данные в указанный файл.
-
-    Args:
-        filename (str): Имя файла для сохранения.
-        data (Dict): Словарь с данными.
-    """
-    try:
-        abs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", filename))
-        os.makedirs(os.path.dirname(abs_path), exist_ok=True)
-        with open(abs_path, "w", encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-    except (PermissionError, OSError) as e:
-        logging.error(f"Ошибка сохранения {abs_path}: {e}")
+# def save_last_input(filename: str, data: Dict) -> None:
+#     """
+#     Сохраняет введённые данные в указанный файл.
+#
+#     Args:
+#         filename (str): Имя файла для сохранения.
+#         data (Dict): Словарь с данными.
+#     """
+#     try:
+#         abs_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", filename))
+#         os.makedirs(os.path.dirname(abs_path), exist_ok=True)
+#         with open(abs_path, "w", encoding='utf-8') as f:
+#             json.dump(data, f, ensure_ascii=False, indent=2)
+#     except (PermissionError, OSError) as e:
+#         logging.error(f"Ошибка сохранения {abs_path}: {e}")
 
 
 def get_textctrl_font(parent: wx.Window) -> wx.Font:
@@ -567,7 +572,7 @@ def fit_text_to_height(ctrl: object, text: str, max_width: int, max_height: int,
     return min_size
 
 
-def parse_float(value: str) -> Optional[float]:
+def parse_float(value: str) -> float | None:
     """
     Преобразует строку в float.
     Поддерживает ',' и '.' как десятичный разделитель.
@@ -611,18 +616,18 @@ class CanvasPanel(wx.Panel):
                 self.image = wx.Image(image_file, wx.BITMAP_TYPE_PNG)
                 if not self.image.IsOk():
                     raise ValueError("Некорректное изображение")
-            except Exception as e:
+            except (RuntimeError, ValueError) as e:
                 logging.error(f"Ошибка загрузки изображения {image_file}: {e}")
                 self.image = None
         self.Bind(wx.EVT_PAINT, self.on_paint)
         self.Bind(wx.EVT_SIZE, self.on_resize)
 
-    def on_paint(self, event: wx.Event) -> None:
+    def on_paint(self, _event: wx.Event) -> None:
         """
         Отрисовывает изображение или сообщение об ошибке, если изображение недоступно.
 
         Args:
-            event: Событие отрисовки (wx.EVT_PAINT).
+            _event: Событие отрисовки (wx.EVT_PAINT).
         """
         dc = wx.BufferedPaintDC(self)
         dc.SetBackground(wx.WHITE_BRUSH)
@@ -651,7 +656,7 @@ class CanvasPanel(wx.Panel):
                 x = (width - self.scaled_bitmap.GetWidth()) // 2
                 y = (height - self.scaled_bitmap.GetHeight()) // 2
                 dc.DrawBitmap(self.scaled_bitmap, x, y)
-            except Exception as e:
+            except (RuntimeError, AttributeError) as e:
                 logging.error(f"Ошибка масштабирования изображения: {e}")
                 dc.SetTextForeground(wx.BLACK)
                 dc.DrawText(loc.get("image_error", "Ошибка изображения"), width // 2 - 50, height // 2)
@@ -679,7 +684,7 @@ class CanvasPanel(wx.Panel):
             else:
                 logging.error(f"Некорректное изображение: {image_path}")
                 self.image = None
-        except Exception as e:
+        except (RuntimeError, AttributeError) as e:
             logging.error(f"Ошибка загрузки изображения {image_path}: {e}")
             self.image = None
 
@@ -715,7 +720,7 @@ class BaseInputWindow(wx.Frame):
         self.model = None
         self.selected_layer = "0"
         self.result = None
-        self.buttons = []
+        self.buttons: list[GenButton] = []
 
         self.CreateStatusBar()
         self.GetStatusBar().SetFieldsCount(2)
@@ -739,12 +744,12 @@ class BaseInputWindow(wx.Frame):
         self.adoc = cad.document
         self.model = cad.model_space
 
-    def on_cancel(self, event: wx.Event) -> None:
+    def on_cancel(self, _event: wx.Event) -> None:
         """
         Отменяет ввод с подтверждением. При подтверждении — закрывает окно и восстанавливает родительское окно.
 
         Args:
-            event: Событие кнопки (wx.EVT_BUTTON).
+            _event: Событие кнопки (wx.EVT_BUTTON).
         """
         confirm_message = loc.get(
             "confirm_cancel_message",
@@ -775,7 +780,7 @@ class BaseInputWindow(wx.Frame):
                         parent.Iconize(False)
                     parent.Raise()
                     parent.SetFocus()
-                except Exception:
+                except (RuntimeError, AttributeError):
                     # Игнорируем любые ошибки при попытке восстановить родителя
                     pass
             # Закрываем текущее окно (Frame)
@@ -784,12 +789,12 @@ class BaseInputWindow(wx.Frame):
         # Пользователь отказался — просто возвращаемся, ничего не пропуская дальше
         return
 
-    def on_close(self, event: wx.Event) -> None:
+    def on_close(self, _event: wx.Event) -> None:
         """
         Сохраняет позицию окна, закрывает его и восстанавливает родительское окно.
 
         Args:
-            event: Событие закрытия (wx.EVT_CLOSE).
+            _event: Событие закрытия (wx.EVT_CLOSE).
         """
         x, y = self.GetPosition()
         save_last_position(x, y)
@@ -805,20 +810,26 @@ class BaseInputWindow(wx.Frame):
         """
         if not self.buttons:
             return
+
         button_font = get_button_font()
         max_width = 0
-        languages = ['ru', 'de', 'en']
-        for button in self.buttons:
+        languages = ["ru", "de", "en"]
+
+        for btn in self.buttons:
+            dc = wx.ClientDC(btn)
+            dc.SetFont(button_font)
+
+            base_label = btn.GetLabel()
+
             for lang in languages:
                 temp_loc = loc.__class__(lang)
-                label = temp_loc.get(button.GetLabel(), button.GetLabel())
-                dc = wx.ClientDC(button)
-                dc.SetFont(button_font)
-                width, _ = dc.GetTextExtent(label)
+                localized = temp_loc.get(base_label, base_label)
+                width, _ = dc.GetTextExtent(localized)
                 max_width = max(max_width, width + 20)
-        for button in self.buttons:
-            _, height = button.GetMinSize()
-            button.SetMinSize((max_width, height))
+
+        for btn in self.buttons:
+            _, height = btn.GetMinSize()
+            btn.SetMinSize(wx.Size(max_width, height))
 
     def on_key_down(self, event: wx.Event) -> None:
         """
@@ -831,18 +842,18 @@ class BaseInputWindow(wx.Frame):
             self.on_cancel(event)
         event.Skip()
 
-    def on_select_point(self, event: wx.Event) -> None:
+    def on_select_point(self, _event: wx.Event) -> None:
         """
         Запрашивает выбор точки вставки в AutoCAD, минимизируя окно на время выбора.
 
         Args:
-            event: Событие кнопки (wx.EVT_BUTTON).
+            _event: Событие кнопки (wx.EVT_BUTTON).
         """
         try:
             self.Iconize(True)
             self.insert_point = at_get_point(self.adoc)
             update_status_bar_point_selected(self, self.insert_point)
-        except Exception as e:
+        except (RuntimeError, AttributeError) as e:
             show_popup(loc.get("point_selection_error", str(e)), popup_type="error")
             logging.error(f"Ошибка выбора точки: {e}")
         finally:
@@ -909,39 +920,39 @@ def apply_styles_recursively(widget: wx.Window) -> None:
         apply_styles_recursively(child)
 
 
-def apply_styles_to_panel(panel: wx.Window) -> None:
+def apply_styles_to_panel(style_panel: wx.Window) -> None:
     """
     Применяет стили ко всем элементам внутри заданной панели.
 
     Args:
-        panel: Панель для стилизации.
+        style_panel: Панель для стилизации.
     """
-    apply_styles_recursively(panel)
+    apply_styles_recursively(style_panel)
 
 
-def adjust_button_widths(buttons: List[wx.Button]) -> None:
+def adjust_button_widths(buttons_list: List[wx.Button]) -> None:
     """
     Устанавливает одинаковую ширину для переданных кнопок с учётом локализации текста.
 
     Args:
-        buttons: Список кнопок для стилизации.
+        buttons_list: Список кнопок для стилизации.
     """
-    if not buttons:
+    if not buttons_list:
         return
     button_font = get_button_font()
     max_width = 0
     languages = ['ru', 'de', 'en']
-    for button in buttons:
+    for btn in buttons_list:
         for lang in languages:
             temp_loc = loc.__class__(lang)
-            label = temp_loc.get(button.GetLabel(), button.GetLabel())
-            dc = wx.ClientDC(button)
+            lbl = temp_loc.get(btn.GetLabel(), btn.GetLabel())
+            dc = wx.ClientDC(btn)
             dc.SetFont(button_font)
-            width, _ = dc.GetTextExtent(label)
+            width, _ = dc.GetTextExtent(lbl)
             max_width = max(max_width, width + 20)
-    for button in buttons:
-        _, height = button.GetMinSize()
-        button.SetMinSize((max_width, height))
+    for btn in buttons_list:
+        _, height = btn.GetMinSize()
+        btn.SetMinSize(wx.Size(max_width, height))
 
 
 def update_status_bar_point_selected(window: wx.Window, insert_point: Optional[object] = None) -> None:
@@ -958,7 +969,7 @@ def update_status_bar_point_selected(window: wx.Window, insert_point: Optional[o
             try:
                 point_text = loc.get("point_selected", "Точка выбрана: x={0}, y={1}").format(insert_point.x, insert_point.y)
                 main_window.GetStatusBar().SetStatusText(point_text, 0)
-            except Exception as e:
+            except (RuntimeError, ValueError) as e:
                 main_window.GetStatusBar().SetStatusText(loc.get("point_selection_error", f"Ошибка выбора точки: {str(e)}"), 0)
                 logging.error(f"Ошибка при обновлении строки состояния: {e}")
         else:
@@ -1023,7 +1034,6 @@ def style_button(
     fg: str = "white",
     hover_bg: str = None,
     pressed_bg: str = None,
-    bezel: int = 1
 ):
     """
     Стилизует GenButton: обычный фон, hover, pressed, шрифт.
@@ -1083,7 +1093,7 @@ def style_button(
             update_background(btn.normal_bg)
         evt.Skip()
 
-    def on_left_down(evt):
+    def on_left_down(_evt):
         update_background(btn.pressed_bg)
         btn.SetBezelWidth(0)  # убираем объём при нажатии
         btn.Refresh()
@@ -1234,11 +1244,11 @@ def style_gen_button_v2(
 
     is_gen = isinstance(btn, GenButton)
 
-    # --- Состояния ---
-    btn._is_pressed = False
-    btn._is_hover   = False
-    btn._is_toggle  = toggle
-    btn._is_active  = False
+    # --- Состояния (замыкание) ---
+    is_pressed = False
+    is_hover   = False
+    is_toggle  = toggle
+    is_active  = False
 
     # --- Базовый вид ---
     btn.SetBackgroundColour(wx.Colour(normal_bg))
@@ -1249,8 +1259,12 @@ def style_gen_button_v2(
         btn.SetUseFocusIndicator(False)
 
     if font_size:
-        font = wx.Font(font_size, wx.FONTFAMILY_DEFAULT,
-                       wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        font = wx.Font(
+            font_size,
+            wx.FONTFAMILY_DEFAULT,
+            wx.FONTSTYLE_NORMAL,
+            wx.FONTWEIGHT_BOLD
+        )
         btn.SetFont(font)
     else:
         btn.SetFont(get_button_font())
@@ -1260,11 +1274,11 @@ def style_gen_button_v2(
 
     # --- Визуальное состояние ---
     def apply_visual_state():
-        if btn._is_toggle and btn._is_active:
+        if is_toggle and is_active:
             color = pressed_bg
-        elif btn._is_pressed:
+        elif is_pressed:
             color = pressed_bg
-        elif btn._is_hover:
+        elif is_hover:
             color = hover_bg
         else:
             color = normal_bg
@@ -1274,28 +1288,32 @@ def style_gen_button_v2(
 
     # --- События ---
     def on_enter(evt):
-        btn._is_hover = True
+        nonlocal is_hover
+        is_hover = True
         apply_visual_state()
         evt.Skip()
 
     def on_leave(evt):
-        btn._is_hover = False
-        btn._is_pressed = False
+        nonlocal is_hover, is_pressed
+        is_hover = False
+        is_pressed = False
         apply_visual_state()
         evt.Skip()
 
     def on_left_down(evt):
-        btn._is_pressed = True
+        nonlocal is_pressed
+        is_pressed = True
         apply_visual_state()
         evt.Skip()
 
     def on_left_up(evt):
-        btn._is_pressed = False
+        nonlocal is_pressed, is_active
+        is_pressed = False
 
-        if btn._is_toggle:
+        if is_toggle:
             x, y = evt.GetPosition()
             if btn.HitTest((x, y)) == wx.HT_WINDOW_INSIDE:
-                btn._is_active = not btn._is_active
+                is_active = not is_active
 
         apply_visual_state()
         evt.Skip()
@@ -1305,8 +1323,10 @@ def style_gen_button_v2(
     btn.Bind(wx.EVT_LEFT_DOWN, on_left_down)
     btn.Bind(wx.EVT_LEFT_UP, on_left_up)
 
+    # --- Публичный метод для toggle-кнопок ---
     def set_active(state: bool):
-        btn._is_active = state
+        nonlocal is_active
+        is_active = state
         apply_visual_state()
 
     btn.set_active = set_active
@@ -1332,20 +1352,21 @@ def create_standard_buttons(parent: wx.Window, on_ok, on_cancel=None, on_clear=N
         clear_button.Bind(wx.EVT_BUTTON, on_clear)
 
     # Cancel — красный
+    cancel_button: GenButton | None = None
     if on_cancel:
         cancel_button = GenButton(parent, label=loc.get("cancel_button"))
         style_gen_button(cancel_button, normal_bg="#c0392b", text_color=button_color, bezel=1)
         cancel_button.Bind(wx.EVT_BUTTON, on_cancel)
 
-    buttons = [ok_button]
+    button_list = [ok_button]
     if cancel_button:
-        buttons.insert(1, cancel_button)
+        button_list.insert(1, cancel_button)
     if clear_button:
-        buttons.insert(1, clear_button)
+        button_list.insert(1, clear_button)
 
-    return buttons
+    return button_list
 
-def apply_radio_group(buttons: list):
+def apply_radio_group(radio_buttons: list):
     """
     Делает toggle-кнопки взаимоисключающими.
     Ожидается, что кнопки уже styled и имеют toggle=True.
@@ -1353,7 +1374,7 @@ def apply_radio_group(buttons: list):
 
     def make_handler(active_btn):
         def handler(evt):
-            for b in buttons:
+            for b in radio_buttons:
                 if b is active_btn:
                     b.toggled = True
                     b.current_bg = b.pressed_bg
@@ -1367,7 +1388,7 @@ def apply_radio_group(buttons: list):
             evt.Skip()
         return handler
 
-    for btn in buttons:
+    for btn in radio_buttons:
         btn.Bind(wx.EVT_LEFT_UP, make_handler(btn))
 
 

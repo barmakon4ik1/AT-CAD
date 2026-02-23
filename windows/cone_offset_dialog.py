@@ -4,14 +4,11 @@ windows/cone_offset_dialog.py
 Диалоговое окно мостика таблички, посаженного на конус
 """
 
-import os
 from pprint import pprint
 
 import wx
-from typing import Dict, Optional
-from wx.lib.buttons import GenButton
-
-from config.at_config import NAME_PLATE_IMAGE_PATH, BRACKET5_CONE_IMAGE_PATH
+from typing import Optional
+from config.at_config import BRACKET5_CONE_IMAGE_PATH
 from locales.at_translations import loc
 from programs.at_construction import at_diameter
 from programs.at_geometry import diameter_cone_offset
@@ -21,13 +18,9 @@ from windows.at_window_utils import (
     CanvasPanel,
     BaseContentPanel,
     apply_styles_to_panel,
-    style_label,
-    style_textctrl,
-    style_staticbox,
-    style_gen_button, load_common_data, parse_float,
+    load_common_data, parse_float,
 )
-from config.name_plates.nameplate_storage import load_nameplates, save_nameplates
-from config.name_plates.nameplate_validation import validate_record
+
 # ----------------------------------------------------------------------
 # Локализация
 # ----------------------------------------------------------------------
@@ -311,7 +304,11 @@ class ConeOffsetContentPanel(BaseContentPanel):
             self.result = (d1, d2)
             print(self.result)
 
-            self.GetParent().EndModal(wx.ID_OK)
+            parent = self.GetParent()
+            if isinstance(parent, wx.Dialog):
+                parent.EndModal(wx.ID_CANCEL)
+            else:
+                parent.Close()
 
         except ValueError:
             show_popup(loc.get("invalid_number_format_error"), popup_type="error")
