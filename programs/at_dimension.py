@@ -34,6 +34,7 @@ from win32com.client import VARIANT
 
 from config.at_cad_init import ATCadInit
 from programs.at_base import regen
+from programs.at_geometry import ensure_point_variant
 from programs.at_input import at_get_point
 from config.at_config import (
     DEFAULT_DIM_SCALE,
@@ -189,6 +190,14 @@ def add_dimension(
         dim_type = str(adoc.Utility.GetString(True, "Введите тип размера (H/V/L/R/D/A): ")).strip().upper()
         if dim_type not in ("H", "V", "L", "R", "D", "A"):
             return None
+
+    # Преобразование точек в вариант
+    start_point = ensure_point_variant(start_point)
+    end_point = ensure_point_variant(end_point)
+    if point3:
+        point3 = ensure_point_variant(point3)
+    if point4:
+        point4 = ensure_point_variant(point4)
 
     # --- Горизонтальный, вертикальный, линейный ---
     if dim_type in ("H", "V", "L"):

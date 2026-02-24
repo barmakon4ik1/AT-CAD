@@ -117,6 +117,7 @@ LAYER_DATA: list[dict[str, object]] = [
     {"name": "AM_0", "color": 7, "linetype": "CONTINUOUS", "lineweight": 1},
     {"name": "SF-ARE", "color": 233, "linetype": "PHANTOM2", "plot": False},
     {"name": "AM_5", "color": 110, "linetype": "CONTINUOUS", "lineweight": 0.05},
+    {"name": "AM_7", "color": 4, "linetype": "AMISO8W050", "lineweight": 0.05},
     {"name": "LASER-TEXT", "color": 2, "linetype": "CONTINUOUS"},
     {"name": "schrift", "color": 4, "linetype": "CONTINUOUS"},
     {"name": "SF-RAHMEN", "color": 140, "linetype": "CONTINUOUS"},

@@ -13,6 +13,7 @@ from programs.at_geometry import ensure_point_variant
 from programs.at_input import at_get_point
 
 from errors.at_errors import ATError, GeometryError, DataError, TextError
+from utils.cad_transaction import transactional
 from windows.at_gui_utils import show_popup
 
 # -----------------------------
@@ -154,7 +155,6 @@ def main(ring_data: dict | None = None) -> bool:
         return False
 
 
-
 if __name__ == "__main__":
     """
     Точка входа в приложение. Для тестирования напрямую (не рекомендуется).
@@ -167,7 +167,7 @@ if __name__ == "__main__":
             "material": "1.4301",
             "thickness": 3,
             "diameters": {"1": 100, "2": 200},
-            "input_point": [0, 0, 0]  # Изменено с insert_point на input_point
+            "input_point": (0, 0, 0)  # Изменено с insert_point на input_point
         }
         main(test_data)
     except Exception as main_err:

@@ -36,6 +36,7 @@ from locales.at_translations import loc
 from programs.at_dimension import add_dimension
 from programs.at_geometry import polar_point, PolylineBuilder, ensure_point_variant, distance_2points, \
     bulge_chord, circle_line_intersection, triangle
+from utils.cad_transaction import transactional
 from windows.at_gui_utils import show_popup
 
 # ---------------------------------------------------------------------------
@@ -660,6 +661,7 @@ def build_type1(modelspace, cfg: BridgeConfig):
     }
 
 
+# @transactional
 def build_type2(modelspace, cfg: BridgeConfig):
     """
     Построение развертки мостика типа BentStraight (type2).
@@ -675,9 +677,6 @@ def build_type2(modelspace, cfg: BridgeConfig):
     length = spec["length"]
     thickness = cfg.thickness
 
-    shell_diameter = spec["shell_diameter1"]
-    shell_radius = shell_diameter / 2 if shell_diameter else 0.0
-
     if cut:
         h_cut = cut["height_cut"]
         l_cut = cut["length_cut"]
@@ -686,23 +685,15 @@ def build_type2(modelspace, cfg: BridgeConfig):
         h_cut = l_cut = r_cut = 0.0
 
     # --------------------------------------------------
-    # Расчет полной длины
-    # --------------------------------------------------
-    if shell_radius:
-        length_full = length + shell_radius - (shell_radius ** 2 - width ** 2 / 4) ** 0.5
-    else:
-        length_full = length
-
-    # --------------------------------------------------
     # Геометрия
     # --------------------------------------------------
     cx, cy = center_point[0], center_point[1]
     h1_cut = (bridge_height - h_cut) / 2.0
 
     p0 = (cx + (0.5 * width - thickness), cy - (0.5 * bridge_height))
-    p1 = (p0[0] + (length_full - thickness), p0[1])
+    p1 = (p0[0] + (length - thickness), p0[1])
     p15 = (cx - (0.5 * width - thickness), p0[1])
-    p14 = (p15[0] - (length_full - thickness), p1[1])
+    p14 = (p15[0] - (length - thickness), p1[1])
 
     p2 = (p1[0], p1[1] + h1_cut)
     p3 = (p2[0] - l_cut, p2[1])
@@ -753,31 +744,27 @@ def build_type2(modelspace, cfg: BridgeConfig):
 
     pb.close()
 
-    # Контур
-    add_polyline(
-        modelspace,
-        pb.vertices(),
-        layer_name=DEFAULT_CUTOUT_LAYER,
-        closed=True,
-    )
-
-    # ------------------------------------------------------------------
-    # Линии сгиба
-    # ------------------------------------------------------------------
-
-    add_line(modelspace, p0, p7, layer_name=DEFAULT_DIM_LAYER)
-    add_line(modelspace, p15, p8, layer_name=DEFAULT_DIM_LAYER)
-
-    # ------------------------------------------------------------------
-    # Размеры
-    # ------------------------------------------------------------------
-
+    # Точки для размерных линий
     p9v = ensure_point_variant(p9)
     p8v = ensure_point_variant(p8)
     p7v = ensure_point_variant(p7)
     p6v = ensure_point_variant(p6)
     p14v = ensure_point_variant(p14)
 
+    # ------------------------------------------------------------------
+    # Контур
+    # ------------------------------------------------------------------
+    add_polyline(modelspace, pb.vertices(), layer_name=DEFAULT_CUTOUT_LAYER, closed=True)
+
+    # ------------------------------------------------------------------
+    # Линии сгиба
+    # ------------------------------------------------------------------
+    add_line(modelspace, p0, p7, layer_name=DEFAULT_DIM_LAYER)
+    add_line(modelspace, p15, p8, layer_name=DEFAULT_DIM_LAYER)
+
+    # ------------------------------------------------------------------
+    # Размеры
+    # ------------------------------------------------------------------
     add_dimension(document, "H", p9v, p8v, offset=DEFAULT_DIM_OFFSET)
     add_dimension(document, "H", p8v, p7v, offset=DEFAULT_DIM_OFFSET)
     add_dimension(document, "H", p7v, p6v, offset=DEFAULT_DIM_OFFSET)

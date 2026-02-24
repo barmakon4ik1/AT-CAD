@@ -1,6 +1,6 @@
 {
-    "order_number": "20409",
+    "order_number": "20411-2",
     "material": "1.4301",
     "thickness": 3.0,
-    "weld_allowance": 1.0
+    "weld_allowance": 3.0
 }

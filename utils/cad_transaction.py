@@ -127,7 +127,7 @@ def run_in_transaction(doc, base_point, build_func, *args, **kwargs):
 
 def transactional(func):
 
-    def wrapper(doc, base_point, *args, **kwargs):
+    def wrapper(base_point, *args, **kwargs):
         from programs.at_geometry import ensure_point_variant
 
         base_variant = ensure_point_variant(base_point)
@@ -137,7 +137,7 @@ def transactional(func):
             if trx.block is None:
                 return None, trx.errors
 
-            result = func(trx.model, *args, **kwargs)
+            result = func(*args, **kwargs)
 
         return result, trx.errors
 
@@ -148,7 +148,7 @@ def transactional(func):
 #  Для примера
 # ------------------------------
 @transactional
-def build_plate(model, width, height):
+def build_plate(width, height):
     add_rectangle(model, (0,0,0), width, height)
     add_circle(model, (width/2, height/2, 0), 50, layer_name="schrift")
     p0 = ensure_point_variant((0, 0, 0))
@@ -162,7 +162,7 @@ if __name__ == '__main__':
     acad = ATCadInit()
     doc, model = acad.document, acad.model_space
     user_point = ensure_point_variant((0, 0, 0))
-    build_plate(doc, user_point, 400, 200)
+    build_plate(user_point, 400, 200)
     regen(doc)
 
 # if __name__ == "__main__":
