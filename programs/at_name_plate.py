@@ -36,7 +36,6 @@ from locales.at_translations import loc
 from programs.at_dimension import add_dimension
 from programs.at_geometry import polar_point, PolylineBuilder, ensure_point_variant, distance_2points, \
     bulge_chord, circle_line_intersection, triangle
-from utils.cad_transaction import transactional
 from windows.at_gui_utils import show_popup
 
 # ---------------------------------------------------------------------------

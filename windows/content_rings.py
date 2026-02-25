@@ -3,7 +3,9 @@ windows/content_rings.py
 
 Панель ввода параметров колец.
 """
+from pprint import pprint
 
+import wx.grid as gridlib
 import wx
 from typing import Optional
 from config.at_config import (
@@ -20,7 +22,7 @@ from windows.at_window_utils import (
     update_status_bar_point_selected,
     BaseContentPanel,
     load_user_settings,
-    get_wx_color_from_value,
+    get_wx_color_from_value, parse_float,
 )
 
 # ----------------------------------------------------------------------
@@ -34,11 +36,13 @@ TRANSLATIONS = {
     "order_label": {"ru": "К-№", "de": "K-Nr.", "en": "K-no."},
     "material_label": {"ru": "Материал", "de": "Material", "en": "Material"},
     "thickness_label": {"ru": "Толщина S, мм", "de": "Dicke S, mm", "en": "Thickness S, mm"},
-    "diameter": {"ru": "Диаметры", "de": "Durchmesser", "en": "Diameters"},
-    "diameters": {"ru": "Диаметр", "de": "Durchmesser", "en": "Diameter"},
+    "diameter": {"ru": "Диаметр D", "de": "Durchmesser D", "en": "Diameter D"},
+    "values": {"ru": "Значения, мм", "de": "Werte, mm", "en": "Values, mm"},
     "no_data_error": {"ru": "Необходимо ввести хотя бы один размер", "de": "Mindestens eine Abmessung muss eingegeben werden", "en": "At least one dimension must be entered"},
     "point_selection_error": {"ru": "Ошибка выбора точки", "de": "Fehler bei der Punktauswahl", "en": "Point selection error"},
     "error": {"ru": "Ошибка", "de": "Fehler", "en": "Error"},
+    "offset_x": {"ru": "Отступ X", "de": "Abstand X", "en": "Offset X"},
+    "offset_y": {"ru": "Отступ Y", "de": "Abstand Y", "en": "Offset Y"},
 }
 loc.register_translations(TRANSLATIONS)
 
@@ -64,6 +68,8 @@ class RingsContentPanel(BaseContentPanel):
 
     def __init__(self, parent: wx.Window, on_submit_callback=None):
         super().__init__(parent)
+        self.diam_grid = None
+        self.diameter_rows = None
         self.settings = load_user_settings()
         self.on_submit_callback = on_submit_callback
         self.parent = parent
@@ -87,6 +93,8 @@ class RingsContentPanel(BaseContentPanel):
         self.form = None
         self.fb = None
         self.diameter_inputs = []
+
+        self.setup_ui()
 
     # ------------------------------------------------------------------
     # UI
@@ -158,22 +166,91 @@ class RingsContentPanel(BaseContentPanel):
         )
 
         # ============================================================
-        # ГРУППА: Диаметры
+        # ГРУППА: Диаметры - старый вариант
         # ============================================================
-        diam_sizer = self.fb.static_box("diameters")
+        # diam_sizer = self.fb.static_box("diameters")
+        # self.static_boxes["diameters"] = diam_sizer.GetStaticBox()
+        #
+        # fb_diam = FieldBuilder(
+        #     parent=self,
+        #     target_sizer=diam_sizer,
+        #     form=self.form
+        # )
+        #
+        # fb_diam.text_column(
+        #     [f"diameter_{i + 1}" for i in range(5)],
+        #     width=200,
+        #     default=""
+        # )
+
+        # ============================================================
+        # Таблица диаметров
+        # ============================================================
+
+        diam_sizer = self.fb.static_box(loc.get("values"))
         self.static_boxes["diameters"] = diam_sizer.GetStaticBox()
 
-        fb_diam = FieldBuilder(
-            parent=self,
-            target_sizer=diam_sizer,
-            form=self.form
-        )
+        # Создаём таблицу
+        self.diam_grid = gridlib.Grid(self)
+        self.diam_grid.CreateGrid(5, 3)
 
-        fb_diam.text_column(
-            [f"diameter_{i + 1}" for i in range(5)],
-            width=200,
-            default=""
-        )
+        # --- Локализованные заголовки ---
+        self.diam_grid.SetColLabelValue(0, loc.get("diameter", "Диаметр D"))
+        self.diam_grid.SetColLabelValue(1, loc.get("offset_x", "Отступ X"))
+        self.diam_grid.SetColLabelValue(2, loc.get("offset_y", "Отступ Y"))
+
+        # --- Убираем номера строк ---
+        self.diam_grid.SetRowLabelSize(0)
+
+        # --- Шрифт ---
+        font = wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+        self.diam_grid.SetDefaultCellFont(font)
+        self.diam_grid.SetLabelFont(font)
+
+        # --- Высота строк под шрифт ---
+        text_height = self.diam_grid.GetTextExtent("Hg")[1]  # вычисляем высоту текста
+        for row in range(self.diam_grid.GetNumberRows()):
+            self.diam_grid.SetRowSize(row, text_height + 8)  # +8 пикселей отступа
+
+        # --- Ширина колонок ---
+        self.diam_grid.SetColSize(0, 120)
+        self.diam_grid.SetColSize(1, 120)
+        self.diam_grid.SetColSize(2, 120)
+
+        # --- Значения по умолчанию ---
+        for row in range(self.diam_grid.GetNumberRows()):
+            self.diam_grid.SetCellValue(row, 0, "")
+            self.diam_grid.SetCellValue(row, 1, "0")
+            self.diam_grid.SetCellValue(row, 2, "0")
+
+        # --- Центрирование всех ячеек ---
+        def align_row_center(row):
+            for col in range(self.diam_grid.GetNumberCols()):
+                self.diam_grid.SetCellAlignment(row, col, wx.ALIGN_CENTER, wx.ALIGN_CENTER_VERTICAL)
+
+        for row in range(self.diam_grid.GetNumberRows()):
+            align_row_center(row)
+
+        # --- Авто-добавление новой строки при заполнении последней ---
+        def on_cell_change(evt):
+            row = evt.GetRow()
+            # проверяем, что хотя бы одна ячейка заполнена
+            if row == self.diam_grid.GetNumberRows() - 1 and any(
+                    self.diam_grid.GetCellValue(row, c).strip() != "" for c in range(3)
+            ):
+                self.diam_grid.AppendRows(1)
+                new_row = self.diam_grid.GetNumberRows() - 1
+                self.diam_grid.SetCellValue(new_row, 0, "")
+                self.diam_grid.SetCellValue(new_row, 1, "0")
+                self.diam_grid.SetCellValue(new_row, 2, "0")
+                self.diam_grid.SetRowSize(new_row, text_height + 8)
+                align_row_center(new_row)
+            evt.Skip()
+
+        self.diam_grid.Bind(gridlib.EVT_GRID_CELL_CHANGED, on_cell_change)
+
+        # --- Добавляем таблицу в sizer ---
+        diam_sizer.Add(self.diam_grid, 1, wx.EXPAND | wx.ALL, 5)
 
         # ------------------------------------------------------------
         # Кнопки
@@ -194,6 +271,29 @@ class RingsContentPanel(BaseContentPanel):
     # ------------------------------------------------------------------
     # Сервис
     # ------------------------------------------------------------------
+    def get_diameter_table(self):
+        """Возвращает список кортежей (D, X, Y). Если хотя бы одно значение некорректно, выдаёт исключение."""
+        data = []
+        for row in range(self.diam_grid.GetNumberRows()):
+            d_str = self.diam_grid.GetCellValue(row, 0).strip()
+            x_str = self.diam_grid.GetCellValue(row, 1).strip()
+            y_str = self.diam_grid.GetCellValue(row, 2).strip()
+
+            # Пропускаем полностью пустые строки
+            if not d_str and not x_str and not y_str:
+                continue
+
+            try:
+                d = parse_float(d_str)
+                x = parse_float(x_str)
+                y = parse_float(y_str)
+            except Exception:
+                raise ValueError(loc.get("error"))
+
+            data.append((d, x, y))
+
+        return data
+
     def clear_input_fields(self):
         self.form.clear()
         self.insert_point = None
@@ -209,21 +309,21 @@ class RingsContentPanel(BaseContentPanel):
                 show_popup(loc.get("no_data_error"), popup_type="error")
                 return
 
-            # диаметры
-            diameters = {
-                k.replace("diameter_", ""): v
-                for k, v in data.items()
-                if k.startswith("diameter_") and v not in ("", None)
-            }
-
-            if not diameters:
+            # --- Сбор таблицы диаметров ---
+            diam_list = self.get_diameter_table()  # [(D1, X1, Y1), (D2, X2, Y2), ...]
+            if not diam_list:
                 show_popup(loc.get("no_data_error"), popup_type="error")
                 return
+
+            # Преобразуем в словарь {"1": [D1, X1, Y1], "2": [D2, X2, Y2], ...}
+            diameters = {str(i + 1): list(v) for i, v in enumerate(diam_list)}
 
             data["diameters"] = diameters
 
             if not self.validate_input(data):
                 return
+
+            pprint(data) # Debug
 
             if self.on_submit_callback:
                 self.on_submit_callback(data)
@@ -233,35 +333,37 @@ class RingsContentPanel(BaseContentPanel):
         except Exception as e:
             show_popup(loc.get("error") + f": {str(e)}", popup_type="error")
 
-    # def on_clear(self, event: Optional[wx.Event] = None):
-    #     _ = event
-    #     self.clear_input_fields()
-    #
-    # def on_cancel(self, event: Optional[wx.Event] = None, switch_content="content_apps"):
-    #     _ = event
-    #     self.switch_content_panel(switch_content)
-
 # ----------------------------------------------------------------------
 # Тестовый запуск
 # ----------------------------------------------------------------------
 if __name__ == "__main__":
-
-    from programs.at_ringe import main
+    import wx
 
     app = wx.App(False)
     frame = wx.Frame(None, title="test_rings_window", size=wx.Size(1500, 700))
-    panel = RingsContentPanel(frame)
 
-    def on_ok_test():
-        data = panel.form.collect()
-        if data:
-            print("FORM DATA:", data)
-            main(data)
-
+    # передаём callback для вывода данных
+    panel = RingsContentPanel(frame, on_submit_callback=lambda data: print("Collected data:", data))
 
     sizer = wx.BoxSizer(wx.VERTICAL)
     sizer.Add(panel, 1, wx.EXPAND)
     frame.SetSizer(sizer)
     frame.Layout()
     frame.Show()
+
+    # --- тест: после запуска окна добавляем таймер для автоматического on_ok ---
+    def call_on_ok():
+        # заполняем несколько строк таблицы для теста
+        grid = panel.diam_grid
+        grid.SetCellValue(0, 0, "100")
+        grid.SetCellValue(0, 1, "5")
+        grid.SetCellValue(0, 2, "5")
+        grid.SetCellValue(1, 0, "200")
+        grid.SetCellValue(1, 1, "10")
+        grid.SetCellValue(1, 2, "10")
+
+        panel.on_ok()  # вызываем метод, который собирает данные
+
+    wx.CallLater(100, call_on_ok)  # вызов через 100 мс после старта
+
     app.MainLoop()

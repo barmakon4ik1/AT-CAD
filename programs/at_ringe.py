@@ -6,14 +6,15 @@ programs/at_ringe.py
 
 from config.at_cad_init import ATCadInit
 from config.at_config import DEFAULT_CIRCLE_LAYER, DEFAULT_DIM_OFFSET
+from engineering_handbook.engineering_handbook.settings import DEBUG
 from locales.at_translations import loc
 from programs.at_construction import add_circle, AccompanyText, MainText
 from programs.at_base import layer_context, regen
-from programs.at_geometry import ensure_point_variant
+from programs.at_dimension import add_dimension
+from programs.at_geometry import ensure_point_variant, polar_point, offset_point
 from programs.at_input import at_get_point
 
 from errors.at_errors import ATError, GeometryError, DataError, TextError
-from utils.cad_transaction import transactional
 from windows.at_gui_utils import show_popup
 
 # -----------------------------
@@ -82,7 +83,7 @@ def main(ring_data: dict | None = None) -> bool:
             raise DataError(__name__, ValueError(loc.get("no_diameters")))
 
         # ------------------------------------------------------------------
-        # Преобразование точки
+        # Преобразование точки центра
         # ------------------------------------------------------------------
         try:
             center_variant = ensure_point_variant(center)
@@ -90,19 +91,27 @@ def main(ring_data: dict | None = None) -> bool:
             raise GeometryError(__name__, err)
 
         # ------------------------------------------------------------------
-        # Построение окружностей
+        # Построение окружностей с учётом смещений
         # ------------------------------------------------------------------
         try:
             with layer_context(adoc, DEFAULT_CIRCLE_LAYER):
-                for diameter_value in diameters.values():
-                    if (
-                        not isinstance(diameter_value, (int, float))
-                        or diameter_value <= 0
-                    ):
-                        raise ValueError(loc.get("no_diameters"))
+                for i, values in enumerate(diameters.values(), start=1):  # start=1 для нумерации
+                    # if not (isinstance(values, (list, tuple)) and len(values) == 3):
+                    #     raise ValueError(loc.get("no_diameters"))
 
-                    radius = diameter_value / 2.0
-                    add_circle(model, center_variant, radius, DEFAULT_CIRCLE_LAYER)
+                    diameter, offset_x, offset_y = values
+
+                    # if not isinstance(diameter, (int, float)) or diameter <= 0:
+                    #     raise ValueError(loc.get("no_diameters"))
+
+                    radius = diameter / 2.0
+                    # точка с учётом смещений
+                    circle_center = offset_point(center_variant, offset_x, offset_y)
+
+                    add_circle(model, circle_center, radius, DEFAULT_CIRCLE_LAYER)
+                    # построение радиуса
+                    # chord_point = polar_point(circle_center, radius, 20 * i)
+                    # add_dimension(adoc, "R", circle_center, chord_point, radius)
 
         except Exception as err:
             raise GeometryError(__name__, err)
@@ -112,21 +121,28 @@ def main(ring_data: dict | None = None) -> bool:
         # ------------------------------------------------------------------
         if work_number:
             try:
-                sorted_radii = sorted(
-                    [d / 2.0 for d in diameters.values()], reverse=True
-                )
-                max_radius = sorted_radii[0]
-                second_radius = sorted_radii[1] if len(sorted_radii) > 1 else 0
+                # # вытаскиваем радиусы из списка [D, X, Y]
+                # sorted_radii = sorted(
+                #     [values[0] / 2.0 for values in diameters.values()], reverse=True
+                # )
+                # max_radius = sorted_radii[0]
+                # second_radius = sorted_radii[1] if len(sorted_radii) > 1 else 0
+                #
+                # # вычисляем смещение текста
+                # y_offset = max_radius - (max_radius - second_radius) * 0.5
+                #
+                # p1 = [center[0], center[1] + y_offset, 0]
+                # p2 = [
+                #     center[0],
+                #     center[1] + max_radius + DEFAULT_DIM_OFFSET + 20,
+                #     0,
+                # ]
 
-                y_offset = max_radius - (max_radius - second_radius) * 0.5
+                # DEBUG
+                p1 = polar_point(center, radius / 2.0, 90)
+                p2 = polar_point(center, radius + 50, 90)
 
-                p1 = [center[0], center[1] + y_offset, 0]
-                p2 = [
-                    center[0],
-                    center[1] + max_radius + DEFAULT_DIM_OFFSET + 20,
-                    0,
-                ]
-
+                # основной текст
                 MainText(
                     {
                         "work_number": work_number,
@@ -134,6 +150,7 @@ def main(ring_data: dict | None = None) -> bool:
                     }
                 ).draw(model, p1, text_alignment=4, laser=True)
 
+                # дополнительный текст
                 AccompanyText(
                     {
                         "thickness": thickness,
@@ -166,7 +183,7 @@ if __name__ == "__main__":
             "detail": "1",
             "material": "1.4301",
             "thickness": 3,
-            "diameters": {"1": 100, "2": 200},
+            "diameters": {"1": [500, 0, 0], "2": [200, 0, 0], "3": [22, 150, -150]},
             "input_point": (0, 0, 0)  # Изменено с insert_point на input_point
         }
         main(test_data)

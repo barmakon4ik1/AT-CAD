@@ -1349,13 +1349,7 @@ class BracketSpecificPanel(wx.Panel):
                     specific["length"] = length_input
 
                 elif length_option == "L0":
-                    under_root = math.sqrt(radius ** 2 - (width ** 2) / 4.0)
-
-                    if under_root < 0:
-                        raise loc.get("geometry_compensation_error")
-
-                    delta = radius - (under_root ** 0.5)
-                    specific["length"] = length_input - delta + radius
+                    specific["length"] = length_input + radius - (radius ** 2 - (width ** 2) / 4.0) ** 0.5
 
                 else:
                     raise loc.get("invalid_length_option")
