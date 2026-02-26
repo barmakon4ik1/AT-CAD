@@ -12,6 +12,8 @@
 
 import json
 from pathlib import Path
+from typing import TypedDict
+
 import wx
 
 # --- Базовые пути ---
@@ -81,8 +83,32 @@ FORM_CONFIG = {
     "field_bg_color": (255, 255, 255)
 }
 
+class DefaultSettings(TypedDict):
+    TITLE_FONT_NAME: str
+    TITLE_FONT_TYPE: str
+    TITLE_FONT_SIZE: int
+    TITLE_FONT_WEIGHT: int
+    TITLE_FONT_COLOR: str
+    FONT_NAME: str
+    FONT_TYPE: str
+    FONT_SIZE: int
+    STATUS_FONT_SIZE: int
+    STATUS_TEXT_COLOR: str
+    BANNER_FONT_SIZE: int
+    LABEL_FONT_SIZE: int
+    LABEL_FONT_NAME: str
+    LABEL_FONT_TYPE: str
+    LABEL_FONT_WEIGHT: str
+    BACKGROUND_COLOR: str
+    FOREGROUND_COLOR: str
+    BANNER_COLOR: str
+    BANNER_TEXT_COLOR: str
+    EXIT_BUTTON_COLOR: str
+    LABEL_FONT_COLOR: str
+    BUTTON_FONT_COLOR: str
+
 # --- Настройки по умолчанию ---
-DEFAULT_SETTINGS: dict[str, object] = {
+DEFAULT_SETTINGS: DefaultSettings = {
     "TITLE_FONT_NAME": "BUSE letters 16x8",
     "TITLE_FONT_TYPE": "normal",
     "TITLE_FONT_SIZE": 48,

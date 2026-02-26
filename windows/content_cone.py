@@ -114,6 +114,9 @@ class ConeContentPanel(BaseContentPanel):
             callback: Функция обратного вызова для передачи данных.
         """
         super().__init__(parent)
+        self.right_sizer = None
+        self.left_sizer = None
+        self.canvas = None
         self.last_input_file = str(LAST_CONE_INPUT_FILE)
         self.on_submit_callback = callback
         self.parent = parent

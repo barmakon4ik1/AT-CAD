@@ -46,6 +46,45 @@ TRANSLATIONS = {
 loc.register_translations(TRANSLATIONS)
 
 
+def get_valid_diameters(diameters: dict) -> list[tuple[float, float, float]]:
+    """
+    Возвращает список корректных (D, X, Y).
+
+    Фильтрует:
+    - None
+    - пустые строки
+    - некорректные типы
+    - отрицательные и нулевые диаметры
+    """
+
+    if not isinstance(diameters, dict):
+        return []
+
+    valid = []
+
+    for values in diameters.values():
+
+        if not isinstance(values, (list, tuple)) or len(values) != 3:
+            continue
+
+        diameter, offset_x, offset_y = values
+
+        # Проверка диаметра
+        if not isinstance(diameter, (int, float)) or diameter <= 0:
+            continue
+
+        # Проверка смещений
+        if not isinstance(offset_x, (int, float)):
+            offset_x = 0.0
+
+        if not isinstance(offset_y, (int, float)):
+            offset_y = 0.0
+
+        valid.append((float(diameter), float(offset_x), float(offset_y)))
+
+    return valid
+
+
 def main(ring_data: dict | None = None) -> bool:
     """
     Основная функция для построения колец в AutoCAD.
@@ -77,7 +116,11 @@ def main(ring_data: dict | None = None) -> bool:
         detail = ring_data.get("detail", "")
         material = ring_data.get("material", "")
         thickness = ring_data.get("thickness", "")
-        diameters = ring_data.get("diameters", {})
+        raw_diameters = ring_data.get("diameters", {})
+        diameters = get_valid_diameters(raw_diameters)
+
+        if not diameters:
+            raise DataError(__name__, ValueError(loc.get("no_diameters")))
 
         if not diameters:
             raise DataError(__name__, ValueError(loc.get("no_diameters")))
@@ -90,28 +133,25 @@ def main(ring_data: dict | None = None) -> bool:
         except Exception as err:
             raise GeometryError(__name__, err)
 
+        # Нахожление окружности с максимальным диаметром
+        max_diameter, max_offset_x, max_offset_y = max(
+            diameters,
+            key=lambda v: v[0]  # сортировка по диаметру
+        )
+
+        max_radius = max_diameter / 2.0
+        max_center = offset_point(center_variant, max_offset_x, max_offset_y)
+
         # ------------------------------------------------------------------
         # Построение окружностей с учётом смещений
         # ------------------------------------------------------------------
         try:
             with layer_context(adoc, DEFAULT_CIRCLE_LAYER):
-                for i, values in enumerate(diameters.values(), start=1):  # start=1 для нумерации
-                    # if not (isinstance(values, (list, tuple)) and len(values) == 3):
-                    #     raise ValueError(loc.get("no_diameters"))
-
-                    diameter, offset_x, offset_y = values
-
-                    # if not isinstance(diameter, (int, float)) or diameter <= 0:
-                    #     raise ValueError(loc.get("no_diameters"))
-
+                for i, (diameter, offset_x, offset_y) in enumerate(diameters, start=1):
                     radius = diameter / 2.0
-                    # точка с учётом смещений
                     circle_center = offset_point(center_variant, offset_x, offset_y)
 
                     add_circle(model, circle_center, radius, DEFAULT_CIRCLE_LAYER)
-                    # построение радиуса
-                    # chord_point = polar_point(circle_center, radius, 20 * i)
-                    # add_dimension(adoc, "R", circle_center, chord_point, radius)
 
         except Exception as err:
             raise GeometryError(__name__, err)
@@ -121,41 +161,17 @@ def main(ring_data: dict | None = None) -> bool:
         # ------------------------------------------------------------------
         if work_number:
             try:
-                # # вытаскиваем радиусы из списка [D, X, Y]
-                # sorted_radii = sorted(
-                #     [values[0] / 2.0 for values in diameters.values()], reverse=True
-                # )
-                # max_radius = sorted_radii[0]
-                # second_radius = sorted_radii[1] if len(sorted_radii) > 1 else 0
-                #
-                # # вычисляем смещение текста
-                # y_offset = max_radius - (max_radius - second_radius) * 0.5
-                #
-                # p1 = [center[0], center[1] + y_offset, 0]
-                # p2 = [
-                #     center[0],
-                #     center[1] + max_radius + DEFAULT_DIM_OFFSET + 20,
-                #     0,
-                # ]
-
-                # DEBUG
-                p1 = polar_point(center, radius / 2.0, 90)
-                p2 = polar_point(center, radius + 50, 90)
+                p1 = offset_point(max_center, 0, max_radius / 2)
+                p2 = offset_point(max_center, 0, max_radius + DEFAULT_DIM_OFFSET + 20)
 
                 # основной текст
                 MainText(
-                    {
-                        "work_number": work_number,
-                        "detail": detail,
-                    }
+                    {"work_number": work_number, "detail": detail}
                 ).draw(model, p1, text_alignment=4, laser=True)
 
                 # дополнительный текст
                 AccompanyText(
-                    {
-                        "thickness": thickness,
-                        "material": material,
-                    }
+                    {"thickness": thickness, "material": material}
                 ).draw(model, p2, text_alignment=4)
 
             except Exception as err:

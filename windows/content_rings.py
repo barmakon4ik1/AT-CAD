@@ -114,7 +114,7 @@ class RingsContentPanel(BaseContentPanel):
         # Левая часть — изображение
         # ------------------------------------------------------------
         image_path = str(RING_IMAGE_PATH)
-        self.canvas = CanvasPanel(self, image_file=image_path, size=(600, 400))
+        self.canvas = CanvasPanel(self, image_file=image_path, size=(750, 400))
         self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
 
         # ------------------------------------------------------------
@@ -166,28 +166,10 @@ class RingsContentPanel(BaseContentPanel):
         )
 
         # ============================================================
-        # ГРУППА: Диаметры - старый вариант
-        # ============================================================
-        # diam_sizer = self.fb.static_box("diameters")
-        # self.static_boxes["diameters"] = diam_sizer.GetStaticBox()
-        #
-        # fb_diam = FieldBuilder(
-        #     parent=self,
-        #     target_sizer=diam_sizer,
-        #     form=self.form
-        # )
-        #
-        # fb_diam.text_column(
-        #     [f"diameter_{i + 1}" for i in range(5)],
-        #     width=200,
-        #     default=""
-        # )
-
-        # ============================================================
         # Таблица диаметров
         # ============================================================
 
-        diam_sizer = self.fb.static_box(loc.get("values"))
+        diam_sizer = self.fb.static_box(loc.get("values"), proportion=1)
         self.static_boxes["diameters"] = diam_sizer.GetStaticBox()
 
         # Создаём таблицу
@@ -203,7 +185,13 @@ class RingsContentPanel(BaseContentPanel):
         self.diam_grid.SetRowLabelSize(0)
 
         # --- Шрифт ---
-        font = wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+        font_size = DEFAULT_SETTINGS["FONT_SIZE"]
+        font = wx.Font(
+            font_size,
+            wx.FONTFAMILY_DEFAULT,
+            wx.FONTSTYLE_NORMAL,
+            wx.FONTWEIGHT_NORMAL
+        )
         self.diam_grid.SetDefaultCellFont(font)
         self.diam_grid.SetLabelFont(font)
 
@@ -255,14 +243,13 @@ class RingsContentPanel(BaseContentPanel):
         # ------------------------------------------------------------
         # Кнопки
         # ------------------------------------------------------------
-        self.right_sizer.AddStretchSpacer()
         self.right_sizer.Add(self.create_button_bar(), 0, wx.ALIGN_RIGHT | wx.ALL, 5)
 
         # ------------------------------------------------------------
         # Финал
         # ------------------------------------------------------------
         main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
-        main_sizer.Add(self.right_sizer, 0, wx.EXPAND | wx.ALL, 10)
+        main_sizer.Add(self.right_sizer, 1, wx.EXPAND | wx.ALL, 10)
 
         self.SetSizer(main_sizer)
         apply_styles_to_panel(self)

@@ -57,9 +57,11 @@ PROMPTS = {
     "L_start": "Укажите первую точку линейного размера",
     "L_end": "Укажите вторую точку линейного размера",
     "R_center": "Укажите центр окружности или дуги",
+    "R_start": "Укажите центр окружности или дуги",
     "R_point": "Укажите точку на окружности или дуге",
-    "D_p1": "Укажите первую точку на окружности",
-    "D_p2": "Укажите противоположную точку на окружности",
+    "R_end": "Укажите точку на окружности или дуге",
+    "D_start": "Укажите первую точку на окружности",
+    "D_end": "Укажите противоположную точку на окружности",
     "A_vertex": "Укажите вершину угла",
     "A_side1": "Укажите точку на первой стороне угла",
     "A_side2": "Укажите точку на второй стороне угла",
@@ -319,11 +321,11 @@ def add_dimension(
         # ------------------------------------------------------------------
         elif dim_type == "D":
 
-            # Сдвигаем start_point диаметрально относительно end_point
-            x0, y0, z0 = _xyz_from_variant(start_point)
-            x1, y1, z1 = _xyz_from_variant(end_point)
+            # # Сдвигаем start_point диаметрально относительно end_point
+            # x0, y0, z0 = _xyz_from_variant(start_point)
+            # x1, y1, z1 = _xyz_from_variant(end_point)
 
-            start_diam = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [x1 + (x1 - x0), y1 + (y1 - y0), z1 + (z1 - z0)])
+            start_diam = start_point
             end_diam = end_point
 
             dim_ent = model.AddDimDiametric(
