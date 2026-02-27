@@ -201,9 +201,9 @@ class RingsContentPanel(BaseContentPanel):
             self.diam_grid.SetRowSize(row, text_height + 8)  # +8 пикселей отступа
 
         # --- Ширина колонок ---
-        self.diam_grid.SetColSize(0, 120)
-        self.diam_grid.SetColSize(1, 120)
-        self.diam_grid.SetColSize(2, 120)
+        self.diam_grid.SetColSize(0, 130)
+        self.diam_grid.SetColSize(1, 130)
+        self.diam_grid.SetColSize(2, 130)
 
         # --- Значения по умолчанию ---
         for row in range(self.diam_grid.GetNumberRows()):
@@ -212,18 +212,18 @@ class RingsContentPanel(BaseContentPanel):
             self.diam_grid.SetCellValue(row, 2, "0")
 
         # --- Центрирование всех ячеек ---
-        def align_row_center(row):
+        def align_row_center(arow):
             for col in range(self.diam_grid.GetNumberCols()):
-                self.diam_grid.SetCellAlignment(row, col, wx.ALIGN_CENTER, wx.ALIGN_CENTER_VERTICAL)
+                self.diam_grid.SetCellAlignment(arow, col, wx.ALIGN_CENTER, wx.ALIGN_CENTER_VERTICAL)
 
         for row in range(self.diam_grid.GetNumberRows()):
             align_row_center(row)
 
         # --- Авто-добавление новой строки при заполнении последней ---
         def on_cell_change(evt):
-            row = evt.GetRow()
+            c_row = evt.GetRow()
             # проверяем, что хотя бы одна ячейка заполнена
-            if row == self.diam_grid.GetNumberRows() - 1 and any(
+            if c_row == self.diam_grid.GetNumberRows() - 1 and any(
                     self.diam_grid.GetCellValue(row, c).strip() != "" for c in range(3)
             ):
                 self.diam_grid.AppendRows(1)
@@ -254,6 +254,7 @@ class RingsContentPanel(BaseContentPanel):
         self.SetSizer(main_sizer)
         apply_styles_to_panel(self)
         self.Layout()
+        self.form.clear()
 
     # ------------------------------------------------------------------
     # Сервис

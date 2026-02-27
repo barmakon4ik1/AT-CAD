@@ -20,9 +20,7 @@
 from __future__ import annotations
 from typing import Any, Callable, Dict, Optional
 import wx
-from wx.lib.buttons import GenButton
-
-from windows.at_window_utils import parse_float, style_gen_button, style_gen_button_v2
+from windows.at_window_utils import parse_float, style_gen_button_v2
 from config.at_config import FORM_CONFIG
 from locales.at_translations import loc
 from windows.at_gui_utils import get_standard_font
@@ -204,7 +202,8 @@ class FormBuilder:
             for name, field in self.fields.items()
         }
 
-    def _ctrl_alive(self, ctrl) -> bool:
+    @staticmethod
+    def _ctrl_alive(ctrl) -> bool:
         """
         Проверяет, существует ли wx-контрол.
         Безопасно для уже уничтоженных C++ объектов.
@@ -504,9 +503,19 @@ class FieldBuilder:
             default: значение по умолчанию
             label: текст кнопки/чекбокса
             callback: функция обработчика кнопки
+
+            --- Дополнительные параметры состояния ---
+            readonly: bool — запрет редактирования (где применимо)
+            enabled: bool — активность контрола
+            visible: bool — видимость контрола
+            tooltip: str — всплывающая подсказка
+            min_size: tuple[int, int] | wx.Size — минимальный размер
+            max_size: tuple[int, int] | wx.Size — максимальный размер
+            rows: int — множитель высоты для кнопки
+
             - "depends_on": dict с ключами:
-            - "ctrl" — контрол, от которого зависит элемент
-            - "callback" — функция: (dependent_ctrl, master_ctrl) -> None
+                - "ctrl" — контрол, от которого зависит элемент
+                - "callback" — функция: (dependent_ctrl, master_ctrl) -> None
         """
         spacing = spacing if spacing is not None else self.label_pad
         row = wx.BoxSizer(wx.HORIZONTAL)
@@ -524,10 +533,14 @@ class FieldBuilder:
         for i, elem in enumerate(elements):
             elem_type = elem.get("type", "text")
             ctrl: Optional[wx.Window] = None
+
             size = elem.get("size", self.default_size)
             if isinstance(size, tuple):
                 size = wx.Size(*size)
 
+            # ---------------------------------------------------------
+            # Text / Float
+            # ---------------------------------------------------------
             if elem_type in ("text", "float"):
                 ctrl = wx.TextCtrl(
                     self.parent,
@@ -537,7 +550,6 @@ class FieldBuilder:
 
                 parser = elem.get("parser")
 
-                # если тип float и parser не задан — используем встроенный
                 if elem_type == "float" and parser is None:
                     parser = parse_float
 
@@ -550,34 +562,83 @@ class FieldBuilder:
                         elem.get("default")
                     )
 
+            # ---------------------------------------------------------
+            # Label / Info text (не редактируемый текст)
+            # ---------------------------------------------------------
+            elif elem_type in ("label", "info"):
+                text_value = str(elem.get("value", ""))
 
+                # Контейнер для иконки + текста
+                if elem.get("info_icon", False):
+                    container = wx.BoxSizer(wx.HORIZONTAL)
+
+                    bmp = wx.ArtProvider.GetBitmap(
+                        wx.ART_INFORMATION,
+                        wx.ART_OTHER,
+                        wx.Size(16, 16)
+                    )
+                    icon = wx.StaticBitmap(self.parent, bitmap=bmp)
+                    container.Add(icon, 0, wx.ALIGN_TOP | wx.RIGHT, 5)
+
+                    ctrl = wx.StaticText(self.parent, label=text_value)
+                    container.Add(ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+
+                    row.Add(container, element_proportion, wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, spacing)
+                    created_controls.append(ctrl)
+
+                    # Цвет текста
+                    if "fg_color" in elem:
+                        ctrl.SetForegroundColour(elem["fg_color"])
+
+                    continue
+                else:
+                    ctrl = wx.StaticText(self.parent, label=text_value)
+
+                # Перенос строки по ширине
+                if "wrap" in elem:
+                    ctrl.Wrap(elem["wrap"])
+
+
+            # ---------------------------------------------------------
+            # Combo / Choice
+            # ---------------------------------------------------------
             elif elem_type in ("combo", "choice"):
                 choices = elem.get("choices", [])
                 value = elem.get("value", choices[0] if choices else "")
-                style = wx.CB_DROPDOWN if elem_type == "combo" else 0
-                size = elem.get("size", self.default_size)
-                if isinstance(size, tuple):
-                    size = wx.Size(*size)
-                ctrl = wx.ComboBox(
-                    self.parent,
-                    choices=choices,
-                    value=str(value),
-                    style=style,
-                    size=size
-                )
+                readonly = elem.get("readonly", False)
+
+                if elem_type == "combo":
+                    style = wx.CB_READONLY if readonly else wx.CB_DROPDOWN
+                    ctrl = wx.ComboBox(
+                        self.parent,
+                        choices=choices,
+                        value=str(value),
+                        style=style,
+                        size=size
+                    )
+                else:
+                    ctrl = wx.Choice(self.parent, choices=choices)
+                    if choices:
+                        ctrl.SetSelection(elem.get("selection", 0))
+
                 if "name" in elem and self.form:
                     self._register_field(
-                        elem["name"], ctrl, elem.get("required", False),
-                        elem.get("parser"), elem.get("default")
+                        elem["name"],
+                        ctrl,
+                        elem.get("required", False),
+                        elem.get("parser"),
+                        elem.get("default")
                     )
 
+            # ---------------------------------------------------------
+            # Button
+            # ---------------------------------------------------------
             elif elem_type == "button":
-                base_size = elem.get("size", self.default_size)
-                if isinstance(base_size, tuple):
-                    base_size = wx.Size(*base_size)
+                base_size = size
+                rows = elem.get("rows", 1)
 
-                rows = elem.get("rows", 1)  # ← новое
-                height = base_size.height * rows if base_size.height > 0 else -1
+                if rows > 1 and base_size.height > 0:
+                    size = wx.Size(base_size.width, base_size.height * rows)
 
                 ctrl = wx.Button(
                     self.parent,
@@ -588,34 +649,76 @@ class FieldBuilder:
                 if "callback" in elem and callable(elem["callback"]):
                     ctrl.Bind(wx.EVT_BUTTON, elem["callback"])
 
-                # --- ВАЖНО: стиль ---
                 style_gen_button_v2(
                     btn=ctrl,
                     normal_bg=elem.get("bg_color", "#3498db"),
                     text_color=elem.get("fg_color"),
                     bezel=elem.get("bezel", 1),
-                    button_height=elem.get("height", 0),
+                    button_height=size.height,
                     font_size=elem.get("font_size"),
                     toggle=elem.get("toggle", False),
                 )
+
                 ctrl.Bind(
                     wx.EVT_SIZE,
                     lambda evt, b=ctrl: (wrap_button_label(b), evt.Skip())
                 )
 
+            # ---------------------------------------------------------
+            # CheckBox
+            # ---------------------------------------------------------
             elif elem_type == "checkbox":
                 ctrl = wx.CheckBox(
                     self.parent,
                     label=elem.get("label", "")
                 )
+
                 if "name" in elem and self.form:
                     self._register_field(
-                        elem["name"], ctrl, elem.get("required", False),
-                        elem.get("parser"), elem.get("default")
+                        elem["name"],
+                        ctrl,
+                        elem.get("required", False),
+                        elem.get("parser"),
+                        elem.get("default")
                     )
 
+            # ---------------------------------------------------------
+            # Универсальная пост-обработка
+            # ---------------------------------------------------------
             if ctrl:
                 ctrl.SetFont(self.font)
+
+                # Readonly (для TextCtrl)
+                if elem.get("readonly", False):
+                    if isinstance(ctrl, wx.TextCtrl):
+                        ctrl.SetEditable(False)
+
+                # Enabled / Disabled
+                if "enabled" in elem:
+                    ctrl.Enable(bool(elem["enabled"]))
+
+                # Visible
+                if "visible" in elem:
+                    ctrl.Show(bool(elem["visible"]))
+
+                # Tooltip
+                if "tooltip" in elem:
+                    ctrl.SetToolTip(elem["tooltip"])
+
+                # Min size
+                if "min_size" in elem:
+                    ms = elem["min_size"]
+                    if isinstance(ms, tuple):
+                        ms = wx.Size(*ms)
+                    ctrl.SetMinSize(ms)
+
+                # Max size
+                if "max_size" in elem:
+                    ms = elem["max_size"]
+                    if isinstance(ms, tuple):
+                        ms = wx.Size(*ms)
+                    ctrl.SetMaxSize(ms)
+
                 right_pad = spacing if i < len(elements) - 1 else 0
                 flags = wx.RIGHT
 
@@ -632,15 +735,17 @@ class FieldBuilder:
                 if depends and "ctrl" in depends and "callback" in depends:
                     master_ctrl = depends["ctrl"]
                     cb = depends["callback"]
-                    master_ctrl.Bind(wx.EVT_COMBOBOX, lambda evt, d=ctrl, m=master_ctrl, f=cb:
-                    f(d, m))
+                    master_ctrl.Bind(
+                        wx.EVT_COMBOBOX,
+                        lambda evt, d=ctrl, m=master_ctrl, f=cb: f(d, m)
+                    )
 
         self.sizer.Add(row, 0, wx.EXPAND | wx.ALL, self.row_border)
 
-        # --- ВАЖНО: сначала делаем Layout ---
+        # # --- ВАЖНО: сначала Layout ---
         self.parent.Layout()
 
-        # --- Затем выполняем перенос текста для кнопок ---
+        # --- Затем перенос текста для кнопок ---
         for ctrl in created_controls:
             if isinstance(ctrl, wx.Button):
                 wrap_button_label(ctrl)

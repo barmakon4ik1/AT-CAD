@@ -164,9 +164,10 @@ class ConeOffsetContentPanel(BaseContentPanel):
                 {"type": "combo",
                  "name": "diameter_db_type",
                  "choices": choices,
-                 "value": "",
+                 "value": choices[0],
                  "required": True,
                  "default": choices[0],
+                 "readonly": True
                  },
                 {"type": "text",
                  "name": "diameter_db",
@@ -182,9 +183,10 @@ class ConeOffsetContentPanel(BaseContentPanel):
                 {"type": "combo",
                  "name": "diameter_dv_type",
                  "choices": choices,
-                 "value": "",
+                 "value": choices[0],
                  "required": True,
                  "default": choices[0],
+                 "readonly": True
                  },
                 {"type": "text",
                  "name": "diameter_dv",
@@ -218,10 +220,11 @@ class ConeOffsetContentPanel(BaseContentPanel):
             [
                 {"type": "combo",
                  "name": "length_offset_option",
-                 "value": "",
+                 "value": length_offset_option[0],
                  "choices": length_offset_option,
                  "required": True,
-                 "default": length_offset_option[0]
+                 "default": length_offset_option[0],
+                 "readonly": True
                  },
                 {"type": "text",
                  "name": "length_offset",

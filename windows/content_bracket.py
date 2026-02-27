@@ -191,6 +191,11 @@ TRANSLATIONS = {
         "de": "Außendurchmesser",
         "en": "Outer"
     },
+    "cut_info": {
+        "ru": "Ввести 0 = без скругления и фаски (срез 90°)",
+        "de": "Einfügen 0 = keine Rundung, keine Fase (90°-Schnitt)",
+        "en": "Input 0 = no rounding, no chamfer (90° cut)"
+    },
     "list_label": {"ru": "Посадка на конус", "de": "Lage auf dem Kegel", "en": "Location on the cone"}
 }
 loc.register_translations(TRANSLATIONS)
@@ -307,195 +312,202 @@ class BracketContentPanel(BaseContentPanel):
         Строит интерфейс панели: левый блок с Canvas, правый блок с данными.
         Добавляет три кнопки для управления спецификой, табличками и вырезом.
         """
-        # Очистка предыдущего интерфейса
-        if self.GetSizer():
-            self.GetSizer().Clear(True)
+        self.Freeze()
+        try:
+            # Очистка предыдущего интерфейса
+            if self.GetSizer():
+                self.GetSizer().Clear(True)
 
-        self.form = FormBuilder(self)
+            self.form = FormBuilder(self)
 
-        main_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.left_sizer = wx.BoxSizer(wx.VERTICAL)
-        self.right_sizer = wx.BoxSizer(wx.VERTICAL)
+            main_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            self.left_sizer = wx.BoxSizer(wx.VERTICAL)
+            self.right_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        # -----------------------------
-        # Левая часть
-        # -----------------------------
-        fb_left = FieldBuilder(self, self.left_sizer, form=self.form)
+            # -----------------------------
+            # Левая часть
+            # -----------------------------
+            fb_left = FieldBuilder(self, self.left_sizer, form=self.form)
 
-        created = fb_left.universal_row(
-            label_key="select_bridge_type",
-            elements=[
-                {
-                    "type": "combo",
-                    "name": "type",
-                    "choices": ["1", "2", "3", "4", "5"],
-                    "value": "",
-                    "required": True,
-                    "parser": lambda v: f"type{v}",
-                    "default": "1",
-                    "align_right": False,
-                }
-            ],
-            element_proportion=0,
-        )
+            created = fb_left.universal_row(
+                label_key="select_bridge_type",
+                elements=[
+                    {
+                        "type": "combo",
+                        "name": "type",
+                        "choices": ["1", "2", "3", "4", "5"],
+                        "value": "5",
+                        "required": True,
+                        "parser": lambda v: f"type{v}",
+                        "default": "5",
+                        "align_right": False,
+                        "readonly": True
+                    }
+                ],
+                element_proportion=0,
+            )
 
-        # universal_row возвращает список созданных контролов
-        self.bridge_type_choice = created[0]
+            # universal_row возвращает список созданных контролов
+            self.bridge_type_choice = created[0]
 
-        # Canvas с изображением мостика
-        default_image = BRIDGE_TYPE_IMAGES.get("1", "")
-        self.canvas = CanvasPanel(self, image_file=str(default_image), size=(600, 400))
-        self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
+            # Canvas с изображением мостика
+            default_image = BRIDGE_TYPE_IMAGES.get("1", "")
+            self.canvas = CanvasPanel(self, image_file=str(default_image), size=(600, 400))
+            self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
 
-        # Событие
-        self.bridge_type_choice.Bind(wx.EVT_COMBOBOX, self.on_bridge_type_changed)
+            # Событие
+            self.bridge_type_choice.Bind(wx.EVT_COMBOBOX, self.on_bridge_type_changed)
 
-        # -----------------------------
-        # Загрузка общих данных
-        # -----------------------------
-        common_data = load_common_data()
-        material_options = [m["name"] for m in common_data.get("material", []) if m["name"]]
-        thickness_options = common_data.get("thicknesses", [])
+            # -----------------------------
+            # Загрузка общих данных
+            # -----------------------------
+            common_data = load_common_data()
+            material_options = [m["name"] for m in common_data.get("material", []) if m["name"]]
+            thickness_options = common_data.get("thicknesses", [])
 
-        # -----------------------------
-        # ПРАВАЯ ЧАСТЬ
-        # -----------------------------
-        self.fb = FieldBuilder(
-            parent=self,
-            target_sizer=self.right_sizer,
-            form=self.form
-        )
+            # -----------------------------
+            # ПРАВАЯ ЧАСТЬ
+            # -----------------------------
+            self.fb = FieldBuilder(
+                parent=self,
+                target_sizer=self.right_sizer,
+                form=self.form
+            )
 
-        # =============================
-        # Основные данные
-        # =============================
-        main_data_sizer = self.fb.static_box("main_data")
-        fb_main = FieldBuilder(parent=self, target_sizer=main_data_sizer, form=self.form)
+            # =============================
+            # Основные данные
+            # =============================
+            main_data_sizer = self.fb.static_box("main_data")
+            fb_main = FieldBuilder(parent=self, target_sizer=main_data_sizer, form=self.form)
 
-        # Номер заказа и номер детали
-        fb_main.universal_row(
-            "order_label",
-            [
-                {"type": "text", "name": "order_number", "value": "", "required": False, "default": ""},
-                {"type": "text", "name": "detail_number", "value": "", "required": False, "default": ""},
-            ]
-        )
+            # Номер заказа и номер детали
+            fb_main.universal_row(
+                "order_label",
+                [
+                    {"type": "text", "name": "order_number", "value": "", "required": False, "default": ""},
+                    {"type": "text", "name": "detail_number", "value": "", "required": False, "default": ""},
+                ]
+            )
 
-        # Материал
-        fb_main.universal_row(
-            "material_label",
-            [
-                {"type": "combo",
-                 "name": "material",
-                 "choices": material_options,
-                 "value": "",
-                 "required": True,
-                 "default": "1.4301",
-                 "size": (310, -1),}
-            ]
-        )
+            # Материал
+            fb_main.universal_row(
+                "material_label",
+                [
+                    {"type": "combo",
+                     "name": "material",
+                     "choices": material_options,
+                     "value": "",
+                     "required": True,
+                     "default": "1.4301",
+                     "size": (310, -1),}
+                ]
+            )
 
-        # Толщина
-        fb_main.universal_row(
-            "thickness_label",
-            [
-                {"type": "combo",
-                 "name": "thickness",
-                 "choices": thickness_options,
-                 "value": "",
-                 "required": True,
-                 "default": "3"}
-            ]
-        )
+            # Толщина
+            fb_main.universal_row(
+                "thickness_label",
+                [
+                    {"type": "combo",
+                     "name": "thickness",
+                     "choices": thickness_options,
+                     "value": "",
+                     "required": True,
+                     "default": "3"}
+                ]
+            )
 
-        # =============================
-        # Базовая геометрия мостика
-        # =============================
-        bridge_geom_sizer = self.fb.static_box("bridge_geometry")
-        fb_geom = FieldBuilder(parent=self, target_sizer=bridge_geom_sizer, form=self.form)
+            # =============================
+            # Базовая геометрия мостика
+            # =============================
+            bridge_geom_sizer = self.fb.static_box("bridge_geometry")
+            fb_geom = FieldBuilder(parent=self, target_sizer=bridge_geom_sizer, form=self.form)
 
-        fb_geom.universal_row(
-            "width_label",
-            [
-                {"type": "text", "name": "width", "value": "", "required": True, "default": ""},
-            ]
-        )
-        fb_geom.universal_row(
-            "height_label",
-            [
-                {"type": "text", "name": "height", "value": "", "required": True, "default": ""},
-            ]
-        )
+            fb_geom.universal_row(
+                "width_label",
+                [
+                    {"type": "text", "name": "width", "value": "", "required": True, "default": ""},
+                ]
+            )
+            fb_geom.universal_row(
+                "height_label",
+                [
+                    {"type": "text", "name": "height", "value": "", "required": True, "default": ""},
+                ]
+            )
 
-        # -----------------------------
-        # Панели специфики
-        # -----------------------------
-        self.specific_panel = BracketSpecificPanel(self, form=self.form)
-        bridge_geom_sizer.Add(self.specific_panel, 0, wx.EXPAND | wx.ALL, 5)
+            # -----------------------------
+            # Панели специфики
+            # -----------------------------
+            self.specific_panel = BracketSpecificPanel(self, form=self.form)
+            bridge_geom_sizer.Add(self.specific_panel, 0, wx.EXPAND | wx.ALL, 5)
 
-        # Панель табличек
-        self.nameplate_panel = NamePlateSelectionPanel(self, form=self.form)
-        self.nameplate_panel.Hide()
-        bridge_geom_sizer.Add(self.nameplate_panel, 0, wx.EXPAND | wx.ALL, 5)
+            # Панель табличек
+            self.nameplate_panel = NamePlateSelectionPanel(self, form=self.form)
+            self.nameplate_panel.Hide()
+            bridge_geom_sizer.Add(self.nameplate_panel, 0, wx.EXPAND | wx.ALL, 5)
 
-        # Панель выреза
-        self.cutout_panel = CutoutPanel(self, form=self.form)
-        self.cutout_panel.Hide()
-        bridge_geom_sizer.Add(self.cutout_panel, 0, wx.EXPAND | wx.ALL, 5)
+            # Панель выреза
+            self.cutout_panel = CutoutPanel(self, form=self.form)
+            self.cutout_panel.Hide()
+            bridge_geom_sizer.Add(self.cutout_panel, 0, wx.EXPAND | wx.ALL, 5)
 
-        # -----------------------------
-        # Кнопки управления
-        # -----------------------------
-        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        fb_button = FieldBuilder(parent=self, target_sizer=button_sizer, form=self.form)
+            # -----------------------------
+            # Кнопки управления
+            # -----------------------------
+            button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            fb_button = FieldBuilder(parent=self, target_sizer=button_sizer, form=self.form)
 
-        fb_button.universal_row(
-            "",
-            [
-                {
-                    "type": "button",
-                    "label": loc.get("dimensions_label"),
-                    "callback": self.on_toggle_specific,
-                    "bg_color": "#27ae60",
-                    "toggle": True,
-                    "size": BUTTON_SIZE
-                },
-                {
-                    "type": "button",
-                    "label": loc.get("vessel_label"),
-                    "callback": self.on_toggle_nameplates,
-                    "bg_color": "#2980b9",
-                    "toggle": True,
-                    "size": BUTTON_SIZE
-                },
-                {
-                    "type": "button",
-                    "label": loc.get("cutout_label"),
-                    "callback": self.on_toggle_cutout,
-                    "bg_color": "#8e44ad",
-                    "toggle": True,
-                    "size": BUTTON_SIZE
-                }
-            ]
-        )
+            fb_button.universal_row(
+                "",
+                [
+                    {
+                        "type": "button",
+                        "label": loc.get("dimensions_label"),
+                        "callback": self.on_toggle_specific,
+                        "bg_color": "#27ae60",
+                        "toggle": True,
+                        "size": BUTTON_SIZE
+                    },
+                    {
+                        "type": "button",
+                        "label": loc.get("vessel_label"),
+                        "callback": self.on_toggle_nameplates,
+                        "bg_color": "#2980b9",
+                        "toggle": True,
+                        "size": BUTTON_SIZE
+                    },
+                    {
+                        "type": "button",
+                        "label": loc.get("cutout_label"),
+                        "callback": self.on_toggle_cutout,
+                        "bg_color": "#8e44ad",
+                        "toggle": True,
+                        "size": BUTTON_SIZE
+                    }
+                ]
+            )
 
-        self.right_sizer.Add(button_sizer, 0, wx.ALL, 5)
+            self.right_sizer.Add(button_sizer, 0, wx.ALL, 5)
 
-        # -----------------------------
-        # Кнопки действия (ОК/Отмена)
-        # -----------------------------
-        self.right_sizer.AddStretchSpacer()
-        self.right_sizer.Add(self.create_button_bar(), 0, wx.ALIGN_RIGHT | wx.ALL, 5)
+            # -----------------------------
+            # Кнопки действия (ОК/Отмена)
+            # -----------------------------
+            self.right_sizer.AddStretchSpacer()
+            self.right_sizer.Add(self.create_button_bar(), 0, wx.ALIGN_RIGHT | wx.ALL, 5)
 
-        # Финальная сборка
-        main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
-        main_sizer.Add(self.right_sizer, 0, wx.EXPAND | wx.ALL, 10)
-        self.SetSizer(main_sizer)
-        apply_styles_to_panel(self)
-        self.Layout()
+            # Финальная сборка
+            main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
+            main_sizer.Add(self.right_sizer, 0, wx.EXPAND | wx.ALL, 10)
 
-        wx.CallAfter(self.on_bridge_type_changed)
-        wx.CallAfter(self.clear_input_fields)
+            self.SetSizer(main_sizer)
+            apply_styles_to_panel(self)
+
+
+            wx.CallAfter(self.on_bridge_type_changed)
+            wx.CallAfter(self.clear_input_fields)
+        finally:
+            self.Layout()
+            self.Thaw()
 
     # ------------------------------------------------------------------
     # Сохранение/восстановление значений контролов панели
@@ -682,14 +694,17 @@ class BracketContentPanel(BaseContentPanel):
 
     def _show_section(self, section: Optional[wx.Panel]):
         # Сначала скрываем все остальные панели
-        for show_panel in (self.specific_panel, self.nameplate_panel, self.cutout_panel):
-            if show_panel and show_panel != section:
-                self._hide_panel(show_panel)
+        self.Freeze()
+        try:
+            for show_panel in (self.specific_panel, self.nameplate_panel, self.cutout_panel):
+                if show_panel and show_panel != section:
+                    self._hide_panel(show_panel)
 
-        # Показываем нужную панель
-        self._show_panel(section)
-        self.Layout()
-
+            # Показываем нужную панель
+            self._show_panel(section)
+        finally:
+            self.Layout()
+            self.Thaw()
 
 class NamePlateSelectionPanel(wx.Panel):
     """
@@ -955,11 +970,11 @@ class CutoutPanel(wx.Panel):
         # ------------------------
         fb_box.universal_row(
             loc.get("height_cut"),
-            [{"type": "text", "name": "height_cut", "value": "", "required": True, "default": ""}]
+            [{"type": "text", "name": "height_cut", "value": "", "required": True, "default": "", "size": (130, -1)}]
         )
         fb_box.universal_row(
             loc.get("length_cut"),
-            [{"type": "text", "name": "length_cut", "value": "", "required": True, "default": ""}]
+            [{"type": "text", "name": "length_cut", "value": "", "required": True, "default": "", "size": (130, -1)}]
         )
 
         # ------------------------
@@ -976,14 +991,29 @@ class CutoutPanel(wx.Panel):
                     "value": cut_options[0],
                     "choices": cut_options,
                     "required": True,
-                    "default": cut_options[0]
+                    "default": cut_options[0],
+                    "readonly": True
                 },
                 {
                     "type": "text",
                     "name": "radius_cut",
                     "value": "",
                     "required": True,
-                    "default": ""
+                    "default": "",
+                    "size": (130, -1)
+                }
+            ]
+        )
+
+        fb_box.universal_row(
+            "",
+            [
+                {
+                    "type": "label",
+                    "value": loc.get("cut_info"),
+                    "info_icon": True,  # опционально
+                    "wrap": 400,  # перенос строки по ширине (опционально),
+                    "fg_color": wx.Colour(90, 90, 90)
                 }
             ]
         )
@@ -1058,7 +1088,6 @@ class CutoutPanel(wx.Panel):
             }
         }
 
-
 class BracketSpecificPanel(wx.Panel):
     """
     Панель специфических параметров мостика.
@@ -1083,161 +1112,156 @@ class BracketSpecificPanel(wx.Panel):
         Перестройка панели под указанный тип мостика.
         Создает контролы с учётом специфик каждого типа.
         """
-        self.bridge_type = bridge_type
-        self.fields_sizer.Clear(True)
-        self.controls.clear()
+        self.Freeze()
+        try:
+            self.bridge_type = bridge_type
+            self.fields_sizer.Clear(True)
+            self.controls.clear()
 
-        fb = FieldBuilder(parent=self, target_sizer=self.fields_sizer, form=self.form)
-        box_sizer = fb.static_box(loc.get("special_parameters"))
-        fb_box = FieldBuilder(parent=self, target_sizer=box_sizer, form=self.form)
+            fb = FieldBuilder(parent=self, target_sizer=self.fields_sizer, form=self.form)
+            box_sizer = fb.static_box(loc.get("special_parameters"))
+            fb_box = FieldBuilder(parent=self, target_sizer=box_sizer, form=self.form)
 
-        # --- Type 1 ---
-        if bridge_type == "type1":
-            fb_box.universal_row(
-                loc.get("add_detail_number"),
-                [{"type": "text", "name": "add_detail_number", "value": "", "required": True, "default": ""}]
-            )
-            fb_box.universal_row(
-                loc.get("length"),
-                [{"type": "text", "name": "length", "value": "", "required": True, "default": ""}]
-            )
-            fb_box.universal_row(
-                loc.get("web_height"),
-                [{"type": "text", "name": "web_height", "value": "", "required": True, "default": ""}]
-            )
+            # --- Type 1 ---
+            if bridge_type == "type1":
+                fb_box.universal_row(
+                    loc.get("add_detail_number"),
+                    [{"type": "text", "name": "add_detail_number", "value": "", "required": True, "default": ""}]
+                )
+                fb_box.universal_row(
+                    loc.get("length"),
+                    [{"type": "text", "name": "length", "value": "", "required": True, "default": ""}]
+                )
+                fb_box.universal_row(
+                    loc.get("web_height"),
+                    [{"type": "text", "name": "web_height", "value": "", "required": True, "default": ""}]
+                )
 
-            corner_options = [loc.get("round"), loc.get("chamber")]
-            fb_box.universal_row(
-                loc.get("corner_label"),
-                [
-                    {"type": "combo", "name": "corner_options", "value": "", "choices": corner_options, "required": True, "default": corner_options[0]},
-                    {"type": "text", "name": "corner_radius", "value": "", "required": True, "default": ""}
-                ]
-            )
+            # --- Type 2 / 4 ---
+            elif bridge_type in ("type2", "type4"):
+                fb_box.universal_row(
+                    loc.get("shell_diameter"),
+                    [{"type": "text", "name": "shell_diameter1", "value": "", "required": True, "default": ""}]
+                )
+                length_option = ["L", "L0"]
 
-        # --- Type 2 / 4 ---
-        elif bridge_type in ("type2", "type4"):
-            fb_box.universal_row(
-                loc.get("shell_diameter"),
-                [{"type": "text", "name": "shell_diameter1", "value": "", "required": True, "default": ""}]
-            )
-            length_option = ["L", "L0"]
+                fb_box.universal_row(
+                    loc.get("length"),
+                    [
+                        {
+                            "type": "combo",
+                            "name": "length_option",
+                            "value": "L",
+                            "choices": length_option,
+                            "required": True,
+                            "default": length_option[0],
+                            "readonly": True
+                        },
+                        {
+                            "type": "text",
+                            "name": "length",
+                            "value": "",
+                            "required": True,
+                            "default": ""
+                        }
+                    ]
+                )
 
-            fb_box.universal_row(
-                loc.get("length"),
-                [
-                    {
-                        "type": "combo",
-                        "name": "length_option",
-                        "value": "",
-                        "choices": length_option,
-                        "required": True,
-                        "default": length_option[0],
-                        "style": wx.CB_READONLY  # запрет ручного ввода
-                    },
-                    {
-                        "type": "text",
-                        "name": "length",
-                        "value": "",
-                        "required": True,
-                        "default": ""
-                    }
-                ]
-            )
+            # --- Type 3 ---
+            elif bridge_type == "type3":
+                fb_box.universal_row(
+                    loc.get("shell_diameter"),
+                    [{"type": "text", "name": "shell_diameter1", "value": "", "required": True, "default": ""}]
+                )
+                fb_box.universal_row(
+                    loc.get("length_label"),
+                    [{"type": "text", "name": "length", "value": "", "required": True, "default": ""}]
+                )
+                fb_box.universal_row(
+                    loc.get("length1"),
+                    [{"type": "combo", "name": "l1", "value": "", "choices": [loc.get("no")], "required": True, "default": loc.get("no")}]
+                )
+                fb_box.universal_row(
+                    loc.get("edge_angle_label"),
+                    [{"type": "combo", "name": "edge_angle", "value": "", "choices": ["90", "120"], "required": True, "default": "90"}]
+                )
 
-        # --- Type 3 ---
-        elif bridge_type == "type3":
-            fb_box.universal_row(
-                loc.get("shell_diameter"),
-                [{"type": "text", "name": "shell_diameter1", "value": "", "required": True, "default": ""}]
-            )
-            fb_box.universal_row(
-                loc.get("length_label"),
-                [{"type": "text", "name": "length", "value": "", "required": True, "default": ""}]
-            )
-            fb_box.universal_row(
-                loc.get("length1"),
-                [{"type": "combo", "name": "l1", "value": "", "choices": [loc.get("no")], "required": True, "default": loc.get("no")}]
-            )
-            fb_box.universal_row(
-                loc.get("edge_angle_label"),
-                [{"type": "combo", "name": "edge_angle", "value": "", "choices": ["90", "120"], "required": True, "default": "90"}]
-            )
+            # --- Type 5 ---
+            elif bridge_type == "type5":
 
-        # --- Type 5 ---
-        elif bridge_type == "type5":
+                # --- Общий горизонтальный контейнер
+                diameters_row = wx.BoxSizer(wx.HORIZONTAL)
 
-            # --- Общий горизонтальный контейнер
-            diameters_row = wx.BoxSizer(wx.HORIZONTAL)
+                # --- Левая часть (2 строки)
+                left_sizer = wx.BoxSizer(wx.VERTICAL)
 
-            # --- Левая часть (2 строки)
-            left_sizer = wx.BoxSizer(wx.VERTICAL)
+                fb_left = FieldBuilder(parent=self, target_sizer=left_sizer, form=self.form)
 
-            fb_left = FieldBuilder(parent=self, target_sizer=left_sizer, form=self.form)
+                fb_left.universal_row(
+                    loc.get("shell_diameter1"),
+                    [{"type": "text", "name": "shell_diameter1",
+                      "value": "", "required": True, "default": ""}]
+                )
 
-            fb_left.universal_row(
-                loc.get("shell_diameter1"),
-                [{"type": "text", "name": "shell_diameter1",
-                  "value": "", "required": True, "default": ""}]
-            )
+                fb_left.universal_row(
+                    loc.get("shell_diameter2"),
+                    [{"type": "text", "name": "shell_diameter2",
+                      "value": "", "required": True, "default": ""}]
+                )
 
-            fb_left.universal_row(
-                loc.get("shell_diameter2"),
-                [{"type": "text", "name": "shell_diameter2",
-                  "value": "", "required": True, "default": ""}]
-            )
+                # Добавляем левую часть
+                diameters_row.Add(left_sizer, 1, wx.EXPAND | wx.RIGHT, 10)
 
-            # Добавляем левую часть
-            diameters_row.Add(left_sizer, 1, wx.EXPAND | wx.RIGHT, 10)
+                # --- Правая часть (кнопка на 2 строки)
+                fb_right = FieldBuilder(
+                    parent=self,
+                    target_sizer=diameters_row,
+                    form=self.form
+                )
 
-            # --- Правая часть (кнопка на 2 строки)
-            fb_right = FieldBuilder(
-                parent=self,
-                target_sizer=diameters_row,
-                form=self.form
-            )
+                fb_right.universal_row(
+                    None,
+                    [
+                        {
+                            "type": "button",
+                            "label": loc.get("list_label"),
+                            "callback": self.on_open_cone_offset_dialog,
+                            "rows": 2,
+                            "size": (120, -1),
+                            "bg_color": "#27ae60"
+                        }
+                    ],
+                    align_right=False
+                )
 
-            fb_right.universal_row(
-                None,
-                [
-                    {
-                        "type": "button",
-                        "label": loc.get("list_label"),
-                        "callback": self.on_open_cone_offset_dialog,
-                        "rows": 2,
-                        "size": (120, -1),
-                        "bg_color": "#27ae60"
-                    }
-                ],
-                align_right=False
-            )
+                # Добавляем весь горизонтальный блок в box_sizer
+                box_sizer.Add(diameters_row, 0, wx.EXPAND | wx.ALL, 5)
 
-            # Добавляем весь горизонтальный блок в box_sizer
-            box_sizer.Add(diameters_row, 0, wx.EXPAND | wx.ALL, 5)
+                length_option1 = ["L", "L2"]
+                fb_box.universal_row(
+                    loc.get("length"),
+                    [
+                        {"type": "combo", "name": "length_option", "value": length_option1[0], "choices": length_option1, "required": True, "default": length_option1[0], "readonly": True},
+                        {"type": "text", "name": "length", "value": "", "required": True, "default": "", "size": (130, -1)}
+                    ]
+                )
+                length_option2 = ["L1", loc.get("no")]
+                fb_box.universal_row(
+                    loc.get("length"),
+                    [
+                        {"type": "combo", "name": "length_option1", "value": length_option2[0], "choices": length_option2, "required": True, "default": length_option2[0], "readonly": True},
+                        {"type": "text", "name": "l1", "value": "", "required": True, "default": "", "size": (130, -1)}
+                    ]
+                )
+                fb_box.universal_row(
+                    loc.get("edge_angle_label"),
+                    [{"type": "combo", "name": "edge_angle", "value": "", "choices": ["90", "120"], "required": True, "default": "90", "size": (130, -1)}]
+                )
 
-            length_option1 = ["L", "L2"]
-            fb_box.universal_row(
-                loc.get("length"),
-                [
-                    {"type": "combo", "name": "length_option", "value": "", "choices": length_option1, "required": True, "default": length_option1[0]},
-                    {"type": "text", "name": "length", "value": "", "required": True, "default": ""}
-                ]
-            )
-            length_option2 = ["L1", loc.get("no")]
-            fb_box.universal_row(
-                loc.get("length"),
-                [
-                    {"type": "combo", "name": "length_option1", "value": "", "choices": length_option2, "required": True, "default": length_option2[0]},
-                    {"type": "text", "name": "l1", "value": "", "required": True, "default": ""}
-                ]
-            )
-            fb_box.universal_row(
-                loc.get("edge_angle_label"),
-                [{"type": "combo", "name": "edge_angle", "value": "", "choices": ["90", "120"], "required": True, "default": "90"}]
-            )
-
-        apply_styles_to_panel(self)
-        self.Layout()
+            apply_styles_to_panel(self)
+        finally:
+            self.Layout()
+            self.Thaw()
 
     def on_open_cone_offset_dialog(self, _event):
         dialog = ConeOffsetDialog(self)

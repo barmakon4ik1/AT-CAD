@@ -250,7 +250,7 @@ def save_user_settings(settings: dict[str, object]) -> None:
         pass
 
 
-def get_setting(key: str):
+def get_setting(key):
     """
     Возвращает значение настройки по ключу из USER_CONFIG_PATH.
     Если ключ отсутствует — возвращает значение из DEFAULT_SETTINGS.
