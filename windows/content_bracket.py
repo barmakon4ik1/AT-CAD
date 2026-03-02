@@ -1141,7 +1141,7 @@ class BracketSpecificPanel(wx.Panel):
             elif bridge_type in ("type2", "type4"):
                 fb_box.universal_row(
                     loc.get("shell_diameter"),
-                    [{"type": "text", "name": "shell_diameter1", "value": "", "required": True, "default": ""}]
+                    [{"type": "text", "name": "shell_diameter1", "value": "", "required": True, "default": "0"}]
                 )
                 length_option = ["L", "L0"]
 
@@ -1345,11 +1345,10 @@ class BracketSpecificPanel(wx.Panel):
             # --- Тип 2 ---
             elif self.bridge_type == "type2":
 
-                diameter = self._require_positive_float(
-                    raw,
-                    "shell_diameter1",
-                    loc.get("diameter_positive_error")
-                )
+                try:
+                    width = parse_float(geometry.get("width"))
+                except (TypeError, ValueError):
+                    raise loc.get("invalid_width_error")
 
                 length_input = self._require_positive_float(
                     raw,
@@ -1359,26 +1358,31 @@ class BracketSpecificPanel(wx.Panel):
 
                 length_option = raw.get("length_option")
 
-                try:
-                    width = parse_float(geometry.get("width"))
-                except (TypeError, ValueError):
-                    raise loc.get("invalid_width_error")
+                if parse_float(specific["shell_diameter1"]) > 0.0 and specific["shell_diameter1"] is not None:
+                    diameter = self._require_positive_float(
+                        raw,
+                        "shell_diameter1",
+                        loc.get("diameter_positive_error")
+                    )
 
-                radius = diameter / 2.0
+                    if width > diameter:
+                        raise loc.get("width_exceeds_diameter")
 
-                if width > diameter:
-                    raise loc.get("width_exceeds_diameter")
+                    radius = diameter / 2.0
 
-                if length_option == "L":
-                    specific["length"] = length_input
+                    if length_option == "L":
+                        specific["length"] = length_input
 
-                elif length_option == "L0":
-                    specific["length"] = length_input + radius - (radius ** 2 - (width ** 2) / 4.0) ** 0.5
+                    elif length_option == "L0":
+                        specific["length"] = length_input + radius - (radius ** 2 - (width ** 2) / 4.0) ** 0.5
 
+                    else:
+                        raise loc.get("invalid_length_option")
+
+                    specific["shell_diameter1"] = diameter
                 else:
-                    raise loc.get("invalid_length_option")
-
-                specific["shell_diameter1"] = diameter
+                    specific["shell_diameter1"] = 0.0
+                    specific["length"] = length_input
 
             # --- Тип 3 ---
             elif self.bridge_type == "type3":

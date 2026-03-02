@@ -137,19 +137,33 @@ class FormBuilder:
     def __init__(self, panel: wx.Window):
         self.panel = panel
         self.fields: Dict[str, FormField] = {}
+        self._field_configs: Dict[str, Dict[str, Any]] = {}
 
     def register(
-        self,
-        name: str,
-        ctrl: wx.Window,
-        required: bool = False,
-        parser: Optional[Callable[[Any], Any]] = None,
-        default: Any = None,
-        getter: Optional[Callable[[], Any]] = None,
-        setter: Optional[Callable[[Any], None]] = None,
+            self,
+            name: str,
+            ctrl: wx.Window,
+            required: bool = False,
+            parser: Optional[Callable[[Any], Any]] = None,
+            default: Any = None,
+            getter: Optional[Callable[[], Any]] = None,
+            setter: Optional[Callable[[Any], None]] = None,
+            config: Optional[Dict[str, Any]] = None,
     ) -> wx.Window:
-        """Регистрирует поле формы."""
+        """
+        Регистрирует поле формы.
+
+        :param name: имя поля
+        :param ctrl: wx-контрол
+        :param required: обязательное поле
+        :param parser: функция преобразования значения
+        :param default: значение по умолчанию
+        :param getter: кастомный getter
+        :param setter: кастомный setter
+        :param config: декларативная конфигурация (JSON-схема)
+        """
         self._purge_dead_fields()
+
         self.fields[name] = FormField(
             name=name,
             ctrl=ctrl,
@@ -159,20 +173,86 @@ class FormBuilder:
             getter=getter,
             setter=setter,
         )
+
+        # сохраняем декларативную конфигурацию (если есть)
+        if config:
+            self._field_configs[name] = config
+
         return ctrl
 
+    def reset(self):
+        """
+        Сброс формы к значениям по умолчанию
+        с учётом декларативной схемы.
+        """
+        self._purge_dead_fields()
+
+        for name, field in self.fields.items():
+
+            cfg = self._field_configs.get(name, {})
+
+            # приоритет — JSON default
+            if "default" in cfg:
+                field.set_value(cfg["default"])
+
+            # затем default из FormField
+            elif field.default is not None:
+                field.set_value(field.default)
+
+            # иначе — очистка
+            else:
+                field.set_value("")
+
     def collect(self) -> dict[Any, Any] | None:
-        """Собирает значения всех полей формы в словарь."""
+        """
+        Собирает значения всех полей формы в словарь.
+
+        Дополнительно:
+        - выполняет стандартную валидацию FormField
+        - выполняет JSON-валидацию (validators из config)
+        """
         self._purge_dead_fields()
 
         data = {}
 
         for name, field in self.fields.items():
+
             try:
                 value = field.get_value()
             except ValueError as e:
                 wx.MessageBox(str(e), "Validation error", wx.OK | wx.ICON_ERROR)
                 return None
+
+            # -----------------------------------------------------
+            # JSON-валидация (если поле зарегистрировано с config)
+            # -----------------------------------------------------
+            cfg = self._field_configs.get(name, {})
+            validators = cfg.get("validators", [])
+
+            if value not in (None, ""):
+
+                if "float" in validators:
+                    try:
+                        float(value)
+                    except (ValueError, TypeError):
+                        wx.MessageBox(
+                            f"Field '{name}' must be a number",
+                            "Validation error",
+                            wx.OK | wx.ICON_ERROR
+                        )
+                        return None
+
+                if "positive" in validators:
+                    try:
+                        if float(value) <= 0:
+                            raise ValueError
+                    except Exception:
+                        wx.MessageBox(
+                            f"Field '{name}' must be positive",
+                            "Validation error",
+                            wx.OK | wx.ICON_ERROR
+                        )
+                        return None
 
             data[name] = value
 
@@ -180,15 +260,12 @@ class FormBuilder:
 
     def clear(self):
         """
-        Сброс формы к значениям по умолчанию.
-        """
-        self._purge_dead_fields()
+        Очистка формы.
 
-        for field in self.fields.values():
-            if field.default is not None:
-                field.set_value(field.default)
-            else:
-                field.set_value("")
+        Использует reset(), чтобы поведение было единым
+        для декларативной и обычной схемы.
+        """
+        self.reset()
 
     def as_dict_schema(self) -> Dict[str, Dict[str, Any]]:
         """Возвращает словарь с описанием всех полей формы."""
@@ -286,6 +363,9 @@ class FieldBuilder:
 
         # Словарь всех локализуемых элементов
         self._localizables: Dict[str, wx.Window] = {}
+
+        self.controls = {}
+        self.dependencies = []
 
     # ------------------------------------------------------------------
     # Вспомогательные методы
@@ -483,64 +563,114 @@ class FieldBuilder:
             align_right: bool = True
     ) -> list[wx.Window]:
         """
-        Универсальная строка: метка слева + любые элементы справа.
+        Универсальная строка формы: метка слева + произвольный набор элементов справа.
 
-        Пример использования:
-            fb.universal_row("order_label", [
-                {"type": "text", "name": "order", "value": ""},
-                {"type": "combo", "name": "material", "choices": ["Steel", "Al"], "value": "Steel"},
-                {"type": "button", "label": "OK", "callback": self.on_ok}
+        Поддерживает:
+            • bind (через self.form + _register_field)
+            • required / parser / default
+            • условную видимость и enabled
+            • depends_on (реактивное поведение)
+            • выбор list[str] и list[dict]
+            • восстановление корректной работы ComboBox
+
+        ------------------------------------------------------------------
+        ПРИМЕР ИСПОЛЬЗОВАНИЯ
+        ------------------------------------------------------------------
+
+            fb.universal_row("material_label", [
+                {
+                    "type": "combo",
+                    "name": "material",
+                    "choices": [
+                        {"label": "Steel", "value": "S235"},
+                        {"label": "Aluminium", "value": "AL"},
+                    ],
+                    "required": True
+                },
+                {
+                    "type": "text",
+                    "name": "density",
+                    "depends_on": {
+                        "field": "material",
+                        "callback": lambda dep, master_value:
+                            dep.SetValue("7850" if master_value == "S235" else "2700")
+                    }
+                }
             ])
 
-        Параметры элементов:
-            type: "text" | "combo" | "choice" | "button" | "checkbox"
-            name: имя для регистрации в форме (для полей)
-            value: начальное значение (для полей)
-            choices: список вариантов (для combo/choice)
-            selection: индекс выбранного элемента (для combo/choice)
-            required: bool, обязательное поле (по умолчанию False)
-            parser: функция преобразования значения
+        ------------------------------------------------------------------
+        ПАРАМЕТРЫ ЭЛЕМЕНТА (dict)
+        ------------------------------------------------------------------
+
+        Базовые:
+            type: "text" | "float" | "combo" | "choice" |
+                  "button" | "checkbox" | "label" | "info"
+            name: имя поля (для регистрации в self.form)
+            value: начальное значение
+            required: bool
+            parser: callable
             default: значение по умолчанию
-            label: текст кнопки/чекбокса
-            callback: функция обработчика кнопки
 
-            --- Дополнительные параметры состояния ---
-            readonly: bool — запрет редактирования (где применимо)
-            enabled: bool — активность контрола
-            visible: bool — видимость контрола
-            tooltip: str — всплывающая подсказка
-            min_size: tuple[int, int] | wx.Size — минимальный размер
-            max_size: tuple[int, int] | wx.Size — максимальный размер
-            rows: int — множитель высоты для кнопки
+        Для combo/choice:
+            choices:
+                list[str]
+                ИЛИ
+                list[{"label": str, "value": Any}]
+            selection: индекс
+            readonly: bool
 
-            - "depends_on": dict с ключами:
-                - "ctrl" — контрол, от которого зависит элемент
-                - "callback" — функция: (dependent_ctrl, master_ctrl) -> None
+        Для button:
+            label: текст
+            callback: обработчик
+            rows: множитель высоты
+
+        Состояние:
+            readonly: bool
+            enabled: bool
+            visible: bool
+            tooltip: str
+            min_size: (w, h)
+            max_size: (w, h)
+
+        Зависимости:
+            depends_on:
+                {
+                    "field": "имя_поля",
+                    "callback": callable(dependent_ctrl, master_value)
+                }
+
+        Возвращает:
+            list[wx.Window] — созданные контролы.
         """
+
         spacing = spacing if spacing is not None else self.label_pad
         row = wx.BoxSizer(wx.HORIZONTAL)
         created_controls = []
 
+        # ---------------------------------------------------------
         # Метка слева
+        # ---------------------------------------------------------
         if label_key:
             lbl = self._create_label(label_key)
             row.Add(lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
 
-        # Растягиватель между меткой и контролами
         if align_right:
             row.AddStretchSpacer(1)
 
+        # =========================================================
+        # СОЗДАНИЕ ЭЛЕМЕНТОВ
+        # =========================================================
         for i, elem in enumerate(elements):
             elem_type = elem.get("type", "text")
-            ctrl: Optional[wx.Window] = None
+            ctrl = None
 
             size = elem.get("size", self.default_size)
             if isinstance(size, tuple):
                 size = wx.Size(*size)
 
-            # ---------------------------------------------------------
-            # Text / Float
-            # ---------------------------------------------------------
+            # -----------------------------------------------------
+            # TEXT / FLOAT
+            # -----------------------------------------------------
             if elem_type in ("text", "float"):
                 ctrl = wx.TextCtrl(
                     self.parent,
@@ -549,7 +679,6 @@ class FieldBuilder:
                 )
 
                 parser = elem.get("parser")
-
                 if elem_type == "float" and parser is None:
                     parser = parse_float
 
@@ -562,64 +691,55 @@ class FieldBuilder:
                         elem.get("default")
                     )
 
-            # ---------------------------------------------------------
-            # Label / Info text (не редактируемый текст)
-            # ---------------------------------------------------------
+            # -----------------------------------------------------
+            # LABEL / INFO
+            # -----------------------------------------------------
             elif elem_type in ("label", "info"):
-                text_value = str(elem.get("value", ""))
+                ctrl = wx.StaticText(
+                    self.parent,
+                    label=str(elem.get("value", ""))
+                )
 
-                # Контейнер для иконки + текста
-                if elem.get("info_icon", False):
-                    container = wx.BoxSizer(wx.HORIZONTAL)
-
-                    bmp = wx.ArtProvider.GetBitmap(
-                        wx.ART_INFORMATION,
-                        wx.ART_OTHER,
-                        wx.Size(16, 16)
-                    )
-                    icon = wx.StaticBitmap(self.parent, bitmap=bmp)
-                    container.Add(icon, 0, wx.ALIGN_TOP | wx.RIGHT, 5)
-
-                    ctrl = wx.StaticText(self.parent, label=text_value)
-                    container.Add(ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
-
-                    row.Add(container, element_proportion, wx.RIGHT | wx.ALIGN_CENTER_VERTICAL, spacing)
-                    created_controls.append(ctrl)
-
-                    # Цвет текста
-                    if "fg_color" in elem:
-                        ctrl.SetForegroundColour(elem["fg_color"])
-
-                    continue
-                else:
-                    ctrl = wx.StaticText(self.parent, label=text_value)
-
-                # Перенос строки по ширине
                 if "wrap" in elem:
                     ctrl.Wrap(elem["wrap"])
 
-
-            # ---------------------------------------------------------
-            # Combo / Choice
-            # ---------------------------------------------------------
+            # -----------------------------------------------------
+            # COMBO / CHOICE (исправлено!)
+            # -----------------------------------------------------
             elif elem_type in ("combo", "choice"):
-                choices = elem.get("choices", [])
-                value = elem.get("value", choices[0] if choices else "")
+
+                raw_choices = elem.get("choices", [])
+
+                # --- Нормализация choices ---
+                if raw_choices and isinstance(raw_choices[0], dict):
+                    labels = [c["label"] for c in raw_choices]
+                    values = [c["value"] for c in raw_choices]
+                else:
+                    labels = list(raw_choices)
+                    values = list(raw_choices)
+
                 readonly = elem.get("readonly", False)
 
                 if elem_type == "combo":
                     style = wx.CB_READONLY if readonly else wx.CB_DROPDOWN
                     ctrl = wx.ComboBox(
                         self.parent,
-                        choices=choices,
-                        value=str(value),
+                        choices=labels,
                         style=style,
                         size=size
                     )
                 else:
-                    ctrl = wx.Choice(self.parent, choices=choices)
-                    if choices:
-                        ctrl.SetSelection(elem.get("selection", 0))
+                    ctrl = wx.Choice(self.parent, choices=labels)
+
+                # --- выбор по value ---
+                value = elem.get("value")
+                if value in values:
+                    ctrl.SetSelection(values.index(value))
+                elif labels:
+                    ctrl.SetSelection(elem.get("selection", 0))
+
+                # --- сохраняем mapping ---
+                ctrl._at_values = values
 
                 if "name" in elem and self.form:
                     self._register_field(
@@ -630,9 +750,9 @@ class FieldBuilder:
                         elem.get("default")
                     )
 
-            # ---------------------------------------------------------
-            # Button
-            # ---------------------------------------------------------
+            # -----------------------------------------------------
+            # BUTTON
+            # -----------------------------------------------------
             elif elem_type == "button":
                 base_size = size
                 rows = elem.get("rows", 1)
@@ -664,14 +784,17 @@ class FieldBuilder:
                     lambda evt, b=ctrl: (wrap_button_label(b), evt.Skip())
                 )
 
-            # ---------------------------------------------------------
-            # CheckBox
-            # ---------------------------------------------------------
+            # -----------------------------------------------------
+            # CHECKBOX
+            # -----------------------------------------------------
             elif elem_type == "checkbox":
                 ctrl = wx.CheckBox(
                     self.parent,
                     label=elem.get("label", "")
                 )
+
+                if "value" in elem:
+                    ctrl.SetValue(bool(elem["value"]))
 
                 if "name" in elem and self.form:
                     self._register_field(
@@ -682,37 +805,31 @@ class FieldBuilder:
                         elem.get("default")
                     )
 
-            # ---------------------------------------------------------
-            # Универсальная пост-обработка
-            # ---------------------------------------------------------
+            # =====================================================
+            # ПОСТ-ОБРАБОТКА
+            # =====================================================
             if ctrl:
+
                 ctrl.SetFont(self.font)
 
-                # Readonly (для TextCtrl)
-                if elem.get("readonly", False):
-                    if isinstance(ctrl, wx.TextCtrl):
-                        ctrl.SetEditable(False)
+                if elem.get("readonly") and isinstance(ctrl, wx.TextCtrl):
+                    ctrl.SetEditable(False)
 
-                # Enabled / Disabled
                 if "enabled" in elem:
                     ctrl.Enable(bool(elem["enabled"]))
 
-                # Visible
                 if "visible" in elem:
                     ctrl.Show(bool(elem["visible"]))
 
-                # Tooltip
                 if "tooltip" in elem:
                     ctrl.SetToolTip(elem["tooltip"])
 
-                # Min size
                 if "min_size" in elem:
                     ms = elem["min_size"]
                     if isinstance(ms, tuple):
                         ms = wx.Size(*ms)
                     ctrl.SetMinSize(ms)
 
-                # Max size
                 if "max_size" in elem:
                     ms = elem["max_size"]
                     if isinstance(ms, tuple):
@@ -720,6 +837,7 @@ class FieldBuilder:
                     ctrl.SetMaxSize(ms)
 
                 right_pad = spacing if i < len(elements) - 1 else 0
+
                 flags = wx.RIGHT
 
                 if elem.get("rows", 1) > 1:
@@ -727,30 +845,77 @@ class FieldBuilder:
                 else:
                     flags |= wx.ALIGN_CENTER_VERTICAL
 
-                row.Add(ctrl, element_proportion, flags, right_pad)
+                row.Add(
+                    ctrl,
+                    element_proportion,
+                    flags,
+                    right_pad
+                )
+
                 created_controls.append(ctrl)
 
-                # ── зависимость от другого контрола ──
+                # -------------------------------------------------
+                # DEPENDS_ON (реактивная логика)
+                # -------------------------------------------------
                 depends = elem.get("depends_on")
-                if depends and "ctrl" in depends and "callback" in depends:
-                    master_ctrl = depends["ctrl"]
-                    cb = depends["callback"]
-                    master_ctrl.Bind(
-                        wx.EVT_COMBOBOX,
-                        lambda evt, d=ctrl, m=master_ctrl, f=cb: f(d, m)
-                    )
+                if depends and self.form:
+
+                    master_name = depends.get("field")
+                    callback = depends.get("callback")
+
+                    if master_name and callback:
+                        master_ctrl = self.form.get_ctrl(master_name)
+
+                        def handler(evt,
+                                    dep=ctrl,
+                                    master=master_ctrl,
+                                    cb=callback):
+                            value = self._extract_value(master)
+                            cb(dep, value)
+                            evt.Skip()
+
+                        master_ctrl.Bind(wx.EVT_ANY, handler)
 
         self.sizer.Add(row, 0, wx.EXPAND | wx.ALL, self.row_border)
-
-        # # --- ВАЖНО: сначала Layout ---
         self.parent.Layout()
 
-        # --- Затем перенос текста для кнопок ---
-        for ctrl in created_controls:
-            if isinstance(ctrl, wx.Button):
-                wrap_button_label(ctrl)
-
         return created_controls
+
+    def build_from_schema(self, schema: Dict[str, Any], data_sources: Dict[str, Any]):
+        """
+        Построение формы по JSON-схеме.
+        """
+
+        for section in schema.get("sections", []):
+
+            box = self.static_box(section["label"])
+
+            sub_builder = FieldBuilder(
+                parent=self.parent,
+                target_sizer=box,
+                form=self.form
+            )
+
+            for field in section.get("fields", []):
+
+                elements = []
+
+                for elem in field.get("controls", []):
+
+                    cfg = elem.copy()
+
+                    if "choices_source" in cfg:
+                        source_key = cfg.pop("choices_source")
+                        cfg["choices"] = data_sources.get(source_key, [])
+
+                    elements.append(cfg)
+
+                sub_builder.universal_row(
+                    field.get("label"),
+                    elements
+                )
+
+            self.sizer.Add(box, 0, wx.EXPAND | wx.ALL, 5)
 
 def wrap_button_label(btn: wx.Button, padding: int = 10):
     """

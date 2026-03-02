@@ -1,0 +1,97 @@
+{
+  "sections": [
+    {
+      "key": "main_data",
+      "label": "main_data_label",
+      "fields": [
+        {
+          "label": "order_label",
+          "controls": [
+            {
+              "type": "text",
+              "name": "order_input"
+            },
+            {
+              "type": "text",
+              "name": "detail_input"
+            }
+          ]
+        },
+        {
+          "label": "material_label",
+          "controls": [
+            {
+              "type": "combo",
+              "name": "material_combo",
+              "choices_source": "material",
+              "required": true,
+              "default": "1.4301"
+            }
+          ]
+        },
+        {
+          "label": "thickness_label",
+          "controls": [
+            {
+              "type": "combo",
+              "name": "thickness_combo",
+              "choices_source": "thicknesses",
+              "required": true,
+              "default": "3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "nozzle_params",
+      "label": "nozzle_params_label",
+      "fields": [
+        {
+          "label": "diameter_label",
+          "controls": [
+            {
+              "type": "text",
+              "name": "diameter",
+              "validators": ["float"]
+            },
+            {
+              "type": "combo",
+              "name": "diameter_type_choice",
+              "choices_source": "diameter_types",
+              "readonly": true,
+              "bind": {
+                "event": "EVT_COMBOBOX",
+                "handler": "on_diameter_type_changed"
+              }
+            }
+          ]
+        },
+        {
+          "label": "diameter_main_label",
+          "controls": [
+            {
+              "type": "text",
+              "name": "diameter_main_input",
+              "validators": ["float"]
+            }
+          ]
+        },
+        {
+          "label": "length_label",
+          "controls": [
+            {
+              "type": "text",
+              "name": "length_input",
+              "validators": ["float"],
+              "visible_if": {
+                "field": "diameter_type_choice",
+                "equals": "outer"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

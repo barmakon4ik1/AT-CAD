@@ -97,5 +97,16 @@
         "r": "3",
         "s": "1",
         "remark": "Kein U-Stamp"
+    },
+    {
+        "name": "Hermetik",
+        "a1": "129",
+        "b1": "69",
+        "a": "119",
+        "b": "59",
+        "d": "2",
+        "r": "5",
+        "s": "1",
+        "remark": "Außengeometry nicht bestimmt"
     }
 ]

@@ -100,161 +100,167 @@ class RingsContentPanel(BaseContentPanel):
     # UI
     # ------------------------------------------------------------------
     def setup_ui(self) -> None:
-        if self.GetSizer():
-            self.GetSizer().Clear(True)
+        self.Freeze()
+        try:
 
-        # ------------------------------------------------------------
-        # Главный сайзер
-        # ------------------------------------------------------------
-        main_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.left_sizer = wx.BoxSizer(wx.VERTICAL)
-        self.right_sizer = wx.BoxSizer(wx.VERTICAL)
+            if self.GetSizer():
+                self.GetSizer().Clear(True)
 
-        # ------------------------------------------------------------
-        # Левая часть — изображение
-        # ------------------------------------------------------------
-        image_path = str(RING_IMAGE_PATH)
-        self.canvas = CanvasPanel(self, image_file=image_path, size=(750, 400))
-        self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
+            # ------------------------------------------------------------
+            # Главный сайзер
+            # ------------------------------------------------------------
+            main_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            self.left_sizer = wx.BoxSizer(wx.VERTICAL)
+            self.right_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        # ------------------------------------------------------------
-        # Данные
-        # ------------------------------------------------------------
-        common_data = load_common_data()
-        material_options = [m["name"] for m in common_data.get("material", []) if m["name"]]
-        thickness_options = common_data.get("thicknesses", [])
+            # ------------------------------------------------------------
+            # Левая часть — изображение
+            # ------------------------------------------------------------
+            image_path = str(RING_IMAGE_PATH)
+            self.canvas = CanvasPanel(self, image_file=image_path, size=(750, 400))
+            self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
 
-        # ------------------------------------------------------------
-        # Форма
-        # ------------------------------------------------------------
-        self.form = FormBuilder(self)
-        self.fb = FieldBuilder(
-            parent=self,
-            target_sizer=self.right_sizer,
-            form=self.form
-        )
+            # ------------------------------------------------------------
+            # Данные
+            # ------------------------------------------------------------
+            common_data = load_common_data()
+            material_options = [m["name"] for m in common_data.get("material", []) if m["name"]]
+            thickness_options = common_data.get("thicknesses", [])
 
-        # ============================================================
-        # ГРУППА: Основные данные
-        # ============================================================
-        main_data_sizer = self.fb.static_box("main_data")
-        fb_main = FieldBuilder(parent=self, target_sizer=main_data_sizer, form=self.form)
+            # ------------------------------------------------------------
+            # Форма
+            # ------------------------------------------------------------
+            self.form = FormBuilder(self)
+            self.fb = FieldBuilder(
+                parent=self,
+                target_sizer=self.right_sizer,
+                form=self.form
+            )
 
-        # Номер заказа и номер детали
-        fb_main.universal_row(
-            "order_label",
-            [
-                {"type": "text", "name": "order", "value": "", "required": False, "default": ""},
-                {"type": "text", "name": "detail", "value": "", "required": False, "default": ""},
-            ]
-        )
+            # ============================================================
+            # ГРУППА: Основные данные
+            # ============================================================
+            main_data_sizer = self.fb.static_box("main_data")
+            fb_main = FieldBuilder(parent=self, target_sizer=main_data_sizer, form=self.form)
 
-        # Материал
-        fb_main.universal_row(
-            "material_label",
-            [
-                {"type": "combo", "name": "material", "choices": material_options, "value": "", "required": True, "default": "1.4301"}
-            ]
-        )
+            # Номер заказа и номер детали
+            fb_main.universal_row(
+                "order_label",
+                [
+                    {"type": "text", "name": "order", "value": "", "required": False, "default": ""},
+                    {"type": "text", "name": "detail", "value": "", "required": False, "default": ""},
+                ]
+            )
 
-        # Толщина
-        fb_main.universal_row(
-            "thickness_label",
-            [
-                {"type": "combo", "name": "thickness", "choices": thickness_options, "value": "", "required": True, "default": "3"}
-            ]
-        )
+            # Материал
+            fb_main.universal_row(
+                "material_label",
+                [
+                    {"type": "combo", "name": "material", "choices": material_options, "value": "", "required": True, "default": "1.4301"}
+                ]
+            )
 
-        # ============================================================
-        # Таблица диаметров
-        # ============================================================
+            # Толщина
+            fb_main.universal_row(
+                "thickness_label",
+                [
+                    {"type": "combo", "name": "thickness", "choices": thickness_options, "value": "", "required": True, "default": "3"}
+                ]
+            )
 
-        diam_sizer = self.fb.static_box(loc.get("values"), proportion=1)
-        self.static_boxes["diameters"] = diam_sizer.GetStaticBox()
+            # ============================================================
+            # Таблица диаметров
+            # ============================================================
 
-        # Создаём таблицу
-        self.diam_grid = gridlib.Grid(self)
-        self.diam_grid.CreateGrid(5, 3)
+            diam_sizer = self.fb.static_box(loc.get("values"), proportion=1)
+            self.static_boxes["diameters"] = diam_sizer.GetStaticBox()
 
-        # --- Локализованные заголовки ---
-        self.diam_grid.SetColLabelValue(0, loc.get("diameter", "Диаметр D"))
-        self.diam_grid.SetColLabelValue(1, loc.get("offset_x", "Отступ X"))
-        self.diam_grid.SetColLabelValue(2, loc.get("offset_y", "Отступ Y"))
+            # Создаём таблицу
+            self.diam_grid = gridlib.Grid(self)
+            self.diam_grid.CreateGrid(5, 3)
 
-        # --- Убираем номера строк ---
-        self.diam_grid.SetRowLabelSize(0)
+            # --- Локализованные заголовки ---
+            self.diam_grid.SetColLabelValue(0, loc.get("diameter", "Диаметр D"))
+            self.diam_grid.SetColLabelValue(1, loc.get("offset_x", "Отступ X"))
+            self.diam_grid.SetColLabelValue(2, loc.get("offset_y", "Отступ Y"))
 
-        # --- Шрифт ---
-        font_size = DEFAULT_SETTINGS["FONT_SIZE"]
-        font = wx.Font(
-            font_size,
-            wx.FONTFAMILY_DEFAULT,
-            wx.FONTSTYLE_NORMAL,
-            wx.FONTWEIGHT_NORMAL
-        )
-        self.diam_grid.SetDefaultCellFont(font)
-        self.diam_grid.SetLabelFont(font)
+            # --- Убираем номера строк ---
+            self.diam_grid.SetRowLabelSize(0)
 
-        # --- Высота строк под шрифт ---
-        text_height = self.diam_grid.GetTextExtent("Hg")[1]  # вычисляем высоту текста
-        for row in range(self.diam_grid.GetNumberRows()):
-            self.diam_grid.SetRowSize(row, text_height + 8)  # +8 пикселей отступа
+            # --- Шрифт ---
+            font_size = DEFAULT_SETTINGS["FONT_SIZE"]
+            font = wx.Font(
+                font_size,
+                wx.FONTFAMILY_DEFAULT,
+                wx.FONTSTYLE_NORMAL,
+                wx.FONTWEIGHT_NORMAL
+            )
+            self.diam_grid.SetDefaultCellFont(font)
+            self.diam_grid.SetLabelFont(font)
 
-        # --- Ширина колонок ---
-        self.diam_grid.SetColSize(0, 130)
-        self.diam_grid.SetColSize(1, 130)
-        self.diam_grid.SetColSize(2, 130)
+            # --- Высота строк под шрифт ---
+            text_height = self.diam_grid.GetTextExtent("Hg")[1]  # вычисляем высоту текста
+            for row in range(self.diam_grid.GetNumberRows()):
+                self.diam_grid.SetRowSize(row, text_height + 8)  # +8 пикселей отступа
 
-        # --- Значения по умолчанию ---
-        for row in range(self.diam_grid.GetNumberRows()):
-            self.diam_grid.SetCellValue(row, 0, "")
-            self.diam_grid.SetCellValue(row, 1, "0")
-            self.diam_grid.SetCellValue(row, 2, "0")
+            # --- Ширина колонок ---
+            self.diam_grid.SetColSize(0, 150)
+            self.diam_grid.SetColSize(1, 120)
+            self.diam_grid.SetColSize(2, 120)
 
-        # --- Центрирование всех ячеек ---
-        def align_row_center(arow):
-            for col in range(self.diam_grid.GetNumberCols()):
-                self.diam_grid.SetCellAlignment(arow, col, wx.ALIGN_CENTER, wx.ALIGN_CENTER_VERTICAL)
+            # --- Значения по умолчанию ---
+            for row in range(self.diam_grid.GetNumberRows()):
+                self.diam_grid.SetCellValue(row, 0, "")
+                self.diam_grid.SetCellValue(row, 1, "0")
+                self.diam_grid.SetCellValue(row, 2, "0")
 
-        for row in range(self.diam_grid.GetNumberRows()):
-            align_row_center(row)
+            # --- Центрирование всех ячеек ---
+            def align_row_center(arow):
+                for col in range(self.diam_grid.GetNumberCols()):
+                    self.diam_grid.SetCellAlignment(arow, col, wx.ALIGN_CENTER, wx.ALIGN_CENTER_VERTICAL)
 
-        # --- Авто-добавление новой строки при заполнении последней ---
-        def on_cell_change(evt):
-            c_row = evt.GetRow()
-            # проверяем, что хотя бы одна ячейка заполнена
-            if c_row == self.diam_grid.GetNumberRows() - 1 and any(
-                    self.diam_grid.GetCellValue(row, c).strip() != "" for c in range(3)
-            ):
-                self.diam_grid.AppendRows(1)
-                new_row = self.diam_grid.GetNumberRows() - 1
-                self.diam_grid.SetCellValue(new_row, 0, "")
-                self.diam_grid.SetCellValue(new_row, 1, "0")
-                self.diam_grid.SetCellValue(new_row, 2, "0")
-                self.diam_grid.SetRowSize(new_row, text_height + 8)
-                align_row_center(new_row)
-            evt.Skip()
+            for row in range(self.diam_grid.GetNumberRows()):
+                align_row_center(row)
 
-        self.diam_grid.Bind(gridlib.EVT_GRID_CELL_CHANGED, on_cell_change)
+            # --- Авто-добавление новой строки при заполнении последней ---
+            def on_cell_change(evt):
+                c_row = evt.GetRow()
+                # проверяем, что хотя бы одна ячейка заполнена
+                if c_row == self.diam_grid.GetNumberRows() - 1 and any(
+                        self.diam_grid.GetCellValue(row, c).strip() != "" for c in range(3)
+                ):
+                    self.diam_grid.AppendRows(1)
+                    new_row = self.diam_grid.GetNumberRows() - 1
+                    self.diam_grid.SetCellValue(new_row, 0, "")
+                    self.diam_grid.SetCellValue(new_row, 1, "0")
+                    self.diam_grid.SetCellValue(new_row, 2, "0")
+                    self.diam_grid.SetRowSize(new_row, text_height + 8)
+                    align_row_center(new_row)
+                evt.Skip()
 
-        # --- Добавляем таблицу в sizer ---
-        diam_sizer.Add(self.diam_grid, 1, wx.EXPAND | wx.ALL, 5)
+            self.diam_grid.Bind(gridlib.EVT_GRID_CELL_CHANGED, on_cell_change)
 
-        # ------------------------------------------------------------
-        # Кнопки
-        # ------------------------------------------------------------
-        self.right_sizer.Add(self.create_button_bar(), 0, wx.ALIGN_RIGHT | wx.ALL, 5)
+            # --- Добавляем таблицу в sizer ---
+            diam_sizer.Add(self.diam_grid, 1, wx.EXPAND | wx.ALL, 5)
 
-        # ------------------------------------------------------------
-        # Финал
-        # ------------------------------------------------------------
-        main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
-        main_sizer.Add(self.right_sizer, 1, wx.EXPAND | wx.ALL, 10)
+            # ------------------------------------------------------------
+            # Кнопки
+            # ------------------------------------------------------------
+            self.right_sizer.Add(self.create_button_bar(), 0, wx.ALIGN_RIGHT | wx.ALL, 5)
 
-        self.SetSizer(main_sizer)
-        apply_styles_to_panel(self)
-        self.Layout()
-        self.form.clear()
+            # ------------------------------------------------------------
+            # Финал
+            # ------------------------------------------------------------
+            main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
+            main_sizer.Add(self.right_sizer, 1, wx.EXPAND | wx.ALL, 10)
+
+            self.SetSizer(main_sizer)
+            apply_styles_to_panel(self)
+            self.Layout()
+        finally:
+            self.Layout()
+            self.Thaw()
+
 
     # ------------------------------------------------------------------
     # Сервис
