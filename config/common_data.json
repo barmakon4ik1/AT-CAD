@@ -39,7 +39,8 @@
       {"name": "1.4833 (S30908)", "density": 8.0},
       {"name": "", "density": 0},
       {"name": "Zr702", "density": 6.51},
-      {"name": "2.4600 (B-3)", "density": 9.22}
+      {"name": "2.4600 (B-3)", "density": 9.22},
+      {"name": "Andere", "density": 1}
     ]
   }
 }

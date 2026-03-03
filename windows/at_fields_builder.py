@@ -20,6 +20,8 @@
 from __future__ import annotations
 from typing import Any, Callable, Dict, Optional
 import wx
+
+from errors.at_errors import DataError
 from windows.at_window_utils import parse_float, style_gen_button_v2
 from config.at_config import FORM_CONFIG
 from locales.at_translations import loc
@@ -31,6 +33,7 @@ from windows.at_gui_utils import get_standard_font
 # ----------------------------------------------------------------------
 class FormField:
     """Описание одного поля формы."""
+    ctrl: wx.Window
 
     def __init__(
         self,
@@ -42,6 +45,7 @@ class FormField:
         getter: Optional[Callable[[], Any]] = None,
         setter: Optional[Callable[[Any], None]] = None,
     ):
+        self.fields = None
         self.name = name
         self.ctrl = ctrl
         self.value_cache = ctrl.GetValue() if hasattr(ctrl, "GetValue") else None
@@ -126,6 +130,12 @@ class FormField:
                 self.ctrl.SetValue("" if value is None else str(value))
         except RuntimeError:
             pass
+
+    def get_ctrl(self, name: str) -> Optional[wx.Window]:
+        field: Optional[FormField] = self.fields.get(name)
+        if field is None:
+            return None
+        return field.ctrl
 
 
 # ----------------------------------------------------------------------
@@ -246,7 +256,7 @@ class FormBuilder:
                     try:
                         if float(value) <= 0:
                             raise ValueError
-                    except Exception:
+                    except DataError:
                         wx.MessageBox(
                             f"Field '{name}' must be positive",
                             "Validation error",
@@ -432,14 +442,36 @@ class FieldBuilder:
         self.row(label_key, [ctrl])
         return ctrl
 
+    # ------------------------------------------------------------------
+    # Combo с меткой, безопасно для readonly и editable
+    # ------------------------------------------------------------------
     def combo(self, name: str, label_key: str, choices: list[str], value="",
               required=False, parser: Optional[Callable] = None,
               default: Any = None, style=wx.CB_DROPDOWN) -> wx.ComboBox:
-        """Комбобокс с меткой."""
-        ctrl = wx.ComboBox(self.parent, choices=choices, value=value,
-                           style=style, size=self.default_size)
+        """
+        Создаёт ComboBox с меткой и безопасной инициализацией:
+        - readonly (CB_READONLY) не вызывает SetInsertionPoint/SetSelection
+        - editable (CB_DROPDOWN) курсор ставится в конец, выделение снимается
+        """
+        ctrl = wx.ComboBox(
+            self.parent,
+            choices=choices,
+            value=value,
+            style=style,
+            size=self.default_size
+        )
+
         self._register_field(name, ctrl, required, parser, default)
         self.row(label_key, [ctrl])
+
+        # --- безопасная установка курсора и снятие выделения для editable ---
+        if not (style & wx.CB_READONLY):
+            try:
+                ctrl.SetSelection(wx.NOT_FOUND)
+                ctrl.SetInsertionPointEnd()
+            except RuntimeError:
+                pass  # объект может быть уже удалён
+
         return ctrl
 
     def multiline_text(self, name: str, label_key: str, value: str = "",
@@ -569,7 +601,6 @@ class FieldBuilder:
             • bind (через self.form + _register_field)
             • required / parser / default
             • условную видимость и enabled
-            • depends_on (реактивное поведение)
             • выбор list[str] и list[dict]
             • восстановление корректной работы ComboBox
 
@@ -590,11 +621,6 @@ class FieldBuilder:
                 {
                     "type": "text",
                     "name": "density",
-                    "depends_on": {
-                        "field": "material",
-                        "callback": lambda dep, master_value:
-                            dep.SetValue("7850" if master_value == "S235" else "2700")
-                    }
                 }
             ])
 
@@ -631,13 +657,6 @@ class FieldBuilder:
             tooltip: str
             min_size: (w, h)
             max_size: (w, h)
-
-        Зависимости:
-            depends_on:
-                {
-                    "field": "имя_поля",
-                    "callback": callable(dependent_ctrl, master_value)
-                }
 
         Возвращает:
             list[wx.Window] — созданные контролы.
@@ -718,25 +737,25 @@ class FieldBuilder:
                     labels = list(raw_choices)
                     values = list(raw_choices)
 
-                readonly = elem.get("readonly", False)
-
                 if elem_type == "combo":
+                    readonly = elem.get("readonly", False)
                     style = wx.CB_READONLY if readonly else wx.CB_DROPDOWN
-                    ctrl = wx.ComboBox(
-                        self.parent,
-                        choices=labels,
-                        style=style,
-                        size=size
-                    )
-                else:
-                    ctrl = wx.Choice(self.parent, choices=labels)
+                    ctrl = wx.ComboBox(self.parent, choices=labels, style=style, size=size)
 
-                # --- выбор по value ---
-                value = elem.get("value")
-                if value in values:
-                    ctrl.SetSelection(values.index(value))
-                elif labels:
-                    ctrl.SetSelection(elem.get("selection", 0))
+                    # --- выбор по value ---
+                    value = elem.get("value")
+                    if value in values:
+                        ctrl.SetSelection(values.index(value))
+                    elif labels:
+                        ctrl.SetSelection(elem.get("selection", 0))
+
+                    # безопасно: только для editable
+                    if not readonly:
+                        try:
+                            ctrl.SetSelection(wx.NOT_FOUND)
+                            ctrl.SetInsertionPointEnd()
+                        except RuntimeError:
+                            pass
 
                 # --- сохраняем mapping ---
                 ctrl._at_values = values
@@ -855,26 +874,15 @@ class FieldBuilder:
                 created_controls.append(ctrl)
 
                 # -------------------------------------------------
-                # DEPENDS_ON (реактивная логика)
+                # BIND (явная привязка событий)
                 # -------------------------------------------------
-                depends = elem.get("depends_on")
-                if depends and self.form:
+                bind_cfg = elem.get("bind")
+                if bind_cfg and isinstance(bind_cfg, dict):
+                    event = bind_cfg.get("event")
+                    handler = bind_cfg.get("handler")
 
-                    master_name = depends.get("field")
-                    callback = depends.get("callback")
-
-                    if master_name and callback:
-                        master_ctrl = self.form.get_ctrl(master_name)
-
-                        def handler(evt,
-                                    dep=ctrl,
-                                    master=master_ctrl,
-                                    cb=callback):
-                            value = self._extract_value(master)
-                            cb(dep, value)
-                            evt.Skip()
-
-                        master_ctrl.Bind(wx.EVT_ANY, handler)
+                    if event and handler:
+                        ctrl.Bind(event, handler)
 
         self.sizer.Add(row, 0, wx.EXPAND | wx.ALL, self.row_border)
         self.parent.Layout()

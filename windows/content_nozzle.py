@@ -33,7 +33,7 @@
 from pprint import pprint
 
 import wx
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programs.at_construction import at_diameter
@@ -90,7 +90,7 @@ default_axis_marks = ["0", "10", "20"]
 default_modes = ["mode_bulge", "mode_polyline", "mode_spline"]
 
 # Рекомендуемые наборы значений accuracy по режимам
-ACCURACY_OPTIONS = {
+ACCURACY_OPTIONS: Dict[str, List[str]] = {
     "bulge": ["18", "24", "30", "36"],          # баланс точности/производительности
     "polyline": ["360", "480", "600", "720"],   # полилиния — много точек
     "spline": ["24", "36", "48", "72"],         # сплайн — умеренно
@@ -161,71 +161,6 @@ class NozzleContentPanel(BaseContentPanel):
             # Правый блок (поля ввода)
             self.fb = FieldBuilder(parent=self, target_sizer=self.right_sizer, form=self.form)
 
-
-            # # --- Основные данные ---
-            # main_data_box = wx.StaticBox(self, label=loc.get("main_data_label", "Основные данные"))
-            # style_staticbox(main_data_box)
-            # self.static_boxes["main_data"] = main_data_box
-            # main_data_sizer = wx.StaticBoxSizer(main_data_box, wx.VERTICAL)
-            #
-            # # строка: К-№ и Деталь
-            # row1 = wx.BoxSizer(wx.HORIZONTAL)
-            # self.labels["order"] = wx.StaticText(main_data_box, label=loc.get("order_label", "К-№"))
-            # style_label(self.labels["order"])
-            # self.order_input = wx.TextCtrl(main_data_box, value="", size=field_size)
-            # style_textctrl(self.order_input)
-            # self.detail_input = wx.TextCtrl(main_data_box, value="", size=field_size)
-            # style_textctrl(self.detail_input)
-            # row1.Add(self.labels["order"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-            # row1.AddStretchSpacer()
-            # row1.Add(self.order_input, 0, wx.RIGHT, 10)
-            # row1.Add(self.detail_input, 0)
-            # main_data_sizer.Add(row1, 0, wx.EXPAND | wx.ALL, 5)
-            #
-            # # Загрузка общих данных
-            # common_data = load_common_data()
-            # material_options = [mat["name"] for mat in common_data.get("material", []) if mat.get("name")]
-            # thickness_options = common_data.get("thicknesses", [])
-            # default_thickness = "5" if "5" in thickness_options or "5.0" in thickness_options else (thickness_options[0] if thickness_options else "")
-            #
-            # # строка: Материал
-            # row2 = wx.BoxSizer(wx.HORIZONTAL)
-            # self.labels["material"] = wx.StaticText(main_data_box, label=loc.get("material_label", "Материал"))
-            # style_label(self.labels["material"])
-            # self.material_combo = wx.ComboBox(
-            #     main_data_box,
-            #     choices=material_options,
-            #     value=material_options[0] if material_options else "",
-            #     style=wx.CB_DROPDOWN,
-            #     size=field_size
-            # )
-            # style_combobox(self.material_combo)
-            # row2.Add(self.labels["material"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-            # row2.AddStretchSpacer()
-            # row2.Add(self.material_combo, 0)
-            # main_data_sizer.Add(row2, 0, wx.EXPAND | wx.ALL, 5)
-            #
-            # # строка: Толщина
-            # row3 = wx.BoxSizer(wx.HORIZONTAL)
-            # self.labels["thickness"] = wx.StaticText(main_data_box, label=loc.get("thickness_label", "Толщина, S"))
-            # style_label(self.labels["thickness"])
-            # self.thickness_combo = wx.ComboBox(
-            #     main_data_box,
-            #     choices=thickness_options,
-            #     value=default_thickness,
-            #     style=wx.CB_DROPDOWN,
-            #     size=field_size
-            # )
-            # style_combobox(self.thickness_combo)
-            # row3.Add(self.labels["thickness"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-            # row3.AddStretchSpacer()
-            # row3.Add(self.thickness_combo, 0)
-            # main_data_sizer.Add(row3, 0, wx.EXPAND | wx.ALL, 5)
-            #
-            # self.right_sizer.Add(main_data_sizer, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 5)
-
-            # --- Параметры отвода ---
-
             # =============================
             # Основные данные
             # =============================
@@ -244,9 +179,18 @@ class NozzleContentPanel(BaseContentPanel):
             fb_main.universal_row(
                 "material_label",
                 [
-                    {"type": "combo", "name": "material_combo", "choices": material_options, "value": "", "required": True, "default": "1.4301", "size": (310, -1),}
+                    {"type": "combo",
+                     "name": "material_combo",
+                     "choices": material_options,
+                     "value": material_options[0],
+                     "required": True,
+                     "default": material_options[0],
+                     "size": (310, -1),
+                     "readonly": False
+                     }
                 ]
             )
+
             # Толщина
             fb_main.universal_row(
                 "thickness_label",
@@ -254,7 +198,6 @@ class NozzleContentPanel(BaseContentPanel):
                     {"type": "combo", "name": "thickness_combo", "choices": thickness_options, "value": "", "required": True, "default": "3"}
                 ]
             )
-            # self.right_sizer.Add(main_data_sizer, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 5)
 
             # --- Параметры отвода ---
             nozzle_sizer = self.fb.static_box(loc.get("nozzle_params_label", "Параметры отвода"))
@@ -281,33 +224,6 @@ class NozzleContentPanel(BaseContentPanel):
                      }
                 ]
             )
-            # nozzle_box = wx.StaticBox(self, label=loc.get("nozzle_params_label", "Параметры отвода"))
-            # style_staticbox(nozzle_box)
-            # self.static_boxes["nozzle_params"] = nozzle_box
-            # nozzle_sizer = wx.StaticBoxSizer(nozzle_box, wx.VERTICAL)
-
-            # row_d = wx.BoxSizer(wx.HORIZONTAL)
-            # self.labels["diameter"] = wx.StaticText(nozzle_box, label=loc.get("diameter_label", "Диаметр, d"))
-            # style_label(self.labels["diameter"])
-            # self.diameter_input = wx.TextCtrl(nozzle_box, value="", size=field_size)
-            # style_textctrl(self.diameter_input)
-            # row_d.Add(self.labels["diameter"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-            # row_d.Add(self.diameter_input, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-
-            # # Тип диаметра
-            # self.diameter_type_choice = wx.Choice(
-            #     nozzle_box,
-            #     choices=[
-            #         loc.get("external_diameter_label", "Внешний"),
-            #         loc.get("middle_diameter_label", "Средний"),
-            #         loc.get("internal_diameter_label", "Внутренний"),
-            #     ]
-            # )
-            # self.diameter_type_choice.SetMinSize(field_size)
-            # self.diameter_type_choice.SetInitialSize(field_size)
-            # self.diameter_type_choice.SetSelection(0)
-            # row_d.Add(self.diameter_type_choice, 1, wx.EXPAND)
-            # nozzle_sizer.Add(row_d, 0, wx.EXPAND | wx.ALL, 5)
 
             # Диаметр магистрали
             fb_nozzle.universal_row(
@@ -323,16 +239,6 @@ class NozzleContentPanel(BaseContentPanel):
                 ]
             )
 
-            # row_dm = wx.BoxSizer(wx.HORIZONTAL)
-            # self.labels["diameter_main"] = wx.StaticText(nozzle_box, label=loc.get("diameter_main_label", "Диаметр магистрали, D"))
-            # style_label(self.labels["diameter_main"])
-            # self.diameter_main_input = wx.TextCtrl(nozzle_box, value="", size=field_size)
-            # style_textctrl(self.diameter_main_input)
-            # row_dm.Add(self.labels["diameter_main"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-            # row_dm.AddStretchSpacer()
-            # row_dm.Add(self.diameter_main_input, 0)
-            # nozzle_sizer.Add(row_dm, 0, wx.EXPAND | wx.ALL, 5)
-
             # Длина
             fb_nozzle.universal_row(
                 "length_label",
@@ -346,16 +252,6 @@ class NozzleContentPanel(BaseContentPanel):
                     }
                 ]
             )
-
-            # row_l = wx.BoxSizer(wx.HORIZONTAL)
-            # self.labels["length"] = wx.StaticText(nozzle_box, label=loc.get("length_label", "Длина L"))
-            # style_label(self.labels["length"])
-            # self.length_input = wx.TextCtrl(nozzle_box, value="", size=field_size)
-            # style_textctrl(self.length_input)
-            # row_l.Add(self.labels["length"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-            # row_l.AddStretchSpacer()
-            # row_l.Add(self.length_input, 0)
-            # nozzle_sizer.Add(row_l, 0, wx.EXPAND | wx.ALL, 5)
 
             # Смещение
             fb_nozzle.universal_row(
@@ -371,26 +267,9 @@ class NozzleContentPanel(BaseContentPanel):
                 ]
             )
 
-            # row_off = wx.BoxSizer(wx.HORIZONTAL)
-            # self.labels["offset"] = wx.StaticText(nozzle_box, label=loc.get("offset_label", "Смещение"))
-            # style_label(self.labels["offset"])
-            # self.offset_input = wx.TextCtrl(nozzle_box, value="0", size=field_size)
-            # style_textctrl(self.offset_input)
-            # row_off.Add(self.labels["offset"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-            # row_off.AddStretchSpacer()
-            # row_off.Add(self.offset_input, 0)
-            # nozzle_sizer.Add(row_off, 0, wx.EXPAND | wx.ALL, 5)
-
-            # self.right_sizer.Add(nozzle_sizer, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 5)
-
             # --- Условия построения ---
             build_sizer = self.fb.static_box(loc.get("build_conditions_label", "Условия построения"))
             fb_build = FieldBuilder(parent=self, target_sizer=build_sizer, form=self.form)
-
-            # build_box = wx.StaticBox(self, label=loc.get("build_conditions_label", "Условия построения"))
-            # style_staticbox(build_box)
-            # self.static_boxes["build_conditions"] = build_box
-            # build_sizer = wx.StaticBoxSizer(build_box, wx.VERTICAL)
 
             # Режим построения
             fb_build.universal_row(
@@ -412,23 +291,6 @@ class NozzleContentPanel(BaseContentPanel):
                 ]
             )
 
-            # row_mode = wx.BoxSizer(wx.HORIZONTAL)
-            # self.labels["mode"] = wx.StaticText(build_box, label=loc.get("mode_label", "Режим"))
-            # style_label(self.labels["mode"])
-            # self.mode_combo = wx.ComboBox(
-            #     build_box,
-            #     choices=[loc.get(mode, mode) for mode in default_modes],
-            #     value=loc.get("mode_bulge", "Bulge"),
-            #     style=wx.CB_READONLY,
-            #     size=field_size
-            # )
-            # style_combobox(self.mode_combo)
-            # self.mode_combo.Bind(wx.EVT_COMBOBOX, self.on_mode_change)
-            # row_mode.Add(self.labels["mode"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-            # row_mode.AddStretchSpacer()
-            # row_mode.Add(self.mode_combo, 0)
-            # build_sizer.Add(row_mode, 0, wx.EXPAND | wx.ALL, 5)
-
             # Точность
             fb_build.universal_row(
                 "accuracy_label",
@@ -439,26 +301,11 @@ class NozzleContentPanel(BaseContentPanel):
                         "choices": ACCURACY_OPTIONS["bulge"],
                         "value": "24",
                         "required": True,
-                        "default": "24"
+                        "default": "24",
+                        "readonly": False,
                     }
                 ]
             )
-
-            # row_acc = wx.BoxSizer(wx.HORIZONTAL)
-            # self.labels["accuracy"] = wx.StaticText(build_box, label=loc.get("accuracy_label", "Точность"))
-            # style_label(self.labels["accuracy"])
-            # self.accuracy_combo = wx.ComboBox(
-            #     build_box,
-            #     choices=ACCURACY_OPTIONS["bulge"],
-            #     value="24",
-            #     style=wx.CB_DROPDOWN,
-            #     size=field_size
-            # )
-            # style_combobox(self.accuracy_combo)
-            # row_acc.Add(self.labels["accuracy"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-            # row_acc.AddStretchSpacer()
-            # row_acc.Add(self.accuracy_combo, 0)
-            # build_sizer.Add(row_acc, 0, wx.EXPAND | wx.ALL, 5)
 
             # Припуск на сварку
             fb_build.universal_row(
@@ -470,27 +317,11 @@ class NozzleContentPanel(BaseContentPanel):
                         "choices": default_allowances,
                         "value": "0",
                         "required": False,
-                        "default": "0"
+                        "default": "0",
+                        "readonly": False,
                     }
                 ]
             )
-
-            # row_weld = wx.BoxSizer(wx.HORIZONTAL)
-            # self.labels["weld_allowance"] = wx.StaticText(build_box,
-            #                                               label=loc.get("weld_allowance_label", "Припуск на сварку"))
-            # style_label(self.labels["weld_allowance"])
-            # self.weld_allowance_input = wx.ComboBox(
-            #     build_box,
-            #     choices=default_allowances,
-            #     value="0",
-            #     style=wx.CB_DROPDOWN,
-            #     size=field_size
-            # )
-            # style_combobox(self.weld_allowance_input)
-            # row_weld.Add(self.labels["weld_allowance"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-            # row_weld.AddStretchSpacer()
-            # row_weld.Add(self.weld_allowance_input, 0)
-            # build_sizer.Add(row_weld, 0, wx.EXPAND | wx.ALL, 5)
 
             # Показать оси (замена CheckBox на ComboBox)
             fb_build.universal_row(
@@ -511,23 +342,6 @@ class NozzleContentPanel(BaseContentPanel):
                 ]
             )
 
-            # row_axis = wx.BoxSizer(wx.HORIZONTAL)
-            # self.labels["axis"] = wx.StaticText(build_box, label=loc.get("axis_checkbox", "Показать оси"))
-            # style_label(self.labels["axis"])
-            # self.axis_combo = wx.ComboBox(
-            #     build_box,
-            #     choices=[loc.get("yes_label", "Да"), loc.get("no_label", "Нет")],
-            #     value=loc.get("yes_label", "Да"),
-            #     style=wx.CB_READONLY,
-            #     size=field_size
-            # )
-            # style_combobox(self.axis_combo)
-            # row_axis.Add(self.labels["axis"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-            # row_axis.AddStretchSpacer()
-            # row_axis.Add(self.axis_combo, 0)
-            # build_sizer.Add(row_axis, 0, wx.EXPAND | wx.ALL, 5)
-
-
             # Метки осей
             fb_build.universal_row(
                 "axis_marks_label",
@@ -538,28 +352,12 @@ class NozzleContentPanel(BaseContentPanel):
                         "choices": default_axis_marks,
                         "value": "0",
                         "required": False,
-                        "default": "0"
+                        "default": "0",
+                        "readonly": False,
                     }
                 ]
             )
 
-            # row_marks = wx.BoxSizer(wx.HORIZONTAL)
-            # self.labels["axis_marks"] = wx.StaticText(build_box, label=loc.get("axis_marks_label", "Метки осей"))
-            # style_label(self.labels["axis_marks"])
-            # self.axis_marks_input = wx.ComboBox(
-            #     build_box,
-            #     choices=default_axis_marks,
-            #     value="0",
-            #     style=wx.CB_DROPDOWN,
-            #     size=field_size
-            # )
-            # style_combobox(self.axis_marks_input)
-            # row_marks.Add(self.labels["axis_marks"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-            # row_marks.AddStretchSpacer()
-            # row_marks.Add(self.axis_marks_input, 0)
-            # build_sizer.Add(row_marks, 0, wx.EXPAND | wx.ALL, 5)
-
-            # self.right_sizer.Add(build_sizer, 0, wx.EXPAND | wx.TOP | wx.BOTTOM, 5)
             self.right_sizer.AddStretchSpacer()
             self.right_sizer.Add(self.create_button_bar(), 0, wx.ALIGN_RIGHT | wx.ALL, 5)
 
@@ -570,26 +368,81 @@ class NozzleContentPanel(BaseContentPanel):
             apply_styles_to_panel(self)
 
             self.form.clear()
-        finally:
+            self.on_mode_change()
             self.Layout()
+        finally:
             self.Thaw()
+
 
 
     # ----------------------------------------------------------------
     # Обработчики событий
     # ----------------------------------------------------------------
+    # ----------------------------------------------------------------
+    # Обработчик смены режима построения
+    # ----------------------------------------------------------------
+    def on_mode_change(self, _event: Optional[wx.Event] = None) -> None:
+        """
+        Обновляет список значений точности (accuracy_combo)
+        в зависимости от выбранного режима построения.
 
-    def on_mode_change(self, _event):
-        """Меняет список значений accuracy при смене режима построения."""
-        mode_map = {
-            loc.get("mode_bulge", "Bulge"): "bulge",
-            loc.get("mode_polyline", "Polyline"): "polyline",
-            loc.get("mode_spline", "Spline"): "spline",
+        Логика:
+        0 -> bulge
+        1 -> polyline
+        2 -> spline
+
+        Используется индекс выбора, а не текст,
+        чтобы исключить ошибки локализации.
+        """
+
+        # Получаем поля из FormBuilder
+        mode_field = self.form.fields.get("mode_combo")
+        acc_field = self.form.fields.get("accuracy_combo")
+
+        if mode_field is None or acc_field is None:
+            return
+
+        mode_ctrl = mode_field.ctrl
+        accuracy_ctrl = acc_field.ctrl
+
+        # Проверка типов контролов
+        if not isinstance(mode_ctrl, wx.ComboBox):
+            return
+
+        if not isinstance(accuracy_ctrl, wx.ComboBox):
+              return
+
+        # Получаем индекс выбранного режима
+        selection_index: int = mode_ctrl.GetSelection()
+
+        # Маппинг по индексу (жёстко и надёжно)
+        index_mode_map: Dict[int, str] = {
+            0: "bulge",
+            1: "polyline",
+            2: "spline",
         }
-        selected_mode = mode_map.get(self.mode_combo.GetValue(), "bulge")
-        options = ACCURACY_OPTIONS.get(selected_mode, ACCURACY_OPTIONS["bulge"])
-        # self.accuracy_combo.SetItems(options)
-        self.accuracy_combo.SetValue(options[0])
+
+        # Если индекс некорректный — выходим
+        if selection_index not in index_mode_map:
+            return
+
+        selected_mode: str = index_mode_map[selection_index]
+
+        # Получаем набор точностей для режима
+        options: List[str] = ACCURACY_OPTIONS[selected_mode]
+
+        # Сохраняем текущее значение, если оно ещё допустимо
+        current_value: str = accuracy_ctrl.GetValue()
+
+        # Обновляем список значений
+        accuracy_ctrl.Set(options)
+
+        # Если текущее значение допустимо — оставить
+        if current_value in options:
+            accuracy_ctrl.SetValue(current_value)
+        else:
+            # иначе выставить первое значение
+            accuracy_ctrl.SetValue(options[0])
 
     def on_ok(self, event: wx.Event):
         """
