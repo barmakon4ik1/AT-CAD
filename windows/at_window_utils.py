@@ -1133,89 +1133,207 @@ def lighten(hex_color: str, factor: float = 1.18) -> str:
     return f'#{lightened[0]:02x}{lightened[1]:02x}{lightened[2]:02x}'
 
 
+# Старая функция ген.кнопки (Заменена на версию 2, но продублирована для случая, если
+# еще где то есть ссылки на первую версию
+# def style_gen_button(
+#         btn: GenButton,
+#         normal_bg: str,
+#         text_color: str = None,
+#         bezel: int = 1,
+#         button_height: int = 0,
+#         font_size: int = None,
+# ):
+#     """
+#     Стилизует GenButton с учётом user_settings.json.
+#
+#     Параметры:
+#         normal_bg      — основной цвет фона
+#         text_color     — цвет текста (если None — берётся из настроек)
+#         bezel          — толщина объёмной рамки
+#         button_height  — фиксированная высота (0 = авто)
+#
+#     Поведение:
+#         - hover = слегка светлее normal_bg
+#         - pressed = темнее normal_bg
+#         - шрифт берётся через get_button_font()
+#     """
+#
+#     normal_bg = _normalize_color_to_hex(normal_bg)
+#
+#     if text_color is not None:
+#         text_color = _normalize_color_to_hex(text_color)
+#
+#     hover_bg   = lighten(normal_bg, 1.15)
+#     pressed_bg = darken(normal_bg, 0.72)
+#
+#     btn.normal_bg  = normal_bg
+#     btn.hover_bg   = hover_bg
+#     btn.pressed_bg = pressed_bg
+#     btn.current_bg = normal_bg
+#
+#     btn.SetBackgroundColour(wx.Colour(normal_bg))
+#     btn.SetForegroundColour(wx.Colour(text_color))
+#     btn.SetBezelWidth(bezel) # 0 = совсем плоская, 1–2 = лёгкий объём
+#     btn.SetUseFocusIndicator(False)
+#
+#     # Шрифт берётся из глобальной настройки
+#     if not font_size:
+#         btn.SetFont(get_button_font())
+#     else:
+#         font = wx.Font(font_size, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+#         btn.SetFont(font)
+#
+#     # Принудительный размер, если указан
+#     if button_height > 0:
+#         w, _ = btn.GetSize()
+#         btn.SetMinSize(wx.Size(w, button_height))
+#         btn.SetSize(wx.Size(w, button_height))
+#
+#     def update_bg(color: str):
+#         btn.current_bg = color
+#         btn.SetBackgroundColour(wx.Colour(color))
+#         btn.Refresh()
+#
+#     def on_enter(evt):
+#         if btn.current_bg != btn.pressed_bg:
+#             update_bg(btn.hover_bg)
+#         evt.Skip()
+#
+#     def on_leave(evt):
+#         if btn.current_bg != btn.pressed_bg:
+#             update_bg(btn.normal_bg)
+#         evt.Skip()
+#
+#     def on_down(evt):
+#         update_bg(btn.pressed_bg)
+#         evt.Skip()
+#
+#     def on_up(evt):
+#         pos = evt.GetPosition()
+#         inside = btn.HitTest(pos) == wx.HT_WINDOW_INSIDE
+#         update_bg(btn.hover_bg if inside else btn.normal_bg)
+#         evt.Skip()
+#
+#     btn.Bind(wx.EVT_ENTER_WINDOW, on_enter)
+#     btn.Bind(wx.EVT_LEAVE_WINDOW, on_leave)
+#     btn.Bind(wx.EVT_LEFT_DOWN,   on_down)
+#     btn.Bind(wx.EVT_LEFT_UP,     on_up)
+
 def style_gen_button(
-        btn: GenButton,
-        normal_bg: str,
-        text_color: str = None,
+        btn,
+        normal_bg,
+        text_color=None,
         bezel: int = 1,
         button_height: int = 0,
         font_size: int = None,
+        toggle: bool = False,
 ):
     """
-    Стилизует GenButton с учётом user_settings.json.
-
-    Параметры:
-        normal_bg      — основной цвет фона
-        text_color     — цвет текста (если None — берётся из настроек)
-        bezel          — толщина объёмной рамки
-        button_height  — фиксированная высота (0 = авто)
-
-    Поведение:
-        - hover = слегка светлее normal_bg
-        - pressed = темнее normal_bg
-        - шрифт берётся через get_button_font()
+    Универсальный стиль:
+    работает и с GenButton и с wx.Button
     """
 
+    # --- Нормализация цветов ---
     normal_bg = _normalize_color_to_hex(normal_bg)
 
-    if text_color is not None:
-        text_color = _normalize_color_to_hex(text_color)
+    if text_color is None:
+        text_color = get_setting("BUTTON_FONT_COLOR") or DEFAULT_SETTINGS["BUTTON_FONT_COLOR"]
 
-    hover_bg   = lighten(normal_bg, 1.15)
-    pressed_bg = darken(normal_bg, 0.72)
+    text_color = _normalize_color_to_hex(text_color)
 
-    btn.normal_bg  = normal_bg
-    btn.hover_bg   = hover_bg
-    btn.pressed_bg = pressed_bg
-    btn.current_bg = normal_bg
+    hover_bg   = lighten(normal_bg, 1.12)
+    pressed_bg = darken(normal_bg, 0.75)
 
+    is_gen = isinstance(btn, GenButton)
+
+    # --- Состояния (замыкание) ---
+    is_pressed = False
+    is_hover   = False
+    is_toggle  = toggle
+    is_active  = False
+
+    # --- Базовый вид ---
     btn.SetBackgroundColour(wx.Colour(normal_bg))
     btn.SetForegroundColour(wx.Colour(text_color))
-    btn.SetBezelWidth(bezel) # 0 = совсем плоская, 1–2 = лёгкий объём
-    btn.SetUseFocusIndicator(False)
 
-    # Шрифт берётся из глобальной настройки
-    if not font_size:
-        btn.SetFont(get_button_font())
-    else:
-        font = wx.Font(font_size, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+    if is_gen:
+        btn.SetBezelWidth(bezel)
+        btn.SetUseFocusIndicator(False)
+
+    if font_size:
+        font = wx.Font(
+            font_size,
+            wx.FONTFAMILY_DEFAULT,
+            wx.FONTSTYLE_NORMAL,
+            wx.FONTWEIGHT_BOLD
+        )
         btn.SetFont(font)
+    else:
+        btn.SetFont(get_button_font())
 
-    # Принудительный размер, если указан
     if button_height > 0:
-        w, _ = btn.GetSize()
-        btn.SetMinSize(wx.Size(w, button_height))
-        btn.SetSize(wx.Size(w, button_height))
+        btn.SetMinSize(wx.Size(-1, button_height))
 
-    def update_bg(color: str):
-        btn.current_bg = color
+    # --- Визуальное состояние ---
+    def apply_visual_state():
+        if is_toggle and is_active:
+            color = pressed_bg
+        elif is_pressed:
+            color = pressed_bg
+        elif is_hover:
+            color = hover_bg
+        else:
+            color = normal_bg
+
         btn.SetBackgroundColour(wx.Colour(color))
         btn.Refresh()
 
+    # --- События ---
     def on_enter(evt):
-        if btn.current_bg != btn.pressed_bg:
-            update_bg(btn.hover_bg)
+        nonlocal is_hover
+        is_hover = True
+        apply_visual_state()
         evt.Skip()
 
     def on_leave(evt):
-        if btn.current_bg != btn.pressed_bg:
-            update_bg(btn.normal_bg)
+        nonlocal is_hover, is_pressed
+        is_hover = False
+        is_pressed = False
+        apply_visual_state()
         evt.Skip()
 
-    def on_down(evt):
-        update_bg(btn.pressed_bg)
+    def on_left_down(evt):
+        nonlocal is_pressed
+        is_pressed = True
+        apply_visual_state()
         evt.Skip()
 
-    def on_up(evt):
-        pos = evt.GetPosition()
-        inside = btn.HitTest(pos) == wx.HT_WINDOW_INSIDE
-        update_bg(btn.hover_bg if inside else btn.normal_bg)
+    def on_left_up(evt):
+        nonlocal is_pressed, is_active
+        is_pressed = False
+
+        if is_toggle:
+            x, y = evt.GetPosition()
+            if btn.HitTest((x, y)) == wx.HT_WINDOW_INSIDE:
+                is_active = not is_active
+
+        apply_visual_state()
         evt.Skip()
 
     btn.Bind(wx.EVT_ENTER_WINDOW, on_enter)
     btn.Bind(wx.EVT_LEAVE_WINDOW, on_leave)
-    btn.Bind(wx.EVT_LEFT_DOWN,   on_down)
-    btn.Bind(wx.EVT_LEFT_UP,     on_up)
+    btn.Bind(wx.EVT_LEFT_DOWN, on_left_down)
+    btn.Bind(wx.EVT_LEFT_UP, on_left_up)
+
+    # --- Публичный метод для toggle-кнопок ---
+    def set_active(state: bool):
+        nonlocal is_active
+        is_active = state
+        apply_visual_state()
+
+    btn.set_active = set_active
+
+    apply_visual_state()
 
 def style_gen_button_v2(
         btn,

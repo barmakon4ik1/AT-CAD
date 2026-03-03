@@ -1245,11 +1245,9 @@ class BracketSpecificPanel(wx.Panel):
                         {"type": "text", "name": "length", "value": "", "required": True, "default": "", "size": (130, -1)}
                     ]
                 )
-                length_option2 = ["L1", loc.get("no")]
                 fb_box.universal_row(
-                    loc.get("length"),
+                    loc.get("length1"),
                     [
-                        {"type": "combo", "name": "length_option1", "value": length_option2[0], "choices": length_option2, "required": True, "default": length_option2[0], "readonly": True},
                         {"type": "text", "name": "l1", "value": "", "required": True, "default": "", "size": (130, -1)}
                     ]
                 )
@@ -1458,7 +1456,7 @@ class BracketSpecificPanel(wx.Panel):
                     specific["variant"] = 1
                     specific["length"] = L
                     specific["l1"] = L1
-                elif length_option == "L" and length_option1 == loc.get("no"):
+                elif length_option == "L" and not length_option1:
                     specific["variant"] = 2
                     specific["length"] = L
                 elif length_option == "L2":
