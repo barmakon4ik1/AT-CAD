@@ -33,8 +33,8 @@ def at_offset(polyline: Any, offset_distance: float, doc: Any, model: Any) -> li
         # vertices = list(zip(coords[::2], coords[1::2]))
 
         # Смещение внутрь
-        offset_distance = -abs(float(offset_distance))
-        offset_objects = polyline.Offset(offset_distance)
+        offset_dist = -abs(float(offset_distance))
+        offset_objects = polyline.Offset(offset_dist)
         result = list(offset_objects) if offset_objects else []
         return result
 

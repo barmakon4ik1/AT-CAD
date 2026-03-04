@@ -31,6 +31,7 @@ windows/content_bracket.py
     windows.content_bracket       — панель ввода и специфики мостиков
 """
 import math
+from pprint import pprint
 from typing import Optional, Any
 from config.at_cad_init import ATCadInit
 from config.at_config import *
@@ -612,7 +613,7 @@ class BracketContentPanel(BaseContentPanel):
         # ======================================================
         # Debug
         # ======================================================
-        # pprint(bridge_data)
+        pprint(bridge_data)
 
         # ======================================================
         # Обработка
@@ -1448,28 +1449,28 @@ class BracketSpecificPanel(wx.Panel):
                 specific["edge_angle"] = parse_float(raw.get("edge_angle"))
 
                 L = parse_float(raw.get("length"))
-                L1 = parse_float(raw.get("l1"))
+                L1 = 0.0 if specific["l1"] is None else parse_float(raw.get("l1"))
                 length_option = raw.get("length_option")
-                length_option1 = raw.get("length_option1")
 
-                if length_option == "L" and length_option1 == "L1":
-                    specific["variant"] = 1
+                if length_option == "L":
                     specific["length"] = L
-                    specific["l1"] = L1
-                elif length_option == "L" and not length_option1:
-                    specific["variant"] = 2
-                    specific["length"] = L
-                elif length_option == "L2":
-                    L2 = parse_float(raw.get("length"))
-                    specific["variant"] = 3
-                    specific["l2"] = L2
-                    specific["l1"] = L1
-
-                if specific["l1"] is None:
-                    specific["l1"] = 0.0
-                if specific["l2"] is None:
                     specific["l2"] = 0.0
+                elif length_option == "L2":
+                    specific["length"] = 0.0
+                    specific["l2"] = L
+                else:
+                    raise loc.get("invalid_length_option")
 
+                specific["l1"] = L1 if L1 > 0 else 0.0
+
+                if length_option == "L" and L1 > 0:
+                    specific["variant"] = 1
+                elif length_option == "L2" and L1 > 0:
+                    specific["variant"] = 3
+                elif length_option == "L":
+                    specific["variant"] = 3
+                else:
+                    raise loc.get("invalid_length_option")
         except:
             raise loc.get("validation_error")
 
