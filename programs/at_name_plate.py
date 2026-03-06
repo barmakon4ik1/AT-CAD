@@ -709,9 +709,10 @@ def build_type2(modelspace, cfg: BridgeConfig):
     p12 = (p11[0], p3[1])
     p13 = (p14[0], p3[1])
 
-    pb = PolylineBuilder(p0)
+    # pb = PolylineBuilder(p0)
+    pb = PolylineBuilder(p1)
 
-    pb.line_to(p1)
+    # pb.line_to(p1)
     if l_cut != 0.0 and h_cut != 0.0:
         pb.line_to(p2)
         if r_cut == 0.0:
@@ -723,8 +724,8 @@ def build_type2(modelspace, cfg: BridgeConfig):
         pb.line_to(p5)
 
     pb.line_to(p6)
-    pb.line_to(p7)
-    pb.line_to(p8)
+    # pb.line_to(p7)
+    # pb.line_to(p8)
     pb.line_to(p9)
 
     if l_cut != 0.0 and h_cut != 0.0:
@@ -738,8 +739,8 @@ def build_type2(modelspace, cfg: BridgeConfig):
         pb.line_to(p13)
 
     pb.line_to(p14)
-    pb.line_to(p15)
-    pb.line_to(p0)
+    # pb.line_to(p15)
+    pb.line_to(p1)
 
     pb.close()
 

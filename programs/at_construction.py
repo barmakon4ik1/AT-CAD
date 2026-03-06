@@ -808,6 +808,8 @@ class MainText:
         """
         work_number = self.data["work_number"]
         detail = self.data["detail"]
+        if detail == "":
+            detail = None
 
         # Добавление текста
         if work_number:  # Добавляем текст только если work_number не пустой
