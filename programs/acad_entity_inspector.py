@@ -5,7 +5,7 @@ import time
 import pywintypes
 import wx
 from win32com.client import VARIANT
-from typing import Union, List, Tuple
+from typing import Union, List, Tuple, Any
 import pythoncom
 
 from config.at_cad_init import ATCadInit
@@ -13,6 +13,12 @@ from programs.at_geometry import ensure_point_variant
 from windows.at_entity_inspector import EntityInspectorFrame
 from shapely.geometry import Polygon, MultiPolygon
 from shapely.affinity import translate, rotate
+
+DEBUG = True
+
+def debug(*args):
+    if DEBUG:
+        print(*args)
 
 # -------------------------------------
 # Проверка направления обхода полилинии
@@ -584,6 +590,261 @@ def place_with_rotation(inner_poly, insert_obj, angles=(0,90)):
 
     return False
 
+
+def polygon_vertices(poly):
+    """
+    Возвращает список вершин Shapely Polygon.
+    Последняя точка (дублирующая первую) удаляется.
+    """
+
+    coords = list(poly.exterior.coords)
+
+    # последняя вершина повторяет первую
+    return coords[:-1]
+
+
+def touch_place(container, part, gap, model=None, angles=(0,90)):
+    """
+    Контактное размещение детали.
+
+    Алгоритм:
+    каждая вершина детали совмещается
+    с каждой вершиной контейнера.
+
+    Добавлен полный DEBUG-контроль.
+    """
+
+    debug("\n===== TOUCH PLACE START =====")
+
+    debug("container bounds:", container.bounds)
+    debug("part bounds:", part.bounds)
+
+    # контейнер с учетом технологического зазора
+    inner_container = container.buffer(-gap)
+
+    debug("container buffer(-gap) bounds:", inner_container.bounds)
+
+    container_vertices = polygon_vertices(container)
+
+    debug("container vertices:")
+    for v in container_vertices:
+        debug("   ", v)
+
+    best = None
+
+    for angle in angles:
+
+        debug("\n---- rotation:", angle)
+
+        # вращаем деталь
+        rp = rotate(part, angle, origin=(0,0))
+
+        debug("rotated part bounds:", rp.bounds)
+
+        part_vertices = polygon_vertices(rp)
+
+        debug("part vertices:")
+        for v in part_vertices:
+            debug("   ", v)
+
+        for cvx, cvy in container_vertices:
+
+            for pvx, pvy in part_vertices:
+
+                # вычисляем смещение
+                dx = cvx - pvx
+                dy = cvy - pvy
+
+                debug("\n--- candidate ---")
+                debug("container vertex:", cvx, cvy)
+                debug("part vertex:", pvx, pvy)
+                debug("translation:", dx, dy)
+
+                # создаём тестовую позицию
+                test = translate(rp, dx, dy)
+
+                debug("test bounds:", test.bounds)
+
+                # быстрый bbox тест
+                cminx, cminy, cmaxx, cmaxy = inner_container.bounds
+                tminx, tminy, tmaxx, tmaxy = test.bounds
+
+                bbox_ok = (
+                    tminx >= cminx and
+                    tminy >= cminy and
+                    tmaxx <= cmaxx and
+                    tmaxy <= cmaxy
+                )
+
+                debug("bbox inside:", bbox_ok)
+
+                # точная проверка
+                inside = inner_container.contains(test)
+                intersects = inner_container.intersects(test)
+
+                debug("contains:", inside)
+                debug("intersects:", intersects)
+
+                if not inside:
+                    continue
+
+                minx, miny, _, _ = test.bounds
+
+                debug("VALID POSITION FOUND")
+
+                if best is None:
+
+                    best = (test, minx, miny, angle)
+
+                    debug("first best:", best)
+
+                else:
+
+                    _, bx, by, _ = best
+
+                    # bottom-left критерий
+                    if miny < by or (miny == by and minx < bx):
+
+                        debug("better position found")
+
+                        best = (test, minx, miny, angle)
+
+    debug("\ncontainer area:", container.area)
+    debug("part area:", part.area)
+
+    if best:
+        debug("BEST RESULT:", best)
+    else:
+        debug("NO VALID POSITION FOUND")
+
+    return best
+
+
+def minkowski_sum(polyA, polyB):
+
+    result = []
+
+    for ax, ay in polyA.exterior.coords:
+        shifted = translate(polyB, ax, ay)
+        result.append(shifted)
+
+    union = result[0]
+
+    for g in result[1:]:
+        union = union.union(g)
+
+    return union
+
+
+def invert_polygon(poly):
+
+    coords = [(-x, -y) for x, y in poly.exterior.coords]
+
+    return Polygon(coords)
+
+
+def compute_nfp(container, part):
+
+    inv = invert_polygon(part)
+
+    nfp = minkowski_sum(container, inv)
+
+    return nfp
+
+
+def find_best_point(nfp):
+
+    best = None
+
+    for x, y in nfp.exterior.coords:
+
+        if best is None:
+            best = (x, y)
+        else:
+            bx, by = best
+
+            if y < by or (y == by and x < bx):
+                best = (x, y)
+
+    return best
+
+
+def place_part(container, part, gap):
+
+    nfp = compute_nfp(container.buffer(-gap), part)
+
+    point = find_best_point(nfp)
+
+    if point is None:
+        return None
+
+    px, py = point
+
+    placed = translate(part, px, py)
+
+    if container.contains(placed):
+
+        return placed, px, py
+
+    return None
+
+
+def nfp_solver(container, parts, gap=0):
+
+    placements = []
+
+    current_container = container
+
+    for part in parts:
+
+        res = place_part(current_container, part, gap)
+
+        if res is None:
+            break
+
+        placed, x, y = res
+
+        placements.append(placed)
+
+        # вырезаем деталь из контейнера
+        current_container = current_container.difference(
+            placed.buffer(gap)
+        )
+
+    return placements
+
+
+def best_rotation(container, part, gap):
+
+    angles = [0, 90, 180, 270]
+
+    best = None
+
+    for a in angles:
+
+        rp = rotate(part, a, origin=(0,0))
+
+        res = place_part(container, rp, gap)
+
+        if res is None:
+            continue
+
+        placed, x, y = res
+
+        minx, miny, _, _ = placed.bounds
+
+        if best is None:
+            best = (placed, minx, miny, a)
+
+        else:
+            _, bx, by, _ = best
+
+            if miny < by or (miny == by and minx < bx):
+                best = (placed, minx, miny, a)
+
+    return best
+
+
 # -------------------------------------
 # Полный алгоритм размещения
 # -------------------------------------
@@ -595,7 +856,7 @@ def run_algorithm(doc):
     if outer is None:
         return
 
-    inner = make_inner_offset(outer, 10.0)
+    inner = outer
     if inner is None:
         print("Не удалось создать offset.")
         return
@@ -618,59 +879,73 @@ def run_algorithm(doc):
     container_shape = acad_poly_to_shapely(inner)
     part_shape = acad_poly_to_shapely(insert_poly)
 
-    placements, containers = nesting_solver(
-        container_shape,
-        [part_shape],
-        gap=10
+    # debug исходного контейнера
+    debug_draw_polygon(model, container_shape)
+
+    # debug внутреннего контейнера
+    draw_container_debug(model, container_shape, 10)
+
+    # debug детали
+    debug_draw_polygon(model, part_shape)
+
+    debug("------ CONTAINER ------")
+    debug(container_shape)
+
+    debug("------ PART ------")
+    debug(part_shape)
+
+    if not hasattr(run_algorithm, "containers"):
+        # первый запуск
+        run_algorithm.containers = [container_shape]
+
+    result = find_position_in_containers(
+        run_algorithm.containers,
+        part_shape,
+        gap=10,
+        model=None
     )
 
-    if not placements:
+    if result is None:
         print("Не удалось разместить деталь")
         return
 
-    placed_poly, x, y, angle = placements[0]
+    used_container, placed_poly, x, y, angle = result
+
+    # обновляем контейнеры
+    run_algorithm.containers = update_containers(
+        run_algorithm.containers,
+        used_container,
+        placed_poly,
+        gap=10
+    )
+
+    for c in run_algorithm.containers:
+        draw_polygon(model, c)
 
     rotate_object(insert_poly, angle)
 
+    pminx, pminy, _, _ = placed_poly.bounds
+
     minpt, _ = get_bbox(insert_poly)
 
-    dx = x - minpt[0]
-    dy = y - minpt[1]
+    dx = pminx - minpt[0]
+    dy = pminy - minpt[1]
 
     move_object(insert_poly, dx, dy)
 
-    if not place_with_rotation(inner, insert_poly):
-        print("Не удалось разместить объект.")
+    print("Размещение выполнено NFP solver")
 
-    if fits_inside(inner, insert_poly):
-        print("Размещение выполнено без поворота.")
-        return
-
-    # если не влез — пробуем повернуть
-    print("Не помещается. Пробуем поворот 90°...")
-
-    rotate_90(insert_poly)
-    move_to_left(inner, insert_poly)
-
-    if fits_inside(inner, insert_poly):
-        print("Размещение выполнено после поворота.")
-        return
-
-    print("Не помещается в левом углу. Запуск grid search...")
-
-    if grid_search_place(inner, insert_poly, step=20):
-        print("Размещение выполнено grid search.")
-        return
-
-    print("Примитив не помещается внутрь.")
 
 
 def generate_residuals(container_poly, placed_poly, gap):
     """
-    Генерация остаточных контуров после размещения детали.
+    Генерация остаточных контейнеров.
+
+    Используется половинный gap,
+    чтобы суммарный зазор между деталями был ровно gap.
     """
 
-    occupied = placed_poly.buffer(gap)
+    occupied = placed_poly.buffer(gap/2, join_style=2)
 
     residual = container_poly.difference(occupied)
 
@@ -686,11 +961,40 @@ def generate_residuals(container_poly, placed_poly, gap):
     return []
 
 
-def filter_residuals(polygons, min_area):
+def filter_residuals(polygons, min_area=100):
+
+    """
+    Удаляет слишком маленькие остаточные полигоны.
+    """
+
     return [p for p in polygons if p.area > min_area]
 
 
 def draw_polygon(model, poly):
+    """
+    Рисует Shapely Polygon в AutoCAD как полилинию.
+    """
+
+    coords = list(poly.exterior.coords)
+
+    pts = []
+
+    for x, y in coords:
+        pts.extend([x, y])
+
+    pts_variant = VARIANT(
+        pythoncom.VT_ARRAY | pythoncom.VT_R8,
+        pts
+    )
+
+    pl = model.AddLightWeightPolyline(pts_variant)
+
+    pl.Closed = True
+
+    return pl
+
+
+def debug_draw_polygon(model, poly):
 
     coords = list(poly.exterior.coords)
 
@@ -698,10 +1002,46 @@ def draw_polygon(model, poly):
     for x, y in coords:
         pts.extend([x, y])
 
-    pl = model.AddLightWeightPolyline(pts)
+    pts_variant = VARIANT(
+        pythoncom.VT_ARRAY | pythoncom.VT_R8,
+        pts
+    )
+
+    pl = model.AddLightWeightPolyline(pts_variant)
     pl.Closed = True
 
-    return pl
+
+def draw_point(model, x, y):
+
+    model.AddPoint(
+        ensure_point_variant((x,y,0))
+    )
+
+
+def update_containers(containers, used_container, placed_poly, gap):
+
+    """
+    Обновляет список контейнеров после размещения детали.
+    """
+
+    new_containers = []
+
+    for c in containers:
+
+        if c == used_container:
+
+            residuals = generate_residuals(c, placed_poly, gap)
+
+            residuals = filter_residuals(residuals)
+            for r in residuals:
+                debug("residual area:", r.area)
+
+            new_containers.extend(residuals)
+
+        else:
+            new_containers.append(c)
+
+    return new_containers
 
 
 def sort_containers(containers):
@@ -712,69 +1052,96 @@ def sort_containers(containers):
     )
 
 
-def find_position_in_containers(containers, part, gap):
+def find_position_in_containers(containers, part, gap, model):
+
+    """
+    Ищет позицию детали среди всех доступных контейнеров.
+
+    Контейнеры сортируются по правилу Bottom-Left.
+
+    Args:
+        containers : list[Polygon]
+        part : Polygon
+        gap : float
+        model : AutoCAD ModelSpace (для debug)
+
+    Returns:
+        (container, placed_poly, x, y, angle) или None
+    """
+
+    debug("\n===== SEARCH CONTAINER =====")
 
     containers = sort_containers(containers)
+
+    debug("containers count:", len(containers))
 
     best = None
     best_container = None
 
-    for container in containers:
+    for i, container in enumerate(containers):
+
+        debug("\ncontainer index:", i)
+        debug("container bounds:", container.bounds)
+        debug("container area:", container.area)
 
         pos = bottom_left_place(container, part, gap)
 
         if pos is None:
+            debug("no position in this container")
             continue
 
         placed_poly, x, y, angle = pos
 
+        debug("candidate placement:", x, y)
+
         if best is None:
+
             best = pos
             best_container = container
+
         else:
+
             _, bx, by, _ = best
 
             if y < by or (y == by and x < bx):
+
+                debug("better container found")
+
                 best = pos
                 best_container = container
 
     if best is None:
+
+        debug("NO CONTAINER FOUND")
+
         return None
+
+    debug("\nSELECTED CONTAINER")
+    debug("position:", best[1], best[2])
 
     return best_container, *best
 
 
-def update_containers(containers, used_container, placed_poly, gap):
-
-    new_containers = []
-
-    for c in containers:
-
-        if c == used_container:
-
-            residuals = generate_residuals(c, placed_poly, gap)
-
-            new_containers.extend(residuals)
-
-        else:
-            new_containers.append(c)
-
-    return new_containers
-
-
 def nesting_solver(container, parts, gap):
-
+    debug("===== SOLVER START =====")
+    debug("container area:", container.area)
+    debug("parts:", len(parts))
+    debug("gap:", gap)
     containers = [container]
-
     placements = []
 
     for part in parts:
 
-        result = find_position_in_containers(containers, part, gap)
+        result = find_position_in_containers(
+            containers,
+            part,
+            gap,
+            None
+        )
 
         if result is None:
-            print("Не удалось разместить деталь")
-            continue
+            print("Деталь не помещается")
+            break
 
         used_container, placed_poly, x, y, angle = result
 
@@ -798,7 +1165,19 @@ def acad_poly_to_shapely(poly):
     for i in range(0, len(coords), 2):
         pts.append((coords[i], coords[i+1]))
 
-    return Polygon(pts)
+    debug("AutoCAD vertices:", pts)
+
+    shp = Polygon(pts)
+
+    debug("Shapely valid:", shp.is_valid)
+    debug("Shapely area:", shp.area)
+    debug("Shapely bounds:", shp.bounds)
+
+    if not shp.is_valid:
+        debug("FIXING geometry using buffer(0)")
+        shp = shp.buffer(0)
+
+    return shp
 
 
 def shapely_bbox(poly):
@@ -808,6 +1187,19 @@ def shapely_bbox(poly):
 
 
 def bottom_left_place(container, part, gap, step=20, angles=(0,90)):
+    """
+    Bottom-Left размещение детали.
+
+    ВАЖНО:
+    gap учитывается через buffer детали,
+    поэтому контейнер НЕ уменьшается.
+
+    Это обеспечивает:
+    • отступ от стенки
+    • правильный зазор между деталями
+    """
+
+    debug("\n===== BOTTOM LEFT PLACE =====")
 
     cminx, cminy, cmaxx, cmaxy = container.bounds
 
@@ -815,9 +1207,12 @@ def bottom_left_place(container, part, gap, step=20, angles=(0,90)):
 
     for angle in angles:
 
+        debug("\nrotation:", angle)
+
         rp = rotate(part, angle, origin=(0,0))
 
         pminx, pminy, pmaxx, pmaxy = rp.bounds
+
         width = pmaxx - pminx
         height = pmaxy - pminy
 
@@ -829,16 +1224,26 @@ def bottom_left_place(container, part, gap, step=20, angles=(0,90)):
 
             while x + width <= cmaxx:
 
-                test = translate(rp, x - pminx, y - pminy)
+                dx = x - pminx
+                dy = y - pminy
 
-                if container.buffer(-gap).contains(test):
+                test = translate(rp, dx, dy)
+
+                # учитываем технологический зазор
+                test_gap = test.buffer(gap/2, join_style=2)
+
+                if container.contains(test_gap):
 
                     if best is None:
+
                         best = (test, x, y, angle)
+
                     else:
+
                         _, bx, by, _ = best
 
                         if y < by or (y == by and x < bx):
+
                             best = (test, x, y, angle)
 
                     break
@@ -852,6 +1257,22 @@ def bottom_left_place(container, part, gap, step=20, angles=(0,90)):
 
     return best
 
+
+def draw_container_debug(model, container, gap):
+    """
+    Рисует внутренний контейнер (учёт технологического зазора).
+
+    Используется только для визуального контроля алгоритма.
+    Сам solver работает с исходным контейнером.
+    """
+
+    inner = container.buffer(-gap, join_style=2)
+
+    if inner.is_empty:
+        print("Container vanished after buffer")
+        return None
+
+    return draw_polygon(model, inner)
 
 
 def main():

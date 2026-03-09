@@ -98,7 +98,7 @@ class EntityInspectorFrame(wx.Frame):
 
                 lines.append(f"VertexCount: {vertex_count}")
                 lines.append(f"Length: {round(obj.Length, 3)}")
-                lines.append(f"Area: {round(getattr(obj,'Area',0),3) / 1000000} м²")
+                lines.append(f"Area: {round(getattr(obj,'Area',0) / 1000000, 3)} м²")
                 lines.append(f"Closed: {obj.Closed}")
 
                 lines.append("\n=== ВЕРШИНЫ ===\n")
