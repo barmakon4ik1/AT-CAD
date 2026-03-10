@@ -114,7 +114,7 @@ self.right_sizer.Add(self.create_button_bar(), 0, wx.ALIGN_RIGHT | wx.ALL, 5)
 # ok_btn = LocalizableButton(self.ok_button, "ok_label")
 # cancel_btn = LocalizableButton(self.cancel_button, "cancel_label")
 
-# 6 Завершение компоновки
+# 6 авершение компоновки
 # 12. Добавляем левую и правую части
 main_sizer = wx.BoxSizer(wx.HORIZONTAL)
 main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
