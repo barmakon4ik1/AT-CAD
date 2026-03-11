@@ -1174,14 +1174,30 @@ class BracketSpecificPanel(wx.Panel):
                     loc.get("shell_diameter"),
                     [{"type": "text", "name": "shell_diameter1", "value": "", "required": True, "default": ""}]
                 )
+
+                length_option1 = ["L", "Lx"]
                 fb_box.universal_row(
-                    loc.get("length_label"),
-                    [{"type": "text", "name": "length", "value": "", "required": True, "default": ""}]
+                    loc.get("length"),
+                    [
+                        {
+                            "type": "combo",
+                         "name": "length_option",
+                         "value": length_option1[0],
+                         "choices": length_option1,
+                         "required": True,
+                         "default": length_option1[0],
+                         "readonly": True,
+                         "size": (130, -1)
+                         },
+                        {"type": "text", "name": "length", "value": "", "required": True, "default": ""}
+                    ]
                 )
+
                 fb_box.universal_row(
                     loc.get("length1"),
                     [{"type": "combo", "name": "l1", "value": "", "choices": [loc.get("no")], "required": True, "default": loc.get("no")}]
                 )
+
                 fb_box.universal_row(
                     loc.get("edge_angle_label"),
                     [{"type": "combo", "name": "edge_angle", "value": "", "choices": ["90", "120"], "required": True, "default": "90"}]
@@ -1387,13 +1403,25 @@ class BracketSpecificPanel(wx.Panel):
             elif self.bridge_type == "type3":
                 specific["shell_diameter1"] = self._require_positive_float(raw, "shell_diameter1", "Диаметр > 0")
                 specific["edge_angle"] = parse_float(raw.get("edge_angle"))
-                if specific["edge_angle"] not in (90.0, 120.0):
-                    raise loc.get("invalid_angle_error")
-                if specific["l1"] == "no":
+                radius = specific["shell_diameter1"] / 2.0
+                length_option = raw.get("length_option")
+
+                length_input = self._require_positive_float(
+                    raw,
+                    "length",
+                    loc.get("length_positive_error")
+                )
+
+                if length_option == "L":
+                    specific["length"] = length_input
+                elif length_option == "Lx":
+                    delta = radius * (1 - math.cos(math.radians(specific["edge_angle"] / 2)))
+                    specific["length"] = length_input - delta
+
+                if specific["l1"] == loc.get("no") or not specific["l1"]:
                     specific["l1"] = 0.0
                 else:
                     specific["l1"] = parse_float(raw.get("l1"))
-                # specific["variant"] = 1 if specific["l1"] > 0 else 0
 
                 # --- Тип 4 ---
             elif self.bridge_type == "type4":
@@ -1448,10 +1476,13 @@ class BracketSpecificPanel(wx.Panel):
                         specific["shell_diameter2"] = d2
                 specific["edge_angle"] = parse_float(raw.get("edge_angle"))
 
-                L = parse_float(raw.get("length"))
-                L1 = 0.0 if specific["l1"] is None else parse_float(raw.get("l1"))
+                L = parse_float(raw.get("length")) or 0.0
+                L1 = max(parse_float(raw.get("l1")) or 0.0, 0.0)
                 length_option = raw.get("length_option")
 
+                specific["l1"] = L1
+
+                # распределение длин
                 if length_option == "L":
                     specific["length"] = L
                     specific["l2"] = 0.0
@@ -1459,18 +1490,23 @@ class BracketSpecificPanel(wx.Panel):
                     specific["length"] = 0.0
                     specific["l2"] = L
                 else:
-                    raise loc.get("invalid_length_option")
+                    raise ValueError(loc.get("invalid_length_option"))
 
-                specific["l1"] = L1 if L1 > 0 else 0.0
+                # таблица решений
+                VARIANTS = {            # Варианты:
+                    ("L", True): 1,     # L и L1
+                    ("L", False): 2,    # только L
+                    ("L2", True): 3,    # L1 и L2
+                    ("L2", False): 4,   # только L2
+                }
 
-                if length_option == "L" and L1 > 0:
-                    specific["variant"] = 1
-                elif length_option == "L2" and L1 > 0:
-                    specific["variant"] = 3
-                elif length_option == "L":
-                    specific["variant"] = 3
-                else:
-                    raise loc.get("invalid_length_option")
+                has_l1 = L1 > 0
+                key = (length_option, has_l1)
+
+                try:
+                    specific["variant"] = VARIANTS[key]
+                except KeyError:
+                    raise ValueError(loc.get("invalid_length_option"))
         except:
             raise loc.get("validation_error")
 

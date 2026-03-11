@@ -1239,8 +1239,15 @@ def build_type5(modelspace, cfg: BridgeConfig):
             raise ValueError("variant 3: dy > radius")
 
         dx = r1 - math.sqrt(r1 * r1 - dy * dy)
+
+    elif variant == 4:
+        l2 -= thickness
+        l = l2 - r1 * (1 - math.cos(a))
+        l01 = l + r1 - (h1 / math.tan(a))
+        dx = 0.0
+
     else:
-        raise ValueError("variant must be 1, 2 or 3")
+        raise ValueError("variant must be 1, 2, 3 or 4")
 
     center1 = (cx + w1 + l + r1 - dx, cy)
     center2 = (cx - w1 - l - r1 + dx, cy)

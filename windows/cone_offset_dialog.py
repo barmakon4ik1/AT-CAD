@@ -305,11 +305,11 @@ class ConeOffsetContentPanel(BaseContentPanel):
                 d1 = diameter_cone_offset(lk, l_offset - w, dvs, dbs)
 
             self.result = (d1, d2)
-            print(self.result)
+            # print(self.result)
 
             parent = self.GetParent()
             if isinstance(parent, wx.Dialog):
-                parent.EndModal(wx.ID_CANCEL)
+                parent.EndModal(wx.ID_OK)
             else:
                 parent.Close()
 
