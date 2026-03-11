@@ -1507,8 +1507,8 @@ class BracketSpecificPanel(wx.Panel):
                     specific["variant"] = VARIANTS[key]
                 except KeyError:
                     raise ValueError(loc.get("invalid_length_option"))
-        except:
-            raise loc.get("validation_error")
+        except Exception as e:
+            raise ValueError(f"{loc.get('validation_error')}: {e}")
 
         return {"specific": specific}
 
