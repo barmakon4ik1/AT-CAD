@@ -12,13 +12,13 @@ from config.at_config import BRACKET5_CONE_IMAGE_PATH
 from locales.at_translations import loc
 from programs.at_construction import at_diameter
 from programs.at_geometry import diameter_cone_offset
-from windows.at_fields_builder import FieldBuilder, FormBuilder
+from windows.at_fields_builder import FieldBuilder, FormBuilder, parse_float
 from windows.at_gui_utils import show_popup
 from windows.at_window_utils import (
     CanvasPanel,
     BaseContentPanel,
     apply_styles_to_panel,
-    load_common_data, parse_float,
+    load_common_data
 )
 
 # ----------------------------------------------------------------------

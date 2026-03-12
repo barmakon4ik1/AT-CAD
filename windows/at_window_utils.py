@@ -572,24 +572,6 @@ def fit_text_to_height(ctrl: object, text: str, max_width: int, max_height: int,
     return min_size
 
 
-def parse_float(value: str) -> float | None:
-    """
-    Преобразует строку в float.
-    Поддерживает ',' и '.' как десятичный разделитель.
-    Возвращает None для пустой строки.
-    Вызывает ValueError при некорректном формате.
-    """
-    if value is None:
-        return None
-
-    cleaned = str(value).strip().replace(",", ".")
-
-    if not cleaned:
-        return None
-
-    return float(cleaned)
-
-
 class CanvasPanel(wx.Panel):
     """
     Панель для отображения изображения с поддержкой масштабирования.

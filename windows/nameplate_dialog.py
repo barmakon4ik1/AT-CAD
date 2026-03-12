@@ -7,7 +7,6 @@ Undo удаления (Ctrl+Z)
 Корректное управление состояниями ADD / EDIT
 """
 
-import os
 import wx
 from typing import Dict, Optional
 from wx.lib.buttons import GenButton
@@ -85,9 +84,9 @@ class NamePlateDialog(wx.Dialog):
 
         self.panel = NamePlateContentPanel(self)
 
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(self.panel, 1, wx.EXPAND)
-        self.SetSizer(sizer)
+        np_sizer = wx.BoxSizer(wx.VERTICAL)
+        np_sizer.Add(self.panel, 1, wx.EXPAND)
+        self.SetSizer(np_sizer)
 
         self.CentreOnParent()
 

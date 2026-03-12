@@ -38,10 +38,10 @@ from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programs.at_construction import at_diameter
 from programs.at_input import at_get_point
-from windows.at_fields_builder import FormBuilder, FieldBuilder
+from windows.at_fields_builder import FormBuilder, FieldBuilder, parse_float
 from windows.at_window_utils import (
     CanvasPanel, show_popup, apply_styles_to_panel, BaseContentPanel,
-    parse_float, load_common_data, update_status_bar_point_selected
+    load_common_data, update_status_bar_point_selected
 )
 from config.at_config import NOZZLE_IMAGE_PATH
 from windows.at_content_registry import run_build

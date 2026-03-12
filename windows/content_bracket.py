@@ -38,10 +38,10 @@ from config.at_config import *
 from config.name_plates.nameplate_storage import load_nameplates
 from locales.at_translations import loc
 from programs.at_name_plate import BridgeConfig, BridgeBuilder, NamePlate
-from windows.at_fields_builder import FormBuilder, FieldBuilder
+from windows.at_fields_builder import FormBuilder, FieldBuilder, parse_float, normalize_input
 from windows.at_window_utils import (
     CanvasPanel, show_popup, apply_styles_to_panel,
-    BaseContentPanel, load_user_settings, load_common_data, get_wx_color_from_value, parse_float
+    BaseContentPanel, load_user_settings, load_common_data, get_wx_color_from_value
 )
 from programs.at_input import at_get_point
 from windows.cone_offset_dialog import ConeOffsetDialog
@@ -1476,8 +1476,8 @@ class BracketSpecificPanel(wx.Panel):
                         specific["shell_diameter2"] = d2
                 specific["edge_angle"] = parse_float(raw.get("edge_angle"))
 
-                L = parse_float(raw.get("length")) or 0.0
-                L1 = max(parse_float(raw.get("l1")) or 0.0, 0.0)
+                L = normalize_input(raw, "length", 0.0)
+                L1 = normalize_input(raw, "l1", 0.0, min_value=0.0)
                 length_option = raw.get("length_option")
 
                 specific["l1"] = L1

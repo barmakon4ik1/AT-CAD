@@ -22,7 +22,7 @@ from typing import Any, Callable, Dict, Optional
 import wx
 
 from errors.at_errors import DataError
-from windows.at_window_utils import parse_float, style_gen_button_v2
+from windows.at_window_utils import style_gen_button_v2
 from config.at_config import FORM_CONFIG
 from locales.at_translations import loc
 from windows.at_gui_utils import get_standard_font
@@ -438,6 +438,7 @@ class FieldBuilder:
              default: Any = None) -> wx.TextCtrl:
         """Текстовое поле с меткой."""
         ctrl = wx.TextCtrl(self.parent, value=value, size=self.default_size)
+        bind_float_input(ctrl)
         self._register_field(name, ctrl, required, parser, default)
         self.row(label_key, [ctrl])
         return ctrl
@@ -696,6 +697,9 @@ class FieldBuilder:
                     value=str(elem.get("value", "")),
                     size=size
                 )
+                # --- автоматически привязываем фильтр float для float-полей ---
+                if elem_type == "float":
+                    bind_float_input(ctrl)
 
                 parser = elem.get("parser")
                 if elem_type == "float" and parser is None:
@@ -955,3 +959,204 @@ def wrap_button_label(btn: wx.Button, padding: int = 10):
         lines.append(current)
 
     btn.SetLabel("\n".join(lines))
+
+def bind_float_input(ctrl: wx.TextCtrl):
+    """
+    Привязывает фильтр для float:
+    - только цифры и одна точка/запятая
+    - заменяет ',' на '.'
+    - стрелки, backspace, delete работают
+    - при ошибке ввод запрещен, звук сигнала
+    """
+    def on_char(event):
+        key = event.GetKeyCode()
+        allowed_control = (wx.WXK_BACK, wx.WXK_DELETE, wx.WXK_LEFT, wx.WXK_RIGHT, wx.WXK_TAB)
+        if key in allowed_control:
+            event.Skip()
+            return
+
+        char = chr(key)
+        if char.isdigit():
+            event.Skip()
+            return
+
+        if char in ".,":  # одна точка или запятая
+            value = ctrl.GetValue()
+            if "." in value:  # точка уже есть
+                wx.Bell()
+                return
+            event.Skip()
+            return
+
+        wx.Bell()
+        return
+
+    ctrl.Bind(wx.EVT_CHAR, on_char)
+
+
+def normalize_input(
+        raw: dict,
+        key: str,
+        default: float | None = None,
+        min_value: float | None = None,
+        form: Optional[FormBuilder] = None
+) -> float | None:
+    """
+    Приводит входные данные формы к числу (float).
+
+    Args:
+        raw: словарь collect() из формы
+        key: имя поля
+        default: значение по умолчанию
+        min_value: нижнее ограничение
+        form: FormBuilder для возврата фокуса при ошибке
+
+    Returns:
+        float или default
+    """
+    try:
+        value = parse_float(raw.get(key))
+    except ValueError:
+        wx.MessageBox(f"Ошибка ввода числа в поле '{key}', проверьте ввод", "Ошибка", wx.OK | wx.ICON_ERROR)
+        if form and key in form.fields:
+            form.fields[key].ctrl.SetFocus()
+        return default
+
+    if value is None:
+        return default
+
+    if min_value is not None and value < min_value:
+        wx.MessageBox(f"Значение поля '{key}' должно быть >= {min_value}", "Ошибка ввода", wx.OK | wx.ICON_ERROR)
+        if form and key in form.fields:
+            form.fields[key].ctrl.SetFocus()
+        return default
+
+    return value
+
+
+def parse_float(value: str) -> float | None:
+    """
+    Преобразует строку в float.
+    Поддерживает ',' и '.' как десятичный разделитель.
+    Возвращает None для пустой строки.
+    Вызывает ValueError при некорректном формате.
+    """
+    if value is None:
+        return None
+
+    cleaned = str(value).strip().replace(",", ".")
+
+    if not cleaned:
+        return None
+
+    return float(cleaned)
+
+def normalize_inputs(raw: dict, schema: dict) -> dict:
+    """
+    Нормализует сразу несколько полей формы по описанию схемы.
+
+    Args:
+        raw:
+            Словарь "сырых" данных формы (обычно результат form.collect()).
+
+        schema:
+            Словарь описания полей.
+
+            Формат элемента схемы:
+
+            {
+                "field_name": {
+                    "default": float | None,
+                    "min_value": float | None,
+                    "doc": str
+                }
+            }
+
+            Все параметры, кроме имени поля, необязательны.
+
+    Returns:
+        dict
+            Словарь нормализованных данных.
+
+    Raises:
+        ValueError:
+            Если одно из значений невозможно преобразовать в float.
+
+    ------------------------------------------------------------
+    ПРИМЕР ОПИСАНИЯ СХЕМЫ
+    ------------------------------------------------------------
+
+    FIELD_SCHEMA = {
+
+        # Основная длина
+        "length": {
+            "default": 0.0,
+            "min_value": 0.0,
+            "doc": "Основная длина мостика"
+        },
+
+        # Смещение
+        "l1": {
+            "default": 0.0,
+            "min_value": 0.0,
+            "doc": "Смещение таблички"
+        },
+
+        # Диаметры
+        "shell_diameter1": {
+            "min_value": 0.0,
+            "doc": "Диаметр оболочки 1"
+        },
+
+        "shell_diameter2": {
+            "min_value": 0.0,
+            "doc": "Диаметр оболочки 2"
+        },
+
+        # Угол
+        "edge_angle": {
+            "min_value": 0.0,
+            "doc": "Угол кромки"
+        }
+    }
+
+    ------------------------------------------------------------
+    ПРИМЕР ИСПОЛЬЗОВАНИЯ
+    ------------------------------------------------------------
+
+    raw = form.collect()
+
+    data = normalize_inputs(raw, FIELD_SCHEMA)
+
+    L = data["length"]
+    L1 = data["l1"]
+    D1 = data["shell_diameter1"]
+    D2 = data["shell_diameter2"]
+    angle = data["edge_angle"]
+
+    После нормализации гарантируется:
+
+        L >= 0
+        L1 >= 0
+        D1 >= 0
+        D2 >= 0
+        angle >= 0
+
+    Если пользователь ввёл отрицательное значение,
+    оно будет автоматически приведено к min_value.
+
+    Если поле пустое — используется default.
+    ------------------------------------------------------------
+    """
+
+    result = {}
+
+    for key, params in schema.items():
+        result[key] = normalize_input(
+            raw,
+            key,
+            default=params.get("default"),
+            min_value=params.get("min_value"),
+        )
+
+    return result

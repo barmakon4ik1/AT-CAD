@@ -5,13 +5,11 @@
 """
 
 import wx
-from typing import Optional, Dict
-from config.at_config import BACKGROUND_COLOR, LANGUAGE
+from config.at_config import DEFAULT_SETTINGS
 from programs.at_construction import at_diameter
 from locales.at_localization_class import loc
 from windows.at_window_utils import BaseInputWindow, CanvasPanel, save_last_input, show_popup, get_standard_font, create_standard_buttons, create_window
 
-loc.language = LANGUAGE
 
 
 class ShellInputWindow(BaseInputWindow):
@@ -33,15 +31,15 @@ class ShellInputWindow(BaseInputWindow):
         """
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         self.notebook = wx.Notebook(self.panel)
-        self.notebook.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
+        self.notebook.SetBackgroundColour(wx.Colour(DEFAULT_SETTINGS["BACKGROUND_COLOR"]))
 
         shell_panel = wx.Panel(self.notebook)
-        shell_panel.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
+        shell_panel.SetBackgroundColour(wx.Colour(DEFAULT_SETTINGS["BACKGROUND_COLOR"]))
         self.notebook.AddPage(shell_panel, loc.get("shell_tab_label"))
         self.setup_shell_tab(shell_panel)
 
         fittings_panel = wx.Panel(self.notebook)
-        fittings_panel.SetBackgroundColour(wx.Colour(BACKGROUND_COLOR))
+        fittings_panel.SetBackgroundColour(wx.Colour(DEFAULT_SETTINGS["BACKGROUND_COLOR"]))
         self.notebook.AddPage(fittings_panel, loc.get("fittings_tab_label"))
         wx.StaticText(fittings_panel, label=loc.get("fittings_placeholder_label"),
                       pos=(10, 10)).SetFont(get_standard_font())
@@ -76,7 +74,7 @@ class ShellInputWindow(BaseInputWindow):
 
         # Правая часть: поля ввода
         font = get_standard_font()
-        input_size = (200, -1)
+        input_size = wx.Size(200, -1)
         spacing = 2
 
         main_data_sizer = wx.StaticBoxSizer(wx.VERTICAL, panel, loc.get("main_data_label"))

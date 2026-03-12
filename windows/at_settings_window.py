@@ -44,7 +44,7 @@ class SettingsWindow(wx.Dialog):
         Аргументы:
             parent (wx.Frame): Родительское окно (ATMainWindow).
         """
-        super().__init__(parent, title=loc.get("settings_title", "Настройки"), size=(400, 750))
+        super().__init__(parent, title=loc.get("settings_title", "Настройки"), size=wx.Size(400, 750))
         self.parent = parent
         self.settings = load_user_settings()
         self.init_ui()

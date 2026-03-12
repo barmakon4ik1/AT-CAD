@@ -28,10 +28,11 @@ from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programs.at_input import at_get_point
 from windows.at_content_registry import run_build
+from windows.at_fields_builder import parse_float
 from windows.at_window_utils import (
     CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel,
-    create_standard_buttons, adjust_button_widths, BaseContentPanel,
-    parse_float, style_label, style_textctrl, style_combobox, style_staticbox,
+    BaseContentPanel,
+    style_label, style_textctrl, style_combobox, style_staticbox,
     update_status_bar_point_selected
 )
 from config.at_config import CUTOUT_IMAGE_PATH

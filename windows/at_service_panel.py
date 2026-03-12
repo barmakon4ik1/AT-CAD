@@ -15,7 +15,6 @@
 #     Если модуль может вызывать show_popup, в панели мы передаём
 #     suppressed=True (см. рекомендации ниже).
 #
-# Автор: ChatGPT (адаптирован)
 # ================================================================
 import win32com.client
 import wx
@@ -25,7 +24,7 @@ from datetime import datetime
 import pythoncom
 import logging
 
-from programs.at_input import at_get_point, at_get_entity
+from programs.at_input import at_get_point
 
 
 class ATServicePanel(wx.Frame):
@@ -167,19 +166,19 @@ class ATServicePanel(wx.Frame):
                 return
 
             # Если режим BRIDGE — используем мост (at_get_point/at_get_entity), он не заводит COM-объекты
-            if mode == "BRIDGE":
-                try:
-                    if action == "point":
-                        pt = at_get_point(use_bridge=True, as_variant=False, suppress_popups=True)
-                        wx.CallAfter(self._on_result, f"Point (Bridge): {pt}")
-                    elif action == "entity":
-                        ent = at_get_entity(use_bridge=True, suppress_popups=True)
-                        wx.CallAfter(self._on_result, f"Entity (Bridge): {ent}")
-                    return
-                except Exception as e:
-                    logging.exception("Bridge call failed")
-                    wx.CallAfter(self._on_result, f"Bridge error: {e}")
-                    return
+            # if mode == "BRIDGE":
+            #     try:
+            #         if action == "point":
+            #             pt = at_get_point(use_bridge=True, as_variant=False, suppress_popups=True)
+            #             wx.CallAfter(self._on_result, f"Point (Bridge): {pt}")
+            #         elif action == "entity":
+            #             ent = at_get_entity(use_bridge=True, suppress_popups=True)
+            #             wx.CallAfter(self._on_result, f"Entity (Bridge): {ent}")
+            #         return
+            #     except Exception as e:
+            #         logging.exception("Bridge call failed")
+            #         wx.CallAfter(self._on_result, f"Bridge error: {e}")
+            #         return
 
             # --- Далее: режим COM, все обращения внутри этого потока ---
             doc = None

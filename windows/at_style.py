@@ -32,7 +32,7 @@ def _get_color(key: str, fallback_key: str | None = None) -> wx.Colour:
 
     try:
         return wx.Colour(value)
-    except Exception:
+    except RuntimeError:
         return wx.Colour("black")
 
 

@@ -269,22 +269,17 @@ class ATCadInit:
 
         for attempt in range(retries):
             try:
-                # Sync перед вызовом
                 self.sync_focus(delay=0.05)
-
                 result = func(*args)
-
-                # Реген после (для text/dim)
                 self.regen_doc()
-
                 logging.info(loc.get("retry_success").format(attempt + 1))
                 return result
-
             except Exception as e:
                 logging.error(f"Retry ошибка {attempt + 1}/{retries}: {e}")
+                # Обновим ссылки на документ и ModelSpace
+                self.refresh_active_document()
                 if attempt < retries - 1:
                     time.sleep(delay)
-                    # Двойная sync на retry
                     self.sync_focus(delay=0.2)
                 else:
                     logging.error(loc.get("retry_fail").format(retries))
@@ -376,52 +371,51 @@ class ATCadInit:
         Надёжно работает при переключении вкладок (включая несохранённые документы).
         """
         try:
-            # ← ДОБАВЛЕНО: Sync перед обновлением
-            self.sync_focus(delay=0.1)
+            if not self.acad:
+                return False
 
-            # Прогон событий COM/UI, чтобы AutoCAD успел обработать переключение
+            # Sync перед обновлением
+            self.sync_focus(delay=0.1)
             pythoncom.PumpWaitingMessages()
 
-            # Всегда заново получаем экземпляр AutoCAD.Application — чтобы получить свежий прокси
+            # Получаем свежий COM-прокси AutoCAD.Application
             try:
                 self.acad = win32com.client.GetActiveObject("AutoCAD.Application")
             except Exception as e:
                 logging.error(f"Не удалось получить AutoCAD.Application: {e}")
                 return False
 
-            # Прогоняем сообщения снова и читаем ActiveDocument
             pythoncom.PumpWaitingMessages()
-            current_doc = None
+
             try:
                 current_doc = self.acad.ActiveDocument
             except Exception as e:
                 logging.error(f"Не удалось прочитать ActiveDocument: {e}")
+                self.adoc = None
+                self.model = None
                 return False
 
-            # Получим надёжный идентификатор документа: сначала Name (например 'Drawing1.dwg'), затем объектную ссылку
-            current_name = getattr(current_doc, "Name", None)
-            prev_name = getattr(self.adoc, "Name", None) if self.adoc else None
-
-            # Если self.adoc не установлен или объект/имя отличаются — обновляем
-            if (self.adoc is None) or (current_doc != self.adoc) or (current_name != prev_name):
+            # Если документ изменился или не установлен, обновляем ссылки
+            if (self.adoc is None) or (current_doc != self.adoc):
                 self.adoc = current_doc
                 try:
                     self.model = self.adoc.ModelSpace
                 except Exception as e:
-                    # Если ModelSpace недоступен — логируем, но оставляем adoc
-                    logging.error(f"Не удалось получить ModelSpace для документа {current_name}: {e}")
+                    logging.error(f"Не удалось получить ModelSpace: {e}")
                     self.model = None
                 try:
                     self.original_layer = self.adoc.ActiveLayer
                 except Exception:
                     self.original_layer = None
-                logging.info(f"Обновлён активный документ: name={current_name}, obj={repr(current_doc)}")
+                logging.info(f"Обновлён активный документ: {getattr(self.adoc, 'Name', 'Unknown')}")
             else:
-                logging.debug(f"Документ не изменился: {current_name}")
+                logging.debug(f"Документ не изменился: {getattr(self.adoc, 'Name', 'Unknown')}")
 
             return True
         except Exception as e:
             logging.error(f"Не удалось обновить активный документ: {e}")
+            self.adoc = None
+            self.model = None
             return False
 
     # -----------------------------
@@ -455,9 +449,8 @@ class ATCadInit:
                 return None
             self.refresh_active_document()
         except Exception:
-            pass
+            self.model = None
         return self.model if self.is_initialized() else None
-
 
 if __name__ == "__main__":
     cad = ATCadInit()

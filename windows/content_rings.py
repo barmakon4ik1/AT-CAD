@@ -13,7 +13,7 @@ from config.at_config import (
     DEFAULT_SETTINGS,
 )
 from locales.at_translations import loc
-from windows.at_fields_builder import FieldBuilder, FormBuilder
+from windows.at_fields_builder import FieldBuilder, FormBuilder, parse_float
 from windows.at_window_utils import (
     CanvasPanel,
     show_popup,
@@ -22,7 +22,7 @@ from windows.at_window_utils import (
     update_status_bar_point_selected,
     BaseContentPanel,
     load_user_settings,
-    get_wx_color_from_value, parse_float,
+    get_wx_color_from_value
 )
 
 # ----------------------------------------------------------------------

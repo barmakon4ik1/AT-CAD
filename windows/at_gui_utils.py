@@ -9,14 +9,14 @@
 к изображениям из at_config.py.
 """
 
-from config.at_config import get_setting, IMAGES_DIR, DONE_ICON_PATH, DEFAULT_SETTINGS
+from config.at_config import get_setting, DONE_ICON_PATH, DEFAULT_SETTINGS
 from locales.at_localization_class import loc
 import wx
 import os
 
 
 def show_popup(message: str, title: str = None, popup_type: str = "error", icon_size: int = 32,
-               buttons: list = ["OK"]) -> int:
+               buttons=None) -> int:
     """
     Показывает всплывающее окно с сообщением.
 
@@ -31,7 +31,9 @@ def show_popup(message: str, title: str = None, popup_type: str = "error", icon_
         int: Код возврата (1 для OK, 0 для Cancel).
     """
     # Создание приложения wxPython, если оно еще не инициализировано
-    app = wx.App(False) if wx.GetApp() is None else None
+    if buttons is None:
+        buttons = ["OK"]
+    wx.App(False) if wx.GetApp() is None else None
 
     # Установка заголовка по умолчанию
     default_titles = {
@@ -43,7 +45,7 @@ def show_popup(message: str, title: str = None, popup_type: str = "error", icon_
 
     # Инициализация диалогового окна
     dialog = wx.Dialog(None, title=title, style=wx.DEFAULT_DIALOG_STYLE | wx.STAY_ON_TOP)
-    dialog.SetMinSize((300, 150))
+    dialog.SetMinSize(wx.Size(300, 150))
 
     # Выбор иконки
     if popup_type.lower() == "success":
@@ -59,21 +61,21 @@ def show_popup(message: str, title: str = None, popup_type: str = "error", icon_
                 image = icon_bitmap.ConvertToImage()
                 scaled_image = image.Scale(icon_size, icon_size, wx.IMAGE_QUALITY_HIGH)
                 icon_bitmap = wx.Bitmap(scaled_image)
-        except Exception:
+        except RuntimeError:
             # Использование стандартной иконки при ошибке
             art_id = wx.ART_INFORMATION
-            icon = wx.ArtProvider.GetIcon(art_id, wx.ART_MESSAGE_BOX, (16, 16))
+            icon = wx.ArtProvider.GetIcon(art_id, wx.ART_MESSAGE_BOX, wx.Size(16, 16))
             dialog.SetIcon(icon)
-            icon_bitmap = wx.ArtProvider.GetBitmap(art_id, wx.ART_MESSAGE_BOX, (icon_size, icon_size))
+            icon_bitmap = wx.ArtProvider.GetBitmap(art_id, wx.ART_MESSAGE_BOX, wx.Size(icon_size, icon_size))
     else:
         icon_map = {
             "error": wx.ART_ERROR,
             "info": wx.ART_INFORMATION
         }
         art_id = icon_map.get(popup_type.lower(), wx.ART_ERROR)
-        icon = wx.ArtProvider.GetIcon(art_id, wx.ART_MESSAGE_BOX, (16, 16))
+        icon = wx.ArtProvider.GetIcon(art_id, wx.ART_MESSAGE_BOX, wx.Size(16, 16))
         dialog.SetIcon(icon)
-        icon_bitmap = wx.ArtProvider.GetBitmap(art_id, wx.ART_MESSAGE_BOX, (icon_size, icon_size))
+        icon_bitmap = wx.ArtProvider.GetBitmap(art_id, wx.ART_MESSAGE_BOX, wx.Size(icon_size, icon_size))
 
     # Настройка шрифта
     font_styles = {
