@@ -455,44 +455,10 @@ def run_algorithm(doc):
 # ---------------------------------------------------------
 
 def main():
-
     pythoncom.CoInitialize()
-
     acad = ATCadInit()
-
     doc = acad.document
-
-    while True:
-
-        cmd = input(
-            "\n1-свойства объекта (окно)\n"
-            "2-размещение\n"
-            "3-свойства объекта (консоль)\n"
-            "другое - выход\n"
-        )
-
-        if cmd == "2":
-
-            run_algorithm(doc)
-
-        elif cmd == "3":
-
-            obj = select_single_object(doc)
-
-            lines = dump_entity(obj)
-
-            for line in lines:
-                print(line)
-
-        elif cmd == "1":
-
-            obj = select_single_object(doc)
-
-            if obj:
-                show_entity_window(obj)
-
-        else:
-            return
+    run_algorithm(doc)
 
 
 if __name__ == "__main__":
