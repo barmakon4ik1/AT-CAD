@@ -889,7 +889,7 @@ class FieldBuilder:
                         ctrl.Bind(event, handler)
 
         self.sizer.Add(row, 0, wx.EXPAND | wx.ALL, self.row_border)
-        self.parent.Layout()
+        # self.parent.Layout()
 
         return created_controls
 

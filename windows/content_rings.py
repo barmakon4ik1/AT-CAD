@@ -156,7 +156,15 @@ class RingsContentPanel(BaseContentPanel):
             fb_main.universal_row(
                 "material_label",
                 [
-                    {"type": "combo", "name": "material", "choices": material_options, "value": "", "required": True, "default": "1.4301"}
+                    {
+                     "type": "combo",
+                     "name": "material",
+                     "choices": material_options,
+                     "value": "",
+                     "required": True,
+                     "default": "1.4301",
+                     "size": (310, -1),
+                     }
                 ]
             )
 
@@ -256,7 +264,7 @@ class RingsContentPanel(BaseContentPanel):
 
             self.SetSizer(main_sizer)
             apply_styles_to_panel(self)
-            self.Layout()
+            # self.Layout()
         finally:
             self.Layout()
             self.Thaw()

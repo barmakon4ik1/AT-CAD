@@ -13,6 +13,8 @@
 """
 
 import wx
+
+from windows.at_content_registry import CONTENT_REGISTRY, run_build
 from windows.at_window_utils import BaseContentPanel, get_link_font
 from windows.at_run_dialog_window import load_content
 from locales.at_translations import loc
@@ -55,7 +57,12 @@ TRANSLATIONS = {
         "ru": "Лист",
         "de": "Platte",
         "en": "Plate"
-    }
+    },
+    "at_info": {
+        "ru": "Информация о примитиве/примитивах",
+        "de": "Informationen über das/die Objekt/Objekten",
+        "en": "Information about the entity/entities"
+    },
 }
 # Регистрируем переводы сразу при загрузке модуля
 loc.register_translations(TRANSLATIONS)
@@ -153,8 +160,9 @@ class AppsContentPanel(BaseContentPanel):
             content_name (str): Имя модуля контента для загрузки (например, 'cone').
         """
         main_window = wx.GetTopLevelParent(self)
-        if hasattr(main_window, "switch_content"):
-            main_window.switch_content(content_name)
+
+        if hasattr(main_window, "open_item"):
+            main_window.open_item(content_name)
 
 
 if __name__ == "__main__":

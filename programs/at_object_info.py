@@ -132,7 +132,7 @@ def object_properties(document):
     """
     obj = select_single_object(document)
     if obj:
-        show_entity_inspector(None, obj)
+        show_entity_inspector(None)
 
 def object_dump(document):
     obj = select_single_object(document)

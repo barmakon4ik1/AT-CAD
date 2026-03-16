@@ -11,7 +11,7 @@ from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programs.at_construction import at_diameter
 from programs.at_input import at_get_point
-from windows.at_fields_builder import parse_float
+from windows.at_fields_builder import parse_float, FormBuilder, FieldBuilder, normalize_input
 from windows.at_window_utils import (
     CanvasPanel, show_popup, get_standard_font, apply_styles_to_panel,
     create_standard_buttons, adjust_button_widths, BaseContentPanel,
@@ -45,6 +45,7 @@ TRANSLATIONS = {
     "clockwise_clockwise": {"ru": "По часовой", "de": "Im Uhrzeigersinn", "en": "Clockwise"},
     "clockwise_counterclockwise": {"ru": "Против часовой", "de": "Gegen Uhrzeigersinn", "en": "Counterclockwise"},
     "additional_label": {"ru": "Дополнительные условия", "de": "Zusatzbedingungen", "en": "Additional"},
+    "offset_label": {"ru": "Отступ Y, мм", "de": "Abstand Y, mm", "en": "Offset Y, mm"},
     "axis_label": {"ru": "Отрисовка осей", "de": "Zeichnungsachsen", "en": "Drawing axes"},
     "axis_yes": {"ru": "Да", "de": "Ja", "en": "Yes"},
     "axis_no": {"ru": "Нет", "de": "Nein", "en": "No"},
@@ -593,6 +594,11 @@ class ShellContentPanel(BaseContentPanel):
             callback: Опциональная функция обратного вызова для передачи собранных данных.
         """
         super().__init__(parent)
+        self.fb = None
+        self.form = None
+        self.right_sizer = None
+        self.canvas = None
+        self.left_sizer = None
         self.branch_button = None
         self.on_submit_callback = callback
         self.parent = parent
@@ -628,239 +634,235 @@ class ShellContentPanel(BaseContentPanel):
         Все поля ввода (TextCtrl, ComboBox, Choice) имеют одинаковую ширину и выровнены по правому краю
         с использованием wx.StretchSpacer() между метками и полями. Стилизация выполняется через функции из at_window_utils.
         """
-        if self.GetSizer():
-            self.GetSizer().Clear(True)
-        main_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.left_sizer = wx.BoxSizer(wx.VERTICAL)
+        self.Freeze()
+        try:
+            # удалить старый layout
+            old = self.GetSizer()
+            if old:
+                old.Clear(True)
+                self.SetSizer(None)
 
-        # Левый блок: изображение и кнопки
-        image_path = str(SHELL_IMAGE_PATH)
-        self.canvas = CanvasPanel(self, image_file=image_path, size=(600, 400))
-        self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
+            self.form = FormBuilder(self)
+
+            # -----------------------------
+            # Загрузка общих данных
+            # -----------------------------
+            common_data = load_common_data()
+            material_options = [m["name"] for m in common_data.get("material", []) if m["name"]]
+            thickness_options = common_data.get("thicknesses", [])
+
+            main_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            self.left_sizer = wx.BoxSizer(wx.VERTICAL)
+            self.right_sizer = wx.BoxSizer(wx.VERTICAL)
+
+            # Левый блок: изображение и кнопки
+            image_path = str(SHELL_IMAGE_PATH)
+            self.canvas = CanvasPanel(self, image_file=image_path, size=(600, 400))
+            self.left_sizer.Add(self.canvas, 1, wx.EXPAND | wx.ALL, 10)
+
+            fb_left = FieldBuilder(parent=self, target_sizer=self.left_sizer, form=self.form)
+            fb_left.universal_row(
+                None,
+                [
+                    {
+                        "type": "button",
+                        "label": loc.get("branch_button"),
+                        "callback": self.on_branch,
+                        "size": (240, 45),
+                        "bg_color": "#3498db"
+                    }
+                ],
+                align_right=False
+            )
+
+            # Правый блок
+            self.fb = FieldBuilder(parent=self, target_sizer=self.right_sizer, form=self.form)
+
+            # --- Основные данные ---
+            main_data_sizer = self.fb.static_box(loc.get("main_data_label", "Основные данные"))
+            fb_main = FieldBuilder(parent=self, target_sizer=main_data_sizer, form=self.form)
+
+            # Номер заказа и номер детали
+            fb_main.universal_row(
+                "order_label",
+                [
+                    {"type": "text", "name": "order_input", "value": "", "required": False, "default": ""},
+                    {"type": "text", "name": "detail_input", "value": "", "required": False, "default": ""},
+                ]
+            )
+            # Материал
+            fb_main.universal_row(
+                "material_label",
+                [
+                    {"type": "combo",
+                     "name": "material_combo",
+                     "choices": material_options,
+                     "value": material_options[0],
+                     "required": True,
+                     "default": material_options[0],
+                     "size": (310, -1),
+                     "readonly": False
+                     }
+                ]
+            )
+
+            # Толщина
+            fb_main.universal_row(
+                "thickness_label",
+                [
+                    {"type": "combo", "name": "thickness_combo", "choices": thickness_options, "value": "",
+                     "required": True, "default": "3"}
+                ]
+            )
+
+            shell_sizer = self.fb.static_box(loc.get("shell_params_label"))
+
+            fb_shell = FieldBuilder(parent=self, target_sizer=shell_sizer, form=self.form)
+
+            # Диаметр + тип
+            fb_shell.universal_row(
+                "diameter_label",
+                [
+                    {"type": "text", "name": "diameter_input", "value": ""},
+                    {
+                        "type": "combo",
+                        "name": "diameter_type_choice",
+                        "choices": [
+                            loc.get("diameter_type_inner"),
+                            loc.get("diameter_type_middle"),
+                            loc.get("diameter_type_outer"),
+                        ],
+                        "value": loc.get("diameter_type_outer"),
+                        "readonly": True
+                    }
+                ]
+            )
+
+            # Длина
+            fb_shell.universal_row(
+                "length_label",
+                [
+                    {"type": "text", "name": "length_input", "value": ""}
+                ]
+            )
+
+            # Угол
+            fb_shell.universal_row(
+                "angle_label",
+                [
+                    {"type": "text", "name": "angle_input", "value": ""}
+                ]
+            )
+
+            # Направление развертки
+            fb_shell.universal_row(
+                "clockwise_label",
+                [
+                    {
+                        "type": "combo",
+                        "name": "clockwise_choice",
+                        "choices": [
+                            loc.get("clockwise_clockwise"),
+                            loc.get("clockwise_counterclockwise")
+                        ],
+                        "value": loc.get("clockwise_clockwise"),
+                        "readonly": True
+                    }
+                ]
+            )
+
+            # Отступ от базового основания
+            fb_shell.universal_row(
+                "offset_label",
+                [
+                    {"type": "text", "name": "offset", "value": "0", "default": "0"},
+                ]
+            )
+
+            # --- Дополнительные условия ---
+            additional_sizer = self.fb.static_box(loc.get("additional_label"))
+
+            fb_add = FieldBuilder(parent=self, target_sizer=additional_sizer, form=self.form)
+
+            # Оси
+            fb_add.universal_row(
+                "axis_label",
+                [
+                    {
+                        "type": "combo",
+                        "name": "axis_choice",
+                        "choices": [
+                            loc.get("axis_yes"),
+                            loc.get("axis_no")
+                        ],
+                        "value": loc.get("axis_yes"),
+                        "readonly": True
+                    }
+                ]
+            )
+
+            # Метки осей
+            fb_add.universal_row(
+                "axis_marks_label",
+                [
+                    {
+                        "type": "combo",
+                        "name": "axis_marks_combo",
+                        "choices": default_axis_marks,
+                        "value": "10",
+                        "required": False,
+                        "default": "10",
+                        "readonly": False,
+                    }
+                ]
+            )
+
+            # Припуск сверху
+            fb_add.universal_row(
+                "allowance_top_label",
+                [
+                    {
+                        "type": "combo",
+                        "name": "allowance_top",
+                        "choices": default_allowances,
+                        "value": "0",
+                        "required": False,
+                        "default": "0",
+                        "readonly": False,
+                    }
+                ]
+            )
+
+            # Припуск снизу
+            fb_add.universal_row(
+                "allowance_bottom_label",
+                [
+                    {
+                        "type": "combo",
+                        "name": "allowance_bottom",
+                        "choices": default_allowances,
+                        "value": "0",
+                        "default": "0",
+                        "readonly": False,
+                    }
+                ]
+            )
 
 
-        # self.branch_button = wx.Button(self, label=loc.get("branch_button", "Наличие отвода"))
-        # self.branch_button.SetBackgroundColour(wx.Colour(0, 102, 204))
-        # self.branch_button.SetForegroundColour(wx.Colour(255, 255, 255))
-        # self.branch_button.SetFont(get_standard_font())
-        self.branch_button = GenButton(self, label=loc.get("branch_button", "Наличие отвода"), size=(240, 30))
-        style_gen_button(self.branch_button, "#3498db", font_size=14, button_height=30)
-        self.left_sizer.Add(self.branch_button, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
+            # self.right_sizer.AddStretchSpacer()
+            # Кнопки
+            self.right_sizer.Add(self.create_button_bar(), 0, wx.ALIGN_RIGHT | wx.ALL, 5)
 
-        # Правый блок
-        self.right_sizer = wx.BoxSizer(wx.VERTICAL)
-        font = get_standard_font()
-        # font_big = get_standard_font().Bold()
-        field_size = wx.Size(150, -1)  # Единая ширина для всех полей ввода
-
-        # --- Основные данные ---
-        main_data_box = wx.StaticBox(self, label=loc.get("main_data_label", "Основные данные"))
-        style_staticbox(main_data_box)
-        self.static_boxes["main_data"] = main_data_box
-        main_data_sizer = wx.StaticBoxSizer(main_data_box, wx.VERTICAL)
-
-        # Первая строка: К-№ и Деталь
-        row1 = wx.BoxSizer(wx.HORIZONTAL)
-        self.labels["order"] = wx.StaticText(main_data_box, label=loc.get("order_label", "К-№"))
-        style_label(self.labels["order"])
-        self.order_input = wx.TextCtrl(main_data_box, value="", size=field_size)
-        style_textctrl(self.order_input)
-        self.detail_input = wx.TextCtrl(main_data_box, value="", size=field_size)
-        style_textctrl(self.detail_input)
-        row1.Add(self.labels["order"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-        row1.AddStretchSpacer()
-        row1.Add(self.order_input, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-        row1.Add(self.detail_input, 0, wx.ALIGN_CENTER_VERTICAL)
-        main_data_sizer.Add(row1, 0, wx.EXPAND | wx.ALL, 5)
-
-        # Загрузка общих данных
-        common_data = load_common_data()
-        material_options = [mat["name"] for mat in common_data.get("material", []) if mat.get("name")]
-        thickness_options = common_data.get("thicknesses", [])
-        default_thickness = "4" if "4" in thickness_options or "4.0" in thickness_options else (thickness_options[0] if thickness_options else "")
-
-        # Вторая строка: Материал
-        row2 = wx.BoxSizer(wx.HORIZONTAL)
-        self.labels["material"] = wx.StaticText(main_data_box, label=loc.get("material_label", "Материал"))
-        style_label(self.labels["material"])
-        self.material_combo = wx.ComboBox(
-            main_data_box,
-            choices=material_options,
-            value=material_options[0] if material_options else "",
-            style=wx.CB_DROPDOWN,
-            size=field_size
-        )
-        style_combobox(self.material_combo)
-        row2.Add(self.labels["material"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-        row2.AddStretchSpacer()
-        row2.Add(self.material_combo, 0, wx.ALIGN_CENTER_VERTICAL)
-        main_data_sizer.Add(row2, 0, wx.EXPAND | wx.ALL, 5)
-
-        # Третья строка: Толщина
-        row3 = wx.BoxSizer(wx.HORIZONTAL)
-        self.labels["thickness"] = wx.StaticText(main_data_box, label=loc.get("thickness_label", "Толщина, S"))
-        style_label(self.labels["thickness"])
-        self.thickness_combo = wx.ComboBox(
-            main_data_box,
-            choices=thickness_options,
-            value=default_thickness,
-            style=wx.CB_DROPDOWN,
-            size=field_size
-        )
-        style_combobox(self.thickness_combo)
-        row3.Add(self.labels["thickness"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-        row3.AddStretchSpacer()
-        row3.Add(self.thickness_combo, 0, wx.ALIGN_CENTER_VERTICAL)
-        main_data_sizer.Add(row3, 0, wx.EXPAND | wx.ALL, 5)
-
-        self.right_sizer.Add(main_data_sizer, 0, wx.EXPAND | wx.ALL, 10)
-
-        # --- Параметры оболочки ---
-        shell_box = wx.StaticBox(self, label=loc.get("shell_params_label", "Параметры оболочки"))
-        style_staticbox(shell_box)
-        self.static_boxes["shell_params"] = shell_box
-        shell_sizer = wx.StaticBoxSizer(shell_box, wx.VERTICAL)
-
-        # Диаметр
-        row4 = wx.BoxSizer(wx.HORIZONTAL)
-        self.labels["diameter"] = wx.StaticText(shell_box, label=loc.get("diameter_label", "Диаметр, D"))
-        style_label(self.labels["diameter"])
-        self.diameter_input = wx.TextCtrl(shell_box, value="", size=field_size)
-        style_textctrl(self.diameter_input)
-        self.diameter_type_choice = wx.Choice(
-            shell_box,
-            choices=[
-                loc.get("diameter_type_inner", "Внутренний"),
-                loc.get("diameter_type_middle", "Средний"),
-                loc.get("diameter_type_outer", "Внешний")
-            ],
-            size=field_size
-        )
-        self.diameter_type_choice.SetFont(font)
-        self.diameter_type_choice.SetSelection(2)  # Внешний по умолчанию
-        row4.Add(self.labels["diameter"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-        row4.AddStretchSpacer()
-        row4.Add(self.diameter_input, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-        row4.Add(self.diameter_type_choice, 0, wx.ALIGN_CENTER_VERTICAL)
-        shell_sizer.Add(row4, 0, wx.EXPAND | wx.ALL, 5)
-
-        # Длина
-        row5 = wx.BoxSizer(wx.HORIZONTAL)
-        self.labels["length"] = wx.StaticText(shell_box, label=loc.get("length_label", "Длина, L"))
-        style_label(self.labels["length"])
-        self.length_input = wx.TextCtrl(shell_box, value="", size=field_size)
-        style_textctrl(self.length_input)
-        row5.Add(self.labels["length"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-        row5.AddStretchSpacer()
-        row5.Add(self.length_input, 0, wx.ALIGN_CENTER_VERTICAL)
-        shell_sizer.Add(row5, 0, wx.EXPAND | wx.ALL, 5)
-
-        # Угол шва
-        row6 = wx.BoxSizer(wx.HORIZONTAL)
-        self.labels["angle"] = wx.StaticText(shell_box, label=loc.get("angle_label", "Положение шва (°)"))
-        style_label(self.labels["angle"])
-        self.angle_input = wx.TextCtrl(shell_box, value="", size=field_size)
-        style_textctrl(self.angle_input)
-        row6.Add(self.labels["angle"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-        row6.AddStretchSpacer()
-        row6.Add(self.angle_input, 0, wx.ALIGN_CENTER_VERTICAL)
-        shell_sizer.Add(row6, 0, wx.EXPAND | wx.ALL, 5)
-
-        # Развертка
-        clockwise_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.labels["clockwise"] = wx.StaticText(shell_box, label=loc.get("clockwise_label", "Развертка"))
-        style_label(self.labels["clockwise"])
-        self.clockwise_choice = wx.Choice(
-            shell_box,
-            choices=[
-                loc.get("clockwise_clockwise", "По часовой"),
-                loc.get("clockwise_counterclockwise", "Против часовой")
-            ],
-            size=field_size
-        )
-        self.clockwise_choice.SetFont(font)
-        self.clockwise_choice.SetSelection(0)  # По часовой по умолчанию
-        clockwise_sizer.Add(self.labels["clockwise"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-        clockwise_sizer.AddStretchSpacer()
-        clockwise_sizer.Add(self.clockwise_choice, 0, wx.ALIGN_CENTER_VERTICAL)
-        shell_sizer.Add(clockwise_sizer, 0, wx.EXPAND | wx.ALL, 5)
-
-        self.right_sizer.Add(shell_sizer, 0, wx.EXPAND | wx.ALL, 10)
-
-        # --- Дополнительные условия ---
-        additional_box = wx.StaticBox(self, label=loc.get("additional_label", "Доп. условия"))
-        style_staticbox(additional_box)
-        self.static_boxes["additional"] = additional_box
-        additional_sizer = wx.StaticBoxSizer(additional_box, wx.VERTICAL)
-
-        # Отрисовка осей
-        axis_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.labels["axis"] = wx.StaticText(additional_box, label=loc.get("axis_label", "Отрисовка осей"))
-        style_label(self.labels["axis"])
-        self.axis_choice = wx.Choice(
-            additional_box,
-            choices=[
-                loc.get("axis_yes", "Да"),
-                loc.get("axis_no", "Нет")
-            ],
-            size=field_size
-        )
-        self.axis_choice.SetFont(font)
-        self.axis_choice.SetSelection(0)  # Да по умолчанию
-        axis_sizer.Add(self.labels["axis"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-        axis_sizer.AddStretchSpacer()
-        axis_sizer.Add(self.axis_choice, 0, wx.ALIGN_CENTER_VERTICAL)
-        additional_sizer.Add(axis_sizer, 0, wx.EXPAND | wx.ALL, 5)
-
-        # Метки осей
-        row7 = wx.BoxSizer(wx.HORIZONTAL)
-        self.labels["axis_marks"] = wx.StaticText(additional_box, label=loc.get("axis_marks_label", "Метки осей"))
-        style_label(self.labels["axis_marks"])
-        self.axis_marks_combo = wx.ComboBox(
-            additional_box,
-            choices=default_axis_marks,
-            value="10",
-            style=wx.CB_DROPDOWN,
-            size=field_size
-        )
-        style_combobox(self.axis_marks_combo)
-        row7.Add(self.labels["axis_marks"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-        row7.AddStretchSpacer()
-        row7.Add(self.axis_marks_combo, 0, wx.ALIGN_CENTER_VERTICAL)
-        additional_sizer.Add(row7, 0, wx.EXPAND | wx.ALL, 5)
-
-        # Припуск на сварку сверху
-        row8 = wx.BoxSizer(wx.HORIZONTAL)
-        self.labels["allowance_top"] = wx.StaticText(additional_box, label=loc.get("allowance_top_label", "Припуск на сварку сверху, Lt"))
-        style_label(self.labels["allowance_top"])
-        self.allowance_top = wx.ComboBox(additional_box, choices=default_allowances, value="0", style=wx.CB_DROPDOWN, size=field_size)
-        style_combobox(self.allowance_top)
-        row8.Add(self.labels["allowance_top"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-        row8.AddStretchSpacer()
-        row8.Add(self.allowance_top, 0, wx.ALIGN_CENTER_VERTICAL)
-        additional_sizer.Add(row8, 0, wx.EXPAND | wx.ALL, 5)
-
-        # Припуск на сварку снизу
-        row9 = wx.BoxSizer(wx.HORIZONTAL)
-        self.labels["allowance_bottom"] = wx.StaticText(additional_box, label=loc.get("allowance_bottom_label", "Припуск на сварку снизу, Lb"))
-        style_label(self.labels["allowance_bottom"])
-        self.allowance_bottom = wx.ComboBox(additional_box, choices=default_allowances, value="0", style=wx.CB_DROPDOWN, size=field_size)
-        style_combobox(self.allowance_bottom)
-        row9.Add(self.labels["allowance_bottom"], 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
-        row9.AddStretchSpacer()
-        row9.Add(self.allowance_bottom, 0, wx.ALIGN_CENTER_VERTICAL)
-        additional_sizer.Add(row9, 0, wx.EXPAND | wx.ALL, 5)
-
-        self.right_sizer.Add(additional_sizer, 0, wx.EXPAND | wx.ALL, 10)
-        self.right_sizer.AddStretchSpacer()
-        self.right_sizer.Add(self.create_button_bar(), 0, wx.ALIGN_RIGHT | wx.ALL, 5)
-
-        # Собираем общий макет
-        main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
-        main_sizer.Add(self.right_sizer, 0, wx.EXPAND | wx.ALL, 10)
-        self.SetSizer(main_sizer)
-        apply_styles_to_panel(self)  # Применяем стили ко всем элементам
-        self.Layout()
+            # Собираем общий макет
+            main_sizer.Add(self.left_sizer, 1, wx.EXPAND | wx.ALL, 10)
+            main_sizer.Add(self.right_sizer, 0, wx.EXPAND | wx.ALL, 10)
+            self.SetSizer(main_sizer)
+            apply_styles_to_panel(self)  # Применяем стили ко всем элементам
+            # self.Layout()
+            self.on_clear()
+        finally:
+            self.Layout()
+            self.Thaw()
 
     def on_branch(self, _):
         """
@@ -868,8 +870,12 @@ class ShellContentPanel(BaseContentPanel):
         Создает и отображает модальное окно BranchWindow для ввода параметров отвода.
         """
         dialog = BranchWindow(self)
-        dialog.ShowModal()
-        dialog.Destroy()
+        try:
+            if dialog.ShowModal() == wx.ID_OK:
+                # collect_input_data уже возвращает список словарей
+                self.branch_data = dialog.collect_input_data()
+        finally:
+            dialog.Destroy()
 
     def collect_input_data(self) -> Dict:
         """
@@ -879,6 +885,7 @@ class ShellContentPanel(BaseContentPanel):
             Dict: Словарь с данными из полей ввода, включая данные отводов.
         """
         try:
+            raw = self.form.collect()
             diameter = parse_float(self.diameter_input.GetValue())
             thickness = parse_float(self.thickness_combo.GetValue())
             diameter_type = ["inner", "middle", "outer"][self.diameter_type_choice.GetSelection()]
@@ -900,8 +907,10 @@ class ShellContentPanel(BaseContentPanel):
                 "weld_allowance_bottom": parse_float(self.allowance_bottom.GetValue()) or 0,
                 "layer_name": "0",
                 "insert_point": self.insert_point,
-                "cutouts": self.branch_data  # Добавляем данные отводов
+                "cutouts": self.branch_data,  # Добавляем данные отводов
+                "offset": normalize_input(raw, "offset", 0.0) # учитываем отступ от базовой плоскости
             }
+            # print(data)
             return data
         except Exception as e:
             show_popup(loc.get("error", f"Ошибка сбора данных: {str(e)}"), popup_type="error")
@@ -954,22 +963,19 @@ class ShellContentPanel(BaseContentPanel):
 
     def clear_input_fields(self):
         """
-        Очищает все поля ввода и сбрасывает значения на начальные.
+        Очистка всех полей формы и сброс точки вставки.
         """
-        self.order_input.SetValue("")
-        self.detail_input.SetValue("")
-        self.material_combo.SetSelection(wx.NOT_FOUND)
-        self.thickness_combo.SetSelection(wx.NOT_FOUND)
-        self.diameter_input.SetValue("")
-        self.diameter_type_choice.SetSelection(2)  # Внешний по умолчанию
-        self.length_input.SetValue("")
-        self.angle_input.SetValue("")
-        self.clockwise_choice.SetSelection(0)  # По часовой по умолчанию
-        self.axis_choice.SetSelection(0)  # Да по умолчанию
-        self.axis_marks_combo.SetValue("10")
-        self.allowance_top.SetValue("0")
-        self.allowance_bottom.SetValue("0")
-        self.insert_point = None
+        self.form.clear()
+
+    def on_clear(self, event: Optional[wx.Event] = None):
+        """Очистка полей по кнопке Clear."""
+        _ = event
+        self.clear_input_fields()
+
+    # def on_cancel(self, event: Optional[wx.Event] = None, switch_content="content_apps"):
+    #     """Закрытие панели и возврат к предыдущему контенту."""
+    #     _ = event
+    #     self.switch_content_panel(switch_content)
 
     def on_ok(self, event: wx.Event):
         """
@@ -1007,7 +1013,7 @@ class ShellContentPanel(BaseContentPanel):
             # Сохраняем точку и обновляем словарь
             self.insert_point = pt
             data["insert_point"] = pt
-            print(data)
+            # print(data)
             # Передаем данные дальше через callback
             if self.on_submit_callback:
                 wx.CallAfter(self.process_input, data)
@@ -1017,63 +1023,7 @@ class ShellContentPanel(BaseContentPanel):
 
 
     def update_ui_language(self):
-        """
-        Обновляет язык интерфейса, применяя переводы ко всем элементам.
-        """
-        try:
-            # Заголовки групп
-            self.static_boxes["main_data"].SetLabel(loc.get("main_data_label", "Основные данные"))
-            self.static_boxes["shell_params"].SetLabel(loc.get("shell_params_label", "Параметры оболочки"))
-            self.static_boxes["additional"].SetLabel(loc.get("additional_label", "Доп. условия"))
-
-            # Метки полей
-            self.labels["order"].SetLabel(loc.get("order_label", "К-№"))
-            self.labels["material"].SetLabel(loc.get("material_label", "Материал"))
-            self.labels["thickness"].SetLabel(loc.get("thickness_label", "Толщина, S"))
-            self.labels["diameter"].SetLabel(loc.get("diameter_label", "Диаметр, D"))
-            self.labels["length"].SetLabel(loc.get("length_label", "Длина, L"))
-            self.labels["angle"].SetLabel(loc.get("angle_label", "Положение шва (°)"))
-            self.labels["clockwise"].SetLabel(loc.get("clockwise_label", "Развертка"))
-            self.labels["axis"].SetLabel(loc.get("axis_label", "Отрисовка осей"))
-            self.labels["axis_marks"].SetLabel(loc.get("axis_marks_label", "Метки осей"))
-            self.labels["allowance_top"].SetLabel(loc.get("allowance_top_label", "Припуск на сварку сверху, Lt"))
-            self.labels["allowance_bottom"].SetLabel(loc.get("allowance_bottom_label", "Припуск на сварку снизу, Lb"))
-
-            # Поле выбора типа диаметра
-            self.diameter_type_choice.SetItems([
-                loc.get("diameter_type_inner", "Внутренний"),
-                loc.get("diameter_type_middle", "Средний"),
-                loc.get("diameter_type_outer", "Внешний")
-            ])
-            self.diameter_type_choice.SetSelection(2)  # Внешний по умолчанию
-
-            # Поле выбора направления развертки
-            self.clockwise_choice.SetItems([
-                loc.get("clockwise_clockwise", "По часовой"),
-                loc.get("clockwise_counterclockwise", "Против часовой")
-            ])
-            self.clockwise_choice.SetSelection(0)  # По часовой по умолчанию
-
-            # Поле выбора отрисовки осей
-            self.axis_choice.SetItems([
-                loc.get("axis_yes", "Да"),
-                loc.get("axis_no", "Нет")
-            ])
-            self.axis_choice.SetSelection(0)  # Да по умолчанию
-
-            # Кнопки
-            self.buttons[0].SetLabel(loc.get("ok_button", "ОК"))
-            if len(self.buttons) > 2:
-                self.buttons[1].SetLabel(loc.get("clear_button", "Очистить"))
-                self.buttons[2].SetLabel(loc.get("cancel_button", "Возврат"))
-            else:
-                self.buttons[1].SetLabel(loc.get("cancel_button", "Возврат"))
-            self.branch_button.SetLabel(loc.get("branch_button", "Наличие отвода"))
-
-            apply_styles_to_panel(self)  # Обновляем стили после смены языка
-            self.Layout()  # Перестраиваем макет для корректного отображения
-        except Exception as e:
-            show_popup(loc.get("error", f"Ошибка обновления языка: {str(e)}"), popup_type="error")
+        self.setup_ui()
 
 if __name__ == "__main__":
     """

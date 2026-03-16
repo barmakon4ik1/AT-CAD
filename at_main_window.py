@@ -426,6 +426,30 @@ class ATMainWindow(wx.Frame):
         self.update_ui(self.settings)
         self.update_footer_hint(content_name)
 
+    def open_item(self, content_name: str, data=None):
+        """
+        Унифицированное открытие элементов из CONTENT_REGISTRY:
+        — панелей (content)
+        — диалогов (dialog)
+        — программ (через build_module)
+        """
+
+        info = CONTENT_REGISTRY.get(content_name)
+        if not info:
+            logging.error(f"Контент '{content_name}' не найден")
+            return
+
+        content_type = info.get("type", "content")
+
+        # ===== ДИАЛОГ =====
+        if content_type == "dialog":
+            from windows.at_content_registry import run_build
+            run_build(content_name, data=data, parent=self)
+            return
+
+        # ===== ОБЫЧНЫЙ КОНТЕНТ (панель) =====
+        self.switch_content(content_name)
+
     def _apply_language_change(self, new_lang: str) -> None:
         loc.set_language(new_lang)
         self.update_language_icon(new_lang)

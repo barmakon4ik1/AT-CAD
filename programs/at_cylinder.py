@@ -112,6 +112,7 @@ def get_insert_point_unwrap(shell_data: Dict, cut: Dict) -> List[float]:
     seam_angle = float(shell_data.get("angle", 0.0))    # угол шва в градусах (абсолютный)
     clockwise = bool(shell_data.get("clockwise", True)) # True = идти по часовой вдоль развёртки
     cut_angle = float(cut.get("angle_deg", 0.0)) # Абсолютный угол выреза (в градусах)
+    offset = float(cut.get("offset", 0.0))
 
     # Разность (cut_angle - seam_angle) в диапазоне [0, 360)
     # Это угол от шва до выреза, считая в направлении "по возрастанию" угла.
@@ -133,7 +134,7 @@ def get_insert_point_unwrap(shell_data: Dict, cut: Dict) -> List[float]:
     arc_length = R * math.radians(angle_from_seam)  # единицы длины = те же, что и R
 
     # Координаты развёртки: X вдоль развёртки (от шва), Y — осевой (offset_axial)
-    return [X0 + arc_length, Y0 + cut.get("offset_axial", 0.0), 0.0]
+    return [X0 + arc_length, Y0 + cut.get("offset_axial", 0.0) - offset, 0.0]
 
 # ========================================================
 # Основной класс построителя
@@ -320,6 +321,7 @@ class CylinderBuilder:
                 "diameter": self.shell_data.get("diameter"),
                 "length": self.shell_data.get("length"),
                 "angle": self.shell_data.get("angle", 0.0),
+                "offset": self.shell_data.get("offset", 0.0),
                 "clockwise": self.shell_data.get("clockwise", True),
                 "axis": self.shell_data.get("axis", True),
                 "axis_marks": self.shell_data.get("axis_marks", 0.0),

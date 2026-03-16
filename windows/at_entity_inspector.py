@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import math
+from typing import Optional
 
 import wx
 import wx.propgrid as pg
@@ -24,7 +25,7 @@ from config.at_cad_init import ATCadInit
 
 TRANSLATIONS = {
     "title": {"ru": "Свойства объекта AutoCAD", "de": "Objekteigenschaften", "en": "Object properties"},
-    "select_button": {"ru": "Выбрать объект", "de": "Objekt wählen", "en": "Select object"},
+    "select_button": {"ru": "Выбрать примитив", "de": "Objekt wählen", "en": "Select entity"},
     "clear_button": {"ru": "Очистить", "de": "Löschen", "en": "Clear"},
     "cancel_button": {"ru": "Закрыть", "de": "Close", "en": "Exit"},
     "no_object": {"ru": "Объект не выбран", "de": "Kein Objekt gewählt", "en": "No object selected"},
@@ -121,19 +122,19 @@ class EntityInspectorDialog(wx.Dialog):
                     "type": "button",
                     "label": loc.get("select_button"),
                     "callback": self.on_select,
-                    "size": (220, 44)
+                    "size": (200, 45)
                 },
                 {
                     "type": "button",
                     "label": loc.get("clear_button"),
                     "callback": self.on_clear,
-                    "size": (160, 44)
+                    "size": (150, 45)
                 },
                 {
                     "type": "button",
                     "label": loc.get("cancel_button"),
                     "callback": self.on_cancel,
-                    "size": (160, 44)
+                    "size": (150, 45)
                 },
             ],
             align_right=True
@@ -451,6 +452,16 @@ def show_entity_inspector(parent=None):
     dlg = EntityInspectorDialog(parent)
     dlg.ShowModal()
     dlg.Destroy()
+
+
+# =========================================================
+# Вызов диалога из главного окна
+# =========================================================
+def open_dialog(parent=None, data=None) -> int | None:
+    dlg = EntityInspectorDialog(parent)
+    result = dlg.ShowModal()
+    dlg.Destroy()
+    return result
 
 
 

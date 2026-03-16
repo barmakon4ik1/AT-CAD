@@ -82,6 +82,11 @@ TRANSLATIONS = {
         "de": "Wählen Sie ein Modul, um zu beginnen",
         "en": "Select a module to start working"
     },
+    "at_info": {
+        "ru": "Информация о примитиве/примитивах",
+        "de": "Informationen über das/die Objekt/Objekten",
+        "en": "Information about the entity/entities"
+    },
     "footer_hint_cone": {
         "ru": "Построение развертки прямого и усеченного конуса",
         "de": "Abwicklung eines geraden oder abgestumpften Kegels",
@@ -104,7 +109,8 @@ TRANSLATIONS = {
         "ru": "Создание и управление табличками оборудования",
         "de": "Erstellung und Verwaltung von Typenschildern",
         "en": "Create and manage equipment name plates"
-    }
+    },
+
 }
 
 # Регистрируем локальные переводы
@@ -161,15 +167,16 @@ CONTENT_REGISTRY = {
         "label": "at_run_eccentric",
         "build_module": "programs.at_run_ecc_red"
     },
-    "cone_pipe": {
-        "module": "windows.content_cone_pipe",
-        "label": "at_run_cone_pipe",
-        "build_module": "programs.at_nozzle_cone"
-    },
+
     "vessel_name": {
         "module": "windows.content_bracket",
         "label": "at_name_plate",
         # "build_module": "windows.nameplate_dialog",
+    },
+    "info": {
+        "module": "windows.at_entity_inspector",
+        "label": "at_info",
+        "type": "dialog"
     },
 }
 
@@ -190,17 +197,6 @@ def run_build(content_name: str, data=None, parent=None):
         # логируем и возвращаем None, сообщение локализовано
         logging.error(loc.get("content_not_found", f"Content '{content_name}' not found").format(content_name))
         return None
-
-    # build_module = info.get("build_module")
-    # if not build_module:
-    #     logging.error(loc.get("no_build_module", f"No build_module specified for '{content_name}'").format(content_name))
-    #     return None
-    #
-    # try:
-    #     return run_program(build_module, data)
-    # except Exception as e:
-    #     logging.error(f"[at_content_registry] Ошибка при запуске {build_module}: {e}")
-    #     return None
 
     content_type = info.get("type", "content")
 
