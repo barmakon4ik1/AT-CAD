@@ -19,7 +19,7 @@
   - Точка входа main(data) для API и блок тестирования при запуске как скрипта.
 """
 
-from typing import Dict, List
+from typing import Dict, List, Any
 import math
 from config.at_cad_init import ATCadInit
 from programs.at_shell import at_shell
@@ -179,7 +179,8 @@ class CylinderBuilder:
         return True
 
     # --------------------------------------------
-    def _adjust_cutout_diameter(self, cutout: Dict, cutout_index: int) -> float:
+    @staticmethod
+    def _adjust_cutout_diameter(cutout: Dict, cutout_index: int) -> float:
         """
         Коррекция диаметра отвода в зависимости от режима контактирования.
 
@@ -268,13 +269,13 @@ class CylinderBuilder:
         # Параметры для вычисления generatrix_length[0]
         diameter_main = float(self.shell_data.get("diameter", 0.0))
         offset = float(cut.get("axial_shift", 0.0))  # смещение отверстия относительно центральной плоскости
-        weld_allowance = float(params.get("weld_allowance", 0.0))
+        # weld_allowance = float(params.get("weld_allowance", 0.0))
         nozzle_length = float(params.get("height", params.get("length", 0.0)))  # height == length
-        thk_correction = bool(params.get("thk_correction", False))
-        thickness = float(params.get("thickness", 0.0))
+        # thk_correction = bool(params.get("thk_correction", False))
+        # thickness = float(params.get("thickness", 0.0))
 
         # radius (может быть использован в дальнейших вычислениях)
-        radius = (float(params.get("diameter", 0.0)) - thickness) / 2.0 if thk_correction else float(params.get("diameter", 0.0)) / 2.0
+        # radius = (float(params.get("diameter", 0.0)) - thickness) / 2.0 if thk_correction else float(params.get("diameter", 0.0)) / 2.0
 
         # length_full — высота развёртки с припуском
         # length_full = nozzle_length + weld_allowance
@@ -302,7 +303,7 @@ class CylinderBuilder:
         return [X0, Y, 0.0]
 
     # --------------------------------------------
-    def build(self) -> Dict:
+    def build(self) -> dict[str, list[Any] | dict[Any, Any]] | None:
         """
         Собирает развёртку цилиндра с вырезами и развёртками отвода.
 
@@ -411,7 +412,7 @@ class CylinderBuilder:
                 try:
                     height = float(params.get("height", 0.0))
                     thickness = float(params.get("thickness", 0.0))
-                except Exception:
+                except ValueError:
                     height = params.get("height", 0.0)
                     thickness = params.get("thickness", 0.0)
                 unroll_branch = bool(params.get("unroll_branch", False))
@@ -574,7 +575,7 @@ def at_cylinder(data: Dict) -> Dict:
 # -----------------------------
 if __name__ == "__main__":
     cad = ATCadInit()
-    shell_data = {
+    test_shell_data = {
         "diameter": 219.1,
         "length": 265,
         "insert_point": [0, 0, 0],
@@ -655,5 +656,5 @@ if __name__ == "__main__":
         ]
     }
     # Тест для at_cylinder
-    result = at_cylinder(shell_data)
+    result = at_cylinder(test_shell_data)
 

@@ -9,7 +9,6 @@ import pythoncom
 
 from config.at_cad_init import ATCadInit
 from programs.at_geometry import ensure_point_variant
-from windows.at_entity_inspector import EntityInspectorFrame
 
 from shapely.geometry import Polygon, MultiPolygon
 from shapely.affinity import translate, rotate
@@ -96,70 +95,6 @@ def select_single_object(doc):
 
 
 # ---------------------------------------------------------
-# Entity inspector
-# ---------------------------------------------------------
-
-def dump_entity(obj):
-
-    lines = ["=== ОСНОВНЫЕ СВОЙСТВА ==="]
-
-    base_props = [
-        "ObjectName",
-        "Layer",
-        "Linetype",
-        "LinetypeScale",
-        "Lineweight",
-        "Color",
-        "Handle",
-        "Visible"
-    ]
-
-    for p in base_props:
-        try:
-            lines.append(f"{p}: {getattr(obj, p)}")
-        except:
-            pass
-
-    lines.append("\n=== ГЕОМЕТРИЯ ===")
-
-    name = obj.ObjectName
-
-    try:
-
-        if name == "AcDbPolyline":
-
-            coords = variant_to_list(obj.Coordinates)
-
-            vertex_count = len(coords) // 2
-
-            lines.append(f"VertexCount: {vertex_count}")
-            lines.append(f"Length: {round(obj.Length,3)} мм")
-            lines.append(f"Area: {round(getattr(obj,'Area',0),3) / 1000000} м²")
-
-    except Exception as e:
-        lines.append(f"Ошибка геометрии: {e}")
-
-    return lines
-
-
-def show_entity_window(obj):
-
-    app = wx.GetApp()
-
-    created_here = False
-
-    if app is None:
-        app = wx.App(False)
-        created_here = True
-
-    frame = EntityInspectorFrame(obj)
-    frame.Show()
-
-    if created_here:
-        app.MainLoop()
-
-
-# ---------------------------------------------------------
 # Geometry conversion
 # ---------------------------------------------------------
 
@@ -190,7 +125,7 @@ def acad_poly_to_shapely(poly):
 # Drawing helpers
 # ---------------------------------------------------------
 
-def draw_polygon(model, poly):
+def draw_polygon(model, poly, layer="AM_5"):
 
     coords = list(poly.exterior.coords)[:-1]
 
@@ -208,32 +143,23 @@ def draw_polygon(model, poly):
 
     pl.Closed = True
 
+    # 👉 Назначаем слой
+    pl.Layer = layer
+
     return pl
 
 
-def debug_draw_polygon(model, poly):
-    draw_polygon(model, poly)
-
-
-# def draw_container_debug(model, container, gap):
-#
-#     inner = container.buffer(-gap, join_style=2)
-#
-#     if inner.is_empty:
-#         return None
-#
-#     return draw_polygon(model, inner)
+def debug_draw_polygon(model, poly, layer="AM_5"):
+    draw_polygon(model, poly, layer)
 
 
 # ---------------------------------------------------------
 # Nesting logic
 # ---------------------------------------------------------
 
-def bottom_left_place(container, part, gap, step=None, angles=(0, 90)):
+def bottom_left_place(container, part, step=None, angles=(0, 90)):
 
     debug("\n===== BOTTOM LEFT PLACE =====")
-    if step is None:
-        step = gap / 2
 
     cminx, cminy, cmaxx, cmaxy = container.bounds
 
@@ -248,6 +174,11 @@ def bottom_left_place(container, part, gap, step=None, angles=(0, 90)):
         width = pmaxx - pminx
         height = pmaxy - pminy
 
+        # Автоматический шаг
+        if step is None:
+            step = min(width, height) * 0.1
+            step = max(step, 1.0)
+
         y = cminy
 
         while y + height <= cmaxy:
@@ -261,17 +192,14 @@ def bottom_left_place(container, part, gap, step=None, angles=(0, 90)):
 
                 test = translate(rp, dx, dy)
 
-                test_gap = test.buffer(gap / 2, join_style=2)
-
-                if container.covers(test_gap):
+                # НИКАКИХ buffer — всё уже учтено
+                if container.covers(test):
 
                     if best is None:
                         best = (test, x, y, angle)
 
                     else:
-
                         _, bx, by, _ = best
-
                         if y < by or (y == by and x < bx):
                             best = (test, x, y, angle)
 
@@ -287,14 +215,12 @@ def bottom_left_place(container, part, gap, step=None, angles=(0, 90)):
     return best
 
 
-def generate_residuals(container_poly, placed_poly, gap):
+def generate_residuals(container_poly, placed_poly):
 
-    occupied = placed_poly.buffer(gap, join_style=2)
-
-    debug("occupied area:", occupied.area)
     debug("container area:", container_poly.area)
+    debug("placed area:", placed_poly.area)
 
-    residual = container_poly.difference(occupied)
+    residual = container_poly.difference(placed_poly)
 
     debug("residual area:", residual.area if not residual.is_empty else 0)
 
@@ -315,15 +241,15 @@ def filter_residuals(polygons, min_area=100):
     return [p for p in polygons if p.area > min_area]
 
 
-def update_containers(containers, used_container, placed_poly, gap):
+def update_containers(containers, used_container, placed_poly):
 
     new_containers = []
 
     for c in containers:
 
-        if c == used_container:
+        if c.equals(used_container):
 
-            residuals = generate_residuals(c, placed_poly, gap)
+            residuals = generate_residuals(c, placed_poly)
 
             residuals = filter_residuals(residuals)
 
@@ -333,7 +259,6 @@ def update_containers(containers, used_container, placed_poly, gap):
             new_containers.extend(residuals)
 
         else:
-
             new_containers.append(c)
 
     return new_containers
@@ -347,7 +272,7 @@ def sort_containers(containers):
     )
 
 
-def find_position_in_containers(containers, part, gap):
+def find_position_in_containers(containers, part):
 
     containers = sort_containers(containers)
 
@@ -356,7 +281,11 @@ def find_position_in_containers(containers, part, gap):
 
     for container in containers:
 
-        pos = bottom_left_place(container, part, gap)
+        # Быстрая отсечка по площади
+        if container.area < part.area:
+            continue
+
+        pos = bottom_left_place(container, part)
 
         if pos is None:
             continue
@@ -368,7 +297,6 @@ def find_position_in_containers(containers, part, gap):
             best_container = container
 
         else:
-
             _, bx, by, _ = best
 
             if y < by or (y == by and x < bx):
@@ -389,65 +317,95 @@ def run_algorithm(doc):
 
     model = doc.ModelSpace
 
-    print("\nВыберите внешний контур:")
+    print("\nВыберите внешний контур (один раз):")
 
     outer = select_single_object(doc)
 
     if outer is None:
         return
 
-    print("\nВыберите размещаемую деталь:")
-
-    insert_obj = select_single_object(doc)
-
-    if insert_obj is None:
-        return
-
     container_shape = acad_poly_to_shapely(outer)
-    part_shape = acad_poly_to_shapely(insert_obj)
 
-    debug_draw_polygon(model, container_shape)
+    gap = 10.0
+    half = gap / 2.0
 
-    debug_draw_polygon(model, part_shape)
+    # --- ЭФФЕКТИВНЫЙ КОНТЕЙНЕР ---
+    container_eff = container_shape.buffer(-half, join_style=2)
 
-    if not hasattr(run_algorithm, "containers"):
-        run_algorithm.containers = [container_shape]
-
-    result = find_position_in_containers(
-        run_algorithm.containers,
-        part_shape,
-        gap=10
-    )
-
-    if result is None:
-        print("Не удалось разместить деталь")
+    if container_eff.is_empty:
+        print("Контейнер слишком мал для заданного зазора")
         return
 
-    used_container, placed_poly, x, y, angle = result
+    # Список доступных областей
+    containers = [container_eff]
 
-    run_algorithm.containers = update_containers(
-        run_algorithm.containers,
-        used_container,
-        placed_poly,
-        gap=10
-    )
+    debug_draw_polygon(model, container_eff)
 
-    for c in run_algorithm.containers:
-        if not c.equals(container_shape):
+    print("\nВыбирайте детали для размещения.")
+    print("Esc или Enter без выбора — выход.")
+
+    # -------------------------------------------------
+    # ОСНОВНОЙ ЦИКЛ
+    # -------------------------------------------------
+
+    while True:
+
+        try:
+            print("\nВыберите деталь:")
+            insert_obj = select_single_object(doc)
+        except pywintypes.com_error:
+            print("Выход из режима размещения")
+            break
+
+        if insert_obj is None:
+            print("Выход")
+            break
+
+        part_shape = acad_poly_to_shapely(insert_obj)
+
+        # --- ЭФФЕКТИВНАЯ ДЕТАЛЬ ---
+        part_eff = part_shape.buffer(half, join_style=2)
+
+        result = find_position_in_containers(
+            containers,
+            part_eff
+        )
+
+        if result is None:
+            print("Не удалось разместить деталь")
+            continue
+
+        used_container, placed_eff, x, y, angle = result
+
+        # --- ОБНОВЛЯЕМ ДОСТУПНЫЕ ОБЛАСТИ ---
+        containers = update_containers(
+            containers,
+            used_container,
+            placed_eff
+        )
+
+        # Отрисовка новых областей (для отладки)
+        for c in containers:
             draw_polygon(model, c)
 
-    rotate_object(insert_obj, angle)
+        # --- ПЕРЕМЕЩАЕМ РЕАЛЬНУЮ ДЕТАЛЬ ---
 
-    pminx, pminy, _, _ = placed_poly.bounds
+        rotate_object(insert_obj, angle)
 
-    minpt, _ = get_bbox(insert_obj)
+        placed_real = placed_eff.buffer(-half, join_style=2)
 
-    dx = pminx - minpt[0]
-    dy = pminy - minpt[1]
+        pminx, pminy, _, _ = placed_real.bounds
 
-    move_object(insert_obj, dx, dy)
+        minpt, _ = get_bbox(insert_obj)
 
-    print("Размещение выполнено")
+        dx = pminx - minpt[0]
+        dy = pminy - minpt[1]
+
+        move_object(insert_obj, dx, dy)
+
+        print("Деталь размещена")
+
+    print("Работа завершена")
 
 
 # ---------------------------------------------------------

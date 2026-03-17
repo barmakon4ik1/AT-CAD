@@ -11,9 +11,13 @@ import time
 from typing import Callable, Optional, Union, List, Any, Tuple
 import pythoncom
 from win32com.client import VARIANT, CDispatch
-from locales.at_localization_class import loc
+from locales.at_translations import loc
 from windows.at_gui_utils import show_popup
 
+TRANSLATIONS = {
+    "com_call_error": {"ru": "Ошибка при вызове AutoCAD API: {}", "de": "Fehler beim Aufruf der AutoCAD-API: {}", "en": "Error calling AutoCAD API: {}"},
+}
+loc.register_translations(TRANSLATIONS)
 
 def _to_xyz_list(value: Any) -> List[float]:
     """Преобразует результат COM-вызова точки в [x, y, z]."""

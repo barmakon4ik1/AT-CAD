@@ -15,7 +15,7 @@ from shapely.ops import unary_union
 from shapely.geometry.base import BaseGeometry
 
 from config.at_cad_init import ATCadInit
-from programs.at_input import at_get_entity  # используем ваши функции ввода
+from programs.at_input import at_get_entity
 from windows.at_gui_utils import show_popup
 
 # ---------------------------------------

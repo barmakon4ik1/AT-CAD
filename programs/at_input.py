@@ -166,14 +166,104 @@ def at_get_point(
 
 
 # ---------------------------------------------------------------------------
+# Выбор примитива (entity)
+# ---------------------------------------------------------------------------
+
+def at_get_entity(
+    adoc: object | None = None,
+    *,
+    prompt: Optional[str] = None,
+    use_bridge: bool = False,   # оставлено для совместимости, не используется
+    suppress_popups: bool = False,
+) -> tuple[object | None, Optional[List[float]], bool, bool, bool]:
+    """
+    Запрашивает у пользователя выбор одного объекта в AutoCAD.
+
+    Возвращает:
+        (entity, pick_point, ok, enter, esc)
+
+    Где:
+        entity      — COM-объект выбранной сущности или None
+        pick_point  — точка выбора [x,y,z] или None
+        ok          — True если объект выбран
+        enter       — True если нажат Enter (завершить ввод)
+        esc         — True если отмена (Esc)
+    """
+
+    cad = ATCadInit()
+    if not cad.is_initialized():
+        if not suppress_popups:
+            show_popup(loc.get("com_failed"), popup_type="error")
+        return None, None, False, False, True
+
+    document = adoc or cad.document
+    if document is None:
+        return None, None, False, False, True
+
+    if prompt is None:
+        prompt = "Выберите объект:"
+
+    if use_bridge:
+        print("В данной версии не поддерживается")
+
+    # Вывод приглашения в командную строку AutoCAD
+    try:
+        document.Utility.Prompt(prompt + "\n")
+    except RuntimeError:
+        pass
+
+    # -------------------------------------------------------------------
+    # Основной путь: Utility.GetEntity()
+    # -------------------------------------------------------------------
+    try:
+        result = safe_utility_call(
+            lambda: document.Utility.GetEntity(),
+            as_variant=False
+        )
+
+        if isinstance(result, Sequence) and len(result) >= 1:
+            entity = result[0]
+            pick_point = list(result[1]) if len(result) > 1 else None
+            return entity, pick_point, True, False, False
+
+    except RuntimeError:
+        pass
+
+    # -------------------------------------------------------------------
+    # Если пользователь нажал Enter — обычно COM бросает исключение
+    # Проверим через команду SELECT
+    # -------------------------------------------------------------------
+    try:
+        before = document.ModelSpace.Count
+        document.SendCommand("_SELECT\n")
+        time.sleep(0.2)
+        after = document.ModelSpace.Count
+
+        # Если ничего не выбрано — считаем Enter
+        if after == before:
+            return None, None, False, True, False
+
+    except RuntimeError:
+        pass
+
+    # -------------------------------------------------------------------
+    # Отмена (Esc)
+    # -------------------------------------------------------------------
+    if not suppress_popups:
+        show_popup(loc.get("selection_cancelled", "Выбор отменён"), popup_type="info")
+
+    return None, None, False, False, True
+
+
+# ---------------------------------------------------------------------------
 # Тестовый запуск
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     print("=== Тест at_input.py ===")
 
-    cad = ATCadInit()
-    adoc = cad.document
+    autocad = ATCadInit()
+    autocaddoc = autocad.document
 
-    selected_point = at_get_point(adoc, as_variant=False)
+    selected_point = at_get_point(autocaddoc, as_variant=False)
     print("Результат:", selected_point)

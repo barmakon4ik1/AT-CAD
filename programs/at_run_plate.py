@@ -17,6 +17,7 @@ from programs.at_dimension import add_dimension
 from programs.at_geometry import ensure_point_variant, polar_point, offset_point, build_polyline_list, \
     convert_to_variant_points
 from programs.at_offset import at_offset
+from utils.cad_transaction import transactional
 from windows.at_gui_utils import show_popup
 
 # -----------------------------
