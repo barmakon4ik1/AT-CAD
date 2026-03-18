@@ -775,7 +775,7 @@ class ShellContentPanel(BaseContentPanel):
             fb_shell.universal_row(
                 "offset_label",
                 [
-                    {"type": "text", "name": "offset", "value": "0", "default": "0"},
+                    {"type": "text", "name": "base_offset", "value": "0", "default": "0"},
                 ]
             )
 
@@ -891,6 +891,13 @@ class ShellContentPanel(BaseContentPanel):
             diameter_type = ["inner", "middle", "outer"][self.diameter_type_choice.GetSelection()]
             diameter = at_diameter(diameter, thickness, diameter_type)
 
+            base_offset = normalize_input(raw, "base_offset", 0.0)
+
+            # 🔧 корректировка координат вырезов
+            if self.branch_data:
+                for c in self.branch_data:
+                    c["offset_axial"] -= base_offset
+
             data = {
                 "order_number": self.order_input.GetValue(),
                 "detail_number": self.detail_input.GetValue(),
@@ -908,8 +915,12 @@ class ShellContentPanel(BaseContentPanel):
                 "layer_name": "0",
                 "insert_point": self.insert_point,
                 "cutouts": self.branch_data,  # Добавляем данные отводов
-                "offset": normalize_input(raw, "offset", 0.0) # учитываем отступ от базовой плоскости
+                "base_offset": base_offset
             }
+
+            print(data["cutouts"])
+            print("base_offset:", data["base_offset"])
+
             # print(data)
             return data
         except Exception as e:

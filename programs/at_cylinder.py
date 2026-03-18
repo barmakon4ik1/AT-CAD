@@ -112,7 +112,7 @@ def get_insert_point_unwrap(shell_data: Dict, cut: Dict) -> List[float]:
     seam_angle = float(shell_data.get("angle", 0.0))    # угол шва в градусах (абсолютный)
     clockwise = bool(shell_data.get("clockwise", True)) # True = идти по часовой вдоль развёртки
     cut_angle = float(cut.get("angle_deg", 0.0)) # Абсолютный угол выреза (в градусах)
-    offset = float(cut.get("offset", 0.0))
+    base_offset = float(cut.get("base_offset", 0.0))
 
     # Разность (cut_angle - seam_angle) в диапазоне [0, 360)
     # Это угол от шва до выреза, считая в направлении "по возрастанию" угла.
@@ -134,7 +134,7 @@ def get_insert_point_unwrap(shell_data: Dict, cut: Dict) -> List[float]:
     arc_length = R * math.radians(angle_from_seam)  # единицы длины = те же, что и R
 
     # Координаты развёртки: X вдоль развёртки (от шва), Y — осевой (offset_axial)
-    return [X0 + arc_length, Y0 + cut.get("offset_axial", 0.0) - offset, 0.0]
+    return [X0 + arc_length, Y0 + cut.get("offset_axial", 0.0) - base_offset, 0.0]
 
 # ========================================================
 # Основной класс построителя
@@ -303,259 +303,210 @@ class CylinderBuilder:
         return [X0, Y, 0.0]
 
     # --------------------------------------------
-    def build(self) -> dict[str, list[Any] | dict[Any, Any]] | None:
+    def build(self) -> dict:
         """
-        Собирает развёртку цилиндра с вырезами и развёртками отвода.
+        Атомарное построение развёртки цилиндра с вырезами и развёртками отводов.
 
-        Returns:
-            Dict: Результат в формате {"entities": [...], "metadata": {...}}.
-        """
-        try:
-            # Проверка входных данных
-            self._validate_input()
+        Принцип работы (fail-fast):
+        ───────────────────────────
+        • Любая ошибка немедленно приводит к исключению
+        • Частичный результат НЕ возвращается
+        • Метод либо возвращает полностью корректную структуру,
+          либо не возвращает ничего (исключение уходит выше)
+        • Вся валидация выполняется ДО добавления сущностей
 
-            # ------------------------
-            # 1) Построение обечайки (at_shell)
-            # ------------------------
-            shell_input = {
-                "insert_point": self.shell_data.get("insert_point"),
-                "diameter": self.shell_data.get("diameter"),
-                "length": self.shell_data.get("length"),
-                "angle": self.shell_data.get("angle", 0.0),
-                "offset": self.shell_data.get("offset", 0.0),
-                "clockwise": self.shell_data.get("clockwise", True),
-                "axis": self.shell_data.get("axis", True),
-                "axis_marks": self.shell_data.get("axis_marks", 0.0),
-                "layer_name": self.shell_data.get("layer_name", "0"),
-                "thickness": str(self.shell_data.get("thickness", 0.0)),
-                "order_number": self.shell_data.get("order_number", ""),
-                "detail_number": self.shell_data.get("detail_number", ""),
-                "weld_allowance_top": self.shell_data.get("weld_allowance_top", 0.0),
-                "weld_allowance_bottom": self.shell_data.get("weld_allowance_bottom", 0.0)
+        Ожидаемый контракт вложенных модулей:
+        ─────────────────────────────────────
+        at_shell / at_cutout / at_nozzle должны:
+            ✔ вернуть dict с success=True
+            ИЛИ
+            ✔ выбросить исключение
+
+        Возвращает:
+        ───────────
+        dict:
+            {
+                "entities": [...],
+                "metadata": {...}
             }
-            shell_info = at_shell(shell_input)
-            if not shell_info or not shell_info.get("success"):
-                raise RuntimeError(loc.get("build_error", "Ошибка построения: at_shell failed"))
+
+        Исключения:
+        ───────────
+        ValueError / RuntimeError — при любой ошибке построения
+        """
+
+        # =====================================================
+        # 0) Валидация входных данных
+        # =====================================================
+        self._validate_input()
+
+        # =====================================================
+        # 1) Построение развёртки обечайки
+        # =====================================================
+        shell_input = {
+            "insert_point": self.shell_data["insert_point"],
+            "diameter": self.shell_data["diameter"],
+            "length": self.shell_data["length"],
+            "angle": self.shell_data.get("angle", 0.0),
+            "offset": self.shell_data.get("offset", 0.0),
+            "clockwise": self.shell_data.get("clockwise", True),
+            "axis": self.shell_data.get("axis", True),
+            "axis_marks": self.shell_data.get("axis_marks", 0.0),
+            "layer_name": self.shell_data.get("layer_name", "0"),
+            "thickness": str(self.shell_data.get("thickness", 0.0)),
+            "order_number": self.shell_data.get("order_number", ""),
+            "detail_number": self.shell_data.get("detail_number", ""),
+            "weld_allowance_top": self.shell_data.get("weld_allowance_top", 0.0),
+            "weld_allowance_bottom": self.shell_data.get("weld_allowance_bottom", 0.0),
+        }
+
+        shell_info = at_shell(shell_input)
+
+        if not shell_info or not shell_info.get("success"):
+            raise RuntimeError("at_shell failed")
+
+        self.result["entities"].append({
+            "type": "shell",
+            "outline": shell_info["outline"],
+            "metadata": shell_info.get("metadata", {})
+        })
+
+        self.result["metadata"].update(shell_info.get("metadata", {}))
+
+        # =====================================================
+        # 2) Построение вырезов под отводы (at_cutout)
+        # =====================================================
+        cutouts = self.shell_data.get("cutouts", [])
+
+        for idx, cut in enumerate(cutouts, 1):
+
+            params = cut.get("params", {})
+
+            # ---- обязательные параметры ----
+            if not all(k in params for k in ("diameter", "thickness", "contact_mode")):
+                raise ValueError(
+                    f"Cutout {idx}: missing required parameters"
+                )
+
+            # ---- координаты на развёртке ----
+            insert_unwrap = get_insert_point_unwrap(self.shell_data, cut)
+
+            # ---- скорректированный диаметр ----
+            cut_diameter = self._adjust_cutout_diameter(cut, idx)
+
+            # ---- геометрические проверки ----
+            R = self.shell_data["diameter"] / 2.0
+            r = cut_diameter / 2.0
+            offset = float(cut.get("axial_shift", 0.0))
+
+            if R <= 0:
+                raise ValueError("Main cylinder diameter <= 0")
+
+            if r <= 0:
+                raise ValueError(f"Cutout {idx}: diameter <= 0")
+
+            if abs(offset) > R:
+                raise ValueError(
+                    f"Cutout {idx}: offset {offset} exceeds main radius {R}"
+                )
+
+            # ---- параметры для at_cutout ----
+            cut_params = {
+                "insert_point": insert_unwrap,
+                "diameter": cut_diameter,
+                "diameter_main": self.shell_data["diameter"],
+                "offset": offset,
+                "steps": params.get("steps", 180),
+                "mode": params.get("bulge_mode", "bulge"),
+                "text": params.get("text", ""),
+                "layer_name": params.get("layer_name", "0"),
+            }
+
+            cut_info = at_cutout(cut_params)
+
+            if not cut_info or not cut_info.get("success"):
+                raise RuntimeError(f"Cutout {idx} build failed")
+
             self.result["entities"].append({
-                "type": "shell",
-                "outline": shell_info.get("outline", []),
-                "metadata": shell_info.get("metadata", {})
+                "type": "cutout",
+                "outline": cut_info["outline"],
+                "metadata": {**cut_info.get("metadata", {}), "cutout_index": idx}
             })
-            self.result["metadata"].update(shell_info.get("metadata", {}))
 
-            # ------------------------
-            # 2) Построение вырезов (at_cutout)
-            # ------------------------
-            cutouts = self.shell_data.get("cutouts", [])
-            for idx, cut in enumerate(cutouts, 1):
-                params = cut.get("params", {})
+        # =====================================================
+        # 3) Построение развёрток отводов (at_nozzle)
+        # =====================================================
+        for idx, cut in enumerate(cutouts, 1):
 
-                # Базовая валидация параметров для выреза
-                if not all(k in params for k in ["diameter", "thickness", "contact_mode"]):
-                    raise ValueError(loc.get("invalid_cutout_data", "Отсутствуют обязательные параметры отвода: {0}").format(params, idx))
+            params = cut.get("params", {})
 
-                # Точка вставки на развёртке
-                insert_unwrap = get_insert_point_unwrap(self.shell_data, cut)
+            height = float(params.get("height", 0.0))
+            thickness = float(params.get("thickness", 0.0))
+            unroll_branch = bool(params.get("unroll_branch", False))
 
-                # Коррекция диаметра
-                cut_diameter = self._adjust_cutout_diameter(cut, idx)
+            # если развёртка не требуется — пропускаем
+            if not (height > 0 and thickness > 0 and unroll_branch):
+                continue
 
-                # Быстрые проверки геометрии, чтобы избежать math errors
-                R = self.shell_data.get("diameter", 0.0) / 2.0
-                r = cut_diameter / 2.0
-                offset = cut.get("axial_shift", 0.0)
-                if R <= 0:
-                    raise ValueError(loc.get("invalid_cutout_data", "Диаметр основной трубы <= 0: {0}").format(R, idx))
-                if r <= 0:
-                    raise ValueError(loc.get("invalid_cutout_data", "Диаметр отвода <= 0: {0}").format(r, idx))
-                if abs(offset / R) > 1:
-                    raise ValueError(loc.get("invalid_cutout_data", "Смещение слишком велико: offset={0}, R={1}").format(offset, R, idx))
+            # ---- точка вставки ----
+            nozzle_insert = self.get_nozzle_insert_point(idx, cut, params)
 
-                # Подготовка параметров для at_cutout
-                cut_params = {
-                    "insert_point": insert_unwrap,
-                    "diameter": cut_diameter,
-                    "diameter_main": self.shell_data.get("diameter", 0.0),
-                    "offset": cut.get("axial_shift", 0.0),
-                    "steps": params.get("steps", 180),
-                    "mode": params.get("bulge_mode", "bulge"),  # Режим отрисовки
-                    "text": params.get("text", ""),
-                    "layer_name": params.get("layer_name", "0")
-                }
+            # ---- диаметры ----
+            thk = thickness
+            diameter = params["diameter"] - thk  # внутренний диаметр отвода
+            diameter_main = self.shell_data["diameter"] + thk  # наружный диаметр обечайки
 
-                # Вызов at_cutout
-                cut_info = at_cutout(cut_params)
-                if not cut_info or not cut_info.get("success"):
-                    self.result["entities"].append({
-                        "type": "cutout",
-                        "outline": [],
-                        "metadata": {
-                            "error": cut_info.get("error", "unknown") if isinstance(cut_info, dict) else "unknown",
-                            "input": cut_params,
-                            "cutout_index": idx
-                        }
-                    })
-                else:
-                    self.result["entities"].append({
-                        "type": "cutout",
-                        "outline": cut_info.get("outline", []),
-                        "metadata": {**cut_info.get("metadata", {}), "cutout_index": idx}
-                    })
+            if diameter <= 0 or diameter_main <= 0:
+                raise ValueError(f"Nozzle {idx}: invalid diameters")
 
-            # ------------------------
-            # 3) Построение развёрток отвода (at_nozzle)
-            # ------------------------
-            for idx, cut in enumerate(cutouts, 1):
-                params = cut.get("params", {})
+            if thickness * 2 >= diameter:
+                raise ValueError(f"Nozzle {idx}: thickness too large")
 
-                # определяем, нужно ли строить развёртку отвода
-                try:
-                    height = float(params.get("height", 0.0))
-                    thickness = float(params.get("thickness", 0.0))
-                except ValueError:
-                    height = params.get("height", 0.0)
-                    thickness = params.get("thickness", 0.0)
-                unroll_branch = bool(params.get("unroll_branch", False))
+            offset = float(cut.get("axial_shift", 0.0))
+            R_main = diameter_main / 2.0
 
-                if not (height > 0 and thickness > 0 and unroll_branch):
-                    # развёртка данного отвода не требуется
-                    continue
+            if abs(offset) > R_main:
+                raise ValueError(
+                    f"Nozzle {idx}: offset exceeds main radius"
+                )
 
-                # вычисление точки вставки развёртки отвода
-                try:
-                    nozzle_insert = self.get_nozzle_insert_point(idx, cut, params)
-                except Exception as e:
-                    self.result["entities"].append({
-                        "type": "nozzle",
-                        "outline": [],
-                        "metadata": {"error": f"get_nozzle_insert_point failed: {str(e)}", "cutout_index": idx}
-                    })
-                    continue
+            # ---- параметры для at_nozzle ----
+            nozzle_params = {
+                "insert_point": nozzle_insert,
+                "diameter": diameter,
+                "diameter_main": diameter_main,
+                "length": height,
+                "thickness": thickness,
+                "layer_name": params.get("layer_name", "0"),
+                "text": params.get("text", f"N{idx}"),
+                "weld_allowance": float(params.get("weld_allowance", 0.0)),
+                "offset": offset,
+                "angle_deg": float(cut.get("angle_deg", 0.0)),
+                "accuracy": int(params.get("accuracy", 180)),
+                "thk_correction": bool(params.get("thk_correction", False)),
+                "mode": params.get("mode", "bulge"),
+                "order_number": self.shell_data.get("order_number", ""),
+                "detail_number": params.get("detail_number", ""),
+                "material": params.get("material", ""),
+            }
 
-                # корректировка диаметра отвода
-                # shell_data["diameter"] — СРЕДНИЙ диаметр обечайки
-                # at_nozzle требует НАРУЖНЫЙ диаметр обечайки
-                # Для технологической корректности используем ВНУТРЕННИЙ диаметр отвода
-                thk = params.get("thickness")
-                diameter = params.get("diameter") - thk
-                diameter_main = self.shell_data["diameter"] + thk # вернуть должно наружный диаметр!
+            nozzle_info = at_nozzle(nozzle_params)
 
-                # подготовка параметров для at_nozzle
-                nozzle_params = {
-                    "insert_point": nozzle_insert,
-                    "diameter": diameter,
-                    "diameter_main": diameter_main,
-                    "length": float(height),
-                    "thickness": float(thickness),
-                    "layer_name": params.get("layer_name", "0"),
-                    "text": params.get("text", f"N{idx}"),
-                    "weld_allowance": float(params.get("weld_allowance", 0.0)),
-                    "offset": float(cut.get("axial_shift", 0.0)),
-                    "angle_deg": float(cut.get("angle_deg", 0.0)),
-                    "accuracy": int(params.get("accuracy", 180)),
-                    "thk_correction": bool(params.get("thk_correction", False)),
-                    "mode": params.get("mode", "bulge"),
-                    "order_number": self.shell_data.get("order_number", ""),
-                    "detail_number": params.get("detail_number", ""),
-                    "material": params.get("material", "")
-                }
+            if not nozzle_info or not nozzle_info.get("success"):
+                raise RuntimeError(f"Nozzle {idx} build failed")
 
-                # быстрые проверки параметров (предотвращение тривиальных проблем)
-                if nozzle_params["diameter"] <= 0 or nozzle_params["diameter_main"] <= 0:
-                    self.result["entities"].append({
-                        "type": "nozzle",
-                        "outline": [],
-                        "metadata": {"error": "Invalid diameters for nozzle", "input": nozzle_params,
-                                     "cutout_index": idx}
-                    })
-                    continue
-                if nozzle_params["thickness"] <= 0 or nozzle_params["length"] <= 0:
-                    self.result["entities"].append({
-                        "type": "nozzle",
-                        "outline": [],
-                        "metadata": {"error": "Invalid height/thickness for nozzle", "input": nozzle_params,
-                                     "cutout_index": idx}
-                    })
-                    continue
-                if nozzle_params["thickness"] * 2 >= nozzle_params["diameter"]:
-                    self.result["entities"].append({
-                        "type": "nozzle",
-                        "outline": [],
-                        "metadata": {"error": "Thickness too large relative to diameter", "input": nozzle_params,
-                                     "cutout_index": idx}
-                    })
-                    continue
-
-                # защита по offset относительно R
-                R_nozzle = nozzle_params["diameter_main"] / 2.0
-                if abs(nozzle_params["offset"]) > R_nozzle:
-                    self.result["entities"].append({
-                        "type": "nozzle",
-                        "outline": [],
-                        "metadata": {"error": f"Offset {nozzle_params['offset']} > R {R_nozzle} — invalid for unroll", "cutout_index": idx}
-                    })
-                    continue
-
-                # вызов at_nozzle с защитой от исключений и от не-dict результат
-                try:
-                    nozzle_info = at_nozzle(nozzle_params)
-                except Exception as e:
-                    tb = traceback.format_exc()
-                    # Добавляем детальный трейсбек в результат — это поможет локализовать math domain error
-                    self.result["entities"].append({
-                        "type": "nozzle",
-                        "outline": [],
-                        "metadata": {
-                            "error": "Exception during at_nozzle",
-                            "exception": str(e),
-                            "traceback": tb,
-                            "input": nozzle_params,
-                            "cutout_index": idx
-                        }
-                    })
-                    # критическая ошибка — показываем всплывающее сообщение
-                    show_popup(loc.get("build_error").format(str(e)), popup_type="error")
-                    continue
-
-                # Если модуль вернул не dict — фиксируем и продолжаем
-                if not isinstance(nozzle_info, dict):
-                    self.result["entities"].append({
-                        "type": "nozzle",
-                        "outline": [],
-                        "metadata": {"error": f"at_nozzle returned non-dict ({type(nozzle_info).__name__})", "value": nozzle_info, "input": nozzle_params, "cutout_index": idx}
-                    })
-                    continue
-
-                # Проверяем поле success
-                if not nozzle_info.get("success", False):
-                    err = nozzle_info.get("error", "unknown nozzle error")
-                    self.result["entities"].append({
-                        "type": "nozzle",
-                        "outline": [],
-                        "metadata": {"error": err, "input": nozzle_params, "cutout_index": idx}
-                    })
-                    continue
-
-                # Вставляем успешную развёртку отвода
-                self.result["entities"].append({
-                    "type": "nozzle",
-                    "outline": nozzle_info.get("outline", []),
-                    "metadata": {**nozzle_info.get("metadata", {}), "cutout_index": idx}
-                })
-
-                # Добавляем входные данные в metadata
-                self.result["metadata"].setdefault("input_data", self.shell_data)
-                return self.result
-
-        except Exception as e:
-        # Внешняя ошибка: фиксируем и возвращаем результат с типом 'error'
             self.result["entities"].append({
-                "type": "error",
-                "outline": [],
-                "metadata": {"error": str(e)}
+                "type": "nozzle",
+                "outline": nozzle_info["outline"],
+                "metadata": {**nozzle_info.get("metadata", {}), "cutout_index": idx}
             })
-            self.result["metadata"]["error"] = str(e)
-            return self.result
+
+        # =====================================================
+        # 4) Финализация
+        # =====================================================
+        self.result["metadata"]["input_data"] = self.shell_data
+
+        return self.result
 
 def at_cylinder(data: Dict) -> Dict:
     """
