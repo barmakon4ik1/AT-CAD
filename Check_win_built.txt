@@ -1,3 +1,8 @@
+Создание EXE:
+pyinstaller launcher.py --onefile --noconsole --collect-all wx --icon=AT-CAD.ico
+
+
+
 # Мини-чеклист для адаптации setup_ui()
 # 1 Инициализация формы
 # 1. Создать объект FormBuilder для текущей панели

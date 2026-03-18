@@ -438,7 +438,7 @@ class FieldBuilder:
              default: Any = None) -> wx.TextCtrl:
         """Текстовое поле с меткой."""
         ctrl = wx.TextCtrl(self.parent, value=value, size=self.default_size)
-        bind_float_input(ctrl)
+        # bind_float_input(ctrl) # Здесь ограничение на ввод только чисел!
         self._register_field(name, ctrl, required, parser, default)
         self.row(label_key, [ctrl])
         return ctrl
