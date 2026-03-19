@@ -181,7 +181,9 @@ class ATMainWindow(wx.Frame):
             parent=None,
             title=loc.get("program_title", "AT-CAD"),
             size=WINDOW_SIZE,  # type: ignore
-            style=wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX),
+            style=wx.DEFAULT_FRAME_STYLE,
+            # style=wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX),
+            # wx.RESIZE_BORDER — нельзя менять размер, wx.MAXIMIZE_BOX — нельзя развернуть
         )
 
         # Инициализация атрибутов для пунктов меню
@@ -313,8 +315,12 @@ class ATMainWindow(wx.Frame):
         # Загрузка начальной страницы
         self.switch_content("content_apps")
 
+        # --- Установка минимального размера окна ---
+        self.update_min_size()
+
         # Привязка обработчика закрытия окна
         self.Bind(wx.EVT_CLOSE, self.on_close)
+        self.Bind(wx.EVT_SIZE, self.on_resize)
 
         # Обновление UI с текущими настройками
         self.update_ui(self.settings)
@@ -336,6 +342,19 @@ class ATMainWindow(wx.Frame):
     #         image = image.Scale(width, height, wx.IMAGE_QUALITY_HIGH)
     #         return wx.Bitmap(image)
     #     return bitmap
+
+    def update_min_size(self):
+        """
+        Устанавливает минимальный размер окна на основе содержимого.
+        """
+        self.panel.Layout()
+        min_size = self.main_sizer.CalcMin()
+
+        # небольшой запас, чтобы не было "впритык"
+        min_width = max(min_size.width + 20, 400)
+        min_height = max(min_size.height + 20, 300)
+
+        self.SetMinSize(wx.Size(min_width, min_height))
 
     def update_footer_hint(self, content_name: str) -> None:
         info = CONTENT_REGISTRY.get(content_name, {})
@@ -436,6 +455,7 @@ class ATMainWindow(wx.Frame):
 
         self.update_ui(self.settings)
         self.update_footer_hint(content_name)
+        self.update_min_size()
 
     def open_item(self, content_name: str, data=None):
         """
@@ -493,8 +513,8 @@ class ATMainWindow(wx.Frame):
         logging.info(f"Установлен цвет фона баннера: {self.settings.get('BANNER_COLOR', DEFAULT_SETTINGS['BANNER_COLOR'])}")
 
         banner_height = max(BANNER_HIGH, 20)
-        self.banner_panel.SetMinSize((wx.DefaultCoord, banner_height))
-        self.banner_panel.SetMaxSize((wx.DefaultCoord, banner_height))
+        self.banner_panel.SetMinSize(wx.Size(wx.DefaultCoord, banner_height))
+        self.banner_panel.SetMaxSize(wx.Size(wx.DefaultCoord, banner_height))
 
         banner_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
@@ -522,11 +542,11 @@ class ATMainWindow(wx.Frame):
         banner_sizer.AddStretchSpacer()
 
         # Название программы по центру
-        max_width = WINDOW_SIZE[0] - 2 * LOGO_SIZE[0] - 50
+        max_width = self.GetClientSize().width - 2 * LOGO_SIZE[0] - 50
         max_height = banner_height - 20
 
         self.title = wx.StaticText(self.banner_panel, label="", style=wx.ST_NO_AUTORESIZE)
-        self.title.SetMinSize((max_width, -1))
+        # self.title.SetMinSize(wx.Size(max_width, -1))
 
         title_text = loc.get("program_title", "AT-CAD")
         style_flags = {
@@ -812,7 +832,7 @@ class ATMainWindow(wx.Frame):
         if hasattr(self, "title"):
             title_text = loc.get("program_title", "AT-CAD")
             self.title.SetLabel("")
-            max_width = WINDOW_SIZE[0] - 2 * LOGO_SIZE[0] - 50
+            max_width = self.GetClientSize().width - 2 * LOGO_SIZE[0] - 50
             max_height = max(BANNER_HIGH, 20) - 20
             style_flags = {
                 "style": wx.FONTSTYLE_NORMAL if settings.get("TITLE_FONT_TYPE", "normal") == "normal" else wx.FONTSTYLE_ITALIC,
@@ -924,6 +944,22 @@ class ATMainWindow(wx.Frame):
         self.Update()
         logging.info("Интерфейс главного окна полностью обновлён")
 
+    def on_resize(self, event):
+        width = self.GetClientSize().width
+
+        if self.title:
+            max_width = width - 2 * LOGO_SIZE[0] - 50
+            if max_width > 50:
+                self.title.Wrap(max_width)
+
+        if hasattr(self, "footer_label"):
+            self.footer_label.Wrap(width - 300)
+
+        self.update_min_size()
+
+        self.Layout()
+        event.Skip()
+
     @staticmethod
     def on_about(event) -> None:
         """
@@ -958,6 +994,7 @@ class ATMainWindow(wx.Frame):
                 logging.warning(f"Не удалось сохранить язык: {language} недопустим, пропуск сохранения")
         except Exception as e:
             logging.error(f"Ошибка сохранения user_language.json: {e}")
+        wx.GetApp().ExitMainLoop()
         event.Skip()
 
 
