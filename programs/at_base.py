@@ -69,23 +69,29 @@ def regen(adoc: object) -> bool:
         return False
 
 
-def ensure_layer(adoc: object, layer_name: str) -> bool:
+def ensure_layer(adoc, layer_name: str, color_index: int = 7, line_type: str = "Continuous") -> Any:
     """
     Проверяет наличие слоя и создает его, если он отсутствует.
 
     Args:
         adoc: Объект документа AutoCAD.
         layer_name: Имя слоя для проверки/создания.
-
+        color_index: Цвет слоя
+        line_type: Тип линии
     Returns:
         bool: True, если слой существует или создан, False при ошибке.
     """
+    layers = adoc.Layers
     try:
-        if layer_name not in [layer.Name for layer in adoc.Layers]:
-            adoc.Layers.Add(layer_name)
-        return True
-    except Exception:
-        return False
+        layer = layers.Item(layer_name)
+    except:
+        layer = layers.Add(layer_name)
+        layer.Color = color_index
+        try:
+            layer.Linetype = line_type
+        except:
+            pass  # если тип линии недоступен — оставляем по умолчанию
+    return layer
 
 
 def set_layer(adoc: object, layer_name: str) -> bool:

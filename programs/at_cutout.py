@@ -9,14 +9,14 @@ import math
 from typing import Dict, Any, List, Tuple
 from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
-from programs.at_base import regen
+from programs.at_base import regen, ensure_layer
 from programs.at_construction import (
     add_polyline,
     add_dimension,
     add_line,
     add_spline,
     add_text,
-    add_circle,
+    add_circle
 )
 from programs.at_geometry import (
     ensure_point_variant,
@@ -245,15 +245,16 @@ def at_cutout(data: Dict[str, Any]) -> Dict[str, Any]:
 
         # Контрольные линии (оставим — это не круги, они помогают понять ориентацию)
         try:
+            layer_center_line = ensure_layer(adoc, "AM_7")
             center_s = R * math.asin(offset / R) if abs(offset / R) <= 1 else offset
             p_top = ensure_point_variant([x0 + center_s, y0 + r, 0.0])
             p_bottom = ensure_point_variant([x0 + center_s, y0 - r, 0.0])
             p_left = ensure_point_variant([x0 + center_s - 1.3 * r, y0, 0.0])
             p_right = ensure_point_variant([x0 + center_s + 1.3 * r, y0, 0.0])
             add_dimension(adoc, "V", p_bottom, p_top, offset=r + 100)
-            add_line(model, p_bottom, p_top, layer_name="AM_7")
-            add_line(model, p_left, p_right, layer_name="AM_7")
-        except Exception:
+            add_line(model, p_bottom, p_top, layer_name=layer_center_line)
+            add_line(model, p_left, p_right, layer_name=layer_center_line)
+        except RuntimeError:
             # не критично
             pass
 

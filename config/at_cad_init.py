@@ -100,6 +100,7 @@ logging.basicConfig(
 # ============================================================
 
 class ATCadInit:
+    from contextlib import contextmanager
 
     _instance = None
 
@@ -205,7 +206,7 @@ class ATCadInit:
 
         # ModelSpace
         try:
-            self.model = self._com_retry(lambda: self.adoc.ModelSpace)
+            self.model = True
             self.original_layer = self._com_retry(
                 lambda: self.adoc.ActiveLayer
             )
@@ -214,13 +215,7 @@ class ATCadInit:
             return
 
         # Настройка документа
-        self._create_layers()
-        self._set_text_style(TEXT_FONT, TEXT_BOLD, TEXT_ITAL)
-
-        try:
-            self.adoc.ActiveLayer = self.adoc.Layers.Item("0")
-        except Exception:
-            pass
+        self._post_init_document()
 
         logging.info(loc.get("cad_init_success"))
 
@@ -240,15 +235,10 @@ class ATCadInit:
             self.model = None
             return False
 
-        if self.adoc != current_doc:
-            self.adoc = current_doc
+        changed = self.adoc != current_doc
 
-            try:
-                self.model = self._com_retry(
-                    lambda: self.adoc.ModelSpace
-                )
-            except Exception:
-                self.model = None
+        if changed:
+            self.adoc = current_doc
 
             try:
                 self.original_layer = self.adoc.ActiveLayer
@@ -256,6 +246,9 @@ class ATCadInit:
                 self.original_layer = None
 
             logging.info(f"Активный документ: {self.adoc.Name}")
+
+            # 🔥 ПОВТОРНАЯ ИНИЦИАЛИЗАЦИЯ
+            self._post_init_document()
 
         return True
 
@@ -327,10 +320,30 @@ class ATCadInit:
     def is_initialized(self) -> bool:
 
         return (
-            self.acad is not None and
-            self.adoc is not None and
-            self.model is not None
+                self.acad is not None and
+                self.adoc is not None
         )
+
+    def _post_init_document(self):
+        """
+        Применение конфигурации к текущему документу
+        """
+
+        try:
+            self._wait_idle()
+            self._create_layers()
+            self._set_text_style(TEXT_FONT, TEXT_BOLD, TEXT_ITAL)
+
+            try:
+                layer0 = self.safe_call(lambda: self.adoc.Layers.Item("0"))
+
+                if layer0:
+                    self.safe_call(lambda: setattr(self.adoc, "ActiveLayer", layer0))
+            except Exception:
+                pass
+
+        except Exception as e:
+            logging.error(f"Post init error: {e}")
 
     def regen_doc(self, mode: int = 0):
         """
@@ -347,6 +360,20 @@ class ATCadInit:
             logging.info("Регенерация документа успешна")
         except Exception as e:
             logging.error(f"Регенерация провалена: {e}")
+
+    def _ensure_model_space(self):
+        """
+        Гарантирует, что мы в ModelSpace
+        """
+
+        try:
+            if self.adoc.ActiveSpace != 1:
+                self.adoc.ActiveSpace = 1
+                time.sleep(0.05)
+        except Exception as e:
+            logging.warning(f"Не удалось переключиться в ModelSpace: {e}")
+
+
 
     # =========================================================
     # ПУБЛИЧНЫЙ API
@@ -366,8 +393,112 @@ class ATCadInit:
         if not self.acad:
             return None
 
+        if not self.refresh_active_document():
+            return None
+
+        self._ensure_model_space()
+
+        return self.safe_call(lambda: self.adoc.ModelSpace)
+
+    @contextmanager
+    def cad_transaction(self,
+                        layer: Optional[str] = None,
+                        regen: bool = True):
+        """
+        Контекст безопасной работы с AutoCAD
+
+        - переключает слой (если задан)
+        - гарантирует возврат слоя
+        - делает regen по завершению
+        """
+
+        if not self.is_initialized():
+            yield
+            return
+
         self.refresh_active_document()
-        return self.model if self.is_initialized() else None
+
+        prev_layer = None
+
+        try:
+            # текущий слой
+            try:
+                prev_layer = self.adoc.ActiveLayer
+            except Exception:
+                pass
+
+            # переключение слоя
+            if layer:
+                try:
+                    self.adoc.Layers.Item(layer)
+                except Exception:
+                    self._create_layers()
+
+                try:
+                    self.adoc.ActiveLayer = self.adoc.Layers.Item(layer)
+                except Exception as e:
+                    logging.warning(f"Layer switch failed: {e}")
+
+            yield
+
+        except Exception as e:
+            logging.error(f"Transaction error: {e}")
+            raise
+
+        finally:
+            # возврат слоя
+            if prev_layer:
+                try:
+                    self.adoc.ActiveLayer = prev_layer
+                except Exception:
+                    pass
+
+            # regen
+            if regen:
+                try:
+                    self.adoc.Regen(0)
+                except Exception:
+                    pass
+
+    def safe_call(self,
+                  func: Callable,
+                  *args,
+                  default=None,
+                  log: bool = True):
+        """
+        Безопасный вызов COM метода
+
+        - retry при RPC_E_CALL_REJECTED
+        - подавляет исключения
+        - возвращает default при ошибке
+        """
+
+        try:
+            return self._com_retry(func, *args)
+
+        except Exception as e:
+            if log:
+                logging.error(f"COM safe_call error: {e}")
+            return default
+
+    def safe_add(self, func: Callable, *args):
+        """
+        Безопасное создание объектов (Line, Circle и т.д.)
+        """
+
+        if not self.is_initialized():
+            return None
+
+        try:
+            model = self.model_space
+            if not model:
+                return None
+
+            return self.safe_call(lambda: func(model, *args))
+
+        except Exception as e:
+            logging.error(f"safe_add error: {e}")
+            return None
 
 
 # ============================================================
@@ -386,5 +517,13 @@ if __name__ == "__main__":
         show_popup(loc.get("cad_init_error_short"), popup_type="error")
     else:
         show_popup(loc.get("cad_init_success"), popup_type="success")
+
+    # with cad.cad_transaction(layer="0"):
+    #     model = cad.model_space
+    #     model.AddLine((0, 0, 0), (0, 1000, 0))
+
+    # cad.safe_add(
+    #     lambda m: m.AddLine((0, 850, 0), (850, 850, 0))
+    # )
 
     app.MainLoop()

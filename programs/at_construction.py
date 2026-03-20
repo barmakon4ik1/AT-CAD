@@ -31,6 +31,7 @@ from programs.at_geometry import add_rectangle_points, offset_point, polar_point
 from programs.at_input import at_get_point
 from windows.at_gui_utils import show_popup
 from locales.at_translations import loc
+from contextlib import contextmanager
 
 # -----------------------------
 # Локальные переводы модуля
@@ -165,6 +166,16 @@ TRANSLATIONS = {
         "ru": "мм",
         "de": "mm",
         "en": "mm"
+    },
+    "thickness_positive_error": {
+        "ru": "Толщина должна быть положительной",
+        "de": "Die Dicke muss positiv sein",
+        "en": "The thickness must be positive"
+    },
+    "diameter_positive_error": {
+        "ru": "Диаметр не может быть отрицательным",
+        "de": "Der Durchmesser kann nicht negativ sein",
+        "en": "The diameter cannot be negative"
     }
 }
 # Регистрируем переводы сразу при загрузке модуля
@@ -396,7 +407,7 @@ def at_cone_sheet(model: Any, input_point: PointLike, diameter_base: float,
         drs2 = R2 * sin_half_theta
         drc1 = R1 * cos_half_theta
         drc2 = R2 * cos_half_theta
-        center = [input_point[0], input_point[1] - (R1 - (R1 - R2) * 0.5), 0.0] if isinstance(input_point, (list, tuple)) else [input_point.value[0], input_point.value[1] - (R1 - (R1 - R2) * 0.5), 0.0]
+        center = [input_point[0], input_point[1] - (R1 - (R1 - R2) / 2.0), 0.0] if isinstance(input_point, (list, tuple)) else [input_point.value[0], input_point.value[1] - (R1 - (R1 - R2) * 0.5), 0.0]
         p1 = [center[0] + drs2, center[1] + drc2, 0.0]
         p2 = [center[0] + drs1, center[1] + drc1, 0.0]
         p3 = [center[0] - drs1, center[1] + drc1, 0.0]
@@ -427,7 +438,7 @@ def at_cone_sheet(model: Any, input_point: PointLike, diameter_base: float,
 # -----------------------------
 # Основные методы
 # -----------------------------
-def add_circle(model: Any, center: PointLike, radius: float,
+def _add_circle(model: Any, center: PointLike, radius: float,
                layer_name: str = "0") -> Optional[Any]:
     """
     Создаёт окружность в модельном пространстве.
@@ -451,7 +462,7 @@ def add_circle(model: Any, center: PointLike, radius: float,
         return None
 
 
-def add_line(model: Any, point1: PointLike,
+def _add_line(model: Any, point1: PointLike,
              point2: PointLike,
              layer_name: str = "0") -> Optional[Any]:
     """
@@ -476,7 +487,7 @@ def add_line(model: Any, point1: PointLike,
         return None
 
 
-def add_polyline(
+def _add_polyline(
     model: Any,
     points: Union[VARIANT, List[VARIANT], List[tuple]],
     layer_name: str = "0",
@@ -543,11 +554,11 @@ def add_polyline(
         return None
 
 
-def add_spline(
+def _add_spline(
     model: Any,
     points: Union[VARIANT, List[VARIANT], List[tuple]],
     layer_name: str = "0",
-    closed: bool = True
+    closed: bool = False
 ) -> Optional[Any]:
     """
     Создаёт сплайн в AutoCAD через заданные точки.
@@ -628,7 +639,7 @@ def add_spline(
         return None
 
 
-def add_rectangle(
+def _add_rectangle(
     model: Any,
     point: Union[List[float], tuple, VARIANT],
     width: float,
@@ -694,8 +705,11 @@ def add_rectangle(
         if radius > 0:
             bl = math.tan(math.radians(90 / 4))  # величина bulge = tan (90°/4)
             bulges = [0.0, bl, 0.0, bl, 0.0, bl, 0.0, bl]
+        elif radius < 0:
+            # TODO логику рисования фаски
+            pass
         else:
-            bulges = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            bulges = [0] * 8
 
         # Передаём точки как список кортежей (x, y), а bulges отдельно
         points_list = [(x, y) for x, y in pts]
@@ -716,7 +730,7 @@ def add_rectangle(
         return None
 
 
-def add_text(
+def _add_text(
         model: Any,
         point: PointLike,
         text: str = "",
@@ -847,6 +861,138 @@ class MainText:
                 raise
 
 
+class _ConstructionContext:
+    def __init__(self):
+        self.batch_mode = False
+        self.suppress_regen = False
+        self.objects_created = 0
+
+CTX = _ConstructionContext()
+
+
+@contextmanager
+def construction_batch(do_regen: bool = False):
+    """
+    Контекст пакетного построения.
+
+    Args:
+        regen: выполнить regen после завершения
+    """
+    prev_batch = CTX.batch_mode
+    prev_regen = CTX.suppress_regen
+
+    CTX.batch_mode = True
+    CTX.suppress_regen = True
+
+    try:
+        yield
+    finally:
+        CTX.batch_mode = prev_batch
+        CTX.suppress_regen = prev_regen
+
+        if do_regen:
+            try:
+                cad = ATCadInit()
+                if cad.is_initialized():
+                    regen(cad.document)
+            except Exception:
+                pass
+
+
+def maybe_regen(document):
+    if not CTX.batch_mode and not CTX.suppress_regen:
+        try:
+            regen(document)
+        except Exception:
+            pass
+
+
+def _execute_construction(func, model: Any, *args, **kwargs):
+    """
+    Универсальный исполнитель построений:
+    - гарантирует наличие AutoCAD
+    - получает document/model при необходимости
+    - выполняет функцию
+    - управляет regen
+    """
+    try:
+        cad = ATCadInit()
+
+        if not cad.is_initialized():
+            raise RuntimeError(loc.get("autocad_not_running"))
+
+        document = cad.document
+        model = model or cad.model_space
+
+        obj = func(model, *args, **kwargs)
+
+        if obj is not None:
+            CTX.objects_created += 1
+            maybe_regen(document)
+
+        return obj
+
+    except Exception as e:
+        logger.error(f"{func.__name__} wrapper failed: {str(e)}")
+        show_popup(str(e), popup_type="error")
+        return None
+
+# ------------------------------------------
+# Публичные обертки без изменения сигнатуры
+# ------------------------------------------
+def add_line(model: Any, point1: PointLike,
+             point2: PointLike,
+             layer_name: str = "0") -> Optional[Any]:
+    """
+    Создаёт линию в модельном пространстве.
+    (Поддерживает batch-режим и оптимизацию regen)
+    """
+    return _execute_construction(_add_line, model, point1, point2, layer_name=layer_name)
+
+def add_circle(model: Any, center: PointLike, radius: float,
+               layer_name: str = "0") -> Optional[Any]:
+    return _execute_construction(_add_circle, model, center, radius, layer_name=layer_name)
+
+def add_polyline(
+    model: Any,
+    points: Union[VARIANT, List[VARIANT], List[tuple]],
+    layer_name: str = "0",
+    closed: bool = True,
+    bulges: Optional[List[float]] = None
+    ) -> Optional[Any]:
+    return _execute_construction(_add_polyline, model, points, layer_name=layer_name, closed=closed, bulges=bulges)
+
+def add_spline(
+    model: Any,
+    points: Union[VARIANT, List[VARIANT], List[tuple]],
+    layer_name: str = "0",
+    closed: bool = True
+) -> Optional[Any]:
+    return _execute_construction(_add_spline, model, points, layer_name=layer_name, closed=closed)
+
+def add_rectangle(
+    model: Any,
+    point: Union[List[float], tuple, VARIANT],
+    width: float,
+    height: float,
+    layer_name: str = "0",
+    point_direction: str = "left_bottom",
+    radius: float = 0.0
+) -> Optional[Any]:
+    return _execute_construction(_add_rectangle, model, point, width, height, layer_name=layer_name, point_direction=point_direction, radius=radius)
+
+def add_text(
+        model: Any,
+        point: PointLike,
+        text: str = "",
+        layer_name: str = DEFAULT_TEXT_LAYER,
+        text_height: float = 30,
+        text_angle: float = 0,
+        text_alignment: int = 4
+) -> Optional[Any]:
+    return _execute_construction(_add_text, model, point, text, layer_name=layer_name, text_height=text_height, text_angle=text_angle, text_alignment=text_alignment)
+
+
 if __name__ == "__main__":
     """
     Тестирование создания текста, окружности, линии, полилинии и прямоугольника
@@ -858,14 +1004,14 @@ if __name__ == "__main__":
       3) Создаются объекты: текст, окружность, линия, полилиния (3 точки), прямоугольник.
       4) Ставится размер (add_dimension) и выполняется regen().
     """
-    cad = ATCadInit()
+    autocad = ATCadInit()
 
-    if cad.is_initialized():
-        adoc = cad.document
-        model = cad.model_space
+    if autocad.is_initialized():
+        autocad_document = autocad.document
+        autocad_model = autocad.model_space
 
         # Запрашиваем точку у пользователя
-        input_point = at_get_point(adoc, prompt=loc.get("select_point", "Укажите центр окружности"))
+        input_point = at_get_point(autocad_document, prompt=loc.get("select_point", "Укажите центр окружности"))
 
         if input_point:
             try:
@@ -875,30 +1021,30 @@ if __name__ == "__main__":
                 point4 = polar_point(input_point, distance=400, alpha=120, as_variant=True)
 
                 # Создание текста
-                add_text(model, polar_point(input_point, distance=500, alpha=90, as_variant=True),
+                add_text(autocad_model, polar_point(input_point, distance=500, alpha=90, as_variant=True),
                          loc.get("test_text", "Тестовый текст"))
 
                 # Создание окружности
-                add_circle(model, input_point, 200, layer_name="AM_0")
+                add_circle(autocad_model, input_point, 200, layer_name="AM_0")
 
                 # Создание линии
-                add_line(model, input_point, point2, layer_name="AM_7")
+                add_line(autocad_model, input_point, point2, layer_name="AM_7")
 
                 # Создание полилинии
                 polyline_points = [input_point, point3, point4]
-                add_polyline(model, polyline_points, layer_name="LASER-TEXT")
+                add_polyline(autocad_model, polyline_points, layer_name="LASER-TEXT")
 
 
                 # Создание прямоугольника
                 width, height = 500, 300
-                add_rectangle(model, input_point, width, height, layer_name="SF-TEXT")
+                add_rectangle(autocad_model, input_point, width, height, layer_name="SF-TEXT")
                 end_point = offset_point(input_point, width, height)
 
                 # Размер
-                add_dimension(adoc, "H", input_point, end_point, offset=DEFAULT_DIM_OFFSET)
+                add_dimension(autocad_document, "H", input_point, end_point, offset=DEFAULT_DIM_OFFSET)
 
                 # Обновляем экран
-                regen(adoc)
+                regen(autocad_document)
 
             except Exception as e:
                 logger.error(f"__main__ test scenario failed: {str(e)}")

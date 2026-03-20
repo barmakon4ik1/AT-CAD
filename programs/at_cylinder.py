@@ -492,14 +492,14 @@ class CylinderBuilder:
 
             nozzle_info = at_nozzle(nozzle_params)
 
-            if not nozzle_info or not nozzle_info.get("success"):
-                raise RuntimeError(f"Nozzle {idx} build failed")
+            # if not nozzle_info or not nozzle_info.get("success"):
+            #     raise RuntimeError(f"Nozzle {idx} build failed")
 
-            self.result["entities"].append({
-                "type": "nozzle",
-                "outline": nozzle_info["outline"],
-                "metadata": {**nozzle_info.get("metadata", {}), "cutout_index": idx}
-            })
+            # self.result["entities"].append({
+            #     "type": "nozzle",
+            #     "outline": nozzle_info["outline"],
+            #     "metadata": {**nozzle_info.get("metadata", {}), "cutout_index": idx}
+            # })
 
         # =====================================================
         # 4) Финализация
