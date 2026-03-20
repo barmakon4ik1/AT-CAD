@@ -9,6 +9,8 @@
 """
 
 from contextlib import contextmanager
+
+import win32com.client
 from config.at_cad_init import ATCadInit
 from locales.at_localization_class import loc
 from programs.at_geometry import ensure_point_variant
@@ -69,28 +71,55 @@ def regen(adoc: object) -> bool:
         return False
 
 
-def ensure_layer(adoc, layer_name: str, color_index: int = 7, line_type: str = "Continuous") -> Any:
+def ensure_layer(
+        adoc,
+        layer_name: str,
+        color_index: int = 7,  # ACI от 1 до 255 (7 = белый/чёрный в зависимости от темы)
+        line_type: str = "Continuous"
+) -> Any:
     """
-    Проверяет наличие слоя и создает его, если он отсутствует.
+    Проверяет наличие слоя в документе AutoCAD и создаёт его при необходимости.
+    Устанавливает цвет через TrueColor (AcCmColor) и тип линии (если доступен).
 
     Args:
-        adoc: Объект документа AutoCAD.
-        layer_name: Имя слоя для проверки/создания.
-        color_index: Цвет слоя
-        line_type: Тип линии
+        adoc: Объект активного документа AutoCAD (acad.ActiveDocument)
+        layer_name: Имя слоя (строка)
+        color_index: Индекс цвета ACI (1–255), по умолчанию 7
+        line_type: Имя типа линии (должен существовать в чертеже)
+
     Returns:
-        bool: True, если слой существует или создан, False при ошибке.
+        Объект слоя (IAcadLayer) или None в случае критической ошибки
     """
     layers = adoc.Layers
+
     try:
         layer = layers.Item(layer_name)
-    except:
-        layer = layers.Add(layer_name)
-        layer.Color = color_index
+        # Слой уже существует → можно здесь обновить свойства, если нужно
+        # (например, всегда принудительно устанавливать цвет и тип линии)
+    except Exception:
+        # Слой не найден → создаём новый
         try:
-            layer.Linetype = line_type
-        except:
-            pass  # если тип линии недоступен — оставляем по умолчанию
+            layer = layers.Add(layer_name)
+        except Exception as e:
+            print(f"Ошибка создания слоя '{layer_name}': {e}")
+            return None
+
+    # ─── Установка цвета через TrueColor (правильный способ в 2020–2026) ───
+    try:
+        color_obj = win32com.client.Dispatch("AutoCAD.AcCmColor")
+        color_obj.ColorIndex = color_index  # ACI-индекс (1=red, 2=yellow, 3=green, ..., 7=white/black)
+        # Альтернатива: color_obj.SetRGB(255, 128, 0)  # для TrueColor RGB
+        layer.TrueColor = color_obj
+    except Exception as e:
+        print(f"Не удалось установить цвет слоя '{layer_name}': {e}")
+
+    # ─── Установка типа линии (опционально, может не существовать) ───
+    try:
+        layer.Linetype = line_type
+    except Exception:
+        # Тип линии отсутствует в чертеже или недоступен → оставляем "Continuous" по умолчанию
+        pass
+
     return layer
 
 
