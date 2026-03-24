@@ -257,6 +257,12 @@ class ATCadInit:
         except Exception as e:
             logging.warning(f"Не удалось переключиться в ModelSpace: {e}")
 
+    def unwrap(self, obj):
+        """Возвращает сырой COM-объект. Это нужно для, например, информации о геометрии"""
+        if hasattr(obj, "_com_obj"):
+            return obj._com_obj
+        return obj
+
     # =========================================================
     # ИНИЦИАЛИЗАЦИЯ
     # =========================================================

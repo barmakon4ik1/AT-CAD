@@ -2,6 +2,7 @@
 # programs/at_object_info.py
 import time
 import pywintypes
+import win32com
 import wx
 import pythoncom
 from config.at_cad_init import ATCadInit
@@ -143,8 +144,8 @@ def object_dump(document):
 
 def get_object_properties():
     pythoncom.CoInitialize()
-    acad = ATCadInit()
-    doc = acad.document
+    acad = win32com.client.GetActiveObject("AutoCAD.Application")
+    doc = acad.ActiveDocument
     while True:
         cmd = input(
             "\n1-Показать в окне свойства объекта\n"

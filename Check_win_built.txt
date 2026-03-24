@@ -1,6 +1,8 @@
 Создание EXE:
 pyinstaller launcher.py --onefile --noconsole --collect-all wx --icon=AT-CAD.ico
 
+pyinstaller launcher.py --onefile --noconsole --collect-all wx --hidden-import win32com --hidden-import pythoncom --icon=AT-CAD.ico
+
 
 
 # Мини-чеклист для адаптации setup_ui()
@@ -140,3 +142,6 @@ self.Layout()
 Choice с текстом — всегда использовать getter локально.
 ComboBox для редактируемых полей — GetValue() стандартно.
 Документация и отладка — self.form.print_fields_table() покажет все поля."""
+
+
+

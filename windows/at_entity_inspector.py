@@ -7,6 +7,7 @@ import wx.propgrid as pg
 import pythoncom
 import pywintypes
 import time
+import win32com.client
 
 from locales.at_translations import loc
 from windows.at_window_utils import (
@@ -16,7 +17,7 @@ from windows.at_window_utils import (
     get_wx_color_from_value
 )
 from windows.at_fields_builder import FieldBuilder, FormBuilder
-from config.at_cad_init import ATCadInit
+
 
 
 # =========================================================
@@ -156,8 +157,8 @@ class EntityInspectorDialog(wx.Dialog):
         try:
             pythoncom.CoInitialize()
 
-            cad = ATCadInit()
-            doc = cad.document
+            acad = win32com.client.GetActiveObject("AutoCAD.Application")
+            doc = acad.ActiveDocument
 
             new_objs = self.select_objects(doc)
 
