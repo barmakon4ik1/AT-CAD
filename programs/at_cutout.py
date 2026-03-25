@@ -8,6 +8,7 @@ File: programs/at_cutout.py
 import math
 from typing import Dict, Any, List, Tuple
 from config.at_cad_init import ATCadInit
+from errors.at_errors import GeometryError
 from locales.at_translations import loc
 from programs.at_base import regen, ensure_layer
 from programs.at_construction import (
@@ -98,11 +99,11 @@ def compute_cyl_cyl_intersection_unwrap(
     phi_max = math.asin(offset / R) if abs(offset / R) <= 1 else 0.0
 
     def contains_phi(interval, target):
-        s, e = interval
-        if s <= e:
-            return s <= target <= e
+        t, e = interval
+        if t <= e:
+            return t <= target <= e
         else:
-            return target >= s or target <= e
+            return target >= t or target <= e
 
     chosen_interval = I1 if contains_phi(I1, phi_max) else I2
     start_phi, end_phi = chosen_interval
@@ -245,15 +246,15 @@ def at_cutout(data: Dict[str, Any]) -> Dict[str, Any]:
 
         # Контрольные линии (оставим — это не круги, они помогают понять ориентацию)
         try:
-            layer_center_line = ensure_layer(adoc, "AM_7")
+            layer_center_line = "AM_5"
             center_s = R * math.asin(offset / R) if abs(offset / R) <= 1 else offset
             p_top = ensure_point_variant([x0 + center_s, y0 + r, 0.0])
             p_bottom = ensure_point_variant([x0 + center_s, y0 - r, 0.0])
             p_left = ensure_point_variant([x0 + center_s - 1.3 * r, y0, 0.0])
             p_right = ensure_point_variant([x0 + center_s + 1.3 * r, y0, 0.0])
-            add_dimension(adoc, "V", p_bottom, p_top, offset=r + 100)
             add_line(model, p_bottom, p_top, layer_name=layer_center_line)
             add_line(model, p_left, p_right, layer_name=layer_center_line)
+            add_dimension(adoc, "V", p_bottom, p_top, offset=r + 100)
         except RuntimeError:
             # не критично
             pass
@@ -262,13 +263,13 @@ def at_cutout(data: Dict[str, Any]) -> Dict[str, Any]:
         try:
             point_text = ensure_point_variant(offset_point(insert_point, 20, 20))
             add_text(model, point_text, text, layer_name="AM_5", text_height=30)
-        except Exception:
+        except GeometryError:
             pass
 
         # --- Упрощённый режим: рисуем окружность, если маленький диаметр или большой разрыв ---
         try:
             ratio = float(diameter_main / diameter) if diameter != 0 else float('inf')
-        except Exception:
+        except [ZeroDivisionError, ValueError]:
             ratio = float('inf')
 
         if offset == 0:
@@ -349,12 +350,11 @@ def at_cutout(data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
-    cad = ATCadInit()
-    adoc = cad.document
-    model = cad.model_space
+    autocad = ATCadInit()
+    autocad_doc = autocad.document
 
-    data = {
-        "insert_point": at_get_point(adoc, prompt=loc.get("select_point", "Укажите центр отвода"), as_variant=False),
+    test_data = {
+        "insert_point": at_get_point(autocad_doc, prompt=loc.get("select_point", "Укажите центр отвода"), as_variant=False),
         "diameter": 90,
         "diameter_main": 168.3,
         "offset": 0,
@@ -363,4 +363,4 @@ if __name__ == "__main__":
         "layer_name": "0",
         "text": ""
     }
-    at_cutout(data)
+    at_cutout(test_data)
