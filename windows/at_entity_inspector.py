@@ -8,6 +8,7 @@ import pythoncom
 import pywintypes
 import time
 import win32com.client
+from win32com.client import gencache
 
 from locales.at_translations import loc
 from windows.at_window_utils import (
@@ -157,7 +158,10 @@ class EntityInspectorDialog(wx.Dialog):
         try:
             pythoncom.CoInitialize()
 
-            acad = win32com.client.GetActiveObject("AutoCAD.Application")
+            acad = win32com.client.gencache.EnsureDispatch(
+                win32com.client.GetActiveObject("AutoCAD.Application")
+            )
+
             doc = acad.ActiveDocument
 
             new_objs = self.select_objects(doc)
@@ -233,6 +237,7 @@ class EntityInspectorDialog(wx.Dialog):
         for i in range(count):
 
             obj = com_retry(lambda i=i: sel.Item(i))
+            obj = cast(obj)
 
             try:
                 if obj.ObjectName in ALLOWED_TYPES:
@@ -267,7 +272,7 @@ class EntityInspectorDialog(wx.Dialog):
         self.pg.Clear()
         self.text.Clear()
 
-        first = objs[0]
+        first = cast(objs[0])
         single_mode = len(objs) == 1
 
         # ---------- Общие свойства ----------
@@ -289,6 +294,7 @@ class EntityInspectorDialog(wx.Dialog):
         lines.append(f"{loc.get('objects')}: {len(objs)}")
 
         for obj in objs:
+            obj = cast(obj)
 
             try:
                 name = obj.ObjectName
@@ -465,6 +471,14 @@ def open_dialog(parent=None, data=None) -> int | None:
     return result
 
 
+# =========================================================
+# Вспомогательные методы
+# =========================================================
+def cast(obj):
+    try:
+        return gencache.EnsureDispatch(obj)
+    except:
+        return obj
 
 # =========================================================
 # Тест
