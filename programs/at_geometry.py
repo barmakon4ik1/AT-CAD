@@ -678,7 +678,8 @@ def distance_2points(p1, p2):
     return math.hypot(dx, dy, dz)  # sqrt(dx*dx + dy*dy + dz*dz)
 
 def bulge_chord(radius: float, chord: float) -> float:
-    return math.tan(0.5 * math.asin(chord / (2 * radius)))
+    x = max(-1.0, min(1.0, chord / (2 * radius)))
+    return math.tan(0.5 * math.asin(x))
 
 def normalize_point(p):
     """
@@ -687,14 +688,18 @@ def normalize_point(p):
     [x, y], (x, y), (x, y, z), [ [x, y] ], ( [x, y, z], ), etc.
     """
     # Распаковка вложенных структур пока не доберёмся до списка/кортежа из чисел
-    while isinstance(p, (list, tuple)) and len(p) == 1 and isinstance(p[0], (list, tuple)):
+    depth = 0
+    while isinstance(p, (list, tuple)) and len(p) == 1:
         p = p[0]
+        depth += 1
+        if depth > 5:
+            raise ValueError("Too deep nesting in point structure")
 
     # Теперь p должен быть списком или кортежем чисел
     if len(p) == 2:
-        return (p[0], p[1], 0.0)
+        return p[0], p[1], 0.0
     if len(p) == 3:
-        return (p[0], p[1], p[2])
+        return p[0], p[1], p[2]
 
     raise ValueError(f"Bad point format: {p}")
 
@@ -1227,12 +1232,12 @@ if __name__ == '__main__':
         'gamma': 90.0,
     }
     data_tri = {
-        "a": None,
-        "b": abs(-15.76),
-        "c": 45,
+        "a": 3,
+        "b": 4,
+        "c": None,
         "alpha": None,
         "beta": None,
-        "gamma": 180 - 45,
+        "gamma": 90,
     }
     # pprint(triangle(data))
     pprint(triangle(data_tri))

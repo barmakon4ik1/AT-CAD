@@ -1,7 +1,5 @@
 # noinspection SpellCheckingInspection
 
-# TODO проверить расчет тип 5, если задана L и нет L1 - сейчас неверно
-#  проверить все остальные развертки. Режим Debug
 """
 File: programs\at_name_plate.py
 

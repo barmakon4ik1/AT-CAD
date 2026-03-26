@@ -17,7 +17,7 @@
 """
 import math
 import sys
-from typing import Optional, Any, List, Union, Sequence
+from typing import Optional, Any, List, Union, Sequence, Tuple
 import os
 import logging
 from win32com.client import VARIANT
@@ -27,7 +27,7 @@ from config.at_config import DEFAULT_TEXT_LAYER, DEFAULT_DIM_OFFSET, TEXT_HEIGHT
     TEXT_HEIGHT_LASER, DEFAULT_LASER_LAYER, MAIN_TEXT_OFFSET
 from programs.at_base import regen
 from programs.at_dimension import add_dimension
-from programs.at_geometry import add_rectangle_points, offset_point, polar_point, ensure_point_variant
+from programs.at_geometry import add_rectangle_points, offset_point, polar_point, ensure_point_variant, PolylineBuilder
 from programs.at_input import at_get_point
 from windows.at_gui_utils import show_popup
 from locales.at_translations import loc
@@ -176,6 +176,21 @@ TRANSLATIONS = {
         "ru": "Диаметр не может быть отрицательным",
         "de": "Der Durchmesser kann nicht negativ sein",
         "en": "The diameter cannot be negative"
+    },
+    "invalid_type": {
+        "ru": "Неподдерживаемый тип данных.",
+        "en": "Unsupported data type.",
+        "de": "Nicht unterstützter Datentyp."
+    },
+    "point_normalization_error": {
+        "ru": "Ошибка нормализации точки.",
+        "en": "Point normalization error.",
+        "de": "Fehler bei der Punktnormalisierung."
+    },
+    "invalid_points_format": {
+        "ru": "Неверный формат списка точек.",
+        "en": "Invalid points format.",
+        "de": "Ungültiges Punkteformat."
     }
 }
 # Регистрируем переводы сразу при загрузке модуля
@@ -199,9 +214,117 @@ logger.propagate = False
 
 PointLike = Union[Sequence[float], VARIANT]
 
-# -----------------------------
 # Вспомогательные методы
 # -----------------------------
+# Нормализация геометрии (ЕДИНЫЙ СТАНДАРТ)
+# -----------------------------
+
+def _normalize_point_2d(point: PointLike) -> Tuple[float, float]:
+    """
+    Приводит точку к формату (x, y).
+
+    Поддерживает:
+    - VARIANT([x, y, z])
+    - list/tuple [x, y, ...]
+
+    Returns:
+        (x, y)
+    """
+    if isinstance(point, VARIANT):
+        coords = list(point.value)
+        if len(coords) < 2:
+            raise ValueError("VARIANT точка содержит менее 2 координат")
+        return float(coords[0]), float(coords[1])
+
+    if isinstance(point, (list, tuple)):
+        if len(point) < 2:
+            raise ValueError("Точка должна содержать минимум x, y")
+        return float(point[0]), float(point[1])
+
+    raise TypeError(f"Неподдерживаемый тип точки: {type(point)}")
+
+
+def _normalize_point_3d(point: PointLike) -> Tuple[float, float, float]:
+    """
+    Приводит точку к формату (x, y, z).
+
+    Если z отсутствует → z = 0.0
+    """
+    if isinstance(point, VARIANT):
+        coords = list(point.value)
+        if len(coords) < 2:
+            raise ValueError("VARIANT точка содержит менее 2 координат")
+        z = float(coords[2]) if len(coords) > 2 else 0.0
+        return float(coords[0]), float(coords[1]), z
+
+    if isinstance(point, (list, tuple)):
+        if len(point) < 2:
+            raise ValueError("Точка должна содержать минимум x, y")
+        z = float(point[2]) if len(point) > 2 else 0.0
+        return float(point[0]), float(point[1]), z
+
+    raise TypeError(f"Неподдерживаемый тип точки: {type(point)}")
+
+
+def _normalize_points(points) -> List[Tuple[float, float, float]]:
+    """
+    Универсальная нормализация точек полилинии.
+
+    Всегда возвращает:
+        [(x, y, bulge), ...]
+
+    Поддерживает:
+    - VARIANT (плоский массив [x1, y1, x2, y2, ...])
+    - список VARIANT
+    - список (x, y)
+    - список (x, y, bulge)
+    - смешанные типы
+
+    Это ГЛАВНАЯ точка входа для всех полилиний.
+    """
+
+    result = []
+
+    # --- VARIANT (плоский массив) ---
+    if isinstance(points, VARIANT):
+        data = list(points.value)
+        if len(data) % 2 != 0:
+            raise ValueError("VARIANT массив должен содержать чётное число координат")
+
+        for i in range(0, len(data), 2):
+            result.append((float(data[i]), float(data[i + 1]), 0.0))
+
+        return result
+
+    # --- список ---
+    if isinstance(points, (list, tuple)):
+        for p in points:
+
+            # VARIANT внутри списка
+            if isinstance(p, VARIANT):
+                x, y, _ = _normalize_point_3d(p)
+                result.append((x, y, 0.0))
+                continue
+
+            # tuple/list
+            if isinstance(p, (list, tuple)):
+                if len(p) < 2:
+                    raise ValueError("Точка должна содержать минимум x, y")
+
+                x = float(p[0])
+                y = float(p[1])
+                bulge = float(p[2]) if len(p) > 2 else 0.0
+
+                result.append((x, y, bulge))
+                continue
+
+            raise TypeError(f"Неподдерживаемый тип точки: {type(p)}")
+
+        return result
+
+    raise TypeError("Неподдерживаемый формат points")
+
+
 def at_diameter(diameter: float, thickness: float, flag: str = "outer") -> float:
     """
     Вычисляет средний диаметр с учётом толщины.
@@ -233,9 +356,9 @@ def at_diameter(diameter: float, thickness: float, flag: str = "outer") -> float
         elif flag == "inner":
             return float(diameter + thickness)
         raise ValueError(loc.get("dia_error", "Неверный тип диаметра."))
-    except ValueError as e:
-        logger.error(f"at_diameter failed: {str(e)}")
-        show_popup(str(e), popup_type="error")
+    except ValueError as err:
+        logger.error(f"at_diameter failed: {str(err)}")
+        show_popup(str(err), popup_type="error")
         raise
 
 
@@ -276,9 +399,9 @@ def at_steigung(height: float, diameter_base: float, diameter_top: float = 0) ->
             logger.error("at_steigung failed: Invalid calculation result")
             return None
         return steigung
-    except Exception as e:
-        show_popup(loc.get("math_error", f"Ошибка математических вычислений: {str(e)}"), popup_type="error")
-        logger.error(f"at_steigung failed: {str(e)}")
+    except Exception as err:
+        show_popup(loc.get("math_error", f"Ошибка математических вычислений: {str(err)}"), popup_type="error")
+        logger.error(f"at_steigung failed: {str(err)}")
         return None
 
 
@@ -343,305 +466,370 @@ def at_cone_height(diameter_base: float, diameter_top: float = 0, steigung: Opti
             logger.error("at_cone_height failed: Invalid calculation result")
             return None
         return height
-    except Exception as e:
-        show_popup(loc.get("math_error", f"Ошибка математических вычислений: {str(e)}"), popup_type="error")
-        logger.error(f"at_cone_height failed: {str(e)}")
+    except Exception as err:
+        show_popup(loc.get("math_error", f"Ошибка математических вычислений: {str(err)}"), popup_type="error")
+        logger.error(f"at_cone_height failed: {str(err)}")
         return None
 
 
-def at_cone_sheet(model: Any, input_point: PointLike, diameter_base: float,
-                  diameter_top: float = 0, height: float = 0, layer_name: str = "0") -> Optional[tuple]:
+def at_cone_sheet(
+    model: Any,
+    input_point: PointLike,
+    diameter_base: float,
+    diameter_top: float = 0,
+    height: float = 0,
+    layer_name: str = "0"
+) -> Optional[tuple]:
     """
     Создаёт развертку конуса в модельном пространстве.
-
-    Args:
-        model: Объект ModelSpace активного документа AutoCAD.
-        input_point: Координаты базовой точки (список, кортеж или VARIANT).
-        diameter_base: Диаметр основания конуса.
-        diameter_top: Диаметр вершины конуса (по умолчанию 0).
-        height: Высота конуса.
-        layer_name: Имя слоя для полилинии.
-
+    Изменена только нормализация входных данных.
     Returns:
-        Optional[tuple]: Кортеж (объект полилинии, точка вставки) или None при ошибке.
+        (points_list, input_point, center, theta)
     """
     try:
+        # --- проверки ---
         if not all(isinstance(x, (int, float)) for x in [diameter_base, diameter_top, height]):
-            show_popup(loc.get("invalid_number", "Неверный формат числа."), popup_type="error")
-            logger.error("at_cone_sheet failed: Invalid number format")
+            show_popup(loc.get("invalid_number"), popup_type="error")
             return None
-        if not isinstance(input_point, (list, tuple, VARIANT)) or (isinstance(input_point, (list, tuple)) and len(input_point) < 2):
-            show_popup(loc.get("invalid_point", "Некорректная точка вставки."), popup_type="error")
-            logger.error("at_cone_sheet failed: Invalid insertion point")
-            return None
+
         if diameter_base <= 0:
-            show_popup(loc.get("diameter_base_positive", "Диаметр основания должен быть положительным."), popup_type="error")
-            logger.error("at_cone_sheet failed: Base diameter must be positive")
+            show_popup(loc.get("diameter_base_positive"), popup_type="error")
             return None
+
         if diameter_top < 0:
-            show_popup(loc.get("diameter_top_non_negative", "Диаметр вершины не может быть отрицательным."), popup_type="error")
-            logger.error("at_cone_sheet failed: Top diameter cannot be negative")
+            show_popup(loc.get("diameter_top_non_negative"), popup_type="error")
             return None
+
         if height <= 0:
-            show_popup(loc.get("height_positive", "Высота должна быть положительной."), popup_type="error")
-            logger.error("at_cone_sheet failed: Height must be positive")
+            show_popup(loc.get("height_positive"), popup_type="error")
             return None
+
+        # --- нормализация точки (КЛЮЧЕВОЕ ИЗМЕНЕНИЕ) ---
+        x0, y0 = _normalize_point_2d(input_point)
+
+        # --- упорядочивание диаметров ---
         if diameter_top > diameter_base:
             diameter_top, diameter_base = diameter_base, diameter_top
+
+        # --- геометрия (НЕ ТРОГАЕМ) ---
         k = 0.5 * math.sqrt(1 + height ** 2 * 4 / ((diameter_base - diameter_top) ** 2))
         R1 = diameter_base * k
         R2 = diameter_top * k
+
         theta = math.pi * diameter_base / R1
-        if math.isinf(theta) or math.isnan(theta):
-            show_popup(loc.get("invalid_result", "Недопустимый результат вычислений."), popup_type="error")
-            logger.error("at_cone_sheet failed: Invalid calculation result")
+
+        if any(map(lambda v: math.isinf(v) or math.isnan(v), [R1, R2, theta])):
+            show_popup(loc.get("invalid_result"), popup_type="error")
             return None
-        if R1 <= 0 or R2 < 0 or math.isinf(R1) or math.isnan(R1) or math.isinf(R2) or math.isnan(R2):
-            show_popup(loc.get("invalid_geometry", "Недопустимая геометрия конуса."), popup_type="error")
-            logger.error("at_cone_sheet failed: Invalid cone geometry")
+
+        if R1 <= 0 or R2 < 0:
+            show_popup(loc.get("invalid_geometry"), popup_type="error")
             return None
+
         half_theta = theta / 2
-        sin_half_theta = math.sin(half_theta)
-        cos_half_theta = math.cos(half_theta)
-        drs1 = R1 * sin_half_theta
-        drs2 = R2 * sin_half_theta
-        drc1 = R1 * cos_half_theta
-        drc2 = R2 * cos_half_theta
-        center = [input_point[0], input_point[1] - (R1 - (R1 - R2) / 2.0), 0.0] if isinstance(input_point, (list, tuple)) else [input_point.value[0], input_point.value[1] - (R1 - (R1 - R2) * 0.5), 0.0]
+        sin_half = math.sin(half_theta)
+        cos_half = math.cos(half_theta)
+
+        drs1 = R1 * sin_half
+        drs2 = R2 * sin_half
+        drc1 = R1 * cos_half
+        drc2 = R2 * cos_half
+
+        # --- центр (переписан, но формула та же) ---
+        center = [
+            x0,
+            y0 - (R1 - (R1 - R2) / 2.0),
+            0.0
+        ]
+
+        # --- точки (БЕЗ изменений) ---
         p1 = [center[0] + drs2, center[1] + drc2, 0.0]
         p2 = [center[0] + drs1, center[1] + drc1, 0.0]
         p3 = [center[0] - drs1, center[1] + drc1, 0.0]
         p4 = [center[0] - drs2, center[1] + drc2, 0.0]
+
+        # --- bulge ---
         bulge = math.tan(0.25 * theta)
+
         if math.isinf(bulge) or math.isnan(bulge):
-            show_popup(loc.get("invalid_bulge", "Недопустимое значение выпуклости."), popup_type="error")
-            logger.error("at_cone_sheet failed: Invalid bulge value")
+            show_popup(loc.get("invalid_bulge"), popup_type="error")
             return None
+
+        # --- ВАЖНО: убрали VARIANT ---
         points_list = [p1, p2, p3, p4]
-        points_variant = [ensure_point_variant(p) for p in points_list]
-        polyline = add_polyline(model, points_variant, layer_name, closed=True)
+
+        # теперь напрямую (через normalize внутри)
+        polyline = add_polyline(model, points_list, layer_name, closed=True)
+
         if polyline is None:
-            show_popup(loc.get("polyline_error", "Ошибка при создании полилинии."), popup_type="error")
-            logger.error("at_cone_sheet failed: Failed to create polyline")
             return None
+
+        # --- bulge (как было) ---
         polyline.SetBulge(1, bulge)
         polyline.SetBulge(3, -bulge)
-        input_point_variant = ensure_point_variant(input_point)
 
         return points_list, input_point, center, theta
-    except Exception as e:
-        show_popup(loc.get("cone_sheet_error", f"Ошибка построения развертки конуса: {str(e)}"), popup_type="error")
-        logger.error(f"at_cone_sheet failed: {str(e)}")
+
+    except Exception as err:
+        print(f"at_cone_sheet error: {err}")
+        show_popup(loc.get("cone_sheet_error", f"Ошибка: {err}"), popup_type="error")
         return None
 
 
 # -----------------------------
 # Основные методы
 # -----------------------------
-def _add_circle(model: Any, center: PointLike, radius: float,
-               layer_name: str = "0") -> Optional[Any]:
+def _add_circle(
+    model: Any,
+    center: PointLike,
+    radius: float,
+    layer_name: str = "0"
+) -> Optional[Any]:
     """
     Создаёт окружность в модельном пространстве.
 
+    Центр может быть:
+    - VARIANT
+    - list/tuple (x, y) или (x, y, z)
+
     Args:
-        model: Объект ModelSpace активного документа AutoCAD.
-        center: Координаты центра окружности (список, кортеж или VARIANT).
-        radius: Радиус окружности.
-        layer_name: Имя слоя для окружности.
+        model: Объект ModelSpace.
+        center: Центр окружности.
+        radius: Радиус.
+        layer_name: Имя слоя.
 
     Returns:
-        Optional[Any]: Объект окружности или None при ошибке.
+        Объект окружности или None при ошибке.
     """
     try:
-        circle = model.AddCircle(ensure_point_variant(center), radius)
+        # --- нормализация ---
+        x, y, z = _normalize_point_3d(center)
+
+        # --- COM ---
+        center_variant = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [x, y, z])
+
+        circle = model.AddCircle(center_variant, float(radius))
         circle.Layer = layer_name
+
         return circle
-    except Exception as e:
-        logger.error(f"add_circle failed: {str(e)}")
-        show_popup(loc.get("circle_error", f"Ошибка при создании окружности: {str(e)}"), popup_type="error")
+
+    except Exception as err:
+        print(f"_add_circle error: {err}")
+        show_popup(loc.get("circle_error", f"Ошибка при создании окружности: {err}"), popup_type="error")
         return None
 
 
-def _add_line(model: Any, point1: PointLike,
-             point2: PointLike,
-             layer_name: str = "0") -> Optional[Any]:
+def _add_line(
+    model: Any,
+    point1: PointLike,
+    point2: PointLike,
+    layer_name: str = "0"
+) -> Optional[Any]:
     """
     Создаёт линию в модельном пространстве.
 
+    Входные точки могут быть:
+    - VARIANT
+    - list/tuple (x, y) или (x, y, z)
+
+    Все точки нормализуются в (x, y, z), затем конвертируются в COM VARIANT.
+
     Args:
-        model: Объект ModelSpace активного документа AutoCAD.
-        point1: Начальная точка линии (список, кортеж или VARIANT).
-        point2: Конечная точка линии (список, кортеж или VARIANT).
-        layer_name: Имя слоя для линии.
+        model: Объект ModelSpace.
+        point1: Начальная точка.
+        point2: Конечная точка.
+        layer_name: Имя слоя.
 
     Returns:
-        Optional[Any]: Объект линии или None при ошибке.
+        Объект линии или None при ошибке.
     """
     try:
-        line = model.AddLine(ensure_point_variant(point1), ensure_point_variant(point2))
+        # --- нормализация ---
+        x1, y1, z1 = _normalize_point_3d(point1)
+        x2, y2, z2 = _normalize_point_3d(point2)
+
+        # --- COM ---
+        p1 = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [x1, y1, z1])
+        p2 = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [x2, y2, z2])
+
+        line = model.AddLine(p1, p2)
         line.Layer = layer_name
+
         return line
-    except Exception as e:
-        logger.error(f"add_line failed: {str(e)}")
-        show_popup(loc.get("line_error", f"Ошибка при создании линии: {str(e)}"), popup_type="error")
+
+    except Exception as err:
+        print(f"_add_line error: {err}")
+        show_popup(loc.get("line_error", f"Ошибка при создании линии: {err}"), popup_type="error")
         return None
 
 
 def _add_polyline(
     model: Any,
-    points: Union[VARIANT, List[VARIANT], List[tuple]],
+    points,
     layer_name: str = "0",
     closed: bool = True,
-    bulges: Optional[List[float]] = None
+    bulges: Optional[list] = None
 ) -> Optional[Any]:
     """
-    Создаёт легковесную полилинию в AutoCAD с опциональными значениями bulge.
+    СТАБИЛЬНЫЙ вариант LWPOLYLINE для AutoCAD COM.
 
-    Args:
-        model: Объект ModelSpace активного документа AutoCAD.
-        points: COM VARIANT с координатами вершин (x1, y1, x2, y2, ...) или список VARIANT-объектов
-                с точками [x, y, z], или список кортежей (x, y, [bulge]).
-        layer_name: Имя слоя для полилинии.
-        closed: Закрывать полилинию или нет (по умолчанию True).
-        bulges: Опциональный список значений bulge для каждого сегмента (используется, если points не содержит bulge).
-
-    Returns:
-        Optional[Any]: Объект полилинии или None при ошибке.
+    ВАЖНО:
+        - AddLightWeightPolyline принимает FLAT ARRAY
+        - bulge задаётся отдельно через SetBulge
     """
+
     try:
-        # Формируем плоский массив координат и извлекаем bulge, если есть
-        flat_points = []
-        extracted_bulges = []
+        norm_pts = _normalize_points(points)
 
-        if isinstance(points, VARIANT):
-            flat_points = list(points.value)
-            extracted_bulges = [0.0] * (len(flat_points) // 2)  # Нет bulge для VARIANT
-        elif isinstance(points, list) and all(isinstance(p, VARIANT) for p in points):
-            for point in points:
-                coords = point.value
-                if len(coords) < 2 or any(c is None or not isinstance(c, (int, float)) for c in coords[:2]):
-                    raise ValueError("Неправильные координаты точки")
-                flat_points.extend([float(coords[0]), float(coords[1])])
-            extracted_bulges = [0.0] * len(points)  # Нет bulge для списка VARIANT
-        elif isinstance(points, list) and all(isinstance(p, (list, tuple)) for p in points):
-            for pt in points:
-                flat_points.extend([float(pt[0]), float(pt[1])])
-                extracted_bulges.append(float(pt[2]) if len(pt) > 2 else 0.0)
-        else:
-            raise TypeError("Точки должны быть VARIANT, списком VARIANT или списком кортежей (x, y, [bulge])")
+        if len(norm_pts) < 2:
+            raise ValueError("Polyline requires at least 2 points")
 
-        # Используем предоставленный bulges, если есть, иначе extracted_bulges
-        final_bulges = bulges if bulges is not None else extracted_bulges
-        if len(final_bulges) != len(flat_points) // 2:
-            raise ValueError("Число значений bulge не соответствует числу точек")
+        n = len(norm_pts)
 
-        # Создаём полилинию
-        points_variant = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, flat_points)
-        polyline = model.AddLightWeightPolyline(points_variant)
-        polyline.Closed = closed
-        polyline.Layer = layer_name
+        # 1. FLAT координаты (ОБЯЗАТЕЛЬНО)
+        flat = []
+        for x, y, *_ in norm_pts:
+            flat.extend([float(x), float(y)])
 
-        # Устанавливаем bulge, если они есть
-        if any(b != 0.0 for b in final_bulges):
-            for i, bulge in enumerate(final_bulges):
-                polyline.SetBulge(i, float(bulge))
+        variant_points = VARIANT(
+            pythoncom.VT_ARRAY | pythoncom.VT_R8,
+            flat
+        )
 
-        return polyline
+        # 2. создаём LWPOLYLINE
+        pl = model.AddLightWeightPolyline(variant_points)
 
-    except Exception as e:
-        logger.error(f"add_polyline failed: {str(e)}")
-        show_popup(loc.get("polyline_error", f"Ошибка при создании полилинии: {str(e)}"), popup_type="error")
+        pl.Layer = layer_name
+        pl.Closed = closed
+
+        # 3. bulge (если есть)
+        if bulges:
+            for i, b in enumerate(bulges):
+                if i < n and abs(b) > 1e-12:
+                    pl.SetBulge(i, float(b))
+
+        # 4. закрытие: последняя дуга → первая
+        # (AutoCAD сам замыкает, но bulge нужно явно задать)
+        if closed and bulges and len(bulges) >= n:
+            pl.SetBulge(n - 1, float(bulges[n - 1]))
+
+        return pl
+
+    except Exception as err:
+        print(f"_add_polyline ERROR: {err}")
+
+        # ❗ ВАЖНО: не вызываем wx здесь
+        # иначе ты скрываешь реальную ошибку COM
         return None
 
 
 def _add_spline(
     model: Any,
-    points: Union[VARIANT, List[VARIANT], List[tuple]],
+    points,
     layer_name: str = "0",
     closed: bool = False
 ) -> Optional[Any]:
     """
     Создаёт сплайн в AutoCAD через заданные точки.
 
+    Вход:
+        points — любые:
+            - VARIANT (плоский массив x,y,z,...)
+            - список VARIANT
+            - список (x, y) или (x, y, z)
+            - смешанные типы
+
+    Все точки приводятся к:
+        [(x, y, z), ...]
+
     Args:
-        model: Объект ModelSpace активного документа AutoCAD.
-        points: COM VARIANT с координатами (x1, y1, z1, x2, y2, z2, ...),
-                список VARIANT-объектов с точками [x, y, z],
-                или список кортежей (x, y) или (x, y, z).
-        layer_name: Имя слоя для сплайна.
-        closed: Замкнуть сплайн или нет (по умолчанию True).
+        model: ModelSpace
+        points: точки сплайна
+        layer_name: слой
+        closed: замкнуть сплайн
 
     Returns:
-        Optional[Any]: COM-объект сплайна или None при ошибке.
+        Объект сплайна или None
     """
     try:
-        # Формируем плоский массив координат [x1, y1, z1, x2, y2, z2, ...]
-        flat_points = []
-        processed_points = []
+        norm: List[Tuple[float, float, float]] = []
+
+        # --- VARIANT (плоский массив) ---
         if isinstance(points, VARIANT):
-            coords = list(points.value)
-            if len(coords) % 3 != 0:
-                raise ValueError("Число координат в VARIANT должно быть кратно 3")
-            flat_points = [float(c) for c in coords]
-            processed_points = [[coords[i], coords[i+1], coords[i+2]] for i in range(0, len(coords), 3)]
-        elif isinstance(points, list) and all(isinstance(p, VARIANT) for p in points):
-            for point in points:
-                coords = point.value
-                flat_points.extend([float(coords[0]), float(coords[1]), float(coords[2]) if len(coords) > 2 else 0.0])
-                processed_points.append([float(coords[0]), float(coords[1]), float(coords[2]) if len(coords) > 2 else 0.0])
-        elif isinstance(points, list) and all(isinstance(p, (list, tuple)) for p in points):
-            for pt in points:
-                if len(pt) < 2:
-                    raise ValueError("Некорректные координаты точки в кортеже")
-                flat_points.extend([float(pt[0]), float(pt[1]), float(pt[2]) if len(pt) > 2 else 0.0])
-                processed_points.append([float(pt[0]), float(pt[1]), float(pt[2]) if len(pt) > 2 else 0.0])
+            data = list(points.value)
+
+            if len(data) % 3 != 0:
+                raise ValueError("VARIANT массив должен быть кратен 3 (x,y,z)")
+
+            for i in range(0, len(data), 3):
+                norm.append((
+                    float(data[i]),
+                    float(data[i + 1]),
+                    float(data[i + 2])
+                ))
+
+        # --- список ---
+        elif isinstance(points, (list, tuple)):
+            for p in points:
+                x, y, z = _normalize_point_3d(p)
+                norm.append((x, y, z))
+
         else:
-            raise TypeError("Точки должны быть VARIANT, списком VARIANT или списком кортежей (x, y, [z])")
+            raise TypeError("Неподдерживаемый формат points")
 
-        # Проверяем минимальное количество точек (минимум 2 точки для сплайна)
-        if len(flat_points) < 6:  # 2 точки * 3 координаты
-            raise ValueError("Для создания сплайна требуется минимум 2 точки")
+        # --- проверка ---
+        if len(norm) < 2:
+            raise ValueError("Для сплайна требуется минимум 2 точки")
 
-        # Если closed=True, проверяем совпадение первой и последней точек
-        if closed and len(processed_points) >= 2:
-            tol = 1e-6  # Допуск для совпадения точек
-            p0, p_last = processed_points[0], processed_points[-1]
-            if not (abs(p0[0] - p_last[0]) < tol and abs(p0[1] - p_last[1]) < tol and abs(p0[2] - p_last[2]) < tol):
-                # Добавляем первую точку в конец для замыкания
-                processed_points.append(p0)
-                flat_points.extend([p0[0], p0[1], p0[2]])
+        # --- замыкание ---
+        if closed:
+            p0 = norm[0]
+            plast = norm[-1]
 
-        # Отладочный вывод
-        print(f"Flat points (length={len(flat_points)}): {flat_points}")
+            tol = 1e-6
+            if not (
+                abs(p0[0] - plast[0]) < tol and
+                abs(p0[1] - plast[1]) < tol and
+                abs(p0[2] - plast[2]) < tol
+            ):
+                norm.append(p0)
 
-        # Создаём VARIANT для точек и касательных
-        points_variant = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, flat_points)
-        start_tangent = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [0.0, 0.0, 0.0])
-        end_tangent = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [0.0, 0.0, 0.0])
+        # --- flat массив ---
+        flat = []
+        for x, y, z in norm:
+            flat.extend([x, y, z])
 
-        # Создаём сплайн
-        spline = model.AddSpline(points_variant, start_tangent, end_tangent)
+        # --- COM ---
+        points_variant = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, flat)
+
+        # касательные (нулевые = AutoCAD сам рассчитает)
+        zero_vec = VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [0.0, 0.0, 0.0])
+
+        spline = model.AddSpline(points_variant, zero_vec, zero_vec)
         spline.Layer = layer_name
 
-        # Пытаемся установить Closed, если требуется
+        # --- попытка закрытия ---
         if closed:
             try:
                 spline.Closed = True
-            except Exception as e:
-                logger.warning(f"Failed to set spline.Closed: {str(e)}. Spline may already be closed or points are not coincident.")
-                # Продолжаем, так как сплайн уже создан
+            except RuntimeError:
+                # иногда AutoCAD не даёт установить — это нормально
+                pass
 
         return spline
 
-    except Exception as e:
-        logger.error(f"add_spline failed: {str(e)}")
-        show_popup(loc.get("spline_error", f"Ошибка при создании сплайна: {str(e)}"), popup_type="error")
+    except Exception as err:
+        print(f"_add_spline error: {err}")
+        show_popup(
+            loc.get("spline_error", f"Ошибка при создании сплайна: {err}"),
+            popup_type="error"
+        )
         return None
 
 
 def _add_rectangle(
     model: Any,
-    point: Union[List[float], tuple, VARIANT],
+    point: PointLike,
     width: float,
     height: float,
     layer_name: str = "0",
@@ -649,84 +837,119 @@ def _add_rectangle(
     radius: float = 0.0
 ) -> Optional[Any]:
     """
-    Создаёт прямоугольник в модельном пространстве.
-    Если radius > 0 — создаёт прямоугольник со скруглёнными углами.
+    Создаёт прямоугольник (обычный / со скруглением / с фасками).
+
+    Логика radius:
+        = 0   → обычный
+        > 0   → скругление (bulge)
+        < 0   → фаска 45° (длина = abs(radius))
 
     Args:
-        model: Объект ModelSpace.
-        point: Координаты базовой точки.
-        width: Ширина.
-        height: Высота.
-        layer_name: Слой.
-        point_direction: "left_bottom", "center" и т.д.
-        radius: Поведение углов (по умолчанию 0 — обычный прямоугольник), > 0 - скругление, < 0 - фаска
+        model: ModelSpace
+        point: базовая точка
+        width: ширина
+        height: высота
+        layer_name: слой
+        point_direction: положение базовой точки
+        radius: радиус или фаска
 
     Returns:
-        Объект LightWeightPolyline или None.
+        Polyline или None
     """
     try:
-        # Проверка на слишком большой радиус
-        if abs(radius) != 0 and radius * 2 >= min(width, height):
-            raise ValueError(f"Радиус {radius} слишком велик для размеров {width}x{height}")
+        # --- базовые точки (через существующую функцию) ---
+        rect_variant = add_rectangle_points(point, width, height, point_direction)
 
+        # нормализуем → [(x, y, 0)...]
+        norm = _normalize_points(rect_variant)
+
+        # извлекаем 4 угла
+        if len(norm) != 4:
+            raise ValueError("Ожидалось 4 точки прямоугольника")
+
+        p1, p2, p3, p4 = [(x, y) for x, y, _ in norm]
+
+        # ----------------------------------------
+        # 1. ОБЫЧНЫЙ ПРЯМОУГОЛЬНИК
+        # ----------------------------------------
         if radius == 0:
-            # === Обычный прямоугольник ===
-            points_variant = add_rectangle_points(point, width, height, point_direction)
-            polyline = add_polyline(model, points_variant, layer_name=layer_name, closed=True)
-            return polyline
+            return add_polyline(
+                model,
+                [p1, p2, p3, p4],
+                layer_name=layer_name,
+                closed=True
+            )
 
-        # === Скруглённый прямоугольник или с фасками===
-        # Получаем 4 угловые точки для вычисления центра и ориентации
-        temp_points = add_rectangle_points(point, width, height, point_direction)
-        coords = list(temp_points.value)  # [x1,y1, x2,y2, x3,y3, x4,y4]
+        # ----------------------------------------
+        # 2. СКРУГЛЕНИЕ (radius > 0)
+        # ----------------------------------------
+        if radius > 0:
+            r = float(radius)
 
-        # Вычисляем центр
-        cx = sum(coords[::2]) / 4.0
-        cy = sum(coords[1::2]) / 4.0
+            if r * 2 >= min(width, height):
+                raise ValueError(f"Радиус {r} слишком велик")
 
-        half_w = width / 2.0
-        half_h = height / 2.0
+            # bulge для 90°
+            bulge = math.tan(math.radians(90 / 4))
 
-        abs_radius = abs(radius)
+            pts = [
+                (p1[0] + r, p1[1]),
+                (p2[0] - r, p2[1]),
+                (p2[0], p2[1] + r),
+                (p3[0], p3[1] - r),
+                (p3[0] - r, p3[1]),
+                (p4[0] + r, p4[1]),
+                (p4[0], p4[1] - r),
+                (p1[0], p1[1] + r),
+            ]
 
-        # 8 точек + соответствующие им bulge (только для угловых сегментов)
+            bulges = [0.0, bulge, 0.0, bulge, 0.0, bulge, 0.0, bulge]
+
+            return add_polyline(
+                model,
+                pts,
+                layer_name=layer_name,
+                closed=True,
+                bulges=bulges
+            )
+
+        # ----------------------------------------
+        # 3. ФАСКА (radius < 0)
+        # ----------------------------------------
+        d = abs(radius)
+
+        if d * 2 >= min(width, height):
+            raise ValueError(f"Фаска {d} слишком велика")
+
+        # формируем 8 точек (по 2 на угол)
         pts = [
-            (cx - half_w + abs_radius, cy - half_h),  # 0: начало нижней стороны
-            (cx + half_w - abs_radius, cy - half_h),  # 1: → дуга
-            (cx + half_w, cy - half_h + abs_radius),  # 2: начало правой
-            (cx + half_w, cy + half_h - abs_radius),  # 3: → дуга
-            (cx + half_w - abs_radius, cy + half_h),  # 4: начало верхней
-            (cx - half_w + abs_radius, cy + half_h),  # 5: → дуга
-            (cx - half_w, cy + half_h - abs_radius),  # 6: начало левой
-            (cx - half_w, cy - half_h + abs_radius),  # 7: → дуга (замыкание)
+            (p1[0] + d, p1[1]),     # нижний левый → вправо
+            (p2[0] - d, p2[1]),     # нижний правый → влево
+            (p2[0], p2[1] + d),     # вверх
+            (p3[0], p3[1] - d),
+            (p3[0] - d, p3[1]),
+            (p4[0] + d, p4[1]),
+            (p4[0], p4[1] - d),
+            (p1[0], p1[1] + d),
         ]
 
-        # Bulge только для сегментов 1→2, 3→4, 5→6, 7→0 (индексы: 1,3,5,7)
-        if radius > 0:
-            bl = math.tan(math.radians(90 / 4))  # величина bulge = tan (90°/4)
-            bulges = [0.0, bl, 0.0, bl, 0.0, bl, 0.0, bl]
-        elif radius < 0:
-            # TODO логику рисования фаски
-            pass
-        else:
-            bulges = [0] * 8
+        # фаска — это просто прямые сегменты → bulge = 0
+        bulges = [0.0] * 8
 
-        # Передаём точки как список кортежей (x, y), а bulges отдельно
-        points_list = [(x, y) for x, y in pts]
-
-        polyline = add_polyline(
-            model=model,
-            points=points_list,
+        return add_polyline(
+            model,
+            pts,
             layer_name=layer_name,
             closed=True,
             bulges=bulges
         )
 
-        return polyline
-
-    except Exception as e:
-        logger.error(f"add_rectangle failed: {str(e)}")
-        show_popup(loc.get("rectangle_error", f"Ошибка при создании прямоугольника: {str(e)}"), popup_type="error")
+    except Exception as err:
+        print(f"_add_rectangle error: {err}")
+        show_popup(
+            loc.get("rectangle_error", f"Ошибка при создании прямоугольника: {err}"),
+            popup_type="error"
+        )
         return None
 
 
@@ -771,10 +994,58 @@ def _add_text(
             text_object.TextAlignmentPoint = point_variant
         text_object.Rotation = text_angle
         return text_object
-    except Exception as e:
-        logger.error(f"add_text failed: {str(e)}")
-        show_popup(loc.get("text_error", f"Ошибка при создании текста: {str(e)}"), popup_type="error")
+    except Exception as err:
+        logger.error(f"add_text failed: {str(err)}")
+        show_popup(loc.get("text_error", f"Ошибка при создании текста: {str(err)}"), popup_type="error")
         return None
+
+
+def rotate(obj, base, angle_deg):
+    """
+    Поворот объекта на заданный угол
+    Args:
+        obj: объект
+        base: точка поворота (вариант)
+        angle_deg: угол поворота в градусах
+    """
+    obj.Rotate(base, math.radians(angle_deg))
+
+
+def _add_slotted_hole(innen_length: float, height: float):
+    """
+    Геометрия продолговатого отверстия (slot)
+
+    Возвращает:
+        points, bulges
+    """
+
+    if innen_length <= 0 or height <= 0:
+        raise ValueError("Invalid slotted hole parameters")
+
+    r = height / 2.0
+    half = innen_length / 2.0
+
+    # точки (строго по часовой стрелке)
+    points = [
+        (-half, -r),  # 0
+        (-half,  r),  # 1 ← левая дуга
+        ( half,  r),  # 2
+        ( half, -r),  # 3 ← правая дуга
+    ]
+
+    # bulge на сегменты:
+    # 0→1 = дуга
+    # 1→2 = линия
+    # 2→3 = дуга
+    # 3→0 = линия
+    bulges = [
+        -1.0,  # 0→1 (левая полуокружность)
+        0.0,  # 1→2
+        -1.0,  # 2→3 (правая полуокружность)
+        0.0   # 3→0
+    ]
+
+    return points, bulges
 
 
 class AccompanyText:
@@ -853,11 +1124,11 @@ class MainText:
                     text_height=TEXT_HEIGHT_SMALL,
                     text_alignment=text_alignment
                     )
-            except KeyError as e:
-                show_popup(loc.get("text_error", f"Отсутствует ключ: {e}"), popup_type="error")
+            except KeyError as err:
+                show_popup(loc.get("text_error", f"Отсутствует ключ: {err}"), popup_type="error")
                 raise
-            except Exception as e:
-                show_popup(loc.get("text_error", f"Ошибка создания текста: {e}"), popup_type="error")
+            except Exception as err:
+                show_popup(loc.get("text_error", f"Ошибка создания текста: {err}"), popup_type="error")
                 raise
 
 
@@ -876,7 +1147,7 @@ def construction_batch(do_regen: bool = False):
     Контекст пакетного построения.
 
     Args:
-        regen: выполнить regen после завершения
+        do_regen: выполнить regen после завершения
     """
     prev_batch = CTX.batch_mode
     prev_regen = CTX.suppress_regen
@@ -895,7 +1166,7 @@ def construction_batch(do_regen: bool = False):
                 cad = ATCadInit()
                 if cad.is_initialized():
                     regen(cad.document)
-            except Exception:
+            except RuntimeError:
                 pass
 
 
@@ -903,38 +1174,56 @@ def maybe_regen(document):
     if not CTX.batch_mode and not CTX.suppress_regen:
         try:
             regen(document)
-        except Exception:
+        except RuntimeError:
             pass
 
 
-def _execute_construction(func, model: Any, *args, **kwargs):
+def _execute_construction(
+    func,
+    *args,
+    **kwargs
+) -> Any:
     """
-    Универсальный исполнитель построений:
-    - гарантирует наличие AutoCAD
-    - получает document/model при необходимости
-    - выполняет функцию
-    - управляет regen
+    Единая точка выполнения всех CAD-конструкций.
+
+    Контракт:
+        - функция должна либо вернуть объект
+        - либо выбросить исключение
+        - возврат None считается ошибкой
+
+    Args:
+        func: функция построения (line, polyline, spline и т.д.)
+        *args, **kwargs: параметры
+
+    Returns:
+        Результат выполнения func
+
+    Raises:
+        RuntimeError если результат None
     """
     try:
-        cad = ATCadInit()
+        result = func(*args, **kwargs)
 
-        if not cad.is_initialized():
-            raise RuntimeError(loc.get("autocad_not_running"))
+        # --- ЖЁСТКАЯ ПРОВЕРКА ---
+        if result is None:
+            raise RuntimeError(
+                f"{func.__name__} returned None (construction failed silently)"
+            )
 
-        document = cad.document
-        model = model or cad.model_space
+        return result
 
-        obj = func(model, *args, **kwargs)
+    except Exception as err:
+        # единый UX-вывод
+        print(f"[EXECUTION ERROR] {func.__name__}: {err}")
 
-        if obj is not None:
-            CTX.objects_created += 1
-            maybe_regen(document)
+        show_popup(
+            loc.get(
+                "execution_error",
+                f"Ошибка выполнения операции {func.__name__}: {err}"
+            ),
+            popup_type="error"
+        )
 
-        return obj
-
-    except Exception as e:
-        logger.error(f"{func.__name__} wrapper failed: {str(e)}")
-        show_popup(str(e), popup_type="error")
         return None
 
 # ------------------------------------------
@@ -955,7 +1244,11 @@ def add_circle(model: Any, center: PointLike, radius: float,
 
 def add_polyline(
     model: Any,
-    points: Union[VARIANT, List[VARIANT], List[tuple]],
+    points: Union[
+        VARIANT,
+        List[VARIANT],
+        Sequence[Sequence[float]]
+    ],
     layer_name: str = "0",
     closed: bool = True,
     bulges: Optional[List[float]] = None
@@ -964,11 +1257,12 @@ def add_polyline(
 
 def add_spline(
     model: Any,
-    points: Union[VARIANT, List[VARIANT], List[tuple]],
+    points: Union[VARIANT, Sequence[Sequence[float]]],
     layer_name: str = "0",
     closed: bool = True
 ) -> Optional[Any]:
     return _execute_construction(_add_spline, model, points, layer_name=layer_name, closed=closed)
+
 
 def add_rectangle(
     model: Any,
@@ -980,6 +1274,97 @@ def add_rectangle(
     radius: float = 0.0
 ) -> Optional[Any]:
     return _execute_construction(_add_rectangle, model, point, width, height, layer_name=layer_name, point_direction=point_direction, radius=radius)
+
+
+def add_slotted_hole(
+    model,
+    input_point,
+    innen_length: float,
+    height: float,
+    angle: float = 0.0,
+    direction: str = "center"
+):
+    """
+    Создание продолговатого отверстия в модели AutoCAD.
+
+    Этот слой отвечает за:
+        - позиционирование в модели
+        - поворот
+        - создание CAD-объекта
+        - вызов execution pipeline
+
+    Геометрия создаётся в локальной системе координат (_add_slotted_hole).
+
+    Args:
+        model: пространство модели AutoCAD
+        input_point: точка вставки (центр слота)
+        innen_length: внутренняя длина слота
+        height: диаметр отверстия
+        angle: угол поворота (в градусах)
+        direction: смещение относительно центра ("center", "left", "right")
+
+    Returns:
+        CAD объект полилинии или None
+    """
+
+    # -----------------------------
+    # 1. НОРМАЛИЗАЦИЯ ПОЛОЖЕНИЯ
+    # -----------------------------
+    x, y, *_ = input_point[0], input_point[1]
+
+    half_length = innen_length / 2.0
+
+    if direction == "left":
+        x += half_length
+    elif direction == "right":
+        x -= half_length
+    elif direction == "top":
+        y -= half_length
+    elif direction == "bottom":
+        y += half_length
+    elif direction != "center":
+        raise ValueError(f"Unknown direction: {direction}")
+
+    base_point = (x, y)
+
+    # -----------------------------
+    # 2. СОЗДАНИЕ ГЕОМЕТРИИ
+    # -----------------------------
+    points, bulges = _add_slotted_hole(innen_length, height)
+
+    # --- трансформация ---
+    transformed_points = [
+        (px + base_point[0], py + base_point[1])
+        for px, py in points
+    ]
+
+    # -----------------------------
+    # 3. СОЗДАНИЕ ОБЪЕКТА
+    # -----------------------------
+    obj = _execute_construction(
+        add_polyline,
+        model,
+        transformed_points,
+        closed=True,
+        bulges=bulges
+    )
+
+    if obj is None:
+        return None
+
+    # -----------------------------
+    # 4. ПОВОРОТ
+    # -----------------------------
+    if angle:
+        base = VARIANT(
+            pythoncom.VT_ARRAY | pythoncom.VT_R8,
+            [base_point[0], base_point[1], 0.0]
+        )
+
+        obj.Rotate(base, math.radians(angle))
+
+    return obj
+
 
 def add_text(
         model: Any,
@@ -1011,37 +1396,44 @@ if __name__ == "__main__":
         autocad_model = autocad.model_space
 
         # Запрашиваем точку у пользователя
-        input_point = at_get_point(autocad_document, prompt=loc.get("select_point", "Укажите центр окружности"))
+        test_input_point = at_get_point(autocad_document, prompt=loc.get("select_point", "Укажите центр окружности"))
 
-        if input_point:
+        if test_input_point:
             try:
                 # Вычисляем дополнительные точки с помощью полярных координат
-                point2 = polar_point(input_point, distance=400, alpha=90, as_variant=True)
-                point3 = polar_point(input_point, distance=400, alpha=60, as_variant=True)
-                point4 = polar_point(input_point, distance=400, alpha=120, as_variant=True)
+                test_point2 = polar_point(test_input_point, distance=400, alpha=90, as_variant=True)
+                test_point3 = polar_point(test_input_point, distance=400, alpha=60, as_variant=True)
+                test_point4 = polar_point(test_input_point, distance=400, alpha=120, as_variant=True)
 
                 # Создание текста
-                add_text(autocad_model, polar_point(input_point, distance=500, alpha=90, as_variant=True),
-                         loc.get("test_text", "Тестовый текст"))
+                # add_text(autocad_model, polar_point(test_input_point, distance=500, alpha=90, as_variant=True),
+                #          loc.get("test_text", "Тестовый текст"))
 
                 # Создание окружности
-                add_circle(autocad_model, input_point, 200, layer_name="AM_0")
+                add_circle(autocad_model, test_input_point, 200, layer_name="AM_0")
 
                 # Создание линии
-                add_line(autocad_model, input_point, point2, layer_name="AM_7")
+                # add_line(autocad_model, test_input_point, test_point2, layer_name="AM_7")
 
                 # Создание полилинии
-                polyline_points = [input_point, point3, point4]
-                add_polyline(autocad_model, polyline_points, layer_name="LASER-TEXT")
+                # test_pts = [test_input_point, test_point3, test_point4]
+                # add_polyline(autocad_model, test_pts, layer_name="LASER-TEXT")
 
 
                 # Создание прямоугольника
-                width, height = 500, 300
-                add_rectangle(autocad_model, input_point, width, height, layer_name="SF-TEXT")
-                end_point = offset_point(input_point, width, height)
+                # rec_width, rec_height = 500, 300
+                # add_rectangle(autocad_model, test_input_point, rec_width, rec_height, layer_name="SF-TEXT")
+                # end_point = offset_point(test_input_point, rec_width, rec_height)
+
+                # Продолговатое отверстие
+                il = float(input("Длина между осями отверстий\n"))
+                d = float(input("Диаметр отверстия\n"))
+                a = float(input("Угол поворота в градусах\n"))
+                direct = str(input("Направление (center/left/right/top/bottom)\n"))
+                add_slotted_hole(autocad_model, test_input_point, il, d, a, direction=direct)
 
                 # Размер
-                add_dimension(autocad_document, "H", input_point, end_point, offset=DEFAULT_DIM_OFFSET)
+                # add_dimension(autocad_document, "H", test_input_point, end_point, offset=DEFAULT_DIM_OFFSET)
 
                 # Обновляем экран
                 regen(autocad_document)

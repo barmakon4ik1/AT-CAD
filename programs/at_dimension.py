@@ -225,7 +225,7 @@ def _ensure_dimstyle_exists(adoc, style_name: str):
 def add_dimension(
     adoc,
     dim_type: str = None,
-    start_point: VARIANT = None,
+    start_point = None,
     end_point: VARIANT = None,
     leader_len: float = None,
     point3: VARIANT = None,
