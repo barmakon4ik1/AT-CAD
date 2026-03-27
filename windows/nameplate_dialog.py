@@ -42,7 +42,7 @@ TRANSLATIONS = {
         "en": "Delete selected name plate?",
         "de": "Ausgewähltes Typenschild löschen?",
     },
-    "field_name": {"ru": "Код", "en": "Code", "de": "Code"},
+    "field_name": {"ru": "Обозначение", "en": "Code", "de": "Code"},
     "field_remark": {"ru": "Примечание", "en": "Remark", "de": "Bemerkung"},
     "name_not_unique": {
         "ru": "Код уже существует",
@@ -55,10 +55,6 @@ loc.register_translations(TRANSLATIONS)
 # ----------------------------------------------------------------------
 # Фабрика панели
 # ----------------------------------------------------------------------
-
-# def create_window(parent: wx.Window) -> wx.Panel:
-#     return NamePlateContentPanel(parent)
-
 def create_window(parent: wx.Window) -> Optional[str]:
     dlg = NamePlateDialog(parent)
     result = dlg.ShowModal()
