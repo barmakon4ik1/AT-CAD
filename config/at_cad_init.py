@@ -12,13 +12,15 @@
 ✔ Безопасные вызовы COM через safe_call
 ✔ Удобная работа с ModelSpace и слоями
 ✔ Не конвертирует точки в VARIANT автоматически — используем списки координат
+✔ Переподключение к AutoCAD через reconnect()
 """
 
-import os
 import time
 import logging
 from contextlib import contextmanager
-from typing import Optional, Callable, Any
+from pathlib import Path
+from typing import Optional, Callable, Any, Generator
+
 import pythoncom
 import win32com.client
 
@@ -66,29 +68,34 @@ TRANSLATIONS = {
 loc.register_translations(TRANSLATIONS)
 
 # ============================================================
+# ЛОГИРОВАНИЕ
+# Именованный logger — не перебивает корневой basicConfig.
+# pathlib.Path — единообразно с остальным проектом.
+# ============================================================
+
+LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE = LOG_DIR / "at_cad_init.log"
+
+logger = logging.getLogger("at_cad_init")
+
+if not logger.handlers:
+    _handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
+    _handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+    logger.addHandler(_handler)
+    logger.setLevel(logging.INFO)
+
+# ============================================================
 # КОНСТАНТЫ
 # ============================================================
 
-DOC_WAIT_TIMEOUT = 15      # время ожидания документа
-IDLE_WAIT_TIMEOUT = 10     # время ожидания окончания команд
-RETRY_DELAY = 0.1          # задержка между попытками COM
-RPC_E_CALL_REJECTED = -2147418111  # HRESULT для RPC_E_CALL_REJECTED
+DOC_WAIT_TIMEOUT: float = 15.0
+IDLE_WAIT_TIMEOUT: float = 10.0
+RETRY_DELAY: float = 0.1
+RPC_E_CALL_REJECTED: int = -2147418111  # HRESULT для RPC_E_CALL_REJECTED
 
-# ============================================================
-# ЛОГИРОВАНИЕ
-# ============================================================
-
-LOG_DIR = os.path.join(os.path.dirname(__file__), "..", "logs")
-os.makedirs(LOG_DIR, exist_ok=True)
-
-LOG_FILE = os.path.join(LOG_DIR, "at_cad_init.log")
-
-logging.basicConfig(
-    filename=LOG_FILE,
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    encoding="utf-8"
-)
+# Тип для COM-исключений, которые ловим повсюду
+_COM_ERRORS = (OSError, pythoncom.com_error, AttributeError)
 
 # ============================================================
 # COM RETRY WRAPPER
@@ -96,57 +103,68 @@ logging.basicConfig(
 
 class COMRetryWrapper:
     """
-    Безопасная обёртка COM:
+    Прозрачная обёртка COM-объекта.
 
     ✔ retry при RPC_E_CALL_REJECTED
     ✔ корректно работает с COM свойствами и методами
-    ✔ НЕ использует callable() (это важно!)
+    ✔ __setattr__ проксирует присвоение на COM-объект
+
+    Намеренно НЕ использует __slots__ — это позволяет избежать
+    ложных предупреждений PyCharm о read-only атрибутах COM-объектов,
+    которые устанавливаются через переопределённый __setattr__.
     """
 
-    def __init__(self, com_obj):
-        self._com_obj = com_obj
+    def __init__(self, com_obj: Any) -> None:
+        # Обходим __setattr__, чтобы не уйти в рекурсию
+        object.__setattr__(self, "_com_obj", com_obj)
 
-    def __getattr__(self, item):
+    def __getattr__(self, item: str) -> Any:
         """
-        Ленивый доступ к COM:
-
-        ВАЖНО:
-        - сначала пробуем получить значение
-        - если это метод — возвращаем callable wrapper
-        - если это COM объект — оборачиваем
+        Ленивый доступ к COM-атрибуту с retry:
+        - COM-объект  → оборачиваем рекурсивно
+        - callable    → оборачиваем вызов в retry
+        - примитив    → возвращаем как есть
         """
+        com_obj = object.__getattribute__(self, "_com_obj")
+        value = COMRetryWrapper._retry(lambda: getattr(com_obj, item))
 
-        def getter():
-            return getattr(self._com_obj, item)
-
-        value = self._retry(getter)
-
-        # Если это COM объект — оборачиваем
         if hasattr(value, "_oleobj_"):
             return COMRetryWrapper(value)
 
-        # Если это вызываемый объект (метод)
         if callable(value):
-            def method(*args, **kwargs):
-                return self._retry(lambda: value(*args, **kwargs))
+            def method(*args: Any, **kwargs: Any) -> Any:
+                return COMRetryWrapper._retry(lambda: value(*args, **kwargs))
             return method
 
-        # обычное значение
         return value
 
-    def _retry(self, func, retries: int = 50, delay: float = RETRY_DELAY):
+    def __setattr__(self, item: str, value: Any) -> None:
+        """Проксирует присвоение атрибута на COM-объект."""
+        if item == "_com_obj":
+            object.__setattr__(self, item, value)
+        else:
+            com_obj = object.__getattribute__(self, "_com_obj")
+            setattr(com_obj, item, value)
+
+    @staticmethod
+    def _retry(func: Callable, retries: int = 50, delay: float = RETRY_DELAY) -> Any:
+        """
+        Повторяет вызов func при RPC_E_CALL_REJECTED.
+        Прочие COM-ошибки пробрасываются немедленно.
+        getattr(e, 'hresult') вместо e.hresult — stub-файлы pythoncom
+        не объявляют этот атрибут явно, что даёт ложное предупреждение PyCharm.
+        """
         for _ in range(retries):
             try:
                 pythoncom.PumpWaitingMessages()
                 return func()
-
             except pythoncom.com_error as e:
-                if e.hresult == RPC_E_CALL_REJECTED:
+                if getattr(e, "hresult", None) == RPC_E_CALL_REJECTED:
                     time.sleep(delay)
                     continue
                 raise
+        raise TimeoutError("COM retry timeout: AutoCAD не отвечает")
 
-        raise TimeoutError("COM retry timeout")
 
 # ============================================================
 # ATCADINIT
@@ -154,114 +172,41 @@ class COMRetryWrapper:
 
 class ATCadInit:
     """
-    Singleton для инициализации AutoCAD через COM.
+    Singleton для инициализации и работы с AutoCAD через COM.
 
-    Использует COMRetryWrapper для автоматического ретрая вызовов,
-    безопасный доступ к ActiveDocument и ModelSpace.
+    Для переподключения к AutoCAD после его перезапуска:
+        ATCadInit.reconnect()
     """
 
     _instance: Optional["ATCadInit"] = None
 
-    def __new__(cls):
+    def __new__(cls) -> "ATCadInit":
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialize()
+            instance = super().__new__(cls)
+            instance._initialize()
+            cls._instance = instance
         return cls._instance
 
-    # =========================================================
-    # ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
-    # =========================================================
-
-    def safe_call(self,
-                  func: Callable,
-                  default: Any = None,
-                  log: bool = True) -> Any:
+    def __init__(self) -> None:
         """
-        Упрощённый safe_call:
-
-        ✔ БЕЗ retry (его делает COMRetryWrapper)
-        ✔ Только защита и логирование
-        ✔ Используется как безопасный guard
-
-        ВАЖНО:
-        func должен быть ЛЯМБДОЙ:
-            lambda: self.adoc.ModelSpace
+        Объявляет атрибуты экземпляра для статического анализа PyCharm.
+        Реальная инициализация — в _initialize(), вызываемой из __new__.
+        hasattr-защита предотвращает сброс атрибутов при повторных ATCadInit().
         """
+        if not hasattr(self, "acad"):
+            self.acad: Optional[COMRetryWrapper] = None
+            self.adoc: Optional[COMRetryWrapper] = None
+            self.model: bool = False
+            self.original_layer: Any = None
 
-        try:
-            return func()
-
-        except Exception as e:
-            if log:
-                logging.error(f"COM safe_call error: {e}")
-            return default
-
-    def _wait_for_document(self) -> bool:
+    @classmethod
+    def reconnect(cls) -> "ATCadInit":
         """
-        Ожидаем появления документа.
-
-        Учитываем:
-        ✔ Documents.Count
-        ✔ ActiveDocument fallback
+        Сбрасывает Singleton и создаёт новое подключение к AutoCAD.
+        Вызывать, если AutoCAD был перезапущен после старта AT-CAD.
         """
-
-        start = time.time()
-
-        while time.time() - start < DOC_WAIT_TIMEOUT:
-            try:
-                # основной путь
-                if self.acad.Documents.Count > 0:
-                    return True
-            except Exception:
-                pass
-
-            # fallback
-            try:
-                doc = self.acad.ActiveDocument
-                if doc:
-                    return True
-            except Exception:
-                pass
-
-            time.sleep(0.2)
-
-        return False
-
-    def _wait_idle(self) -> bool:
-        """
-        Ожидание окончания команд (CMDACTIVE=0)
-        """
-
-        start = time.time()
-
-        while time.time() - start < IDLE_WAIT_TIMEOUT:
-            cmd_active = self.safe_call(
-                lambda: self.adoc.GetVariable("CMDACTIVE"),
-                default=1
-            )
-
-            if cmd_active == 0:
-                return True
-
-            pythoncom.PumpWaitingMessages()
-            time.sleep(0.1)
-
-        return False
-
-    def _ensure_model_space(self):
-        """Переключение в ModelSpace."""
-        try:
-            if self.adoc.ActiveSpace != 1:
-                self.adoc.ActiveSpace = 1
-                time.sleep(0.05)
-        except Exception as e:
-            logging.warning(f"Не удалось переключиться в ModelSpace: {e}")
-
-    def unwrap(self, obj):
-        """Возвращает сырой COM-объект. Это нужно для, например, информации о геометрии"""
-        if hasattr(obj, "_com_obj"):
-            return obj._com_obj
-        return obj
+        cls._instance = None
+        return cls()
 
     # =========================================================
     # ИНИЦИАЛИЗАЦИЯ
@@ -269,106 +214,190 @@ class ATCadInit:
 
     def _initialize(self) -> None:
         """
-        Инициализация AutoCAD через COM.
-
-        ✔ Только подключение к существующему экземпляру
-        ❌ НЕ запускает AutoCAD
+        Подключается к уже запущенному AutoCAD через COM.
+        Не запускает AutoCAD самостоятельно.
         """
-
         self.acad = None
         self.adoc = None
         self.model = False
         self.original_layer = None
 
-        # --------------------------------------------------------
-        # ТОЛЬКО GetActiveObject
-        # --------------------------------------------------------
         try:
             raw = win32com.client.GetActiveObject("AutoCAD.Application")
             self.acad = COMRetryWrapper(raw)
-
-            logging.info("Подключено к запущенному AutoCAD")
-
-        except Exception:
-            logging.warning(loc.get("cad_not_ready"))
+            logger.info("Подключено к запущенному AutoCAD")
+        except (OSError, pythoncom.com_error):
+            logger.warning(loc.get("cad_not_ready"))
             return
 
-        # --------------------------------------------------------
-        # ДАЛЬШЕ КАК БЫЛО
-        # --------------------------------------------------------
         if not self._wait_for_document():
-            logging.warning(loc.get("no_documents"))
+            logger.warning(loc.get("no_documents"))
             return
 
         try:
             self.adoc = self.acad.ActiveDocument
-        except Exception as e:
-            logging.error(f"ActiveDocument error: {e}")
+        except pythoncom.com_error as e:
+            logger.error(f"ActiveDocument error: {e}")
             return
 
         if not self._wait_idle():
-            logging.warning(loc.get("cad_not_ready"))
+            logger.warning(loc.get("cad_not_ready"))
             return
 
         self.model = True
-
-        try:
-            self.original_layer = self.adoc.ActiveLayer
-        except Exception:
-            self.original_layer = None
+        self.original_layer = self._safe_call(lambda: self.adoc.ActiveLayer)
 
         self._post_init_document()
-        logging.info(loc.get("cad_init_success"))
+        logger.info(loc.get("cad_init_success"))
+
+    # =========================================================
+    # ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
+    # =========================================================
+
+    @staticmethod
+    def _safe_call(func: Callable, default: Any = None) -> Any:
+        """
+        Тихий guard: возвращает default при ошибке, не логирует.
+        Используется внутри класса для некритичных COM-обращений.
+        """
+        try:
+            return func()
+        except _COM_ERRORS:
+            return default
+
+    def safe_call(self,
+                  func: Callable,
+                  default: Any = None,
+                  log: bool = True) -> Any:
+        """
+        Публичный guard: возвращает default при ошибке, опционально логирует.
+        func должен быть лямбдой: lambda: self.adoc.ModelSpace
+        """
+        try:
+            return func()
+        except _COM_ERRORS as e:
+            if log:
+                logger.error(f"COM safe_call error: {e}")
+            return default
+
+    def _wait_for_document(self) -> bool:
+        """Ожидает появления хотя бы одного открытого документа."""
+        start = time.monotonic()
+        while time.monotonic() - start < DOC_WAIT_TIMEOUT:
+            if self._safe_call(lambda: self.acad.Documents.Count, default=0) > 0:
+                return True
+            if self._safe_call(lambda: self.acad.ActiveDocument) is not None:
+                return True
+            time.sleep(0.2)
+        return False
+
+    def _wait_idle(self) -> bool:
+        """Ждёт, пока AutoCAD не завершит активную команду (CMDACTIVE=0)."""
+        start = time.monotonic()
+        while time.monotonic() - start < IDLE_WAIT_TIMEOUT:
+            cmd_active = self._safe_call(
+                lambda: self.adoc.GetVariable("CMDACTIVE"),
+                default=1
+            )
+            if cmd_active == 0:
+                return True
+            pythoncom.PumpWaitingMessages()
+            time.sleep(0.1)
+        return False
+
+    def _ensure_model_space(self) -> None:
+        """Переключает активное пространство в ModelSpace (acSpace=1)."""
+        try:
+            if self.adoc.ActiveSpace != 1:
+                self.adoc.ActiveSpace = 1
+                time.sleep(0.05)
+        except _COM_ERRORS as e:
+            logger.warning(f"Не удалось переключиться в ModelSpace: {e}")
+
+    def _is_com_alive(self) -> bool:
+        """
+        Проверяет живость COM-соединения лёгким вызовом.
+        Возвращает False, если AutoCAD был закрыт.
+        """
+        return self._safe_call(lambda: self.acad.Version) is not None
+
+    @staticmethod
+    def unwrap(obj: Any) -> Any:
+        """
+        Возвращает сырой COM-объект из COMRetryWrapper.
+        Нужно для прямого доступа к геометрии объектов.
+        """
+        if isinstance(obj, COMRetryWrapper):
+            return object.__getattribute__(obj, "_com_obj")
+        return obj
 
     # =========================================================
     # ДОКУМЕНТ
     # =========================================================
 
     def refresh_active_document(self) -> bool:
-        """Обновление ActiveDocument, если пользователь сменил документ."""
+        """
+        Обновляет adoc, если пользователь переключился на другой документ.
+        Сравнение по имени — надёжнее, чем == на COM-объектах.
+        """
         if not self.acad:
             return False
 
-        current_doc = self.safe_call(lambda: self.acad.ActiveDocument)
-        if not current_doc:
+        current_doc = self._safe_call(lambda: self.acad.ActiveDocument)
+        if current_doc is None:
             self.adoc = None
             self.model = False
             return False
 
-        changed = self.adoc != current_doc
-        if changed:
+        current_name = self._safe_call(lambda: current_doc.Name)
+        existing_name = self._safe_call(lambda: self.adoc.Name) if self.adoc else None
+
+        if current_name != existing_name:
             self.adoc = current_doc
-            self.original_layer = self.safe_call(lambda: self.adoc.ActiveLayer)
-            logging.info(f"Активный документ: {self.adoc.Name}")
+            self.original_layer = self._safe_call(lambda: self.adoc.ActiveLayer)
+            logger.info(f"Активный документ изменён: {current_name}")
             self._post_init_document()
+
         return True
 
     # =========================================================
-    # ЛОГИКА СЛОЕВ
+    # СЛОИ
     # =========================================================
 
     def _create_layers(self) -> bool:
-        """Создание слоёв из конфигурации LAYER_DATA."""
+        """
+        Создаёт слои из LAYER_DATA, если они ещё не существуют.
+
+        Цвет устанавливается через layer.color = ACI-индекс напрямую.
+        Имя захватывается по значению (n=name) — защита от ловушки замыкания.
+        Явные int()/str() касты устраняют предупреждения PyCharm о типе 'object'
+        из-за сигнатуры LAYER_DATA: list[dict[str, object]].
+        """
+        if not self.adoc:
+            return False
+
         try:
             layers = self.adoc.Layers
-            for layer in LAYER_DATA:
-                name = layer["name"]
 
-                existing = self.safe_call(lambda: layers.Item(name), default=None)
-
-                if existing:
+            for layer_def in LAYER_DATA:
+                name: str = str(layer_def["name"])
+                existing = self._safe_call(lambda n=name: layers.Item(n))
+                if existing is not None:
                     continue
 
                 new_layer = layers.Add(name)
-                # Установка цвета через TrueColor (устойчиво)
-                color_value = layer["color"]
+                new_layer.color = int(layer_def.get("color", 7))  # type: ignore[arg-type]
 
-                color = new_layer.TrueColor
-                color.SetRGB(color_value, color_value, color_value)
+                linetype: str = str(layer_def.get("linetype", "CONTINUOUS"))
+                try:
+                    new_layer.Linetype = linetype
+                except _COM_ERRORS:
+                    pass  # тип линии может отсутствовать в шаблоне — не критично
 
             return True
-        except Exception as e:
-            logging.error(str(e))
+
+        except _COM_ERRORS as e:
+            logger.error(f"_create_layers: {e}")
             show_popup(
                 loc.get("create_layer_error").format(error=str(e)),
                 popup_type="error"
@@ -379,15 +408,16 @@ class ATCadInit:
     # ШРИФТ
     # =========================================================
 
-    def _set_text_style(self, font_name: str,
+    def _set_text_style(self,
+                        font_name: str,
                         bold: bool = False,
                         italic: bool = False) -> None:
-        """Установка шрифта ActiveTextStyle."""
+        """Устанавливает шрифт для ActiveTextStyle."""
         try:
             style = self.adoc.ActiveTextStyle
             style.SetFont(font_name, bool(bold), bool(italic), 0, 0)
-        except Exception as e:
-            logging.error(str(e))
+        except _COM_ERRORS as e:
+            logger.error(f"_set_text_style: {e}")
             show_popup(
                 loc.get("text_style_error").format(error=str(e)),
                 popup_type="error"
@@ -397,99 +427,123 @@ class ATCadInit:
     # POST-INIT
     # =========================================================
 
-    def _post_init_document(self):
-        """Применение конфигурации документа: слои, шрифт, восстановление слоя '0'."""
+    def _post_init_document(self) -> None:
+        """Применяет конфигурацию к документу: слои, шрифт, сброс на слой '0'."""
+        if not self.adoc:
+            return
         try:
             self._wait_idle()
             self._create_layers()
             self._set_text_style(TEXT_FONT, TEXT_BOLD, TEXT_ITAL)
-            # вернуть слой "0"
-            layer0 = self.safe_call(lambda: self.adoc.Layers.Item("0"))
-            if layer0:
-                self.safe_call(lambda: setattr(self.adoc, "ActiveLayer", layer0))
-        except Exception as e:
-            logging.error(f"Post init error: {e}")
+
+            layer0 = self._safe_call(lambda: self.adoc.Layers.Item("0"))
+            if layer0 is not None:
+                self.adoc.ActiveLayer = layer0
+
+        except _COM_ERRORS as e:
+            logger.error(f"_post_init_document: {e}")
 
     # =========================================================
-    # API
+    # PUBLIC API
     # =========================================================
 
     @property
-    def application(self):
+    def application(self) -> Optional[COMRetryWrapper]:
         return self.acad if self.is_initialized() else None
 
     @property
-    def document(self):
+    def document(self) -> Optional[COMRetryWrapper]:
         return self.adoc if self.is_initialized() else None
 
     @property
-    def model_space(self):
+    def model_space(self) -> Optional[COMRetryWrapper]:
         if not self.acad or not self.refresh_active_document():
             return None
         self._ensure_model_space()
-        return self.safe_call(lambda: self.adoc.ModelSpace)
+        return self._safe_call(lambda: self.adoc.ModelSpace)
 
     def is_initialized(self) -> bool:
-        return self.acad is not None and self.adoc is not None
+        """Проверяет not None и живость COM-соединения."""
+        if self.acad is None or self.adoc is None:
+            return False
+        return self._is_com_alive()
 
-    def restore_original_layer(self):
-        if self.original_layer and self.adoc:
-            self.adoc.ActiveLayer = self.original_layer
+    def restore_original_layer(self) -> None:
+        """Восстанавливает слой, активный до начала построения."""
+        if self.original_layer is not None and self.adoc is not None:
+            try:
+                self.adoc.ActiveLayer = self.original_layer
+            except _COM_ERRORS as e:
+                logger.warning(f"restore_original_layer: {e}")
 
     @contextmanager
-    def cad_transaction(self, layer: Optional[str] = None, regen: bool = True):
+    def cad_transaction(self,
+                        layer: Optional[str] = None,
+                        regen: bool = True) -> Generator[None, None, None]:
         """
-        Контекст безопасной работы с AutoCAD:
-        - Переключает слой (если задан)
-        - Возвращает исходный слой
-        - Делает regen по завершению
+        Контекстный менеджер для безопасной работы с AutoCAD:
+        - переключает активный слой (если задан)
+        - гарантирует возврат исходного слоя после выхода
+        - делает Regen по завершению (если regen=True)
+
+        Использование:
+            with cad.cad_transaction(layer="schrift"):
+                # рисуем
         """
         if not self.is_initialized():
             yield
             return
 
         self.refresh_active_document()
-        prev_layer = self.safe_call(lambda: self.adoc.ActiveLayer)
+        prev_layer = self._safe_call(lambda: self.adoc.ActiveLayer)
 
         try:
             if layer:
-                if not self.safe_call(lambda: self.adoc.Layers.Item(layer)):
+                target = self._safe_call(lambda: self.adoc.Layers.Item(layer))
+                if target is None:
                     self._create_layers()
-                try:
-                    self.adoc.ActiveLayer = self.adoc.Layers.Item(layer)
-                except Exception as e:
-                    logging.warning(f"Layer switch failed: {e}")
+                    target = self._safe_call(lambda: self.adoc.Layers.Item(layer))
+                if target is not None:
+                    try:
+                        self.adoc.ActiveLayer = target
+                    except _COM_ERRORS as e:
+                        logger.warning(f"cad_transaction layer switch: {e}")
             yield
+
         finally:
-            if prev_layer:
+            if prev_layer is not None:
                 try:
                     self.adoc.ActiveLayer = prev_layer
-                except Exception:
+                except _COM_ERRORS:
                     pass
             if regen:
                 try:
                     self.adoc.Regen(0)
-                except Exception:
+                except _COM_ERRORS:
                     pass
 
-    def safe_add(self, func: Callable, *args) -> Optional[Any]:
-        """Безопасное создание объектов в ModelSpace."""
+    def safe_add(self, func: Callable, *args: Any) -> Optional[Any]:
+        """
+        Безопасно создаёт объект в ModelSpace.
+        func(model, *args) — принимает ModelSpace первым аргументом.
+        """
         if not self.is_initialized():
             return None
         model = self.model_space
-        if not model:
+        if model is None:
             return None
         return self.safe_call(lambda: func(model, *args))
 
-    def regen_doc(self, mode: int = 0):
+    def regen_doc(self, mode: int = 0) -> None:
         """Принудительная регенерация документа."""
         if not self.is_initialized():
             return
         try:
             self.adoc.Regen(mode)
-            logging.info("Регенерация документа успешна")
-        except Exception as e:
-            logging.error(f"Регенерация провалена: {e}")
+            logger.info("Регенерация документа выполнена")
+        except _COM_ERRORS as e:
+            logger.error(f"regen_doc: {e}")
+
 
 # ============================================================
 # ТЕСТ
@@ -497,8 +551,8 @@ class ATCadInit:
 
 if __name__ == "__main__":
     import wx
-    app = wx.App(False)
 
+    app = wx.App(False)
     cad = ATCadInit()
 
     if not cad.is_initialized():
