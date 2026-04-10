@@ -1081,3 +1081,9 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+"""
+Сборка exe с иконкой:
+pyinstaller --noconfirm --clean --onefile --windowed --icon=kfinder.ico --name=kfinder kfinder_gui.py
+"""
