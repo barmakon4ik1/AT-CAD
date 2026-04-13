@@ -671,13 +671,12 @@ def _add_polyline(
     bulges: Optional[list] = None
 ) -> Optional[Any]:
     """
-    СТАБИЛЬНЫЙ вариант LWPOLYLINE для AutoCAD COM.
+    Создаёт LWPOLYLINE через AutoCAD COM.
 
-    ВАЖНО:
-        - AddLightWeightPolyline принимает FLAT ARRAY
-        - bulge задаётся отдельно через SetBulge
+    Поддерживает два способа задания bulge:
+    1. отдельным списком bulges=[...]
+    2. внутри точек [(x, y, bulge), ...]
     """
-
     try:
         norm_pts = _normalize_points(points)
 
@@ -686,40 +685,40 @@ def _add_polyline(
 
         n = len(norm_pts)
 
-        # 1. FLAT координаты (ОБЯЗАТЕЛЬНО)
+        # flat-массив координат для AddLightWeightPolyline
         flat = []
-        for x, y, *_ in norm_pts:
-            flat.extend([float(x), float(y)])
+        embedded_bulges = []
+
+        for item in norm_pts:
+            x = float(item[0])
+            y = float(item[1])
+            b = float(item[2]) if len(item) > 2 else 0.0
+
+            flat.extend([x, y])
+            embedded_bulges.append(b)
 
         variant_points = VARIANT(
             pythoncom.VT_ARRAY | pythoncom.VT_R8,
             flat
         )
 
-        # 2. создаём LWPOLYLINE
         pl = model.AddLightWeightPolyline(variant_points)
-
         pl.Layer = layer_name
         pl.Closed = closed
 
-        # 3. bulge (если есть)
-        if bulges:
-            for i, b in enumerate(bulges):
-                if i < n and abs(b) > 1e-12:
-                    pl.SetBulge(i, float(b))
+        # приоритет у явного списка bulges,
+        # иначе используем bulge из самих вершин
+        effective_bulges = bulges if bulges is not None else embedded_bulges
 
-        # 4. закрытие: последняя дуга → первая
-        # (AutoCAD сам замыкает, но bulge нужно явно задать)
-        if closed and bulges and len(bulges) >= n:
-            pl.SetBulge(n - 1, float(bulges[n - 1]))
+        if effective_bulges:
+            for i, b in enumerate(effective_bulges[:n]):
+                if abs(float(b)) > 1e-12:
+                    pl.SetBulge(i, float(b))
 
         return pl
 
     except Exception as err:
         print(f"_add_polyline ERROR: {err}")
-
-        # ❗ ВАЖНО: не вызываем wx здесь
-        # иначе ты скрываешь реальную ошибку COM
         return None
 
 
@@ -809,12 +808,12 @@ def _add_spline(
         spline.Layer = layer_name
 
         # --- попытка закрытия ---
-        if closed:
-            try:
-                spline.Closed = True
-            except RuntimeError:
-                # иногда AutoCAD не даёт установить — это нормально
-                pass
+        # if closed:
+        #     try:
+        #         spline.Closed = True
+        #     except RuntimeError:
+        #         # иногда AutoCAD не даёт установить — это нормально
+        #         pass
 
         return spline
 

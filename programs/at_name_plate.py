@@ -20,6 +20,7 @@ File: programs\at_name_plate.py
 from __future__ import annotations
 import json
 import math
+from pprint import pprint
 from typing import Dict, List, Optional
 
 from win32com.client import CDispatch
