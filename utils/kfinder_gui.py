@@ -135,9 +135,12 @@ TXT = {
     "about_title":             "Info",
     "about_text":              (
         "K-Finder\n\n"
-        "Suche nach Auftragsordnern und zugehörigen Dokumenten.\n\n"
+        "Das Programm ermöglicht das schnelle Navigieren\n"
+        "zu einem Dokumentenordner und das Öffnen einer\n"
+        "DWG-Zeichnung.\n"
+        "Es durchsucht sowohl die Bestellnummer als auch die Seriennummer.\n\n"
         "Autor: A. Tutubalin\n"
-        "Version: 2.0\n"
+        "Version: 3.0\n"
         "© 2026"
     ),
     "update_data":             "Daten aktualisieren",
@@ -190,6 +193,24 @@ TXT = {
     "service_rebuild_error": "Fehler bei der Neuindizierung",
     "status_start_update": "Automatische Aktualisierung beim Start…",
     "status_ready_short": "Bereit.",
+    "input_hint": "Suchtyp und Nummer eingeben:",
+    "search_type_label": "Typ:",
+    "search_mode_k": "K",
+    "search_mode_dxf": "DXF",
+    "search_mode_app": "App. Nr.",
+
+    "msg_mode_not_supported": "Diese Aktion ist für den gewählten Suchtyp nicht verfügbar.",
+    "msg_dxf_input_error": "Zulässige Eingabe: nur DXF-Nummer, z. B. 11601.",
+    "msg_dxf_not_found_title": "DXF nicht gefunden",
+    "msg_dxf_not_found": "Für DXF '{query}' wurden keine Daten gefunden.",
+
+    "msg_app_input_error": "Zulässige Eingabe: Apparate-Nr. oder deren Präfix, z. B. 1234 oder 1234.1-2.",
+    "msg_app_not_found_title": "Apparate-Nr. nicht gefunden",
+    "msg_app_not_found": "Für Apparate-Nr. '{query}' wurde keine Zuordnung gefunden.",
+    "msg_app_multi_title": "Mehrere K-Nummern gefunden",
+    "msg_app_multi": "Für Apparate-Nr. '{query}' wurden mehrere K-Nummern gefunden:\n{codes}",
+
+    "status_found_with_serial": "{code} gefunden. App.-Nr.: {serials}",
 }
 
 # ============================================================
@@ -1188,6 +1209,7 @@ class KFinderFrame(wx.Frame):
         self.index = KIndex(cfg)
         self.service = SearchService(cfg, self.index)
         self.dxf_repo = DXFRepository()
+        self.appnr_repo = AppNrRepository()
 
         self._rebuild_running: bool = False
         self._main_buttons: list[wx.Window] = []
@@ -1218,7 +1240,7 @@ class KFinderFrame(wx.Frame):
     def _build(self) -> None:
         outer = wx.BoxSizer(wx.VERTICAL)
 
-        # ── Поле ввода ─────────────────────────────────────────────────
+        # ── Поле ввода и тип поиска ───────────────────────────────────────
         input_sizer = _static_box_sizer(self, TXT["input_box"])
 
         hint = wx.StaticText(self, label=TXT["input_hint"])
@@ -1231,11 +1253,37 @@ class KFinderFrame(wx.Frame):
         ))
         input_sizer.Add(hint, 0, wx.ALIGN_CENTER | wx.TOP | wx.BOTTOM, 4)
 
+        row = wx.BoxSizer(wx.HORIZONTAL)
+
+        # --- Общая высота элементов ---
+        ctrl_height = 36
+
+        # --- Choice (выровнен по высоте) ---
+        self.search_mode = wx.Choice(
+            self,
+            choices=[
+                TXT["search_mode_k"],
+                TXT["search_mode_dxf"],
+                TXT["search_mode_app"],
+            ],
+            size=wx.Size(50, ctrl_height),
+        )
+        self.search_mode.SetSelection(0)
+        self.search_mode.SetMinSize(wx.Size(95, ctrl_height))
+        self.search_mode.SetFont(wx.Font(
+            10,
+            wx.FONTFAMILY_DEFAULT,
+            wx.FONTSTYLE_NORMAL,
+            wx.FONTWEIGHT_BOLD
+        ))
+
+        # --- Поле ввода ---
         self.entry = wx.TextCtrl(
             self,
             style=wx.TE_CENTER | wx.TE_PROCESS_ENTER,
-            size=wx.Size(170, 36),
+            size=wx.Size(170, ctrl_height),
         )
+        self.entry.SetMinSize(wx.Size(170, ctrl_height))
         self.entry.SetFont(wx.Font(
             18,
             wx.FONTFAMILY_DEFAULT,
@@ -1244,11 +1292,32 @@ class KFinderFrame(wx.Frame):
         ))
         self.entry.SetForegroundColour(wx.Colour("#1a3a1a"))
         self.entry.Bind(wx.EVT_TEXT_ENTER, lambda _: self._smart_search())
-        input_sizer.Add(self.entry, 0, wx.ALIGN_CENTER | wx.ALL, 6)
 
+        # --- Кнопка очистки ---
+        clear_btn = _make_gen_button(
+            self,
+            "✖",
+            CLR_BTN_DANGER,
+            wx.Size(36, ctrl_height),
+            12
+        )
+
+        def _clear():
+            self.entry.SetValue("")
+            self.search_mode.SetSelection(0)  # возврат к "K"
+            self.entry.SetFocus()
+
+        clear_btn.Bind(wx.EVT_BUTTON, lambda _: _clear())
+
+        # --- Компоновка ---
+        row.Add(self.search_mode, 0, wx.RIGHT, 8)
+        row.Add(self.entry, 1, wx.RIGHT, 6)
+        row.Add(clear_btn, 0)
+
+        input_sizer.Add(row, 0, wx.EXPAND | wx.ALL, 6)
         outer.Add(input_sizer, 0, wx.EXPAND | wx.ALL, 10)
 
-        # ── Основные действия ──────────────────────────────────────────
+        # ── Основные действия ─────────────────────────────────────────────
         action_sizer = _static_box_sizer(self, TXT["actions_box"])
         actions = [
             (TXT["search_show"], CLR_BTN_PRIMARY, "show"),
@@ -1265,7 +1334,7 @@ class KFinderFrame(wx.Frame):
 
         outer.Add(action_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
 
-        # ── Компактный статус ──────────────────────────────────────────
+        # ── Компактный статус ─────────────────────────────────────────────
         status_sizer = _static_box_sizer(self, TXT["status_box"])
 
         self.status_lbl = wx.StaticText(self, label=TXT["status_ready_short"])
@@ -1281,7 +1350,7 @@ class KFinderFrame(wx.Frame):
 
         outer.Add(status_sizer, 0, wx.EXPAND | wx.ALL, 10)
 
-        # ── Нижние кнопки ──────────────────────────────────────────────
+        # ── Нижние кнопки ─────────────────────────────────────────────────
         bottom_row = wx.BoxSizer(wx.HORIZONTAL)
 
         service_btn = _make_gen_button(
@@ -1506,6 +1575,24 @@ class KFinderFrame(wx.Frame):
     def _get_query(self) -> str:
         return self.entry.GetValue().strip()
 
+    def _get_search_mode(self) -> str:
+        return self.search_mode.GetStringSelection()
+
+    def _get_serials_text_for_k(self, k_code: str) -> str:
+        serials = self.appnr_repo.get_serials_for_k(k_code)
+        return ", ".join(serials)
+
+    def _resolve_app_to_k_codes(self, raw: str) -> list[str]:
+        records = self.appnr_repo.search_by_serial(raw)
+        codes = sorted({r.k_code for r in records})
+        return codes
+
+    def _normalize_dxf_input(self, raw: str) -> str:
+        s = raw.strip()
+        if not s or not s.isdigit():
+            raise ValueError(TXT["msg_dxf_input_error"])
+        return s
+
     def _smart_search(self) -> None:
         raw = self._get_query()
         if not raw:
@@ -1517,11 +1604,25 @@ class KFinderFrame(wx.Frame):
             self.entry.SetFocus()
             return
 
+        mode = self._get_search_mode()
+
         try:
-            if self.index.is_full_code(raw):
-                self._process_full(self.index.normalize_full(raw), "show")
-            else:
-                self._process_partial(raw)
+            if mode == TXT["search_mode_k"]:
+                if self.index.is_full_code(raw):
+                    self._process_full(self.index.normalize_full(raw), "show")
+                else:
+                    self._process_partial(raw)
+                return
+
+            if mode == TXT["search_mode_dxf"]:
+                dxf_no = self._normalize_dxf_input(raw)
+                self._process_dxf(dxf_no, "show")
+                return
+
+            if mode == TXT["search_mode_app"]:
+                self._process_app_nr(raw, "show")
+                return
+
         except ValueError as e:
             wx.MessageBox(str(e), TXT["msg_input_error"], wx.OK | wx.ICON_ERROR)
             self.entry.SetFocus()
@@ -1538,25 +1639,38 @@ class KFinderFrame(wx.Frame):
             self.entry.SetFocus()
             return
 
+        mode = self._get_search_mode()
+
         try:
-            if action == "dxf":
-                if not self.index.is_full_code(raw):
-                    wx.MessageBox(
-                        TXT["msg_input_required"],
-                        TXT["msg_hint"],
-                        wx.OK | wx.ICON_INFORMATION
-                    )
-                    self.entry.SetFocus()
-                    self.entry.SelectAll()
+            if mode == TXT["search_mode_k"]:
+                if action == "dxf":
+                    if not self.index.is_full_code(raw):
+                        wx.MessageBox(
+                            TXT["msg_input_error"],
+                            TXT["msg_hint"],
+                            wx.OK | wx.ICON_INFORMATION
+                        )
+                        self.entry.SetFocus()
+                        self.entry.SelectAll()
+                        return
+
+                    self._show_dxf_results(self.index.normalize_full(raw))
                     return
 
-                self._show_dxf_results(self.index.normalize_full(raw))
+                if self.index.is_full_code(raw):
+                    self._process_full(self.index.normalize_full(raw), action)
+                else:
+                    self._process_partial(raw)
                 return
 
-            if self.index.is_full_code(raw):
-                self._process_full(self.index.normalize_full(raw), action)
-            else:
-                self._process_partial(raw)
+            if mode == TXT["search_mode_dxf"]:
+                dxf_no = self._normalize_dxf_input(raw)
+                self._process_dxf(dxf_no, action)
+                return
+
+            if mode == TXT["search_mode_app"]:
+                self._process_app_nr(raw, action)
+                return
 
         except ValueError as e:
             wx.MessageBox(str(e), TXT["msg_input_error"], wx.OK | wx.ICON_ERROR)
@@ -1565,6 +1679,155 @@ class KFinderFrame(wx.Frame):
         except (OSError, FileNotFoundError) as e:
             self._set_status(str(e), "err")
             wx.MessageBox(str(e), TXT["msg_error"], wx.OK | wx.ICON_ERROR)
+
+    def _process_dxf(self, dxf_no: str, action: str) -> None:
+        results = self.dxf_repo.search_by_dxf_no(dxf_no)
+
+        if not results:
+            wx.MessageBox(
+                TXT["msg_dxf_not_found"].format(query=dxf_no),
+                TXT["msg_dxf_not_found_title"],
+                wx.OK | wx.ICON_INFORMATION
+            )
+            self.entry.SetFocus()
+            self.entry.SelectAll()
+            return
+
+        if action in ("show", "dxf"):
+            dlg = DXFResultsDialog(self, results, f"{TXT['dxf_results_title']} — {dxf_no}")
+            dlg.ShowModal()
+            dlg.Destroy()
+            return
+
+        # Для прямого DXF действия открываем первый найденный основной DWG
+        first = results[0]
+        path = Path(first.main_dwg_path)
+
+        if action == "folder":
+            folder = path.parent
+            if folder.exists():
+                _open_path(folder)
+            else:
+                wx.MessageBox(
+                    TXT["dxf_folder_missing"].format(path=folder),
+                    TXT["msg_error"],
+                    wx.OK | wx.ICON_WARNING
+                )
+            return
+
+        if action == "dwg":
+            if first.has_main_dwg and path.exists():
+                _open_path(path)
+            else:
+                wx.MessageBox(
+                    TXT["dxf_file_missing"].format(path=path),
+                    TXT["msg_error"],
+                    wx.OK | wx.ICON_WARNING
+                )
+            return
+
+        if action == "sketch":
+            wx.MessageBox(
+                TXT["msg_mode_not_supported"],
+                TXT["msg_hint"],
+                wx.OK | wx.ICON_INFORMATION
+            )
+
+    def _process_app_nr(self, raw: str, action: str) -> None:
+        codes = self._resolve_app_to_k_codes(raw)
+
+        if not codes:
+            wx.MessageBox(
+                TXT["msg_app_not_found"].format(query=raw),
+                TXT["msg_app_not_found_title"],
+                wx.OK | wx.ICON_INFORMATION
+            )
+            self.entry.SetFocus()
+            self.entry.SelectAll()
+            return
+
+        if len(codes) > 1:
+            wx.MessageBox(
+                TXT["msg_app_multi"].format(query=raw, codes=", ".join(codes)),
+                TXT["msg_app_multi_title"],
+                wx.OK | wx.ICON_INFORMATION
+            )
+            self.entry.SetFocus()
+            self.entry.SelectAll()
+            return
+
+        k_code = codes[0]
+
+        if action == "dxf":
+            self._show_dxf_results(k_code)
+            return
+
+        self._process_full(k_code, action)
+
+    def _process_full(self, k_code: str, action: str) -> None:
+        self._set_status(TXT["status_searching"].format(code=k_code), "ok")
+        entry = self.service.get_or_search(k_code)
+
+        if not entry:
+            self._set_status(TXT["status_not_found"].format(code=k_code), "warn")
+            wx.MessageBox(
+                TXT["msg_not_found_full"].format(code=k_code),
+                TXT["msg_not_found_title"],
+                wx.OK | wx.ICON_INFORMATION
+            )
+            self.entry.SetFocus()
+            self.entry.SelectAll()
+            return
+
+        if not entry.has_folder:
+            self._set_status(TXT["status_no_folder"].format(code=k_code), "warn")
+            wx.MessageBox(
+                TXT["msg_no_folder_full"].format(code=k_code),
+                TXT["msg_no_folder_title"],
+                wx.OK | wx.ICON_WARNING
+            )
+            self.entry.SetFocus()
+            self.entry.SelectAll()
+            return
+
+        serials_text = self._get_serials_text_for_k(k_code)
+        if serials_text:
+            self._set_status(
+                TXT["status_found_with_serial"].format(code=k_code, serials=serials_text),
+                "ok"
+            )
+        else:
+            self._set_status(TXT["status_found"].format(code=k_code), "ok")
+
+        if action == "show":
+            title = k_code
+            if serials_text:
+                short_serials = serials_text if len(serials_text) <= 60 else serials_text[:57] + "..."
+                title = f"{k_code} | App. Nr.: {short_serials}"
+
+            dlg = ResultsDialog(self, [entry], title)
+            dlg.ShowModal()
+            dlg.Destroy()
+            return
+
+        path_map = {
+            "folder": Path(entry.folder_path),
+            "sketch": Path(entry.sketch_path),
+            "dwg": Path(entry.dwg_path),
+        }
+        path = path_map.get(action)
+        if path is None:
+            return
+
+        if path.exists():
+            _open_path(path)
+        else:
+            msg = TXT["msg_file_missing"] if action == "dwg" else TXT["msg_folder_missing"]
+            wx.MessageBox(
+                msg.format(path=path),
+                TXT["msg_error"],
+                wx.OK | wx.ICON_WARNING
+            )
 
     def _process_partial(self, raw: str) -> None:
         results = self.index.find_partial(raw)
@@ -1611,59 +1874,6 @@ class KFinderFrame(wx.Frame):
         dlg.Destroy()
         self._set_status(TXT["status_found_many"].format(count=len(results)), "ok")
 
-    def _process_full(self, k_code: str, action: str) -> None:
-        self._set_status(TXT["status_searching"].format(code=k_code), "ok")
-        entry = self.service.get_or_search(k_code)
-
-        if not entry:
-            self._set_status(TXT["status_not_found"].format(code=k_code), "warn")
-            wx.MessageBox(
-                TXT["msg_not_found_full"].format(code=k_code),
-                TXT["msg_not_found_title"],
-                wx.OK | wx.ICON_INFORMATION
-            )
-            self.entry.SetFocus()
-            self.entry.SelectAll()
-            return
-
-        if not entry.has_folder:
-            self._set_status(TXT["status_no_folder"].format(code=k_code), "warn")
-            wx.MessageBox(
-                TXT["msg_no_folder_full"].format(code=k_code),
-                TXT["msg_no_folder_title"],
-                wx.OK | wx.ICON_WARNING
-            )
-            self.entry.SetFocus()
-            self.entry.SelectAll()
-            return
-
-        self._set_status(TXT["status_found"].format(code=k_code), "ok")
-
-        if action == "show":
-            dlg = ResultsDialog(self, [entry], k_code)
-            dlg.ShowModal()
-            dlg.Destroy()
-            return
-
-        path_map = {
-            "folder": Path(entry.folder_path),
-            "sketch": Path(entry.sketch_path),
-            "dwg": Path(entry.dwg_path),
-        }
-        path = path_map.get(action)
-        if path is None:
-            return
-
-        if path.exists():
-            _open_path(path)
-        else:
-            msg = TXT["msg_file_missing"] if action == "dwg" else TXT["msg_folder_missing"]
-            wx.MessageBox(
-                msg.format(path=path),
-                TXT["msg_error"],
-                wx.OK | wx.ICON_WARNING
-            )
-
     # ------------------------------------------------------------------
     # Служебные кнопки
     # ------------------------------------------------------------------
@@ -1707,36 +1917,6 @@ class KFinderFrame(wx.Frame):
 """
 
 # ============================================================
-# Рабочая папка
-# ============================================================
-
-def _app_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parent
-
-
-APP_DIR = _app_dir()
-
-
-# ============================================================
-# Логирование — только ошибки
-# ============================================================
-
-_LOG_FILE = APP_DIR / "dxf_core.log"
-logger = logging.getLogger("dxf_core")
-logger.propagate = False
-
-if not logger.handlers:
-    _h = logging.FileHandler(_LOG_FILE, encoding="utf-8")
-    _h.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
-    _h.setLevel(logging.ERROR)
-    logger.addHandler(_h)
-
-logger.setLevel(logging.ERROR)
-
-
-# ============================================================
 # Конфигурация
 # ============================================================
 
@@ -1758,6 +1938,214 @@ class DXFConfig:
 
 
 DXF_CONFIG = DXFConfig()
+
+# ============================================================
+# Apparate-Nr. / Seriennummer
+# ============================================================
+
+@dataclass(frozen=True)
+class AppNrConfig:
+    excel_file: Path = Path(r"G:\Auftragsdokumente\Apparate-Nr.xlsx")
+    index_json: Path = APP_DIR / "appnr_index.json"
+
+
+APPNR_CONFIG = AppNrConfig()
+
+
+@dataclass
+class AppNrRecord:
+    serial_no: str
+    serial_prefix: str
+    k_code: str
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @staticmethod
+    def from_dict(d: dict) -> "AppNrRecord":
+        return AppNrRecord(
+            serial_no=str(d["serial_no"]),
+            serial_prefix=str(d["serial_prefix"]),
+            k_code=str(d["k_code"]),
+        )
+
+
+class AppNrRepository:
+    """
+    Репозиторий серийных номеров аппаратов.
+
+    Источник данных:
+      - Excel-файл Apparate-Nr.xlsx
+      - столбец A: серийный номер
+      - столбец E: K-номер
+
+    Индексы:
+      - prefix -> записи
+      - k_code -> список серийных номеров
+    """
+
+    FULL_K_RE = re.compile(r"^K\d{5}$", re.IGNORECASE)
+
+    def __init__(self, cfg: AppNrConfig = APPNR_CONFIG):
+        self.cfg = cfg
+        self._by_prefix: dict[str, list[AppNrRecord]] = {}
+        self._by_k_code: dict[str, list[str]] = {}
+        self.reload()
+
+    # --------------------------------------------------------
+    # Служебные методы
+    # --------------------------------------------------------
+
+    def _normalize_k_code(self, value) -> str:
+        if value is None:
+            return ""
+
+        s = str(value).strip().upper()
+        if not s:
+            return ""
+
+        if re.fullmatch(r"\d{5}", s):
+            return f"K{s}"
+
+        if self.FULL_K_RE.fullmatch(s):
+            return s
+
+        return ""
+
+    def _normalize_serial_text(self, value) -> str:
+        if value is None:
+            return ""
+        return str(value).strip()
+
+    def _extract_prefix(self, serial_text: str) -> str:
+        """
+        Для поиска используем только префикс до точки.
+        Примеры:
+          1234      -> 1234
+          1234.1    -> 1234
+          1234.1-2  -> 1234
+        """
+        s = serial_text.strip()
+        if not s:
+            return ""
+
+        head = s.split(".", 1)[0].strip()
+        m = re.match(r"^(\d+)", head)
+        return m.group(1) if m else ""
+
+    def is_excel_available(self) -> bool:
+        return self.cfg.excel_file.exists() and self.cfg.excel_file.is_file()
+
+    # --------------------------------------------------------
+    # JSON
+    # --------------------------------------------------------
+
+    def _load_raw(self) -> dict:
+        if not self.cfg.index_json.is_file():
+            return {"items": []}
+
+        try:
+            with self.cfg.index_json.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            if not isinstance(data, dict) or "items" not in data:
+                return {"items": []}
+            return data
+        except (OSError, json.JSONDecodeError) as e:
+            logger.error(f"AppNrRepository._load_raw: {e}")
+            return {"items": []}
+
+    def _save_raw(self, data: dict) -> None:
+        self.cfg.index_json.parent.mkdir(parents=True, exist_ok=True)
+        with self.cfg.index_json.open("w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+    def reload(self) -> None:
+        data = self._load_raw()
+        self._by_prefix = {}
+        self._by_k_code = {}
+
+        for item in data.get("items", []):
+            try:
+                rec = AppNrRecord.from_dict(item)
+            except (KeyError, TypeError, ValueError):
+                continue
+
+            self._by_prefix.setdefault(rec.serial_prefix, []).append(rec)
+            self._by_k_code.setdefault(rec.k_code, []).append(rec.serial_no)
+
+        for prefix in self._by_prefix:
+            self._by_prefix[prefix].sort(key=lambda x: (x.k_code, x.serial_no))
+
+        for k_code in self._by_k_code:
+            self._by_k_code[k_code] = sorted(set(self._by_k_code[k_code]))
+
+    # --------------------------------------------------------
+    # Построение индекса
+    # --------------------------------------------------------
+
+    def rebuild_index(self) -> int:
+        """
+        Полная перестройка индекса из Apparate-Nr.xlsx.
+        """
+        if not self.is_excel_available():
+            raise FileNotFoundError(f"Excel-Datei nicht gefunden: {self.cfg.excel_file}")
+
+        wb = load_workbook(self.cfg.excel_file, data_only=True, read_only=True)
+        ws = wb.active
+
+        items: list[AppNrRecord] = []
+        first = True
+
+        for row in ws.iter_rows(values_only=True):
+            if first:
+                first = False
+                continue
+
+            serial_no = self._normalize_serial_text(row[0] if len(row) > 0 else None)
+            k_code = self._normalize_k_code(row[4] if len(row) > 4 else None)
+
+            if not serial_no or not k_code:
+                continue
+
+            prefix = self._extract_prefix(serial_no)
+            if not prefix:
+                continue
+
+            items.append(
+                AppNrRecord(
+                    serial_no=serial_no,
+                    serial_prefix=prefix,
+                    k_code=k_code,
+                )
+            )
+
+        payload = {
+            "items": [x.to_dict() for x in items]
+        }
+        self._save_raw(payload)
+        self.reload()
+        return len(items)
+
+    def ensure_index(self) -> None:
+        if not self._by_prefix and self.is_excel_available():
+            self.rebuild_index()
+
+    # --------------------------------------------------------
+    # Поиск
+    # --------------------------------------------------------
+
+    def search_by_serial(self, query: str) -> list[AppNrRecord]:
+        self.ensure_index()
+
+        prefix = self._extract_prefix(str(query).strip())
+        if not prefix:
+            return []
+
+        return list(self._by_prefix.get(prefix, []))
+
+    def get_serials_for_k(self, k_code: str) -> list[str]:
+        self.ensure_index()
+        return list(self._by_k_code.get(k_code.strip().upper(), []))
 
 
 # ============================================================
@@ -1928,6 +2316,66 @@ class DXFRepository:
         Основной DWG — только строго xxxxx.dwg без суффиксов.
         """
         return bool(self.PRIMARY_DWG_RE.fullmatch(filename.strip()))
+
+    def search_by_dxf_no(self, query: str) -> list[DXFSearchResult]:
+        """
+        Поиск по самому DXF-номеру.
+
+        Логика:
+          - ищем все строки Excel, где встречается этот DXF
+          - если строк Excel нет, но файл существует в индексе файлов,
+            всё равно возвращаем минимальную запись
+          - результат всегда список, чтобы можно было переиспользовать
+            уже существующий DXFResultsDialog
+        """
+        raw = str(query).strip()
+        if not raw or not raw.isdigit():
+            return []
+
+        dxf_no = int(raw)
+        results: list[DXFSearchResult] = []
+
+        # Ищем все строки Excel с этим DXF
+        for rows in self._excel_index.values():
+            for row in rows:
+                if row.dxf_no != dxf_no:
+                    continue
+
+                file_rec = self._files_index.get(dxf_no)
+                results.append(
+                    DXFSearchResult(
+                        dxf_no=row.dxf_no,
+                        k_num=row.k_num,
+                        wst=row.wst,
+                        dicke_mm=row.dicke_mm,
+                        a_kn_brutto_qm=row.a_kn_brutto_qm,
+                        laenge_zuschnitt_mm=row.laenge_zuschnitt_mm,
+                        preis_pro_laenge_eur=row.preis_pro_laenge_eur,
+                        main_dwg_path=file_rec.main_dwg_path if file_rec else "",
+                        has_main_dwg=file_rec.has_main_dwg if file_rec else False,
+                    )
+                )
+
+        # Если в Excel ничего нет, но файл известен, возвращаем минимальную запись
+        if not results:
+            file_rec = self._files_index.get(dxf_no)
+            if file_rec:
+                results.append(
+                    DXFSearchResult(
+                        dxf_no=dxf_no,
+                        k_num="",
+                        wst="",
+                        dicke_mm=None,
+                        a_kn_brutto_qm=None,
+                        laenge_zuschnitt_mm=None,
+                        preis_pro_laenge_eur=None,
+                        main_dwg_path=file_rec.main_dwg_path,
+                        has_main_dwg=file_rec.has_main_dwg,
+                    )
+                )
+
+        results.sort(key=lambda x: (x.dxf_no, x.k_num))
+        return results
 
     # --------------------------------------------------------
     # JSON: ranges
