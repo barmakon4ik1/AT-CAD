@@ -64,8 +64,7 @@ logger.setLevel(logging.ERROR)
 TXT = {
     "app_title":               "K-Finder  —  Auftragsverzeichnis",
     "app_subtitle":            "Auftragsverzeichnis-Suche",
-    "input_box":               "Auftragserfassung",
-    "input_hint":              "Voll- oder Teil-K-Nummer eingeben:",
+    "input_box":               "Bitte K-Nr., DXF-Nr. o. App.Nr. auswählen und einfügen",
     "actions_box":             "Suchen & Öffnen",
     "service_box":             "Service",
     "meta_box":                "Indexinformationen",
@@ -127,22 +126,28 @@ TXT = {
     "table_year":              "Jahr",
     "table_folder_exists":     "Ordner vorhanden",
     "table_folder":            "Auftragsordner",
-    "table_sketch":            "Skizzenordner",
+    "table_sketch":            "RP-DXF-Skizzen",
     "table_dwg":               "DWG-Datei",
     "table_has_folder_yes":    "✅",
     "table_has_folder_no":     "⚠ kein Ordner",
     "about_button":            "Info",
-    "about_title":             "Info",
-    "about_text":              (
-        "K-Finder\n\n"
-        "Das Programm ermöglicht das schnelle Navigieren\n"
-        "zu einem Dokumentenordner und das Öffnen einer\n"
-        "DWG-Zeichnung.\n"
-        "Es durchsucht sowohl die Bestellnummer als auch die Seriennummer.\n\n"
+    "about_title": "Über K-Finder",
+    "about_text_title": "K-Finder",
+    "about_text_subtitle": "Suche und Navigation für Auftragsdaten",
+    "about_text_body": (
+        "Das Programm ermöglicht den schnellen Zugriff auf\n"
+        "Auftragsordner, Skizzenordner und DWG-Dateien.\n\n"
+        "Unterstützte Suchtypen:\n"
+        "• K-Nummer\n"
+        "• DXF-Nummer\n"
+        "• Apparate-Nr.\n"
+    ),
+    "about_text_footer": (
         "Autor: A. Tutubalin\n"
         "Version: 3.0\n"
         "© 2026"
     ),
+    "about_ok": "OK",
     "update_data":             "Daten aktualisieren",
     "full_rebuild":            "Vollständig neu aufbauen",
     "update_confirm_title":    "Daten aktualisieren",
@@ -211,6 +216,11 @@ TXT = {
     "msg_app_multi": "Für Apparate-Nr. '{query}' wurden mehrere K-Nummern gefunden:\n{codes}",
 
     "status_found_with_serial": "{code} gefunden. App.-Nr.: {serials}",
+    "search_type_button": "K",
+    "search_mode_menu_title": "Suchtyp wählen",
+    "input_hint_k": "K-Nummer:",
+    "input_hint_dxf": "DXF-Nummer:",
+    "input_hint_app": "Apparate-Nr.:",
 }
 
 # ============================================================
@@ -228,7 +238,7 @@ class AppConfig:
     auto_show_single:       bool  = True
     live_search_if_missing: bool  = True
 
-    window_size:            tuple = (410, 520)
+    window_size:            tuple = (410, 490)
     service_window_size:    tuple = (500, 360)
 
     tail_backtrack:         int   = 50
@@ -250,10 +260,12 @@ CLR_BTN_DANGER  = "#c0392b"
 CLR_BTN_DARK    = "#2c3e50"
 CLR_TEXT        = "#ffffff"
 CLR_LABEL       = "#e8f5e9"
-CLR_STATUS_OK   = "#a8d8a8"
+CLR_STATUS_OK   = "#ffffff"
 CLR_STATUS_WARN = "#f9ca74"
 CLR_STATUS_ERR  = "#f08080"
 CLR_BOX_FG      = "#c8e6c9"
+CLR_PLACEHOLDER = "#A0A0A0"
+CLR_INPUT_TEXT  = "#1a3a1a"
 
 # ============================================================
 # Модель записи
@@ -1095,12 +1107,12 @@ class DXFResultsDialog(wx.Dialog):
 class ServiceDialog(wx.Dialog):
     """Служебное окно с действиями по индексу и краткой информацией."""
 
-    def __init__(self, parent: wx.Window, title: str):
+    def __init__(self, parent: "KFinderFrame", title: str):
         super().__init__(
             parent,
             title=title,
             style=wx.DEFAULT_DIALOG_STYLE,
-            size=wx.Size(*parent.cfg.service_window_size), # type: ignore
+            size=wx.Size(*parent.cfg.service_window_size),
         )
         self.owner = parent
         self._build()
@@ -1153,17 +1165,17 @@ class ServiceDialog(wx.Dialog):
         self.SetSizer(outer)
 
     def _refresh_info(self) -> None:
-        meta = self.owner.index.get_meta() # type: ignore
+        meta = self.owner.index.get_meta()
         count = meta.get("count", 0)
         gen = meta.get("generated_at", "—")
-        root = meta.get("root", str(self.owner.cfg.root_dir)) # type: ignore
+        root = meta.get("root", str(self.owner.cfg.root_dir))
 
         self.info_lbl.SetLabel(
             f"Einträge: {count}\n"
             f"Aktualisiert: {gen}\n"
             f"Pfad: {root}\n"
-            f"Rückschritt: {self.owner.cfg.tail_backtrack}\n" # type: ignore
-            f"Geprüfte Jahre: {self.owner.cfg.tail_years_to_scan}" # type: ignore
+            f"Rückschritt: {self.owner.cfg.tail_backtrack}\n" 
+            f"Geprüfte Jahre: {self.owner.cfg.tail_years_to_scan}"
         )
 
     def _run_partial(self) -> None:
@@ -1191,707 +1203,102 @@ class ServiceDialog(wx.Dialog):
             on_done=self._refresh_info
         )
 
-# ============================================================
-# Главное окно
-# ============================================================
 
-class KFinderFrame(wx.Frame):
-    """Главное окно K-Finder в стиле AT-CAD."""
+class AboutDialog(wx.Dialog):
+    """Красивое информационное окно о программе."""
 
-    def __init__(self, cfg: AppConfig = APP_CONFIG):
+    def __init__(self, parent: wx.Window):
         super().__init__(
-            None,
-            title=TXT["app_title"],
-            size=wx.Size(*cfg.window_size),
-            style=wx.DEFAULT_FRAME_STYLE,
+            parent,
+            title=TXT["about_title"],
+            style=wx.DEFAULT_DIALOG_STYLE,
+            size=wx.Size(430, 410),
         )
-        self.cfg = cfg
-        self.index = KIndex(cfg)
-        self.service = SearchService(cfg, self.index)
-        self.dxf_repo = DXFRepository()
-        self.appnr_repo = AppNrRepository()
-
-        self._rebuild_running: bool = False
-        self._main_buttons: list[wx.Window] = []
-        self._service_buttons: list[wx.Window] = []
-
-        self.SetBackgroundColour(wx.Colour(CLR_BG))
-        self.SetMinSize(wx.Size(390, 500))
-        self._center()
         self._build()
-        self._check_root()
-        self.Bind(wx.EVT_CLOSE, self._on_close)
-
-        if self.cfg.auto_update_on_start:
-            wx.CallLater(300, lambda: self._update_tail_async(
-                ask=False,
-                silent=True
-            ))
-
-    # ------------------------------------------------------------------
-    # Построение UI
-    # ------------------------------------------------------------------
-
-    def _center(self) -> None:
-        sw, sh = wx.GetDisplaySize()
-        w, h = self.GetSize()
-        self.SetPosition(wx.Point((sw - w) // 2, (sh - h) // 2))
+        self.CentreOnParent()
 
     def _build(self) -> None:
+        self.SetBackgroundColour(wx.Colour(CLR_BG))
+
         outer = wx.BoxSizer(wx.VERTICAL)
 
-        # ── Поле ввода и тип поиска ───────────────────────────────────────
-        input_sizer = _static_box_sizer(self, TXT["input_box"])
+        # --- Заголовочный блок ---
+        header_panel = wx.Panel(self)
+        header_panel.SetBackgroundColour(wx.Colour("#2c5f2e"))
+        header_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        hint = wx.StaticText(self, label=TXT["input_hint"])
-        hint.SetForegroundColour(wx.Colour(CLR_LABEL))
-        hint.SetFont(wx.Font(
-            10,
+        title_lbl = wx.StaticText(header_panel, label=TXT["about_text_title"])
+        title_lbl.SetForegroundColour(wx.Colour(CLR_TEXT))
+        title_lbl.SetFont(wx.Font(
+            14,
+            wx.FONTFAMILY_DEFAULT,
+            wx.FONTSTYLE_NORMAL,
+            wx.FONTWEIGHT_BOLD
+        ))
+
+        subtitle_lbl = wx.StaticText(header_panel, label=TXT["about_text_subtitle"])
+        subtitle_lbl.SetForegroundColour(wx.Colour("#d9f2da"))
+        subtitle_lbl.SetFont(wx.Font(
+            12,
+            wx.FONTFAMILY_DEFAULT,
+            wx.FONTSTYLE_ITALIC,
+            wx.FONTWEIGHT_NORMAL
+        ))
+
+        header_sizer.Add(title_lbl, 0, wx.ALIGN_CENTER | wx.TOP, 12)
+        header_sizer.Add(subtitle_lbl, 0, wx.ALIGN_CENTER | wx.TOP | wx.BOTTOM, 10)
+        header_panel.SetSizer(header_sizer)
+
+        outer.Add(header_panel, 0, wx.EXPAND)
+
+        # --- Основной текст ---
+        body_panel = wx.Panel(self)
+        body_panel.SetBackgroundColour(wx.Colour(CLR_BG))
+        body_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        body_lbl = wx.StaticText(body_panel, label=TXT["about_text_body"])
+        body_lbl.SetForegroundColour(wx.Colour(CLR_LABEL))
+        body_lbl.SetFont(wx.Font(
+            12,
             wx.FONTFAMILY_DEFAULT,
             wx.FONTSTYLE_NORMAL,
             wx.FONTWEIGHT_NORMAL
         ))
-        input_sizer.Add(hint, 0, wx.ALIGN_CENTER | wx.TOP | wx.BOTTOM, 4)
 
-        row = wx.BoxSizer(wx.HORIZONTAL)
-
-        # --- Общая высота элементов ---
-        ctrl_height = 36
-
-        # --- Choice (выровнен по высоте) ---
-        self.search_mode = wx.Choice(
-            self,
-            choices=[
-                TXT["search_mode_k"],
-                TXT["search_mode_dxf"],
-                TXT["search_mode_app"],
-            ],
-            size=wx.Size(50, ctrl_height),
-        )
-        self.search_mode.SetSelection(0)
-        self.search_mode.SetMinSize(wx.Size(95, ctrl_height))
-        self.search_mode.SetFont(wx.Font(
-            10,
+        footer_lbl = wx.StaticText(body_panel, label=TXT["about_text_footer"])
+        footer_lbl.SetForegroundColour(wx.Colour(CLR_TEXT))
+        footer_lbl.SetFont(wx.Font(
+            12,
             wx.FONTFAMILY_DEFAULT,
             wx.FONTSTYLE_NORMAL,
             wx.FONTWEIGHT_BOLD
         ))
 
-        # --- Поле ввода ---
-        self.entry = wx.TextCtrl(
+        body_sizer.Add(body_lbl, 0, wx.EXPAND | wx.ALL, 16)
+        body_sizer.Add(footer_lbl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 16)
+
+        body_panel.SetSizer(body_sizer)
+        outer.Add(body_panel, 1, wx.EXPAND)
+
+        # --- Кнопка OK ---
+        btn_row = wx.BoxSizer(wx.HORIZONTAL)
+
+        ok_btn = _make_gen_button(
             self,
-            style=wx.TE_CENTER | wx.TE_PROCESS_ENTER,
-            size=wx.Size(170, ctrl_height),
+            TXT["about_ok"],
+            CLR_BTN_PRIMARY,
+            wx.Size(100, 32),
+            10
         )
-        self.entry.SetMinSize(wx.Size(170, ctrl_height))
-        self.entry.SetFont(wx.Font(
-            18,
-            wx.FONTFAMILY_DEFAULT,
-            wx.FONTSTYLE_NORMAL,
-            wx.FONTWEIGHT_BOLD
-        ))
-        self.entry.SetForegroundColour(wx.Colour("#1a3a1a"))
-        self.entry.Bind(wx.EVT_TEXT_ENTER, lambda _: self._smart_search())
+        ok_btn.Bind(wx.EVT_BUTTON, lambda _: self.EndModal(wx.ID_OK))
 
-        # --- Кнопка очистки ---
-        clear_btn = _make_gen_button(
-            self,
-            "✖",
-            CLR_BTN_DANGER,
-            wx.Size(36, ctrl_height),
-            12
-        )
+        btn_row.AddStretchSpacer(1)
+        btn_row.Add(ok_btn, 0)
+        # btn_row.AddStretchSpacer(1)
 
-        def _clear():
-            self.entry.SetValue("")
-            self.search_mode.SetSelection(0)  # возврат к "K"
-            self.entry.SetFocus()
-
-        clear_btn.Bind(wx.EVT_BUTTON, lambda _: _clear())
-
-        # --- Компоновка ---
-        row.Add(self.search_mode, 0, wx.RIGHT, 8)
-        row.Add(self.entry, 1, wx.RIGHT, 6)
-        row.Add(clear_btn, 0)
-
-        input_sizer.Add(row, 0, wx.EXPAND | wx.ALL, 6)
-        outer.Add(input_sizer, 0, wx.EXPAND | wx.ALL, 10)
-
-        # ── Основные действия ─────────────────────────────────────────────
-        action_sizer = _static_box_sizer(self, TXT["actions_box"])
-        actions = [
-            (TXT["search_show"], CLR_BTN_PRIMARY, "show"),
-            (TXT["open_folder"], CLR_BTN_OK, "folder"),
-            (TXT["open_sketch"], CLR_BTN_OK, "sketch"),
-            (TXT["open_dwg"], CLR_BTN_PRIMARY, "dwg"),
-            (TXT["open_dxf"], CLR_BTN_DARK, "dxf"),
-        ]
-        for label, color, action in actions:
-            btn = _make_gen_button(self, label, color, wx.Size(-1, 38), 10)
-            btn.Bind(wx.EVT_BUTTON, lambda _, a=action: self._handle_action(a))
-            action_sizer.Add(btn, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 6)
-            self._main_buttons.append(btn)
-
-        outer.Add(action_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
-
-        # ── Компактный статус ─────────────────────────────────────────────
-        status_sizer = _static_box_sizer(self, TXT["status_box"])
-
-        self.status_lbl = wx.StaticText(self, label=TXT["status_ready_short"])
-        self.status_lbl.SetForegroundColour(wx.Colour(CLR_STATUS_OK))
-        self.status_lbl.SetFont(wx.Font(
-            9,
-            wx.FONTFAMILY_DEFAULT,
-            wx.FONTSTYLE_NORMAL,
-            wx.FONTWEIGHT_BOLD
-        ))
-        self.status_lbl.Wrap(340)
-        status_sizer.Add(self.status_lbl, 0, wx.ALL | wx.EXPAND, 6)
-
-        outer.Add(status_sizer, 0, wx.EXPAND | wx.ALL, 10)
-
-        # ── Нижние кнопки ─────────────────────────────────────────────────
-        bottom_row = wx.BoxSizer(wx.HORIZONTAL)
-
-        service_btn = _make_gen_button(
-            self, TXT["service_button"], CLR_BTN_WARN, wx.Size(-1, 30), 9
-        )
-        service_btn.Bind(wx.EVT_BUTTON, lambda _: self._open_service_dialog())
-
-        about_btn = _make_gen_button(
-            self, TXT["about_button"], CLR_BTN_DARK, wx.Size(-1, 30), 9
-        )
-        about_btn.Bind(wx.EVT_BUTTON, lambda _: self._show_about())
-
-        exit_btn = _make_gen_button(
-            self, TXT["close_program"], CLR_BTN_DANGER, wx.Size(-1, 30), 9
-        )
-        exit_btn.Bind(wx.EVT_BUTTON, lambda _: self.Close())
-
-        bottom_row.Add(service_btn, 1, wx.RIGHT, 6)
-        bottom_row.Add(about_btn, 1, wx.RIGHT, 6)
-        bottom_row.Add(exit_btn, 1)
-
-        outer.Add(bottom_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        outer.Add(btn_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
 
         self.SetSizer(outer)
-        self.entry.SetFocus()
-
-    # ------------------------------------------------------------------
-    # Статус и блокировка
-    # ------------------------------------------------------------------
-
-    def _set_status(self, text: str, level: str = "ok") -> None:
-        colors = {
-            "ok": CLR_STATUS_OK,
-            "warn": CLR_STATUS_WARN,
-            "err": CLR_STATUS_ERR,
-        }
-        self.status_lbl.SetLabel(text)
-        self.status_lbl.SetForegroundColour(wx.Colour(colors.get(level, CLR_STATUS_OK)))
-        self.status_lbl.Wrap(340)
-        self.status_lbl.Refresh()
-        self.Layout()
-
-    def _set_busy(self, busy: bool) -> None:
-        """Блокирует/разблокирует основное окно на время индексации."""
-        self.entry.Enable(not busy)
-
-        for btn in self._main_buttons:
-            btn.Enable(not busy)
-
-        for btn in self._service_buttons:
-            btn.Enable(not busy)
-
-        if busy:
-            if not wx.IsBusy():
-                wx.BeginBusyCursor()
-        else:
-            if wx.IsBusy():
-                wx.EndBusyCursor()
-
-    # ------------------------------------------------------------------
-    # DXF/DWG
-    # ------------------------------------------------------------------
-
-    def _show_dxf_results(self, k_code: str) -> None:
-        results = self.dxf_repo.search_by_k_num(k_code)
-
-        if not results:
-            wx.MessageBox(
-                TXT["dxf_no_hits"].format(code=k_code),
-                TXT["dxf_no_hits_title"],
-                wx.OK | wx.ICON_INFORMATION
-            )
-            self.entry.SetFocus()
-            self.entry.SelectAll()
-            return
-
-        dlg = DXFResultsDialog(self, results, f"{TXT['dxf_results_title']} — {k_code}")
-        dlg.ShowModal()
-        dlg.Destroy()
-
-    # ------------------------------------------------------------------
-    # Служебное окно
-    # ------------------------------------------------------------------
-
-    def _open_service_dialog(self) -> None:
-        dlg = ServiceDialog(self, TXT["service_dialog_title"])
-        dlg.ShowModal()
-        dlg.Destroy()
-
-    # ------------------------------------------------------------------
-    # Обновление индекса
-    # ------------------------------------------------------------------
-
-    def _update_tail_async(self, ask: bool = True, silent: bool = False, on_done=None) -> None:
-        if self._rebuild_running:
-            if not silent:
-                wx.MessageBox(
-                    TXT["update_already_running"],
-                    TXT["update_confirm_title"],
-                    wx.OK | wx.ICON_INFORMATION
-                )
-            return
-
-        if ask:
-            if wx.MessageBox(
-                TXT["update_confirm"],
-                TXT["update_confirm_title"],
-                wx.YES_NO | wx.ICON_QUESTION
-            ) != wx.YES:
-                return
-
-        self._rebuild_running = True
-        self._set_busy(True)
-        self._set_status(
-            TXT["status_start_update"] if silent else TXT["service_update_running"],
-            "warn"
-        )
-
-        def worker():
-            try:
-                count = self.index.update_tail(
-                    backtrack=self.cfg.tail_backtrack,
-                    tail_years_to_scan=self.cfg.tail_years_to_scan,
-                    progress_cb=lambda m: self.after(lambda msg=m: self._set_status(msg, "warn"))
-                )
-                self.after(lambda: self._set_status(
-                    TXT["service_partial_done"].format(count=count), "ok"
-                ))
-                if not silent:
-                    self.after(lambda: wx.MessageBox(
-                        TXT["update_done_msg"].format(count=count),
-                        TXT["update_done_title"],
-                        wx.OK | wx.ICON_INFORMATION
-                    ))
-                if on_done:
-                    self.after(on_done)
-            except (OSError, FileNotFoundError) as e:
-                logger.error(f"update_tail: {e}")
-                self.after(lambda: self._set_status(TXT["service_update_error"], "err"))
-                if not silent:
-                    self.after(lambda: wx.MessageBox(
-                        str(e), TXT["msg_error"], wx.OK | wx.ICON_ERROR
-                    ))
-            finally:
-                self.after(lambda: setattr(self, "_rebuild_running", False))
-                self.after(lambda: self._set_busy(False))
-
-        threading.Thread(target=worker, daemon=True).start()
-
-    def _rebuild_async(self, ask: bool = True, on_done=None) -> None:
-        if self._rebuild_running:
-            wx.MessageBox(
-                TXT["msg_rebuild_already_running"],
-                TXT["msg_rebuild_confirm_title"],
-                wx.OK | wx.ICON_INFORMATION
-            )
-            return
-
-        if ask:
-            if wx.MessageBox(
-                TXT["msg_rebuild_confirm"],
-                TXT["msg_rebuild_confirm_title"],
-                wx.YES_NO | wx.ICON_QUESTION
-            ) != wx.YES:
-                return
-
-        self._rebuild_running = True
-        self._set_busy(True)
-        self._set_status(TXT["service_rebuild_running"], "warn")
-
-        def worker():
-            try:
-                count = self.index.rebuild(
-                    progress_cb=lambda m: self.after(lambda msg=m: self._set_status(msg, "warn"))
-                )
-                self.after(lambda: self._set_status(
-                    TXT["service_full_done"].format(count=count), "ok"
-                ))
-                self.after(lambda: wx.MessageBox(
-                    TXT["msg_rebuild_done"].format(count=count),
-                    TXT["msg_rebuild_done_title"],
-                    wx.OK | wx.ICON_INFORMATION
-                ))
-                if on_done:
-                    self.after(on_done)
-            except (OSError, FileNotFoundError) as e:
-                logger.error(f"rebuild: {e}")
-                self.after(lambda: self._set_status(TXT["service_rebuild_error"], "err"))
-                self.after(lambda: wx.MessageBox(
-                    str(e), TXT["msg_error"], wx.OK | wx.ICON_ERROR
-                ))
-            finally:
-                self.after(lambda: setattr(self, "_rebuild_running", False))
-                self.after(lambda: self._set_busy(False))
-
-        threading.Thread(target=worker, daemon=True).start()
-
-    def after(self, func) -> None:
-        """Безопасный вызов из фонового потока."""
-        wx.CallAfter(func)
-
-    # ------------------------------------------------------------------
-    # Инициализация
-    # ------------------------------------------------------------------
-
-    def _check_root(self) -> None:
-        if not self.index.is_root_available():
-            self._set_status(TXT["status_root_warn"], "warn")
-            wx.MessageBox(
-                TXT["msg_root_unavailable"].format(path=self.cfg.root_dir),
-                TXT["msg_warning"],
-                wx.OK | wx.ICON_WARNING
-            )
-
-    def _on_close(self, _event: wx.CloseEvent) -> None:
-        self.Destroy()
-
-    # ------------------------------------------------------------------
-    # Поиск и действия
-    # ------------------------------------------------------------------
-
-    def _get_query(self) -> str:
-        return self.entry.GetValue().strip()
-
-    def _get_search_mode(self) -> str:
-        return self.search_mode.GetStringSelection()
-
-    def _get_serials_text_for_k(self, k_code: str) -> str:
-        serials = self.appnr_repo.get_serials_for_k(k_code)
-        return ", ".join(serials)
-
-    def _resolve_app_to_k_codes(self, raw: str) -> list[str]:
-        records = self.appnr_repo.search_by_serial(raw)
-        codes = sorted({r.k_code for r in records})
-        return codes
-
-    def _normalize_dxf_input(self, raw: str) -> str:
-        s = raw.strip()
-        if not s or not s.isdigit():
-            raise ValueError(TXT["msg_dxf_input_error"])
-        return s
-
-    def _smart_search(self) -> None:
-        raw = self._get_query()
-        if not raw:
-            wx.MessageBox(
-                TXT["msg_input_required"],
-                TXT["msg_hint"],
-                wx.OK | wx.ICON_INFORMATION
-            )
-            self.entry.SetFocus()
-            return
-
-        mode = self._get_search_mode()
-
-        try:
-            if mode == TXT["search_mode_k"]:
-                if self.index.is_full_code(raw):
-                    self._process_full(self.index.normalize_full(raw), "show")
-                else:
-                    self._process_partial(raw)
-                return
-
-            if mode == TXT["search_mode_dxf"]:
-                dxf_no = self._normalize_dxf_input(raw)
-                self._process_dxf(dxf_no, "show")
-                return
-
-            if mode == TXT["search_mode_app"]:
-                self._process_app_nr(raw, "show")
-                return
-
-        except ValueError as e:
-            wx.MessageBox(str(e), TXT["msg_input_error"], wx.OK | wx.ICON_ERROR)
-            self.entry.SetFocus()
-            self.entry.SelectAll()
-
-    def _handle_action(self, action: str) -> None:
-        raw = self._get_query()
-        if not raw:
-            wx.MessageBox(
-                TXT["msg_input_required"],
-                TXT["msg_hint"],
-                wx.OK | wx.ICON_INFORMATION
-            )
-            self.entry.SetFocus()
-            return
-
-        mode = self._get_search_mode()
-
-        try:
-            if mode == TXT["search_mode_k"]:
-                if action == "dxf":
-                    if not self.index.is_full_code(raw):
-                        wx.MessageBox(
-                            TXT["msg_input_error"],
-                            TXT["msg_hint"],
-                            wx.OK | wx.ICON_INFORMATION
-                        )
-                        self.entry.SetFocus()
-                        self.entry.SelectAll()
-                        return
-
-                    self._show_dxf_results(self.index.normalize_full(raw))
-                    return
-
-                if self.index.is_full_code(raw):
-                    self._process_full(self.index.normalize_full(raw), action)
-                else:
-                    self._process_partial(raw)
-                return
-
-            if mode == TXT["search_mode_dxf"]:
-                dxf_no = self._normalize_dxf_input(raw)
-                self._process_dxf(dxf_no, action)
-                return
-
-            if mode == TXT["search_mode_app"]:
-                self._process_app_nr(raw, action)
-                return
-
-        except ValueError as e:
-            wx.MessageBox(str(e), TXT["msg_input_error"], wx.OK | wx.ICON_ERROR)
-            self.entry.SetFocus()
-            self.entry.SelectAll()
-        except (OSError, FileNotFoundError) as e:
-            self._set_status(str(e), "err")
-            wx.MessageBox(str(e), TXT["msg_error"], wx.OK | wx.ICON_ERROR)
-
-    def _process_dxf(self, dxf_no: str, action: str) -> None:
-        results = self.dxf_repo.search_by_dxf_no(dxf_no)
-
-        if not results:
-            wx.MessageBox(
-                TXT["msg_dxf_not_found"].format(query=dxf_no),
-                TXT["msg_dxf_not_found_title"],
-                wx.OK | wx.ICON_INFORMATION
-            )
-            self.entry.SetFocus()
-            self.entry.SelectAll()
-            return
-
-        if action in ("show", "dxf"):
-            dlg = DXFResultsDialog(self, results, f"{TXT['dxf_results_title']} — {dxf_no}")
-            dlg.ShowModal()
-            dlg.Destroy()
-            return
-
-        # Для прямого DXF действия открываем первый найденный основной DWG
-        first = results[0]
-        path = Path(first.main_dwg_path)
-
-        if action == "folder":
-            folder = path.parent
-            if folder.exists():
-                _open_path(folder)
-            else:
-                wx.MessageBox(
-                    TXT["dxf_folder_missing"].format(path=folder),
-                    TXT["msg_error"],
-                    wx.OK | wx.ICON_WARNING
-                )
-            return
-
-        if action == "dwg":
-            if first.has_main_dwg and path.exists():
-                _open_path(path)
-            else:
-                wx.MessageBox(
-                    TXT["dxf_file_missing"].format(path=path),
-                    TXT["msg_error"],
-                    wx.OK | wx.ICON_WARNING
-                )
-            return
-
-        if action == "sketch":
-            wx.MessageBox(
-                TXT["msg_mode_not_supported"],
-                TXT["msg_hint"],
-                wx.OK | wx.ICON_INFORMATION
-            )
-
-    def _process_app_nr(self, raw: str, action: str) -> None:
-        codes = self._resolve_app_to_k_codes(raw)
-
-        if not codes:
-            wx.MessageBox(
-                TXT["msg_app_not_found"].format(query=raw),
-                TXT["msg_app_not_found_title"],
-                wx.OK | wx.ICON_INFORMATION
-            )
-            self.entry.SetFocus()
-            self.entry.SelectAll()
-            return
-
-        if len(codes) > 1:
-            wx.MessageBox(
-                TXT["msg_app_multi"].format(query=raw, codes=", ".join(codes)),
-                TXT["msg_app_multi_title"],
-                wx.OK | wx.ICON_INFORMATION
-            )
-            self.entry.SetFocus()
-            self.entry.SelectAll()
-            return
-
-        k_code = codes[0]
-
-        if action == "dxf":
-            self._show_dxf_results(k_code)
-            return
-
-        self._process_full(k_code, action)
-
-    def _process_full(self, k_code: str, action: str) -> None:
-        self._set_status(TXT["status_searching"].format(code=k_code), "ok")
-        entry = self.service.get_or_search(k_code)
-
-        if not entry:
-            self._set_status(TXT["status_not_found"].format(code=k_code), "warn")
-            wx.MessageBox(
-                TXT["msg_not_found_full"].format(code=k_code),
-                TXT["msg_not_found_title"],
-                wx.OK | wx.ICON_INFORMATION
-            )
-            self.entry.SetFocus()
-            self.entry.SelectAll()
-            return
-
-        if not entry.has_folder:
-            self._set_status(TXT["status_no_folder"].format(code=k_code), "warn")
-            wx.MessageBox(
-                TXT["msg_no_folder_full"].format(code=k_code),
-                TXT["msg_no_folder_title"],
-                wx.OK | wx.ICON_WARNING
-            )
-            self.entry.SetFocus()
-            self.entry.SelectAll()
-            return
-
-        serials_text = self._get_serials_text_for_k(k_code)
-        if serials_text:
-            self._set_status(
-                TXT["status_found_with_serial"].format(code=k_code, serials=serials_text),
-                "ok"
-            )
-        else:
-            self._set_status(TXT["status_found"].format(code=k_code), "ok")
-
-        if action == "show":
-            title = k_code
-            if serials_text:
-                short_serials = serials_text if len(serials_text) <= 60 else serials_text[:57] + "..."
-                title = f"{k_code} | App. Nr.: {short_serials}"
-
-            dlg = ResultsDialog(self, [entry], title)
-            dlg.ShowModal()
-            dlg.Destroy()
-            return
-
-        path_map = {
-            "folder": Path(entry.folder_path),
-            "sketch": Path(entry.sketch_path),
-            "dwg": Path(entry.dwg_path),
-        }
-        path = path_map.get(action)
-        if path is None:
-            return
-
-        if path.exists():
-            _open_path(path)
-        else:
-            msg = TXT["msg_file_missing"] if action == "dwg" else TXT["msg_folder_missing"]
-            wx.MessageBox(
-                msg.format(path=path),
-                TXT["msg_error"],
-                wx.OK | wx.ICON_WARNING
-            )
-
-    def _process_partial(self, raw: str) -> None:
-        results = self.index.find_partial(raw)
-        if not results:
-            self._set_status(TXT["status_no_hits"], "warn")
-            wx.MessageBox(
-                TXT["msg_no_hits"].format(query=raw),
-                TXT["msg_no_hits_title"],
-                wx.OK | wx.ICON_INFORMATION
-            )
-            self.entry.SetFocus()
-            self.entry.SelectAll()
-            return
-
-        if len(results) == 1:
-            entry = results[0]
-            if not entry.has_folder:
-                self._set_status(TXT["status_no_folder"].format(code=entry.k_code), "warn")
-                wx.MessageBox(
-                    TXT["msg_no_folder_single"].format(code=entry.k_code),
-                    TXT["msg_no_folder_title"],
-                    wx.OK | wx.ICON_WARNING
-                )
-                self.entry.SetFocus()
-                self.entry.SelectAll()
-                return
-
-            if self.cfg.auto_open_single:
-                path = Path(entry.folder_path)
-                if path.exists():
-                    _open_path(path)
-                    self._set_status(TXT["status_found_one"].format(code=entry.k_code), "ok")
-                    return
-
-            if self.cfg.auto_show_single:
-                dlg = ResultsDialog(self, [entry], entry.k_code)
-                dlg.ShowModal()
-                dlg.Destroy()
-                self._set_status(TXT["status_found_one"].format(code=entry.k_code), "ok")
-                return
-
-        dlg = ResultsDialog(self, results, f"Treffer für '{raw}'")
-        dlg.ShowModal()
-        dlg.Destroy()
-        self._set_status(TXT["status_found_many"].format(count=len(results)), "ok")
-
-    # ------------------------------------------------------------------
-    # Служебные кнопки
-    # ------------------------------------------------------------------
-
-    def _show_about(self) -> None:
-        wx.MessageBox(
-            TXT["about_text"],
-            TXT["about_title"],
-            wx.OK | wx.ICON_INFORMATION
-        )
-
-    def run_partial_update(self, silent: bool = False, on_done=None) -> None:
-        """Публичный запуск частичного обновления индекса."""
-        self._update_tail_async(ask=False, silent=silent, on_done=on_done)
-
-    def run_full_rebuild(self, on_done=None) -> None:
-        """Публичный запуск полной переиндексации."""
-        self._rebuild_async(ask=False, on_done=on_done)
 
 
 # ============================================================
@@ -2749,6 +2156,819 @@ class DXFRepository:
 
         if not self._files_index:
             self.rebuild_files_index_full()
+
+
+# ============================================================
+# Главное окно
+# ============================================================
+
+class KFinderFrame(wx.Frame):
+    """Главное окно K-Finder в стиле AT-CAD."""
+
+    def __init__(self, cfg: AppConfig = APP_CONFIG):
+        super().__init__(
+            None,
+            title=TXT["app_title"],
+            size=wx.Size(*cfg.window_size),
+            style=wx.CAPTION | wx.CLOSE_BOX | wx.MINIMIZE_BOX | wx.SYSTEM_MENU,
+        )
+        self.cfg = cfg
+        self.index = KIndex(cfg)
+        self.service = SearchService(cfg, self.index)
+        self.dxf_repo = DXFRepository()
+        self.appnr_repo = AppNrRepository()
+
+        self._rebuild_running: bool = False
+        self._main_buttons: list[wx.Window] = []
+        self._service_buttons: list[wx.Window] = []
+
+        self.SetBackgroundColour(wx.Colour(CLR_BG))
+        self.SetMinSize(wx.Size(*cfg.window_size))
+        self.SetMaxSize(wx.Size(*cfg.window_size))
+
+        self._center()
+        self._build()
+        self._set_search_mode(TXT["search_mode_k"], clear_entry=False)
+        self._check_root()
+        self.Bind(wx.EVT_CLOSE, self._on_close)
+
+        if self.cfg.auto_update_on_start:
+            wx.CallLater(300, lambda: self._update_tail_async(
+                ask=False,
+                silent=True
+            ))
+
+    # ------------------------------------------------------------------
+    # Построение UI
+    # ------------------------------------------------------------------
+
+    def _center(self) -> None:
+        sw, sh = wx.GetDisplaySize()
+        w, h = self.GetSize()
+        self.SetPosition(wx.Point((sw - w) // 2, (sh - h) // 2))
+
+    def _on_entry_focus(self, event: wx.FocusEvent) -> None:
+        """
+        При входе в поле убирает placeholder и переводит цвет
+        в обычный цвет пользовательского ввода.
+        """
+        if self.entry.GetValue() == self._current_hint:
+            self.entry.SetValue("")
+            self.entry.SetForegroundColour(wx.Colour(CLR_INPUT_TEXT))
+
+        event.Skip()
+
+    def _on_entry_kill_focus(self, event: wx.FocusEvent) -> None:
+        """
+        При выходе из поля возвращает placeholder,
+        если пользователь ничего не ввёл.
+        """
+        if not self.entry.GetValue().strip():
+            self.entry.SetValue(self._current_hint)
+            self.entry.SetForegroundColour(wx.Colour(CLR_PLACEHOLDER))
+            self.entry.SetInsertionPoint(0)
+
+        event.Skip()
+
+    def _update_input_hint(self, force: bool = False) -> None:
+        """
+        Устанавливает placeholder в зависимости от режима поиска.
+
+        force=True:
+          принудительно записывает placeholder в поле, если оно пустое
+          или уже содержит старую подсказку.
+        """
+        hints = {
+            TXT["search_mode_k"]: "K-Nummer:",
+            TXT["search_mode_dxf"]: "DXF-Nummer:",
+            TXT["search_mode_app"]: "Apparate-Nr.:",
+        }
+
+        new_hint = hints.get(self.search_mode_value, "")
+        current_value = self.entry.GetValue()
+
+        # Если нужно принудительно обновить placeholder
+        if force:
+            if not current_value or current_value == self._current_hint:
+                self._current_hint = new_hint
+                self.entry.SetValue(new_hint)
+                self.entry.SetForegroundColour(wx.Colour(CLR_PLACEHOLDER))
+                self.entry.SetInsertionPoint(0)
+                return
+
+        # Просто обновляем внутреннее значение текущей подсказки
+        self._current_hint = new_hint
+
+    def _build(self) -> None:
+        outer = wx.BoxSizer(wx.VERTICAL)
+
+        # ── Поле ввода и тип поиска ───────────────────────────────────────
+        input_sizer = _static_box_sizer(self, TXT["input_box"])
+
+        row = wx.BoxSizer(wx.HORIZONTAL)
+        ctrl_height = 36
+        text_height = 12
+
+        # --- Кнопка выбора типа поиска ---
+        self.search_mode_value = TXT["search_mode_k"]
+
+        self.search_mode_btn = _make_gen_button(
+            self,
+            self.search_mode_value,
+            CLR_BTN_PRIMARY,
+            wx.Size(85, ctrl_height),
+            text_height
+        )
+        self.search_mode_btn.Bind(wx.EVT_BUTTON, self._on_search_mode_button)
+
+        # --- Поле ввода ---
+        self.entry = wx.TextCtrl(
+            self,
+            style=wx.TE_CENTER | wx.TE_PROCESS_ENTER,
+            size=wx.Size(170, ctrl_height),
+        )
+        self.entry.SetMinSize(wx.Size(170, ctrl_height))
+        self.entry.SetFont(wx.Font(
+            18,
+            wx.FONTFAMILY_DEFAULT,
+            wx.FONTSTYLE_NORMAL,
+            wx.FONTWEIGHT_BOLD
+        ))
+        self.entry.SetForegroundColour(wx.Colour(CLR_INPUT_TEXT))
+
+        # Привязки событий поля ввода
+        self.entry.Bind(wx.EVT_TEXT_ENTER, lambda _: self._smart_search())
+        self.entry.Bind(wx.EVT_SET_FOCUS, self._on_entry_focus)
+        self.entry.Bind(wx.EVT_KILL_FOCUS, self._on_entry_kill_focus)
+
+        # Начальное состояние placeholder
+        self._current_hint = ""
+        self._update_input_hint(force=True)
+
+        # --- Кнопка очистки ---
+        clear_btn = _make_gen_button(
+            self,
+            "✖",
+            CLR_BTN_DANGER,
+            wx.Size(36, ctrl_height),
+            text_height
+        )
+        clear_btn.Bind(wx.EVT_BUTTON, lambda _: self._clear_search_form())
+
+        # --- Компоновка ---
+        row.Add(self.search_mode_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
+        row.Add(self.entry, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
+        row.Add(clear_btn, 0, wx.ALIGN_CENTER_VERTICAL)
+
+        input_sizer.Add(row, 0, wx.EXPAND | wx.ALL, 6)
+        outer.Add(input_sizer, 0, wx.EXPAND | wx.ALL, 10)
+
+        # ── Основные действия ─────────────────────────────────────────────
+        action_sizer = _static_box_sizer(self, TXT["actions_box"])
+        actions = [
+            (TXT["search_show"], CLR_BTN_PRIMARY, "show"),
+            (TXT["open_folder"], CLR_BTN_OK, "folder"),
+            (TXT["open_sketch"], CLR_BTN_OK, "sketch"),
+            (TXT["open_dwg"], CLR_BTN_PRIMARY, "dwg"),
+            (TXT["open_dxf"], CLR_BTN_DARK, "dxf"),
+        ]
+        for label, color, action in actions:
+            btn = _make_gen_button(self, label, color, wx.Size(-1, ctrl_height), text_height)
+            btn.Bind(wx.EVT_BUTTON, lambda _, a=action: self._handle_action(a))
+            action_sizer.Add(btn, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 6)
+            self._main_buttons.append(btn)
+
+        outer.Add(action_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+
+        # ── Компактный статус ─────────────────────────────────────────────
+        status_sizer = _static_box_sizer(self, TXT["status_box"])
+
+        self.status_lbl = wx.StaticText(self, label=TXT["status_ready_short"])
+        self.status_lbl.SetForegroundColour(wx.Colour(CLR_STATUS_OK))
+        self.status_lbl.SetFont(wx.Font(
+            text_height,
+            wx.FONTFAMILY_DEFAULT,
+            wx.FONTSTYLE_NORMAL,
+            wx.FONTWEIGHT_BOLD
+        ))
+        self.status_lbl.Wrap(340)
+        status_sizer.Add(self.status_lbl, 0, wx.ALL | wx.EXPAND, 6)
+
+        outer.Add(status_sizer, 0, wx.EXPAND | wx.ALL, 10)
+
+        # ── Нижние кнопки ─────────────────────────────────────────────────
+        bottom_row = wx.BoxSizer(wx.HORIZONTAL)
+
+        service_btn = _make_gen_button(
+            self, TXT["service_button"], CLR_BTN_WARN, wx.Size(-1, ctrl_height), text_height
+        )
+        service_btn.Bind(wx.EVT_BUTTON, lambda _: self._open_service_dialog())
+
+        about_btn = _make_gen_button(
+            self, TXT["about_button"], CLR_BTN_DARK, wx.Size(-1, ctrl_height), text_height
+        )
+        about_btn.Bind(wx.EVT_BUTTON, lambda _: self._show_about())
+
+        exit_btn = _make_gen_button(
+            self, TXT["close_program"], CLR_BTN_DANGER, wx.Size(-1, ctrl_height), text_height
+        )
+        exit_btn.Bind(wx.EVT_BUTTON, lambda _: self.Close())
+
+        bottom_row.Add(service_btn, 1, wx.RIGHT, 6)
+        bottom_row.Add(about_btn, 1, wx.RIGHT, 6)
+        bottom_row.Add(exit_btn, 1)
+
+        outer.Add(bottom_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+
+        self.SetSizer(outer)
+        self.entry.SetFocus()
+
+    def _get_search_mode(self) -> str:
+        """
+        Возвращает текущий режим поиска по тексту кнопки.
+        """
+        return self.search_mode_value
+
+    def _on_entry_text(self, event: wx.CommandEvent) -> None:
+        """
+        При вводе текста убирает placeholder и меняет цвет на основной.
+        """
+        value = self.entry.GetValue()
+
+        if value == getattr(self, "_current_hint", ""):
+            self.entry.SetForegroundColour(wx.Colour(CLR_PLACEHOLDER))
+        else:
+            self.entry.SetForegroundColour(wx.Colour(CLR_INPUT_TEXT))
+
+        event.Skip()
+
+    def _get_search_mode_color(self, mode: str) -> str:
+        """
+        Цвет кнопки в зависимости от режима поиска.
+        """
+        if mode == TXT["search_mode_dxf"]:
+            return CLR_BTN_DARK
+        if mode == TXT["search_mode_app"]:
+            return CLR_BTN_WARN
+        return CLR_BTN_PRIMARY
+
+    def _set_search_mode(self, mode: str, clear_entry: bool = True) -> None:
+        """
+        Устанавливает текущий режим поиска, обновляет внешний вид кнопки
+        и placeholder внутри поля ввода.
+        """
+        self.search_mode_value = mode
+        self.search_mode_btn.SetLabel(mode)
+        self.search_mode_btn.SetBackgroundColour(wx.Colour(self._get_search_mode_color(mode)))
+        self.search_mode_btn.Refresh()
+
+        if clear_entry:
+            self.entry.SetValue("")
+
+        self._update_input_hint(force=True)
+        self.entry.SetFocus()
+
+    def _on_search_mode_button(self, event: wx.CommandEvent) -> None:
+        """
+        Показывает всплывающее меню выбора типа поиска.
+        При смене режима поле ввода очищается автоматически.
+        """
+        menu = wx.Menu()
+
+        item_k = menu.Append(wx.ID_ANY, TXT["search_mode_k"])
+        item_dxf = menu.Append(wx.ID_ANY, TXT["search_mode_dxf"])
+        item_app = menu.Append(wx.ID_ANY, TXT["search_mode_app"])
+
+        self.Bind(wx.EVT_MENU, lambda _: self._set_search_mode(TXT["search_mode_k"]), item_k)
+        self.Bind(wx.EVT_MENU, lambda _: self._set_search_mode(TXT["search_mode_dxf"]), item_dxf)
+        self.Bind(wx.EVT_MENU, lambda _: self._set_search_mode(TXT["search_mode_app"]), item_app)
+
+        btn = event.GetEventObject()
+        if isinstance(btn, wx.Window):
+            btn.PopupMenu(menu)
+
+        menu.Destroy()
+
+    def _clear_search_form(self) -> None:
+        """
+        Очищает форму поиска и возвращает режим по умолчанию: K.
+        """
+        self._set_search_mode(TXT["search_mode_k"])
+
+    # ------------------------------------------------------------------
+    # Статус и блокировка
+    # ------------------------------------------------------------------
+
+    def _set_status(self, text: str, level: str = "ok") -> None:
+        colors = {
+            "ok": CLR_STATUS_OK,
+            "warn": CLR_STATUS_WARN,
+            "err": CLR_STATUS_ERR,
+        }
+        self.status_lbl.SetLabel(text)
+        self.status_lbl.SetForegroundColour(wx.Colour(colors.get(level, CLR_STATUS_OK)))
+        self.status_lbl.Wrap(340)
+        self.status_lbl.Refresh()
+        self.Layout()
+
+    def _set_busy(self, busy: bool) -> None:
+        """Блокирует/разблокирует основное окно на время индексации."""
+        self.entry.Enable(not busy)
+
+        for btn in self._main_buttons:
+            btn.Enable(not busy)
+
+        for btn in self._service_buttons:
+            btn.Enable(not busy)
+
+        if busy:
+            if not wx.IsBusy():
+                wx.BeginBusyCursor()
+        else:
+            if wx.IsBusy():
+                wx.EndBusyCursor()
+
+    # ------------------------------------------------------------------
+    # DXF/DWG
+    # ------------------------------------------------------------------
+
+    def _show_dxf_results(self, k_code: str) -> None:
+        results = self.dxf_repo.search_by_k_num(k_code)
+
+        if not results:
+            wx.MessageBox(
+                TXT["dxf_no_hits"].format(code=k_code),
+                TXT["dxf_no_hits_title"],
+                wx.OK | wx.ICON_INFORMATION
+            )
+            self.entry.SetFocus()
+            self.entry.SelectAll()
+            return
+
+        dlg = DXFResultsDialog(self, results, f"{TXT['dxf_results_title']} — {k_code}")
+        dlg.ShowModal()
+        dlg.Destroy()
+
+    # ------------------------------------------------------------------
+    # Служебное окно
+    # ------------------------------------------------------------------
+
+    def _open_service_dialog(self) -> None:
+        dlg = ServiceDialog(self, TXT["service_dialog_title"])
+        dlg.ShowModal()
+        dlg.Destroy()
+
+    # ------------------------------------------------------------------
+    # Обновление индекса
+    # ------------------------------------------------------------------
+
+    def _update_tail_async(self, ask: bool = True, silent: bool = False, on_done=None) -> None:
+        if self._rebuild_running:
+            if not silent:
+                wx.MessageBox(
+                    TXT["update_already_running"],
+                    TXT["update_confirm_title"],
+                    wx.OK | wx.ICON_INFORMATION
+                )
+            return
+
+        if ask:
+            if wx.MessageBox(
+                TXT["update_confirm"],
+                TXT["update_confirm_title"],
+                wx.YES_NO | wx.ICON_QUESTION
+            ) != wx.YES:
+                return
+
+        self._rebuild_running = True
+        self._set_busy(True)
+        self._set_status(
+            TXT["status_start_update"] if silent else TXT["service_update_running"],
+            "warn"
+        )
+
+        def worker():
+            try:
+                count = self.index.update_tail(
+                    backtrack=self.cfg.tail_backtrack,
+                    tail_years_to_scan=self.cfg.tail_years_to_scan,
+                    progress_cb=lambda m: self.after(lambda msg=m: self._set_status(msg, "warn"))
+                )
+                self.after(lambda: self._set_status(
+                    TXT["service_partial_done"].format(count=count), "ok"
+                ))
+                if not silent:
+                    self.after(lambda: wx.MessageBox(
+                        TXT["update_done_msg"].format(count=count),
+                        TXT["update_done_title"],
+                        wx.OK | wx.ICON_INFORMATION
+                    ))
+                if on_done:
+                    self.after(on_done)
+            except (OSError, FileNotFoundError) as e:
+                logger.error(f"update_tail: {e}")
+                self.after(lambda: self._set_status(TXT["service_update_error"], "err"))
+                if not silent:
+                    self.after(lambda: wx.MessageBox(
+                        str(e), TXT["msg_error"], wx.OK | wx.ICON_ERROR
+                    ))
+            finally:
+                self.after(lambda: setattr(self, "_rebuild_running", False))
+                self.after(lambda: self._set_busy(False))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _rebuild_async(self, ask: bool = True, on_done=None) -> None:
+        if self._rebuild_running:
+            wx.MessageBox(
+                TXT["msg_rebuild_already_running"],
+                TXT["msg_rebuild_confirm_title"],
+                wx.OK | wx.ICON_INFORMATION
+            )
+            return
+
+        if ask:
+            if wx.MessageBox(
+                TXT["msg_rebuild_confirm"],
+                TXT["msg_rebuild_confirm_title"],
+                wx.YES_NO | wx.ICON_QUESTION
+            ) != wx.YES:
+                return
+
+        self._rebuild_running = True
+        self._set_busy(True)
+        self._set_status(TXT["service_rebuild_running"], "warn")
+
+        def worker():
+            try:
+                count = self.index.rebuild(
+                    progress_cb=lambda m: self.after(lambda msg=m: self._set_status(msg, "warn"))
+                )
+                self.after(lambda: self._set_status(
+                    TXT["service_full_done"].format(count=count), "ok"
+                ))
+                self.after(lambda: wx.MessageBox(
+                    TXT["msg_rebuild_done"].format(count=count),
+                    TXT["msg_rebuild_done_title"],
+                    wx.OK | wx.ICON_INFORMATION
+                ))
+                if on_done:
+                    self.after(on_done)
+            except (OSError, FileNotFoundError) as e:
+                logger.error(f"rebuild: {e}")
+                self.after(lambda: self._set_status(TXT["service_rebuild_error"], "err"))
+                self.after(lambda: wx.MessageBox(
+                    str(e), TXT["msg_error"], wx.OK | wx.ICON_ERROR
+                ))
+            finally:
+                self.after(lambda: setattr(self, "_rebuild_running", False))
+                self.after(lambda: self._set_busy(False))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def after(self, func) -> None:
+        """Безопасный вызов из фонового потока."""
+        wx.CallAfter(func)
+
+    # ------------------------------------------------------------------
+    # Инициализация
+    # ------------------------------------------------------------------
+
+    def _check_root(self) -> None:
+        if not self.index.is_root_available():
+            self._set_status(TXT["status_root_warn"], "warn")
+            wx.MessageBox(
+                TXT["msg_root_unavailable"].format(path=self.cfg.root_dir),
+                TXT["msg_warning"],
+                wx.OK | wx.ICON_WARNING
+            )
+
+    def _on_close(self, _event: wx.CloseEvent) -> None:
+        self.Destroy()
+
+    # ------------------------------------------------------------------
+    # Поиск и действия
+    # ------------------------------------------------------------------
+
+    def _get_query(self) -> str:
+        value = self.entry.GetValue().strip()
+        if value == self._current_hint:
+            return ""
+        return value
+
+    def _get_serials_text_for_k(self, k_code: str) -> str:
+        serials = self.appnr_repo.get_serials_for_k(k_code)
+        return ", ".join(serials)
+
+    def _resolve_app_to_k_codes(self, raw: str) -> list[str]:
+        records = self.appnr_repo.search_by_serial(raw)
+        codes = sorted({r.k_code for r in records})
+        return codes
+
+    def _normalize_dxf_input(self, raw: str) -> str:
+        s = raw.strip()
+        if not s or not s.isdigit():
+            raise ValueError(TXT["msg_dxf_input_error"])
+        return s
+
+    def _smart_search(self) -> None:
+        raw = self._get_query()
+        if not raw:
+            wx.MessageBox(
+                TXT["msg_input_required"],
+                TXT["msg_hint"],
+                wx.OK | wx.ICON_INFORMATION
+            )
+            self.entry.SetFocus()
+            return
+
+        mode = self._get_search_mode()
+
+        try:
+            if mode == TXT["search_mode_k"]:
+                if self.index.is_full_code(raw):
+                    self._process_full(self.index.normalize_full(raw), "show")
+                else:
+                    self._process_partial(raw)
+                return
+
+            if mode == TXT["search_mode_dxf"]:
+                dxf_no = self._normalize_dxf_input(raw)
+                self._process_dxf(dxf_no, "show")
+                return
+
+            if mode == TXT["search_mode_app"]:
+                self._process_app_nr(raw, "show")
+                return
+
+        except ValueError as e:
+            wx.MessageBox(str(e), TXT["msg_input_error"], wx.OK | wx.ICON_ERROR)
+            self.entry.SetFocus()
+            self.entry.SelectAll()
+
+    def _handle_action(self, action: str) -> None:
+        raw = self._get_query()
+        if not raw:
+            wx.MessageBox(
+                TXT["msg_input_required"],
+                TXT["msg_hint"],
+                wx.OK | wx.ICON_INFORMATION
+            )
+            self.entry.SetFocus()
+            return
+
+        mode = self._get_search_mode()
+
+        try:
+            if mode == TXT["search_mode_k"]:
+                if action == "dxf":
+                    if not self.index.is_full_code(raw):
+                        wx.MessageBox(
+                            TXT["msg_input_error"],
+                            TXT["msg_hint"],
+                            wx.OK | wx.ICON_INFORMATION
+                        )
+                        self.entry.SetFocus()
+                        self.entry.SelectAll()
+                        return
+
+                    self._show_dxf_results(self.index.normalize_full(raw))
+                    return
+
+                if self.index.is_full_code(raw):
+                    self._process_full(self.index.normalize_full(raw), action)
+                else:
+                    self._process_partial(raw)
+                return
+
+            if mode == TXT["search_mode_dxf"]:
+                dxf_no = self._normalize_dxf_input(raw)
+                self._process_dxf(dxf_no, action)
+                return
+
+            if mode == TXT["search_mode_app"]:
+                self._process_app_nr(raw, action)
+                return
+
+        except ValueError as e:
+            wx.MessageBox(str(e), TXT["msg_input_error"], wx.OK | wx.ICON_ERROR)
+            self.entry.SetFocus()
+            self.entry.SelectAll()
+        except (OSError, FileNotFoundError) as e:
+            self._set_status(str(e), "err")
+            wx.MessageBox(str(e), TXT["msg_error"], wx.OK | wx.ICON_ERROR)
+
+    def _process_dxf(self, dxf_no: str, action: str) -> None:
+        results = self.dxf_repo.search_by_dxf_no(dxf_no)
+
+        if not results:
+            wx.MessageBox(
+                TXT["msg_dxf_not_found"].format(query=dxf_no),
+                TXT["msg_dxf_not_found_title"],
+                wx.OK | wx.ICON_INFORMATION
+            )
+            self.entry.SetFocus()
+            self.entry.SelectAll()
+            return
+
+        if action in ("show", "dxf"):
+            dlg = DXFResultsDialog(self, results, f"{TXT['dxf_results_title']} — {dxf_no}")
+            dlg.ShowModal()
+            dlg.Destroy()
+            return
+
+        # Для прямого DXF действия открываем первый найденный основной DWG
+        first = results[0]
+        path = Path(first.main_dwg_path)
+
+        if action == "folder":
+            folder = path.parent
+            if folder.exists():
+                _open_path(folder)
+            else:
+                wx.MessageBox(
+                    TXT["dxf_folder_missing"].format(path=folder),
+                    TXT["msg_error"],
+                    wx.OK | wx.ICON_WARNING
+                )
+            return
+
+        if action == "dwg":
+            if first.has_main_dwg and path.exists():
+                _open_path(path)
+            else:
+                wx.MessageBox(
+                    TXT["dxf_file_missing"].format(path=path),
+                    TXT["msg_error"],
+                    wx.OK | wx.ICON_WARNING
+                )
+            return
+
+        if action == "sketch":
+            wx.MessageBox(
+                TXT["msg_mode_not_supported"],
+                TXT["msg_hint"],
+                wx.OK | wx.ICON_INFORMATION
+            )
+
+    def _process_app_nr(self, raw: str, action: str) -> None:
+        codes = self._resolve_app_to_k_codes(raw)
+
+        if not codes:
+            wx.MessageBox(
+                TXT["msg_app_not_found"].format(query=raw),
+                TXT["msg_app_not_found_title"],
+                wx.OK | wx.ICON_INFORMATION
+            )
+            self.entry.SetFocus()
+            self.entry.SelectAll()
+            return
+
+        if len(codes) > 1:
+            wx.MessageBox(
+                TXT["msg_app_multi"].format(query=raw, codes=", ".join(codes)),
+                TXT["msg_app_multi_title"],
+                wx.OK | wx.ICON_INFORMATION
+            )
+            self.entry.SetFocus()
+            self.entry.SelectAll()
+            return
+
+        k_code = codes[0]
+
+        if action == "dxf":
+            self._show_dxf_results(k_code)
+            return
+
+        self._process_full(k_code, action)
+
+    def _process_full(self, k_code: str, action: str) -> None:
+        self._set_status(TXT["status_searching"].format(code=k_code), "ok")
+        entry = self.service.get_or_search(k_code)
+
+        if not entry:
+            self._set_status(TXT["status_not_found"].format(code=k_code), "warn")
+            wx.MessageBox(
+                TXT["msg_not_found_full"].format(code=k_code),
+                TXT["msg_not_found_title"],
+                wx.OK | wx.ICON_INFORMATION
+            )
+            self.entry.SetFocus()
+            self.entry.SelectAll()
+            return
+
+        if not entry.has_folder:
+            self._set_status(TXT["status_no_folder"].format(code=k_code), "warn")
+            wx.MessageBox(
+                TXT["msg_no_folder_full"].format(code=k_code),
+                TXT["msg_no_folder_title"],
+                wx.OK | wx.ICON_WARNING
+            )
+            self.entry.SetFocus()
+            self.entry.SelectAll()
+            return
+
+        serials_text = self._get_serials_text_for_k(k_code)
+        if serials_text:
+            self._set_status(
+                TXT["status_found_with_serial"].format(code=k_code, serials=serials_text),
+                "ok"
+            )
+        else:
+            self._set_status(TXT["status_found"].format(code=k_code), "ok")
+
+        if action == "show":
+            title = k_code
+            if serials_text:
+                short_serials = serials_text if len(serials_text) <= 60 else serials_text[:57] + "..."
+                title = f"{k_code} | App. Nr.: {short_serials}"
+
+            dlg = ResultsDialog(self, [entry], title)
+            dlg.ShowModal()
+            dlg.Destroy()
+            return
+
+        path_map = {
+            "folder": Path(entry.folder_path),
+            "sketch": Path(entry.sketch_path),
+            "dwg": Path(entry.dwg_path),
+        }
+        path = path_map.get(action)
+        if path is None:
+            return
+
+        if path.exists():
+            _open_path(path)
+        else:
+            msg = TXT["msg_file_missing"] if action == "dwg" else TXT["msg_folder_missing"]
+            wx.MessageBox(
+                msg.format(path=path),
+                TXT["msg_error"],
+                wx.OK | wx.ICON_WARNING
+            )
+
+    def _process_partial(self, raw: str) -> None:
+        results = self.index.find_partial(raw)
+        if not results:
+            self._set_status(TXT["status_no_hits"], "warn")
+            wx.MessageBox(
+                TXT["msg_no_hits"].format(query=raw),
+                TXT["msg_no_hits_title"],
+                wx.OK | wx.ICON_INFORMATION
+            )
+            self.entry.SetFocus()
+            self.entry.SelectAll()
+            return
+
+        if len(results) == 1:
+            entry = results[0]
+            if not entry.has_folder:
+                self._set_status(TXT["status_no_folder"].format(code=entry.k_code), "warn")
+                wx.MessageBox(
+                    TXT["msg_no_folder_single"].format(code=entry.k_code),
+                    TXT["msg_no_folder_title"],
+                    wx.OK | wx.ICON_WARNING
+                )
+                self.entry.SetFocus()
+                self.entry.SelectAll()
+                return
+
+            if self.cfg.auto_open_single:
+                path = Path(entry.folder_path)
+                if path.exists():
+                    _open_path(path)
+                    self._set_status(TXT["status_found_one"].format(code=entry.k_code), "ok")
+                    return
+
+            if self.cfg.auto_show_single:
+                dlg = ResultsDialog(self, [entry], entry.k_code)
+                dlg.ShowModal()
+                dlg.Destroy()
+                self._set_status(TXT["status_found_one"].format(code=entry.k_code), "ok")
+                return
+
+        dlg = ResultsDialog(self, results, f"Treffer für '{raw}'")
+        dlg.ShowModal()
+        dlg.Destroy()
+        self._set_status(TXT["status_found_many"].format(count=len(results)), "ok")
+
+    # ------------------------------------------------------------------
+    # Служебные кнопки
+    # ------------------------------------------------------------------
+
+    def _show_about(self) -> None:
+        """Показывает отдельное окно About."""
+        dlg = AboutDialog(self)
+        dlg.ShowModal()
+        dlg.Destroy()
+
+    def run_partial_update(self, silent: bool = False, on_done=None) -> None:
+        """Публичный запуск частичного обновления индекса."""
+        self._update_tail_async(ask=False, silent=silent, on_done=on_done)
+
+    def run_full_rebuild(self, on_done=None) -> None:
+        """Публичный запуск полной переиндексации."""
+        self._rebuild_async(ask=False, on_done=on_done)
 
 # ============================================================
 # Запуск
