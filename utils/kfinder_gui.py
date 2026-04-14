@@ -53,6 +53,8 @@ GUI:
 Сборка .exe
 -----------
 pyinstaller --noconfirm --clean --onefile --windowed --icon=kfinder.ico --name=kfinder --hidden-import=openpyxl kfinder_gui.py
+pyinstaller --noconfirm --clean --onedir --windowed --icon=kfinder.ico --name=kfinder --hidden-import=openpyxl kfinder_gui.py
+2 способ преимущественнее, но создается дополнительная директрория с файлами библиотек. Зато сам файл короче.
 """
 
 from __future__ import annotations
@@ -70,6 +72,13 @@ from typing import Optional, Callable
 import wx
 from openpyxl import load_workbook
 from wx.lib.buttons import GenButton
+
+if sys.platform == "win32":
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("AT-CAD.kfinder")
+    except Exception:
+        pass
 
 # ============================================================
 # Рабочая папка приложения
@@ -292,7 +301,7 @@ TXT = {
     ),
     "about_text_footer": (
         "Autor: A. Tutubalin\n"
-        "Version: 3.2\n"
+        "Version: 3.3\n"
         "© 2026"
     ),
     "about_ok":                "OK",
@@ -328,7 +337,7 @@ class AppConfig:
     auto_open_single:       bool  = False
     auto_show_single:       bool  = True
     live_search_if_missing: bool  = True
-    window_size:            tuple = (410, 490)
+    window_size:            tuple = (410, 500)
     service_window_size:    tuple = (500, 360)
     tail_backtrack:         int   = 50
     tail_years_to_scan:     int   = 2
