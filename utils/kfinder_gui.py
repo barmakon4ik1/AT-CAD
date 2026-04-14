@@ -52,8 +52,7 @@ GUI:
 
 Сборка .exe
 -----------
-pyinstaller --noconfirm --clean --onefile --windowed --icon=kfinder.ico
-    --name=kfinder --hidden-import=openpyxl kfinder_gui.py
+pyinstaller --noconfirm --clean --onefile --windowed --icon=kfinder.ico --name=kfinder --hidden-import=openpyxl kfinder_gui.py
 """
 
 from __future__ import annotations
@@ -191,16 +190,16 @@ TXT = {
     "msg_mode_not_supported":  "Diese Aktion ist für den gewählten Suchtyp nicht verfügbar.",
 
     # Сообщения — DXF-режим
-    "msg_dxf_input_error":      "Zulässige Eingabe: nur DXF-Nummer, z. B. 11601.",
+    "msg_dxf_input_error":      "Zulässige Eingabe: nur Ziffern der DXF-Nummer, z. B. 11601 oder 116.",
     "msg_dxf_not_found_title":  "DXF nicht gefunden",
     "msg_dxf_not_found":        "Für DXF '{query}' wurden keine Daten gefunden.",
 
     # Сообщения — App.Nr.-режим
-    "msg_app_input_error":      "Zulässige Eingabe: Apparate-Nr. oder deren Präfix, z. B. 1234 oder 1234.1-2.",
+    "msg_app_input_error":      "Zulässige Eingabe: Apparate-Nr. oder deren Anfang, z. B. 1234 oder 1234.1-2.",
     "msg_app_not_found_title":  "Apparate-Nr. nicht gefunden",
     "msg_app_not_found":        "Für Apparate-Nr. '{query}' wurde keine Zuordnung gefunden.",
-    "msg_app_multi_title":      "Mehrere K-Nummern gefunden",
-    "msg_app_multi":            "Für Apparate-Nr. '{query}' wurden mehrere K-Nummern gefunden:\n{codes}",
+    "msg_app_multi_title":      "Mehrere Apparate-Nr. gefunden",
+    "msg_app_multi":            "Für Apparate-Nr. '{query}' wurden mehrere Treffer gefunden.",
 
     # Диалог результатов K-поиска
     "results_box":             "Gefundene Aufträge",
@@ -239,6 +238,17 @@ TXT = {
     "dxf_col_length":          "Länge Zuschnitt, mm",
     "dxf_col_price":           "Preis/Länge €",
     "dxf_col_file":            "DWG",
+
+    # Диалог результатов App.Nr.-поиска
+    "app_results_title":       "Apparate-Nr.-Ergebnisse",
+    "app_box":                 "Gefundene Apparate",
+    "app_actions_box":         "Aktionen",
+    "app_select_entry":        "Bitte eine Zeile auswählen.",
+    "app_col_serial":          "App.-Nr.",
+    "app_col_prefix":          "Präfix",
+    "app_col_k":               "K-Nr.",
+    "app_col_folder_exists":   "Ordner vorhanden",
+    "app_col_folder":          "Auftragsordner",
 
     # Служебный диалог
     "service_dialog_title":    "Service",
@@ -282,7 +292,7 @@ TXT = {
     ),
     "about_text_footer": (
         "Autor: A. Tutubalin\n"
-        "Version: 3.1\n"
+        "Version: 3.2\n"
         "© 2026"
     ),
     "about_ok":                "OK",
@@ -1498,16 +1508,21 @@ class DXFRepository:
 
     def search_by_dxf_no(self, query: str) -> list[DXFSearchResult]:
         """
-        Поиск по самому DXF-номеру.
+        Точный поиск по самому DXF-номеру.
 
         Использует обратный индекс _by_dxf_no — O(1) вместо O(N).
         Если строк в Excel нет, но файл известен — возвращает минимальную запись.
+
+        Важно:
+        - этот метод выполняет только точный поиск;
+        - для частичного поиска по началу номера используется
+          отдельный метод search_by_dxf_partial().
         """
         raw = str(query).strip()
         if not raw or not raw.isdigit():
             return []
 
-        dxf_no   = int(raw)
+        dxf_no = int(raw)
         results: list[DXFSearchResult] = []
 
         # Быстрый поиск через обратный индекс
@@ -1522,7 +1537,7 @@ class DXFRepository:
                 laenge_zuschnitt_mm=row.laenge_zuschnitt_mm,
                 preis_pro_laenge_eur=row.preis_pro_laenge_eur,
                 main_dwg_path=file_rec.main_dwg_path if file_rec else "",
-                has_main_dwg=file_rec.has_main_dwg  if file_rec else False,
+                has_main_dwg=file_rec.has_main_dwg if file_rec else False,
             ))
 
         # Если в Excel ничего нет, но файл известен — минимальная запись
@@ -1541,7 +1556,67 @@ class DXFRepository:
                     has_main_dwg=file_rec.has_main_dwg,
                 ))
 
-        results.sort(key=lambda x: (x.dxf_no, x.k_num))
+        results.sort(key=lambda x: (x.dxf_no, x.k_num, x.main_dwg_path))
+        return results
+
+    def search_by_dxf_partial(self, query: str) -> list[DXFSearchResult]:
+        """
+        Частичный поиск по началу DXF-номера.
+
+        Правила:
+        - допустимы только цифры;
+        - выполняется поиск по префиксу строкового представления номера:
+          query='116' найдёт 116, 1160, 11601, 11699 и т.п.;
+        - результаты собираются как из Excel-индекса (_by_dxf_no),
+          так и из файлового индекса (_files_index);
+        - если по одному DXF-номеру есть несколько Excel-строк
+          (например, для нескольких K-номеров), все они попадают в результат;
+        - если Excel-строк нет, но основной DWG-файл известен,
+          создаётся минимальная запись.
+
+        Метод предназначен именно для табличного вывода множества совпадений.
+        """
+        raw = str(query).strip()
+        if not raw or not raw.isdigit():
+            return []
+
+        results: list[DXFSearchResult] = []
+        matched_numbers = sorted(
+            no for no in set(self._by_dxf_no.keys()) | set(self._files_index.keys())
+            if str(no).startswith(raw)
+        )
+
+        for dxf_no in matched_numbers:
+            excel_rows = self._by_dxf_no.get(dxf_no, [])
+            file_rec = self._files_index.get(dxf_no)
+
+            if excel_rows:
+                for row in excel_rows:
+                    results.append(DXFSearchResult(
+                        dxf_no=row.dxf_no,
+                        k_num=row.k_num,
+                        wst=row.wst,
+                        dicke_mm=row.dicke_mm,
+                        a_kn_brutto_qm=row.a_kn_brutto_qm,
+                        laenge_zuschnitt_mm=row.laenge_zuschnitt_mm,
+                        preis_pro_laenge_eur=row.preis_pro_laenge_eur,
+                        main_dwg_path=file_rec.main_dwg_path if file_rec else "",
+                        has_main_dwg=file_rec.has_main_dwg if file_rec else False,
+                    ))
+            elif file_rec:
+                results.append(DXFSearchResult(
+                    dxf_no=dxf_no,
+                    k_num="",
+                    wst="",
+                    dicke_mm=None,
+                    a_kn_brutto_qm=None,
+                    laenge_zuschnitt_mm=None,
+                    preis_pro_laenge_eur=None,
+                    main_dwg_path=file_rec.main_dwg_path,
+                    has_main_dwg=file_rec.has_main_dwg,
+                ))
+
+        results.sort(key=lambda x: (x.dxf_no, x.k_num, x.main_dwg_path))
         return results
 
     def ensure_minimum_indexes(self) -> None:
@@ -1567,8 +1642,15 @@ class AppNrRepository:
       Столбец E: K-номер заказа.
 
     Индексы (хранятся в памяти):
-      _by_prefix: str → list[AppNrRecord]  — поиск по числовому префиксу.
-      _by_k_code: str → list[str]          — список серийных номеров для K-кода.
+      _by_prefix: str → list[AppNrRecord]
+          Быстрый поиск по числовому префиксу.
+
+      _by_k_code: str → list[str]
+          Список серийных номеров для K-кода.
+
+      _all_records: list[AppNrRecord]
+          Полный список записей для частичного поиска по началу
+          полного серийного номера.
 
     Числовой префикс — часть серийного номера до первой точки:
       "1234"     → "1234"
@@ -1579,9 +1661,10 @@ class AppNrRepository:
     FULL_K_RE = re.compile(r"^K\d{5}$", re.IGNORECASE)
 
     def __init__(self, cfg: AppNrConfig = APPNR_CONFIG):
-        self.cfg       = cfg
+        self.cfg = cfg
         self._by_prefix: dict[str, list[AppNrRecord]] = {}
-        self._by_k_code: dict[str, list[str]]         = {}
+        self._by_k_code: dict[str, list[str]] = {}
+        self._all_records: list[AppNrRecord] = []
         self.reload()
 
     # ------------------------------------------------------------------
@@ -1616,7 +1699,7 @@ class AppNrRepository:
         if not s:
             return ""
         head = s.split(".", 1)[0].strip()
-        m    = re.match(r"^(\d+)", head)
+        m = re.match(r"^(\d+)", head)
         return m.group(1) if m else ""
 
     def is_excel_available(self) -> bool:
@@ -1645,10 +1728,18 @@ class AppNrRepository:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
     def reload(self) -> None:
-        """Загружает индекс с диска в память."""
+        """
+        Загружает индекс с диска в память.
+
+        Дополнительно формирует:
+        - _all_records для частичного поиска по полному serial_no;
+        - _by_prefix для быстрого поиска по числовому префиксу;
+        - _by_k_code для вывода App.Nr. в статусе K-поиска.
+        """
         data = self._load_raw()
         self._by_prefix = {}
         self._by_k_code = {}
+        self._all_records = []
 
         for item in data.get("items", []):
             try:
@@ -1656,12 +1747,16 @@ class AppNrRepository:
             except (KeyError, TypeError, ValueError):
                 continue
 
+            self._all_records.append(rec)
             self._by_prefix.setdefault(rec.serial_prefix, []).append(rec)
             self._by_k_code.setdefault(rec.k_code, []).append(rec.serial_no)
 
-        # Сортируем внутри каждой группы для стабильности вывода
+        # Сортировка нужна для стабильного порядка в таблицах и статусе
+        self._all_records.sort(key=lambda x: (x.serial_no, x.k_code))
+
         for prefix in self._by_prefix:
-            self._by_prefix[prefix].sort(key=lambda x: (x.k_code, x.serial_no))
+            self._by_prefix[prefix].sort(key=lambda x: (x.serial_no, x.k_code))
+
         for k_code in self._by_k_code:
             self._by_k_code[k_code] = sorted(set(self._by_k_code[k_code]))
 
@@ -1678,8 +1773,8 @@ class AppNrRepository:
         if not self.is_excel_available():
             raise FileNotFoundError(f"Excel-Datei nicht gefunden: {self.cfg.excel_file}")
 
-        wb    = load_workbook(self.cfg.excel_file, data_only=True, read_only=True)
-        ws    = wb.active
+        wb = load_workbook(self.cfg.excel_file, data_only=True, read_only=True)
+        ws = wb.active
         items: list[AppNrRecord] = []
         first = True
 
@@ -1689,7 +1784,7 @@ class AppNrRepository:
                 continue
 
             serial_no = self._normalize_serial_text(row[0] if len(row) > 0 else None)
-            k_code    = self._normalize_k_code(row[4]    if len(row) > 4 else None)
+            k_code = self._normalize_k_code(row[4] if len(row) > 4 else None)
 
             if not serial_no or not k_code:
                 continue
@@ -1711,7 +1806,7 @@ class AppNrRepository:
 
     def ensure_index(self) -> None:
         """Строит индекс если он пуст и Excel-файл доступен."""
-        if not self._by_prefix and self.is_excel_available():
+        if not self._all_records and self.is_excel_available():
             self.rebuild_index()
 
     # ------------------------------------------------------------------
@@ -1720,14 +1815,41 @@ class AppNrRepository:
 
     def search_by_serial(self, query: str) -> list[AppNrRecord]:
         """
-        Поиск записей по числовому префиксу серийного номера. O(1).
-        Например, запрос "1234" найдёт "1234", "1234.1", "1234.1-2".
+        Частичный поиск по началу полного серийного номера.
+
+        Примеры:
+        - '1234'     → 1234, 1234.1, 1234.1-2
+        - '1234.1'   → 1234.1, 1234.1-2
+        - '1234.1-'  → более узкий набор
+
+        Алгоритм:
+        1. Нормализуем запрос.
+        2. Если запрос пуст — возвращаем [].
+        3. Сначала пытаемся использовать быстрый индекс _by_prefix,
+           если запрос равен чистому числовому префиксу.
+        4. Затем фильтруем по startswith() по полному serial_no.
+           Это обеспечивает и совместимость со старым поведением,
+           и более точный частичный поиск.
         """
         self.ensure_index()
-        prefix = self._extract_prefix(str(query).strip())
-        if not prefix:
+
+        q = str(query).strip()
+        if not q:
             return []
-        return list(self._by_prefix.get(prefix, []))
+
+        # Быстрый путь для чисто числового префикса
+        if q.isdigit():
+            candidates = self._by_prefix.get(q, [])
+            return list(candidates)
+
+        # Общий путь: поиск по началу полного серийного номера
+        q_upper = q.upper()
+        results = [
+            rec for rec in self._all_records
+            if rec.serial_no.upper().startswith(q_upper)
+        ]
+        results.sort(key=lambda x: (x.serial_no, x.k_code))
+        return results
 
     def get_serials_for_k(self, k_code: str) -> list[str]:
         """Возвращает все серийные номера для данного K-кода."""
@@ -1986,11 +2108,17 @@ class ResultsDialog(wx.Dialog):
 
 class DXFResultsDialog(wx.Dialog):
     """
-    Модальное окно с результатами поиска DXF/DWG по K-номеру или DXF-номеру.
+    Модальное окно с результатами поиска DXF/DWG по K-номеру,
+    точному DXF-номеру или частичному совпадению по началу DXF-номера.
 
     Колонки: DXF | K-Nr. | Werkstoff | Dicke | A Kn brutto | Länge | Preis | DWG.
     Строки без основного DWG-файла (has_main_dwg=False) выделены жёлтым.
     Поддерживает сохранение результатов в TXT и CSV.
+
+    Важно:
+    - выбор строки выполняется по индексу строки в таблице, а не только по dxf_no;
+    - это необходимо, потому что один и тот же DXF-номер может встречаться
+      в нескольких строках для разных K-номеров.
     """
 
     def __init__(self, parent: wx.Window, results: list[DXFSearchResult], title: str):
@@ -2016,38 +2144,42 @@ class DXFResultsDialog(wx.Dialog):
             style=wx.LC_REPORT | wx.LC_SINGLE_SEL | wx.BORDER_SUNKEN,
         )
         self.tree.SetBackgroundColour(wx.Colour("#f0f4f0"))
-        self.tree.SetFont(wx.Font(10, wx.FONTFAMILY_DEFAULT,
-                                  wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+        self.tree.SetFont(wx.Font(
+            10,
+            wx.FONTFAMILY_DEFAULT,
+            wx.FONTSTYLE_NORMAL,
+            wx.FONTWEIGHT_NORMAL,
+        ))
 
         cols = [
-            (TXT["dxf_col_no"],     90),
-            (TXT["dxf_col_k"],      90),
-            (TXT["dxf_col_wst"],   110),
-            (TXT["dxf_col_dicke"],  90),
-            (TXT["dxf_col_area"],  120),
-            (TXT["dxf_col_length"],150),
-            (TXT["dxf_col_price"], 100),
-            (TXT["dxf_col_file"],  250),
+            (TXT["dxf_col_no"],      90),
+            (TXT["dxf_col_k"],       90),
+            (TXT["dxf_col_wst"],    110),
+            (TXT["dxf_col_dicke"],   90),
+            (TXT["dxf_col_area"],   120),
+            (TXT["dxf_col_length"], 150),
+            (TXT["dxf_col_price"],  100),
+            (TXT["dxf_col_file"],   250),
         ]
         for idx, (hdr, width) in enumerate(cols):
             self.tree.InsertColumn(idx, hdr, width=width)
 
         for res in self.results:
-            # В колонке DWG показываем только имя файла, не полный путь
             file_name = Path(res.main_dwg_path).name if res.main_dwg_path else "—"
             row = [
                 str(res.dxf_no),
                 res.k_num,
                 res.wst,
-                "" if res.dicke_mm             is None else f"{res.dicke_mm:g}",
-                "" if res.a_kn_brutto_qm       is None else f"{res.a_kn_brutto_qm:g}",
-                "" if res.laenge_zuschnitt_mm   is None else f"{res.laenge_zuschnitt_mm:g}",
-                "" if res.preis_pro_laenge_eur  is None else f"{res.preis_pro_laenge_eur:g}",
+                "" if res.dicke_mm is None else f"{res.dicke_mm:g}",
+                "" if res.a_kn_brutto_qm is None else f"{res.a_kn_brutto_qm:g}",
+                "" if res.laenge_zuschnitt_mm is None else f"{res.laenge_zuschnitt_mm:g}",
+                "" if res.preis_pro_laenge_eur is None else f"{res.preis_pro_laenge_eur:g}",
                 file_name,
             ]
             idx = self.tree.InsertItem(self.tree.GetItemCount(), row[0])
             for col, val in enumerate(row[1:], 1):
                 self.tree.SetItem(idx, col, val)
+
             if not res.has_main_dwg:
                 self.tree.SetItemBackgroundColour(idx, wx.Colour("#fff0a0"))
 
@@ -2056,7 +2188,7 @@ class DXFResultsDialog(wx.Dialog):
 
         # --- Кнопки действий ---
         act_sizer = _static_box_sizer(self, TXT["dxf_actions_box"])
-        btn_row   = wx.BoxSizer(wx.HORIZONTAL)
+        btn_row = wx.BoxSizer(wx.HORIZONTAL)
 
         actions = [
             (TXT["dxf_open_folder"], CLR_BTN_OK,      self._open_dwg_folder),
@@ -2071,53 +2203,72 @@ class DXFResultsDialog(wx.Dialog):
 
         act_sizer.Add(btn_row, 0, wx.EXPAND | wx.ALL, 6)
         outer.Add(data_sizer, 1, wx.EXPAND | wx.ALL, 10)
-        outer.Add(act_sizer,  0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        outer.Add(act_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
         self.SetSizer(outer)
 
     def _selected(self) -> Optional[DXFSearchResult]:
-        """Возвращает выбранную строку или None."""
+        """
+        Возвращает выбранную строку или None.
+
+        Здесь нельзя искать запись только по dxf_no, потому что один DXF
+        может встречаться в нескольких строках. Поэтому берём результат
+        напрямую по индексу строки.
+        """
         idx = self.tree.GetFirstSelected()
         if idx == wx.NOT_FOUND:
             return None
-        try:
-            dxf_no = int(self.tree.GetItemText(idx, 0))
-        except ValueError:
+        if idx < 0 or idx >= len(self.results):
             return None
-        return next((r for r in self.results if r.dxf_no == dxf_no), None)
+        return self.results[idx]
 
     def _require_selected(self) -> Optional[DXFSearchResult]:
         """Возвращает выбранную строку или показывает подсказку."""
         res = self._selected()
         if not res:
-            wx.MessageBox(TXT["dxf_select_entry"], TXT["msg_hint"],
-                          wx.OK | wx.ICON_INFORMATION)
+            wx.MessageBox(
+                TXT["dxf_select_entry"],
+                TXT["msg_hint"],
+                wx.OK | wx.ICON_INFORMATION,
+            )
         return res
 
     def _open_dwg_folder(self) -> None:
         res = self._require_selected()
         if not res:
             return
+
         if not res.main_dwg_path:
-            wx.MessageBox(TXT["dxf_folder_missing"].format(path="—"),
-                          TXT["msg_error"], wx.OK | wx.ICON_WARNING)
+            wx.MessageBox(
+                TXT["dxf_folder_missing"].format(path="—"),
+                TXT["msg_error"],
+                wx.OK | wx.ICON_WARNING,
+            )
             return
+
         folder = Path(res.main_dwg_path).parent
         if folder.exists():
             _open_path(folder)
         else:
-            wx.MessageBox(TXT["dxf_folder_missing"].format(path=folder),
-                          TXT["msg_error"], wx.OK | wx.ICON_WARNING)
+            wx.MessageBox(
+                TXT["dxf_folder_missing"].format(path=folder),
+                TXT["msg_error"],
+                wx.OK | wx.ICON_WARNING,
+            )
 
     def _open_dwg_file(self) -> None:
         res = self._require_selected()
         if not res:
             return
+
         path = Path(res.main_dwg_path)
         if res.has_main_dwg and path.exists():
             _open_path(path)
         else:
-            wx.MessageBox(TXT["dxf_file_missing"].format(path=path),
-                          TXT["msg_error"], wx.OK | wx.ICON_WARNING)
+            wx.MessageBox(
+                TXT["dxf_file_missing"].format(path=path),
+                TXT["msg_error"],
+                wx.OK | wx.ICON_WARNING,
+            )
 
     def _save_to_file(self) -> None:
         """Сохраняет результаты в TXT или CSV по выбору пользователя."""
@@ -2143,8 +2294,10 @@ class DXFResultsDialog(wx.Dialog):
 
         try:
             if is_csv:
-                lines = ["DXF;K-Nr.;Werkstoff;Dicke,mm;A Kn brutto,qm;"
-                         "Länge Zuschnitt,mm;Preis/Länge €;DWG"]
+                lines = [
+                    "DXF;K-Nr.;Werkstoff;Dicke,mm;A Kn brutto,qm;"
+                    "Länge Zuschnitt,mm;Preis/Länge €;DWG"
+                ]
                 for r in self.results:
                     lines.append(
                         f"{r.dxf_no};{r.k_num};{r.wst};"
@@ -2154,7 +2307,7 @@ class DXFResultsDialog(wx.Dialog):
                     )
             else:
                 lines = []
-                sep   = "-" * 60
+                sep = "-" * 60
                 for r in self.results:
                     lines += [
                         f"DXF: {r.dxf_no}",
@@ -2169,11 +2322,209 @@ class DXFResultsDialog(wx.Dialog):
                     ]
 
             target.write_text("\n".join(lines), encoding="utf-8")
-            wx.MessageBox(TXT["dxf_save_done"].format(path=target),
-                          TXT["update_done_title"], wx.OK | wx.ICON_INFORMATION)
+            wx.MessageBox(
+                TXT["dxf_save_done"].format(path=target),
+                TXT["update_done_title"],
+                wx.OK | wx.ICON_INFORMATION,
+            )
         except OSError as e:
             wx.MessageBox(str(e), TXT["msg_error"], wx.OK | wx.ICON_ERROR)
 
+
+class AppNrResultsDialog(wx.Dialog):
+    """
+    Модальное окно с результатами поиска по Apparate-Nr.
+
+    Показывает:
+    - полный серийный номер;
+    - числовой префикс;
+    - K-номер;
+    - наличие папки заказа;
+    - путь к папке заказа.
+
+    Поддерживает действия по выбранной строке:
+    - открыть папку заказа;
+    - открыть папку скетчей;
+    - открыть основной DWG;
+    - показать связанные DXF/DWG-результаты по K-номеру.
+
+    В окно передаётся родитель KFinderFrame, чтобы можно было
+    безопасно использовать уже существующие сервисы поиска K и DXF.
+    """
+
+    def __init__(self, parent: "KFinderFrame", records: list[AppNrRecord], title: str):
+        super().__init__(
+            parent,
+            title=title or TXT["app_results_title"],
+            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
+            size=wx.Size(1100, 560),
+        )
+        self.owner: KFinderFrame = parent
+        self.records = records
+        self._build()
+        self.CentreOnScreen()
+
+    def _build(self) -> None:
+        self.SetBackgroundColour(wx.Colour(CLR_BG))
+        outer = wx.BoxSizer(wx.VERTICAL)
+
+        # --- Таблица ---
+        tbl_sizer = _static_box_sizer(self, TXT["app_box"])
+
+        self.tree = wx.ListCtrl(
+            self,
+            style=wx.LC_REPORT | wx.LC_SINGLE_SEL | wx.BORDER_SUNKEN,
+        )
+        self.tree.SetBackgroundColour(wx.Colour("#f0f4f0"))
+        self.tree.SetFont(wx.Font(
+            10,
+            wx.FONTFAMILY_DEFAULT,
+            wx.FONTSTYLE_NORMAL,
+            wx.FONTWEIGHT_NORMAL,
+        ))
+
+        cols = [
+            (TXT["app_col_serial"],        180),
+            (TXT["app_col_prefix"],         90),
+            (TXT["app_col_k"],              90),
+            (TXT["app_col_folder_exists"], 130),
+            (TXT["app_col_folder"],        430),
+        ]
+        for idx, (hdr, width) in enumerate(cols):
+            self.tree.InsertColumn(idx, hdr, width=width)
+
+        for rec in self.records:
+            entry = self.owner.service.get_or_search(rec.k_code)
+            has_folder = bool(entry and entry.has_folder)
+            folder_path = entry.folder_path if has_folder else "—"
+
+            row = [
+                rec.serial_no,
+                rec.serial_prefix,
+                rec.k_code,
+                TXT["table_has_folder_yes"] if has_folder else TXT["table_has_folder_no"],
+                folder_path,
+            ]
+            idx = self.tree.InsertItem(self.tree.GetItemCount(), row[0])
+            for col, val in enumerate(row[1:], 1):
+                self.tree.SetItem(idx, col, val)
+
+            if not has_folder:
+                self.tree.SetItemBackgroundColour(idx, wx.Colour("#fff0a0"))
+
+        self.tree.Bind(wx.EVT_LIST_ITEM_ACTIVATED, lambda _: self._open_folder())
+        tbl_sizer.Add(self.tree, 1, wx.EXPAND | wx.ALL, 6)
+
+        # --- Кнопки ---
+        act_sizer = _static_box_sizer(self, TXT["app_actions_box"])
+        btn_row = wx.BoxSizer(wx.HORIZONTAL)
+
+        actions = [
+            (TXT["open_folder"],  CLR_BTN_OK,      self._open_folder),
+            (TXT["open_sketch"],  CLR_BTN_OK,      self._open_sketch),
+            (TXT["open_dwg"],     CLR_BTN_PRIMARY, self._open_dwg),
+            (TXT["open_dxf"],     CLR_BTN_DARK,    self._show_dxf),
+            (TXT["close_dialog"], CLR_BTN_DANGER,  self.Close),
+        ]
+        for label, color, handler in actions:
+            btn = _make_gen_button(self, label, color, wx.Size(-1, 34), 10)
+            btn.Bind(wx.EVT_BUTTON, lambda _, h=handler: h())
+            btn_row.Add(btn, 1, wx.RIGHT, 6)
+
+        act_sizer.Add(btn_row, 0, wx.EXPAND | wx.ALL, 6)
+        outer.Add(tbl_sizer, 1, wx.EXPAND | wx.ALL, 10)
+        outer.Add(act_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        self.SetSizer(outer)
+
+    def _selected_record(self) -> Optional[AppNrRecord]:
+        """Возвращает выбранную запись таблицы или None."""
+        idx = self.tree.GetFirstSelected()
+        if idx == wx.NOT_FOUND:
+            return None
+        if idx < 0 or idx >= len(self.records):
+            return None
+        return self.records[idx]
+
+    def _require_selected_record(self) -> Optional[AppNrRecord]:
+        """Требует выбранную строку, иначе показывает подсказку."""
+        rec = self._selected_record()
+        if not rec:
+            wx.MessageBox(
+                TXT["app_select_entry"],
+                TXT["msg_hint"],
+                wx.OK | wx.ICON_INFORMATION,
+            )
+        return rec
+
+    def _require_selected_entry(self) -> Optional[KEntry]:
+        """
+        Возвращает KEntry для выбранной строки, если у связанного K-кода
+        существует папка заказа. Иначе показывает понятное сообщение.
+        """
+        rec = self._require_selected_record()
+        if not rec:
+            return None
+
+        entry = self.owner.service.get_or_search(rec.k_code)
+        if not entry or not entry.has_folder:
+            wx.MessageBox(
+                TXT["msg_no_folder_single"].format(code=rec.k_code),
+                TXT["msg_no_folder_title"],
+                wx.OK | wx.ICON_WARNING,
+            )
+            return None
+        return entry
+
+    def _open_folder(self) -> None:
+        entry = self._require_selected_entry()
+        if not entry:
+            return
+
+        p = Path(entry.folder_path)
+        if p.exists():
+            _open_path(p)
+        else:
+            wx.MessageBox(
+                TXT["msg_folder_missing"].format(path=p),
+                TXT["msg_error"],
+                wx.OK | wx.ICON_WARNING,
+            )
+
+    def _open_sketch(self) -> None:
+        entry = self._require_selected_entry()
+        if not entry:
+            return
+
+        p = Path(entry.sketch_path)
+        if p.exists():
+            _open_path(p)
+        else:
+            wx.MessageBox(
+                TXT["msg_folder_missing"].format(path=p),
+                TXT["msg_error"],
+                wx.OK | wx.ICON_WARNING,
+            )
+
+    def _open_dwg(self) -> None:
+        entry = self._require_selected_entry()
+        if not entry:
+            return
+
+        p = Path(entry.dwg_path)
+        if p.exists():
+            _open_path(p)
+        else:
+            wx.MessageBox(
+                TXT["msg_file_missing"].format(path=p),
+                TXT["msg_error"],
+                wx.OK | wx.ICON_WARNING,
+            )
+
+    def _show_dxf(self) -> None:
+        rec = self._require_selected_record()
+        if not rec:
+            return
+        self.owner._show_dxf_results(rec.k_code)
 
 # ============================================================
 # СЛУЖЕБНЫЙ ДИАЛОГ
@@ -2182,11 +2533,22 @@ class DXFResultsDialog(wx.Dialog):
 class ServiceDialog(wx.Dialog):
     """
     Служебное окно с двумя операциями:
-    - Teilaktualisierung (хвостовое обновление — быстро).
-    - Vollständige Neuindizierung (полное перестроение — медленно).
 
-    Также отображает текущую информацию об индексе:
-    количество записей, дату обновления, путь, параметры хвоста.
+    1. Teilaktualisierung
+       Быстрое хвостовое обновление:
+       - K-индекса заказов;
+       - файлового DXF-индекса;
+       - App.Nr.-индекса из Excel.
+
+    2. Vollständige Neuindizierung
+       Полное перестроение:
+       - K-индекса заказов;
+       - DXF-диапазонов из листа Key;
+       - DXF-Excel-индекса из листа Tabelle1;
+       - DXF-файлового индекса;
+       - App.Nr.-индекса из Excel.
+
+    Диалог также показывает краткую сводку по текущим индексам.
     """
 
     def __init__(self, parent: "KFinderFrame", title: str):
@@ -2205,70 +2567,116 @@ class ServiceDialog(wx.Dialog):
         self.SetBackgroundColour(wx.Colour(CLR_BG))
         outer = wx.BoxSizer(wx.VERTICAL)
 
-        # --- Информация об индексе ---
+        # --- Информация об индексах ---
         info_sizer = _static_box_sizer(self, TXT["service_info_box"])
         self.info_lbl = wx.StaticText(self, label="—")
         self.info_lbl.SetForegroundColour(wx.Colour(CLR_LABEL))
-        self.info_lbl.SetFont(wx.Font(9, wx.FONTFAMILY_DEFAULT,
-                                      wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+        self.info_lbl.SetFont(wx.Font(
+            9,
+            wx.FONTFAMILY_DEFAULT,
+            wx.FONTSTYLE_NORMAL,
+            wx.FONTWEIGHT_NORMAL,
+        ))
         info_sizer.Add(self.info_lbl, 0, wx.ALL | wx.EXPAND, 6)
-        outer.Add(info_sizer, 0, wx.EXPAND | wx.ALL, 10)
+        outer.Add(info_sizer, 1, wx.EXPAND | wx.ALL, 10)
 
         # --- Кнопки действий ---
         act_sizer = _static_box_sizer(self, TXT["service_actions_box"])
-        btn_col   = wx.BoxSizer(wx.VERTICAL)
+        btn_row = wx.BoxSizer(wx.HORIZONTAL)
 
-        self.btn_partial = _make_gen_button(
-            self, TXT["service_update_partial"], CLR_BTN_WARN, wx.Size(-1, 34), 10)
-        self.btn_partial.Bind(wx.EVT_BUTTON, lambda _: self._run_partial())
-
-        self.btn_full = _make_gen_button(
-            self, TXT["service_update_full"], CLR_BTN_DANGER, wx.Size(-1, 34), 10)
-        self.btn_full.Bind(wx.EVT_BUTTON, lambda _: self._run_full())
-
+        btn_partial = _make_gen_button(
+            self, TXT["service_update_partial"], CLR_BTN_WARN, wx.Size(-1, 36), 10
+        )
+        btn_full = _make_gen_button(
+            self, TXT["service_update_full"], CLR_BTN_PRIMARY, wx.Size(-1, 36), 10
+        )
         btn_close = _make_gen_button(
-            self, TXT["service_close"], CLR_BTN_DARK, wx.Size(-1, 34), 10)
+            self, TXT["service_close"], CLR_BTN_DANGER, wx.Size(-1, 36), 10
+        )
+
+        btn_partial.Bind(wx.EVT_BUTTON, lambda _: self._run_partial())
+        btn_full.Bind(wx.EVT_BUTTON, lambda _: self._run_full())
         btn_close.Bind(wx.EVT_BUTTON, lambda _: self.Close())
 
-        btn_col.Add(self.btn_partial, 0, wx.EXPAND | wx.BOTTOM, 6)
-        btn_col.Add(self.btn_full,    0, wx.EXPAND | wx.BOTTOM, 6)
-        btn_col.Add(btn_close,        0, wx.EXPAND)
+        btn_row.Add(btn_partial, 1, wx.RIGHT, 6)
+        btn_row.Add(btn_full, 1, wx.RIGHT, 6)
+        btn_row.Add(btn_close, 1)
 
-        act_sizer.Add(btn_col, 0, wx.EXPAND | wx.ALL, 6)
+        act_sizer.Add(btn_row, 0, wx.EXPAND | wx.ALL, 6)
         outer.Add(act_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+
         self.SetSizer(outer)
 
     def _refresh_info(self) -> None:
-        """Обновляет метаданные индекса в информационной секции."""
-        meta  = self.owner.index.get_meta()
-        count = meta.get("count", 0)
-        gen   = meta.get("generated_at", "—")
-        root  = meta.get("root", str(self.owner.cfg.root_dir))
+        """
+        Обновляет текст сводной информации по индексам.
 
-        self.info_lbl.SetLabel(
-            f"Einträge: {count}\n"
-            f"Aktualisiert: {gen}\n"
-            f"Pfad: {root}\n"
-            f"Rückschritt: {self.owner.cfg.tail_backtrack}\n"
-            f"Geprüfte Jahre: {self.owner.cfg.tail_years_to_scan}"
-        )
+        Здесь показывается:
+        - информация по K-индексу;
+        - наличие / количество DXF-диапазонов;
+        - количество K-групп в DXF Excel-индексе;
+        - количество записей в DXF файловом индексе;
+        - количество App.Nr.-записей.
+        """
+        k_meta = self.owner.index.get_meta()
+        k_count = k_meta.get("count", 0)
+        k_generated = k_meta.get("generated_at", "—")
+        k_root = str(self.owner.cfg.root_dir)
+
+        dxf_ranges_count = len(self.owner.dxf_repo._ranges)
+        dxf_excel_groups = len(self.owner.dxf_repo._excel_index)
+        dxf_file_count = len(self.owner.dxf_repo._files_index)
+        appnr_count = len(self.owner.appnr_repo._all_records)
+
+        lines = [
+            "K-Index:",
+            f"  Einträge: {k_count}",
+            f"  Stand: {k_generated}",
+            f"  Root: {k_root}",
+            "",
+            "DXF-Indexe:",
+            f"  Bereiche (Key): {dxf_ranges_count}",
+            f"  Excel-Gruppen (nach K-Nr.): {dxf_excel_groups}",
+            f"  DWG-Dateien: {dxf_file_count}",
+            "",
+            "Apparate-Nr.:",
+            f"  Einträge: {appnr_count}",
+            "",
+            "Teilaktualisierung:",
+            f"  K: tail_backtrack={self.owner.cfg.tail_backtrack}, "
+            f"tail_years={self.owner.cfg.tail_years_to_scan}",
+            f"  DXF: file_backtrack={self.owner.dxf_repo.cfg.file_tail_backtrack}, "
+            f"file_forward={self.owner.dxf_repo.cfg.file_tail_forward_scan}",
+        ]
+        self.info_lbl.SetLabel("\n".join(lines))
+        self.Layout()
 
     def _run_partial(self) -> None:
+        """
+        Запускает частичное обновление всех поддерживаемых индексов.
+        После завершения обновляет сводку в окне.
+        """
         if wx.MessageBox(
             TXT["service_partial_confirm"],
             TXT["update_confirm_title"],
             wx.YES_NO | wx.ICON_QUESTION,
         ) != wx.YES:
             return
+
         self.owner.run_partial_update(silent=False, on_done=self._refresh_info)
 
     def _run_full(self) -> None:
+        """
+        Запускает полное перестроение всех поддерживаемых индексов.
+        После завершения обновляет сводку в окне.
+        """
         if wx.MessageBox(
             TXT["service_full_confirm"],
             TXT["msg_rebuild_confirm_title"],
             wx.YES_NO | wx.ICON_QUESTION,
         ) != wx.YES:
             return
+
         self.owner.run_full_rebuild(on_done=self._refresh_info)
 
 
@@ -2671,14 +3079,28 @@ class KFinderFrame(wx.Frame):
         return ", ".join(serials)
 
     def _resolve_app_to_k_codes(self, raw: str) -> list[str]:
-        """Ищет K-коды по серийному номеру аппарата."""
+        """
+        Ищет K-коды по введённому серийному номеру или его начальному фрагменту.
+
+        Метод сохранён как вспомогательный для совместимости с остальным кодом.
+        Возвращает уникальные K-коды в отсортированном виде.
+        """
         records = self.appnr_repo.search_by_serial(raw)
         return sorted({r.k_code for r in records})
 
     def _normalize_dxf_input(self, raw: str) -> str:
         """
-        Проверяет что ввод является числом (DXF-номером).
-        Бросает ValueError если нет.
+        Нормализует ввод для DXF-режима.
+
+        Допустимы только цифры. Метод принимает как полный DXF-номер,
+        так и его начало для частичного поиска.
+
+        Примеры допустимого ввода:
+        - 11601   -> точный поиск
+        - 116     -> частичный поиск по началу номера
+        - 78      -> частичный поиск по началу номера
+
+        Бросает ValueError при любом другом формате.
         """
         s = raw.strip()
         if not s or not s.isdigit():
@@ -2772,71 +3194,126 @@ class KFinderFrame(wx.Frame):
             wx.MessageBox(str(e), TXT["msg_error"], wx.OK | wx.ICON_ERROR)
 
     def _process_dxf(self, dxf_no: str, action: str) -> None:
-        """Обрабатывает действие в режиме DXF-поиска."""
-        results = self.dxf_repo.search_by_dxf_no(dxf_no)
+        """
+        Обрабатывает действие в режиме DXF-поиска.
+
+        Логика:
+        1. Сначала пытаемся выполнить точный поиск по DXF-номеру.
+        2. Если точных совпадений нет — выполняем частичный поиск
+           по началу номера.
+        3. Для show/dxf всегда показываем таблицу результатов.
+        4. Для прямых действий (folder/dwg) открываем первый результат
+           только если он найден однозначно точным поиском; иначе тоже
+           открываем таблицу, чтобы пользователь сам выбрал строку.
+
+        Такой подход сохраняет старое ожидаемое поведение для полного номера
+        и добавляет удобный partial-match без отдельного режима.
+        """
+        exact_results = self.dxf_repo.search_by_dxf_no(dxf_no)
+        partial_results = [] if exact_results else self.dxf_repo.search_by_dxf_partial(dxf_no)
+
+        results = exact_results or partial_results
 
         if not results:
-            wx.MessageBox(TXT["msg_dxf_not_found"].format(query=dxf_no),
-                          TXT["msg_dxf_not_found_title"], wx.OK | wx.ICON_INFORMATION)
-            self.entry.SetFocus()
-            self.entry.SelectAll()
-            return
-
-        if action in ("show", "dxf"):
-            dlg = DXFResultsDialog(self, results, f"{TXT['dxf_results_title']} — {dxf_no}")
-            dlg.ShowModal()
-            dlg.Destroy()
-            return
-
-        # Прямые действия: открываем первый результат
-        first = results[0]
-        path  = Path(first.main_dwg_path)
-
-        if action == "folder":
-            folder = path.parent
-            if folder.exists():
-                _open_path(folder)
-            else:
-                wx.MessageBox(TXT["dxf_folder_missing"].format(path=folder),
-                              TXT["msg_error"], wx.OK | wx.ICON_WARNING)
-            return
-
-        if action == "dwg":
-            if first.has_main_dwg and path.exists():
-                _open_path(path)
-            else:
-                wx.MessageBox(TXT["dxf_file_missing"].format(path=path),
-                              TXT["msg_error"], wx.OK | wx.ICON_WARNING)
-            return
-
-        # Режим DXF не поддерживает открытие папки скетчей
-        if action == "sketch":
-            wx.MessageBox(TXT["msg_mode_not_supported"], TXT["msg_hint"],
-                          wx.OK | wx.ICON_INFORMATION)
-
-    def _process_app_nr(self, raw: str, action: str) -> None:
-        """Обрабатывает действие в режиме App.Nr.-поиска."""
-        codes = self._resolve_app_to_k_codes(raw)
-
-        if not codes:
-            wx.MessageBox(TXT["msg_app_not_found"].format(query=raw),
-                          TXT["msg_app_not_found_title"], wx.OK | wx.ICON_INFORMATION)
-            self.entry.SetFocus()
-            self.entry.SelectAll()
-            return
-
-        # Если найдено несколько K-номеров — показываем список
-        if len(codes) > 1:
             wx.MessageBox(
-                TXT["msg_app_multi"].format(query=raw, codes=", ".join(codes)),
-                TXT["msg_app_multi_title"],
+                TXT["msg_dxf_not_found"].format(query=dxf_no),
+                TXT["msg_dxf_not_found_title"],
                 wx.OK | wx.ICON_INFORMATION,
             )
             self.entry.SetFocus()
             self.entry.SelectAll()
             return
 
-        k_code = codes[0]
+        # Для показа всегда открываем таблицу.
+        if action in ("show", "dxf"):
+            dlg = DXFResultsDialog(self, results, f"{TXT['dxf_results_title']} — {dxf_no}")
+            dlg.ShowModal()
+            dlg.Destroy()
+            return
+
+        # Для прямых действий безопасно автоматически открывать только
+        # результат точного поиска. Для частичного поиска нужна явная
+        # выборка строки пользователем.
+        if not exact_results:
+            dlg = DXFResultsDialog(self, results, f"{TXT['dxf_results_title']} — {dxf_no}")
+            dlg.ShowModal()
+            dlg.Destroy()
+            return
+
+        first = exact_results[0]
+        path = Path(first.main_dwg_path)
+
+        if action == "folder":
+            folder = path.parent
+            if folder.exists():
+                _open_path(folder)
+            else:
+                wx.MessageBox(
+                    TXT["dxf_folder_missing"].format(path=folder),
+                    TXT["msg_error"],
+                    wx.OK | wx.ICON_WARNING,
+                )
+            return
+
+        if action == "dwg":
+            if first.has_main_dwg and path.exists():
+                _open_path(path)
+            else:
+                wx.MessageBox(
+                    TXT["dxf_file_missing"].format(path=path),
+                    TXT["msg_error"],
+                    wx.OK | wx.ICON_WARNING,
+                )
+            return
+
+        # Режим DXF не поддерживает открытие папки скетчей
+        if action == "sketch":
+            wx.MessageBox(
+                TXT["msg_mode_not_supported"],
+                TXT["msg_hint"],
+                wx.OK | wx.ICON_INFORMATION,
+            )
+
+    def _process_app_nr(self, raw: str, action: str) -> None:
+        """
+        Обрабатывает действие в режиме App.Nr.-поиска.
+
+        Новое поведение:
+        - поиск выполняется по началу полного серийного номера;
+        - при множественных совпадениях вместо MessageBox открывается
+          табличный AppNrResultsDialog;
+        - для show всегда открывается таблица, даже если найден один результат;
+        - для прямого действия при одном результате выполняется переход
+          сразу к связанному K-коду;
+        - для прямого действия при нескольких результатах открывается таблица,
+          чтобы пользователь сам выбрал нужную строку.
+        """
+        records = self.appnr_repo.search_by_serial(raw)
+
+        if not records:
+            wx.MessageBox(
+                TXT["msg_app_not_found"].format(query=raw),
+                TXT["msg_app_not_found_title"],
+                wx.OK | wx.ICON_INFORMATION,
+            )
+            self.entry.SetFocus()
+            self.entry.SelectAll()
+            return
+
+        # Таблица по явному show или при неоднозначности
+        if action == "show" or len(records) > 1:
+            dlg = AppNrResultsDialog(
+                self,
+                records,
+                f"{TXT['app_results_title']} — {raw}",
+            )
+            dlg.ShowModal()
+            dlg.Destroy()
+            return
+
+        # Ниже остаётся только один однозначный результат
+        rec = records[0]
+        k_code = rec.k_code
 
         if action == "dxf":
             self._show_dxf_results(k_code)
@@ -2981,55 +3458,127 @@ class KFinderFrame(wx.Frame):
     # ------------------------------------------------------------------
 
     def _update_tail_async(
-        self,
-        ask: bool = True,
-        silent: bool = False,
-        on_done: Optional[Callable] = None,
+            self,
+            ask: bool = True,
+            silent: bool = False,
+            on_done: Optional[Callable] = None,
     ) -> None:
         """
-        Запускает хвостовое обновление K-индекса в фоновом потоке.
+        Запускает частичное обновление всех индексов в фоновом потоке.
 
-        ask=True     — сначала спрашивает подтверждения.
-        silent=True  — не показывает сообщения по завершению (для автозапуска).
-        on_done      — колбэк, вызывается после завершения через wx.CallAfter.
+        Что обновляется:
+        1. K-индекс заказов:
+           - хвостовое обновление последних лет.
+
+        2. DXF-индексы:
+           - при необходимости строится карта диапазонов из Excel (лист Key);
+           - выполняется хвостовое обновление файлового индекса DWG;
+           - Excel-индекс DXF перестраивается полностью, т.к. таблица является
+             основным источником и обычно меняется целостно.
+
+        3. App.Nr.:
+           - индекс серийных номеров перестраивается полностью из Excel.
+
+        ask=True     — сначала спрашивает подтверждение.
+        silent=True  — не показывает сообщение по завершению.
+        on_done      — callback, вызывается после завершения через wx.CallAfter.
         """
         if self._rebuild_running:
             if not silent:
-                wx.MessageBox(TXT["update_already_running"],
-                              TXT["update_confirm_title"], wx.OK | wx.ICON_INFORMATION)
+                wx.MessageBox(
+                    TXT["update_already_running"],
+                    TXT["update_confirm_title"],
+                    wx.OK | wx.ICON_INFORMATION,
+                )
             return
 
         if ask:
-            if wx.MessageBox(TXT["update_confirm"], TXT["update_confirm_title"],
-                             wx.YES_NO | wx.ICON_QUESTION) != wx.YES:
+            if wx.MessageBox(
+                    TXT["update_confirm"],
+                    TXT["update_confirm_title"],
+                    wx.YES_NO | wx.ICON_QUESTION,
+            ) != wx.YES:
                 return
 
         self._rebuild_running = True
         self._set_busy(True)
         self._set_status(
-            TXT["status_start_update"] if silent else TXT["service_update_running"], "warn")
+            TXT["status_start_update"] if silent else TXT["service_update_running"],
+            "warn",
+        )
 
         def worker():
             try:
-                count = self.index.update_tail(
+                # ----------------------------------------------------------
+                # 1. K-индекс
+                # ----------------------------------------------------------
+                self.after(lambda: self._set_status("K-Index: Teilaktualisierung…", "warn"))
+                k_count = self.index.update_tail(
                     backtrack=self.cfg.tail_backtrack,
                     tail_years_to_scan=self.cfg.tail_years_to_scan,
                     progress_cb=lambda m: self.after(lambda msg=m: self._set_status(msg, "warn")),
                 )
-                self.after(lambda: self._set_status(
-                    TXT["service_partial_done"].format(count=count), "ok"))
+
+                # ----------------------------------------------------------
+                # 2. DXF-индексы
+                # ----------------------------------------------------------
+                self.after(lambda: self._set_status("DXF: Bereiche prüfen…", "warn"))
+                if not self.dxf_repo._ranges:
+                    self.dxf_repo.rebuild_ranges_from_workbook()
+
+                self.after(lambda: self._set_status("DXF: Excel-Index aktualisieren…", "warn"))
+                dxf_excel_count = self.dxf_repo.rebuild_excel_index()
+
+                self.after(lambda: self._set_status("DXF: Datei-Index aktualisieren…", "warn"))
+                dxf_file_count = self.dxf_repo.update_files_index_tail(
+                    backtrack=self.dxf_repo.cfg.file_tail_backtrack,
+                    forward_scan=self.dxf_repo.cfg.file_tail_forward_scan,
+                    progress_cb=lambda m: self.after(lambda msg=m: self._set_status(msg, "warn")),
+                )
+
+                # ----------------------------------------------------------
+                # 3. App.Nr.
+                # ----------------------------------------------------------
+                self.after(lambda: self._set_status("App.Nr.: Index aktualisieren…", "warn"))
+                appnr_count = self.appnr_repo.rebuild_index()
+
+                # Перезагрузка индексов в память для надёжности
+                self.after(self.index.reload)
+                self.after(self.dxf_repo.reload_all)
+                self.after(self.appnr_repo.reload)
+
+                done_msg = (
+                    f"K: {k_count} | "
+                    f"DXF-Excel: {dxf_excel_count} | "
+                    f"DXF-Dateien: {dxf_file_count} | "
+                    f"App.Nr.: {appnr_count}"
+                )
+
+                self.after(lambda: self._set_status(done_msg, "ok"))
+
                 if not silent:
                     self.after(lambda: wx.MessageBox(
-                        TXT["update_done_msg"].format(count=count),
-                        TXT["update_done_title"], wx.OK | wx.ICON_INFORMATION))
+                        "Indexdaten wurden aktualisiert.\n\n"
+                        f"K-Index: {k_count}\n"
+                        f"DXF-Excel: {dxf_excel_count}\n"
+                        f"DXF-Dateien: {dxf_file_count}\n"
+                        f"Apparate-Nr.: {appnr_count}",
+                        TXT["update_done_title"],
+                        wx.OK | wx.ICON_INFORMATION,
+                    ))
+
                 if on_done:
                     self.after(on_done)
-            except (OSError, FileNotFoundError) as e:
-                logger.error(f"update_tail: {e}")
+
+            except (OSError, FileNotFoundError, KeyError) as e:
+                logger.error(f"update_tail_all: {e}")
                 self.after(lambda: self._set_status(TXT["service_update_error"], "err"))
                 if not silent:
                     self.after(lambda: wx.MessageBox(
-                        str(e), TXT["msg_error"], wx.OK | wx.ICON_ERROR))
+                        str(e),
+                        TXT["msg_error"],
+                        wx.OK | wx.ICON_ERROR,
+                    ))
             finally:
                 self.after(lambda: setattr(self, "_rebuild_running", False))
                 self.after(lambda: self._set_busy(False))
@@ -3037,22 +3586,36 @@ class KFinderFrame(wx.Frame):
         threading.Thread(target=worker, daemon=True).start()
 
     def _rebuild_async(
-        self,
-        ask: bool = True,
-        on_done: Optional[Callable] = None,
+            self,
+            ask: bool = True,
+            on_done: Optional[Callable] = None,
     ) -> None:
         """
-        Запускает полное перестроение K-индекса в фоновом потоке.
-        ask=True — сначала спрашивает подтверждения.
+        Запускает полное перестроение всех индексов в фоновом потоке.
+
+        Что перестраивается:
+        1. K-индекс заказов — полный rebuild().
+        2. DXF-диапазоны — из листа Key.
+        3. DXF Excel-индекс — из листа Tabelle1.
+        4. DXF файловый индекс — полный проход по диапазону номеров.
+        5. App.Nr.-индекс — полное чтение из Excel.
+
+        ask=True — сначала спрашивает подтверждение.
         """
         if self._rebuild_running:
-            wx.MessageBox(TXT["msg_rebuild_already_running"],
-                          TXT["msg_rebuild_confirm_title"], wx.OK | wx.ICON_INFORMATION)
+            wx.MessageBox(
+                TXT["msg_rebuild_already_running"],
+                TXT["msg_rebuild_confirm_title"],
+                wx.OK | wx.ICON_INFORMATION,
+            )
             return
 
         if ask:
-            if wx.MessageBox(TXT["msg_rebuild_confirm"], TXT["msg_rebuild_confirm_title"],
-                             wx.YES_NO | wx.ICON_QUESTION) != wx.YES:
+            if wx.MessageBox(
+                    TXT["msg_rebuild_confirm"],
+                    TXT["msg_rebuild_confirm_title"],
+                    wx.YES_NO | wx.ICON_QUESTION,
+            ) != wx.YES:
                 return
 
         self._rebuild_running = True
@@ -3061,21 +3624,70 @@ class KFinderFrame(wx.Frame):
 
         def worker():
             try:
-                count = self.index.rebuild(
+                # ----------------------------------------------------------
+                # 1. K-индекс
+                # ----------------------------------------------------------
+                self.after(lambda: self._set_status("K-Index: Vollaufbau…", "warn"))
+                k_count = self.index.rebuild(
                     progress_cb=lambda m: self.after(lambda msg=m: self._set_status(msg, "warn")),
                 )
-                self.after(lambda: self._set_status(
-                    TXT["service_full_done"].format(count=count), "ok"))
+
+                # ----------------------------------------------------------
+                # 2. DXF-индексы
+                # ----------------------------------------------------------
+                self.after(lambda: self._set_status("DXF: Bereiche aus Excel…", "warn"))
+                dxf_ranges_count = self.dxf_repo.rebuild_ranges_from_workbook()
+
+                self.after(lambda: self._set_status("DXF: Excel-Index Vollaufbau…", "warn"))
+                dxf_excel_count = self.dxf_repo.rebuild_excel_index()
+
+                self.after(lambda: self._set_status("DXF: Datei-Index Vollaufbau…", "warn"))
+                dxf_file_count = self.dxf_repo.rebuild_files_index_full(
+                    progress_cb=lambda m: self.after(lambda msg=m: self._set_status(msg, "warn")),
+                )
+
+                # ----------------------------------------------------------
+                # 3. App.Nr.
+                # ----------------------------------------------------------
+                self.after(lambda: self._set_status("App.Nr.: Vollaufbau…", "warn"))
+                appnr_count = self.appnr_repo.rebuild_index()
+
+                # Перечитать всё с диска после построения
+                self.after(self.index.reload)
+                self.after(self.dxf_repo.reload_all)
+                self.after(self.appnr_repo.reload)
+
+                done_msg = (
+                    f"K: {k_count} | "
+                    f"DXF-Bereiche: {dxf_ranges_count} | "
+                    f"DXF-Excel: {dxf_excel_count} | "
+                    f"DXF-Dateien: {dxf_file_count} | "
+                    f"App.Nr.: {appnr_count}"
+                )
+                self.after(lambda: self._set_status(done_msg, "ok"))
+
                 self.after(lambda: wx.MessageBox(
-                    TXT["msg_rebuild_done"].format(count=count),
-                    TXT["msg_rebuild_done_title"], wx.OK | wx.ICON_INFORMATION))
+                    "Indexdaten wurden vollständig neu aufgebaut.\n\n"
+                    f"K-Index: {k_count}\n"
+                    f"DXF-Bereiche: {dxf_ranges_count}\n"
+                    f"DXF-Excel: {dxf_excel_count}\n"
+                    f"DXF-Dateien: {dxf_file_count}\n"
+                    f"Apparate-Nr.: {appnr_count}",
+                    TXT["msg_rebuild_done_title"],
+                    wx.OK | wx.ICON_INFORMATION,
+                ))
+
                 if on_done:
                     self.after(on_done)
-            except (OSError, FileNotFoundError) as e:
-                logger.error(f"rebuild: {e}")
+
+            except (OSError, FileNotFoundError, KeyError) as e:
+                logger.error(f"rebuild_all: {e}")
                 self.after(lambda: self._set_status(TXT["service_rebuild_error"], "err"))
                 self.after(lambda: wx.MessageBox(
-                    str(e), TXT["msg_error"], wx.OK | wx.ICON_ERROR))
+                    str(e),
+                    TXT["msg_error"],
+                    wx.OK | wx.ICON_ERROR,
+                ))
             finally:
                 self.after(lambda: setattr(self, "_rebuild_running", False))
                 self.after(lambda: self._set_busy(False))
