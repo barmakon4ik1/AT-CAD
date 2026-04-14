@@ -1112,7 +1112,6 @@ def build_type4(modelspace, cfg: BridgeConfig):
         pb.arc_to(p9, -bulge)
 
     pb.line_to(p14)
-    pb.line_to(p15)
     pb.line_to(p0)
 
     pb.close()

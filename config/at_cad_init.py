@@ -466,7 +466,10 @@ class ATCadInit:
         """Проверяет not None и живость COM-соединения."""
         if self.acad is None or self.adoc is None:
             return False
-        return self._is_com_alive()
+        if not self._is_com_alive():
+            return False
+            # Дополнительно: проверяем что текущий adoc ещё жив
+        return self._safe_call(lambda: self.adoc.Name) is not None
 
     def restore_original_layer(self) -> None:
         """Восстанавливает слой, активный до начала построения."""

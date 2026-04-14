@@ -20,12 +20,9 @@
 """
 
 from __future__ import annotations
-
 import time
-from typing import Optional, List, Sequence, Union
-
-from comtypes.automation import VARIANT
-
+from typing import Optional, List, Sequence
+from _ctypes import COMError
 from config.at_cad_init import ATCadInit
 from programs.at_com_utils import safe_utility_call
 from locales.at_translations import loc
@@ -95,13 +92,33 @@ def _get_point_via_sendcommand(document: object, timeout: float = 30.0) -> Optio
 # Основной API
 # ---------------------------------------------------------------------------
 
-def at_get_point(
-    adoc: object | None = None,
-    *,
-    prompt: Optional[str] = None,
-    as_variant: bool = False,
-    suppress_popups: bool = False,
-) -> Optional[Union[List[float], VARIANT]]:
+# programs/at_input.py
+
+def _resolve_document(cad: ATCadInit, adoc: object | None) -> object | None:
+    """
+    Возвращает рабочий документ:
+    - если передан adoc и он живой — используем его
+    - иначе берём актуальный ActiveDocument через refresh
+    """
+    if adoc is not None and _is_document_alive(adoc):
+        return adoc
+
+    # refresh_active_document обновляет cad.adoc до ActiveDocument
+    if not cad.refresh_active_document():
+        return None
+
+    return cad.adoc  # уже актуальный после refresh
+
+def _is_document_alive(doc: object) -> bool:
+    """Проверяет, что COM-объект документа ещё валиден."""
+    try:
+        _ = doc.Name          # бросит исключение если документ закрыт
+        _ = doc.ModelSpace    # проверяем доступность ModelSpace
+        return True
+    except (AttributeError, RuntimeError, OSError, COMError):
+        return False
+
+def at_get_point(adoc=None, *, prompt=None, as_variant=False, suppress_popups=False):
     """
     Запрашивает у пользователя точку в AutoCAD.
 
@@ -114,6 +131,7 @@ def at_get_point(
     Возвращает:
         [x, y, z] | VARIANT | None
     """
+
     result_point: Optional[List[float]] = None
 
     cad = ATCadInit()
@@ -122,7 +140,11 @@ def at_get_point(
             show_popup(loc.get("com_failed"), popup_type="error")
         return None
 
-    document = adoc or cad.document
+    if adoc is not None and not _is_document_alive(adoc):
+        adoc = None
+
+    document = _resolve_document(cad, adoc)
+
     if document is None:
         if not suppress_popups:
             show_popup(loc.get("com_failed"), popup_type="error")
@@ -196,7 +218,7 @@ def at_get_entity(
             show_popup(loc.get("com_failed"), popup_type="error")
         return None, None, False, False, True
 
-    document = adoc or cad.document
+    document = _resolve_document(cad, adoc)
     if document is None:
         return None, None, False, False, True
 
