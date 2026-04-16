@@ -1,0 +1,57 @@
+{
+  "paths": {
+    "root_dir": "G:\\Auftragsdokumente",
+    "dxf_excel_file": "G:\\Drawing\\DXF-LASER\\DXF-2017.xlsm",
+    "dxf_root_dir": "G:\\Drawing\\DXF-LASER",
+    "appnr_excel_file": "G:\\Auftragsdokumente\\Apparate-Nr.xlsx",
+    "sketch_folder_name": "RP - dxf -Skizzen"
+  },
+
+  "indexing": {
+    "auto_update_on_start": false,
+
+    "k": {
+      "start_year": 2011,
+      "tail_backtrack": 50,
+      "tail_years_to_scan": 2
+    },
+
+    "dxf": {
+      "min_dxf_no": 7801,
+      "max_dxf_no": 12000,
+      "file_tail_backtrack": 100,
+      "file_tail_forward_scan": 100
+    },
+
+    "appnr": {
+      "tail_backtrack_prefix": 100
+    }
+  },
+
+  "ui": {
+    "window_size": [410, 570],
+    "service_window_size": [500, 360],
+
+    "auto_open_single": false,
+    "auto_show_single": true,
+    "live_search_if_missing": true,
+
+    "colors": {
+      "bg": "#508050",
+      "btn_primary": "#2980b9",
+      "btn_ok": "#27ae60",
+      "btn_warn": "#e67e22",
+      "btn_danger": "#c0392b",
+      "btn_dark": "#2c3e50",
+      "text": "#ffffff",
+      "label": "#e8f5e9"
+    },
+
+    "fonts": {
+      "default_size": 10,
+      "small_size": 9,
+      "title_size": 12,
+      "button_size": 10
+    }
+  }
+}
