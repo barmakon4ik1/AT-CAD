@@ -163,11 +163,12 @@ def build_truncated_cone_from_halves(d1: float, d2: float, h: float, n: int, cur
         bulge_upper = [math.tan(phi_step_upper / 4.0)] * len(upper_curve) if phi_step_upper else [0.0] * len(upper_curve)
 
     # --- Формируем общий контур (нижняя -> правая образующая -> верхняя (обратная) -> левая образующая)
+    # Вместо поиска min/max по X — берём явные торцевые точки
     contour = (
-        lower_curve +
-        [lower_right, upper_right] +
-        list(reversed(upper_curve)) +
-        [upper_left, lower_left]
+            lower_curve +  # нижняя дуга слева направо
+            [upper_curve[-1]] +  # правая образующая: конец нижней → конец верхней
+            list(reversed(upper_curve)) +  # верхняя дуга справа налево
+            [lower_curve[0]]  # левая образующая: начало верхней → начало нижней
     )
     bulge_list = [0.0] * (len(contour) - 1)
 
@@ -441,7 +442,7 @@ def at_eccentric_reducer(data: Dict[str, Any]) -> bool:
                 return False
 
         # --- обновление документа
-        regen(adoc)
+        regen(document_acad)
 
         return True
 
