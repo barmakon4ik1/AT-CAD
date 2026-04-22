@@ -71,8 +71,8 @@ class SlottedHoleCommand:
 
 if __name__ == "__main__":
     result = {
-        "diameter": 25,
-        "length": 50,
+        "diameter": 14,
+        "length": 10,
         "angle": 90,
         "direction": "center",
         "input_point": None
