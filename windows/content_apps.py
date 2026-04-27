@@ -58,9 +58,9 @@ TRANSLATIONS = {
         "en": "Plate"
     },
     "at_info": {
-        "ru": "Информация о примитиве/примитивах",
-        "de": "Informationen über das/die Objekt/Objekten",
-        "en": "Information about the entity/entities"
+        "ru": "Инфо о примитиве(ах)",
+        "de": "Info ü.Objekt(en)",
+        "en": "Info about entity(ies)"
     },
 }
 # Регистрируем переводы сразу при загрузке модуля
