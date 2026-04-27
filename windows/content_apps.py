@@ -14,7 +14,6 @@
 
 import wx
 
-from windows.at_content_registry import CONTENT_REGISTRY, run_build
 from windows.at_window_utils import BaseContentPanel, get_link_font
 from windows.at_run_dialog_window import load_content
 from locales.at_translations import loc
@@ -111,10 +110,15 @@ class AppsContentPanel(BaseContentPanel):
             self.GetSizer().Clear(True)
         self.links.clear()
 
+        # Количество колонок в списке модулей — увеличь при необходимости
+        COLUMNS = 2
+
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         main_sizer.AddSpacer(20)
 
-        link_sizer = wx.BoxSizer(wx.VERTICAL)
+        # Отступ между колонками регулируется через hgap=30,
+        # вертикальный — через vgap (сейчас 0, так как уже есть wx.ALL, 10 у каждой ссылки).
+        link_sizer = wx.FlexGridSizer(cols=COLUMNS, vgap=0, hgap=30)
 
         # Получаем список доступных программ из CONTENT_REGISTRY через load_content
         programs = load_content("get_content_menu", self) or []

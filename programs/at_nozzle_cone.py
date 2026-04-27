@@ -19,7 +19,7 @@ from config.at_cad_init import ATCadInit
 from locales.at_translations import loc
 from programs.at_base import regen
 from programs.at_construction import at_cone_sheet, add_polyline, add_text
-from programs.at_geometry import ensure_point_variant, rad_to_deg, polar_point
+from programs.at_geometry import ensure_point_variant, polar_point
 from programs.at_input import at_get_point
 from windows.at_gui_utils import show_popup
 from config.at_config import TEXT_HEIGHT_SMALL, TEXT_DISTANCE, TEXT_HEIGHT_BIG
@@ -132,7 +132,7 @@ def main(data):
 # Основная логика: парсер входного словаря -> геометрия -> развертка
 # ---------------------------------------------------------------------------
 
-def at_nozzle_cone(data: Dict[str, Any], params=None) -> bool:
+def at_nozzle_cone(data: Dict[str, Any]) -> bool:
     """
     Основная функция построения развертки патрубка-конуса.
 
@@ -242,7 +242,7 @@ def at_nozzle_cone(data: Dict[str, Any], params=None) -> bool:
             # apex_variant может быть VARIANT; ensure it is sequence
             apex = tuple(apex_variant if not hasattr(apex_variant, 'value') else apex_variant.value
                          for apex_variant in (apex_variant,))  # will be tuple of one element... safer to process below
-        except Exception:
+        except TypeError:
             # попытка разобрать как простой список/кортеж
             if isinstance(apex_variant, (list, tuple)):
                 apex = tuple(apex_variant)
@@ -250,7 +250,7 @@ def at_nozzle_cone(data: Dict[str, Any], params=None) -> bool:
                 # если неожиданный формат — попытаемся взять первые 3 чисел
                 try:
                     apex = (float(apex_variant[0]), float(apex_variant[1]), float(apex_variant[2]))
-                except Exception:
+                except RuntimeError:
                     apex = (0.0, 0.0, 0.0)
 
         # many at_cone_sheet return apex as [x,y,z] directly; handle that:
@@ -262,7 +262,7 @@ def at_nozzle_cone(data: Dict[str, Any], params=None) -> bool:
                 val = getattr(apex_variant, "value", None)
                 if isinstance(val, (list, tuple)):
                     apex = tuple(val)
-            except Exception:
+            except RuntimeError:
                 pass
 
         # Ensure apex is 3-tuple
@@ -277,7 +277,7 @@ def at_nozzle_cone(data: Dict[str, Any], params=None) -> bool:
         pts_flat = build_intersection_points_on_flat(apex, theta_rad, gens)
 
         # Поворот: чтобы апекс оказался внизу
-        rotate_angle = 90.0 - rad_to_deg(theta_rad) / 2.0
+        rotate_angle = 90.0 - math.radians(theta_rad) / 2.0
         pts_rot = rotate_points(pts_flat, rotate_angle, origin=apex)
 
         # Добавляем полилинию в модель
@@ -389,7 +389,7 @@ def at_nozzle_cone(data: Dict[str, Any], params=None) -> bool:
                     popup_type="error"
                 )
                 logging.error(f"Ошибка добавления текста {i + 1}: {e}")
-                return None
+                return False
 
         regen(adoc)
         return True
@@ -405,11 +405,10 @@ def at_nozzle_cone(data: Dict[str, Any], params=None) -> bool:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    cad = ATCadInit()
-    adoc = cad.document
-    model = cad.model_space
+    autocad = ATCadInit()
+    autocaddoc = autocad.document
 
-    insert = at_get_point(adoc, prompt=loc.get("select_point", "Укажите точку вставки"), as_variant=False)
+    insert = at_get_point(autocaddoc, prompt=loc.get("select_point", "Укажите точку вставки"), as_variant=False)
 
     sample = {
         "insert_point": insert,

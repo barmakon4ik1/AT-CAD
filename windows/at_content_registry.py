@@ -8,6 +8,7 @@ windows/at_content_registry.py
 import logging
 from programs.at_base import run_program
 from locales.at_translations import loc
+from importlib import import_module
 
 # -----------------------------
 # Локальные переводы модуля
@@ -76,16 +77,20 @@ TRANSLATIONS = {
         "de": "Kegelpassung",
         "en": "Cone fitting"
     },
-    "at_name_plate": {"ru": "Мостики для табличек", "en": "Name Plates Bracket", "de": "Typenschildträger"},
+    "at_name_plate": {
+        "ru": "Мостики для табличек",
+        "en": "Name Plates Bracket",
+        "de": "Typenschildträger"
+    },
     "footer_hint_default": {
         "ru": "Выберите модуль для начала работы",
         "de": "Wählen Sie ein Modul, um zu beginnen",
         "en": "Select a module to start working"
     },
     "at_info": {
-        "ru": "Информация о примитиве/примитивах",
-        "de": "Informationen über das/die Objekt/Objekten",
-        "en": "Information about the entity/entities"
+        "ru": "Инфо о примитиве(ах)",
+        "de": "Info ü. Objekt(en)",
+        "en": "Info about entity(ies)"
     },
     "footer_hint_cone": {
         "ru": "Построение развертки прямого и усеченного конуса",
@@ -129,6 +134,17 @@ loc.register_translations(TRANSLATIONS)
 
 
 # Словарь с именами модулей контента, их метками и программами построения
+"""
+    Записи в регистре на примере продолговатого отверстия:
+    
+    Ключ "slotted_hole" — это имя модуля, по которому вся система его находит. Внутри:
+
+    "module" — путь к файлу диалогового окна. Отсюда импортируется open_dialog().
+    "label" — ключ локализации. По нему content_apps.py берёт текст ссылки в списке модулей (loc.get("at_run_slotted_hole") → "Продолговатое отверстие").
+    "footer_hint" — ключ локализации для подсказки в футере главного окна. Обновляется через update_footer_hint().
+    "type": "dialog" — говорит run_build() что это модальное окно, а не встраиваемая панель.
+    "build_module" — путь к модулю построения. После того как диалог вернул словарь, run_build() вызывает main() именно отсюда.
+"""
 CONTENT_REGISTRY = {
     "cone": {
         "module": "windows.content_cone",
@@ -178,7 +194,11 @@ CONTENT_REGISTRY = {
         "label": "at_run_eccentric",
         "build_module": "programs.at_run_ecc_red"
     },
-
+    "cone_pipe": {
+        "module": "windows.content_cone_pipe",
+        "label": "at_run_cone_pipe",
+        "build_module": "programs.at_nozzle_cone",
+    },
     "vessel_name": {
         "module": "windows.content_bracket",
         "label": "at_name_plate",
@@ -187,7 +207,8 @@ CONTENT_REGISTRY = {
     "info": {
         "module": "windows.at_entity_inspector",
         "label": "at_info",
-        "type": "dialog"
+        "type": "dialog",
+        "build_module": "None",
     },
     "slotted_hole": {
         "module": "windows.slotted_hole_dialog",
@@ -227,7 +248,6 @@ def run_build(content_name: str, data=None, parent=None):
         return run_program(build_module, data)
    # ====== ДИАЛОГ ======
     elif content_type == "dialog":
-        from importlib import import_module
 
         mod = import_module(info["module"])
         if not hasattr(mod, "open_dialog"):

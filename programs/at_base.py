@@ -73,6 +73,9 @@ def run_program(module_name: str, data: Any = None) -> Any:
     """
     try:
         module = importlib.import_module(module_name)
+    except ModuleNotFoundError:
+        logger.info("Нет обрабатывающего модуля - он не нужен?")
+        return None
     except ImportError as e:
         logger.error(f"[run_program] Не удалось импортировать модуль '{module_name}': {e}")
         return None
