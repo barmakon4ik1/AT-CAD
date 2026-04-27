@@ -111,6 +111,17 @@ TRANSLATIONS = {
         "en": "Create and manage equipment name plates"
     },
 
+    "at_run_slotted_hole": {
+        "ru": "Продолговатое отверстие",
+        "de": "Langloch",
+        "en": "Slotted hole"
+    },
+    "footer_hint_slotted_hole": {
+        "ru": "Построение продолговатого отверстия",
+        "de": "Langloch zeichnen",
+        "en": "Draw slotted hole"
+    },
+
 }
 
 # Регистрируем локальные переводы
@@ -178,6 +189,13 @@ CONTENT_REGISTRY = {
         "label": "at_info",
         "type": "dialog"
     },
+    "slotted_hole": {
+        "module": "windows.slotted_hole_dialog",
+        "label": "at_run_slotted_hole",
+        "footer_hint": "footer_hint_slotted_hole",
+        "type": "dialog",
+        "build_module": "programs.at_slotted_hole",
+    },
 }
 
 
@@ -213,9 +231,17 @@ def run_build(content_name: str, data=None, parent=None):
 
         mod = import_module(info["module"])
         if not hasattr(mod, "open_dialog"):
-            raise RuntimeError(f"{info['module']} must define open_dialog(parent)")
+            raise RuntimeError(f"{info['module']} must define open_dialog(parent) -> dict | None")
 
-        return mod.open_dialog(parent)
-    else:
+        data = mod.open_dialog(parent)
+
+        if data is not None:
+            build_module_path = info.get("build_module")
+            if build_module_path:
+                return run_program(build_module_path, data)
+            else:
+                logging.warning(f"dialog '{content_name}' вернул данные, но build_module не указан")
+
         return None
+    return None
 

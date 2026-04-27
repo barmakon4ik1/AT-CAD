@@ -69,6 +69,12 @@ class SlottedHoleCommand:
         if adoc:
             regen(adoc)
 
+
+def main(data: dict):
+    """Точка входа для вызова из at_content_registry через run_program."""
+    SlottedHoleCommand(data).execute()
+
+
 if __name__ == "__main__":
     result = {
         "diameter": 14,

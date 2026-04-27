@@ -282,6 +282,18 @@ class SlottedHoleContentPanel(BaseContentPanel):
         self.clear_input_fields()
 
 
+def open_dialog(parent: wx.Window) -> dict | None:
+    """
+    Открывает диалог, возвращает словарь с данными или None при отмене.
+    """
+    dlg = SlottedHoleDialog(parent)
+    result = None
+    if dlg.ShowModal() == wx.ID_OK:
+        result = dlg.panel.result
+    dlg.Destroy()
+    return result
+
+
 if __name__ == "__main__":
 
     app = wx.App(False)
