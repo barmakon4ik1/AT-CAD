@@ -473,7 +473,7 @@ def polar_point(base_point: Union[List[float], Tuple[float, ...], VARIANT],
 
 def build_polyline_list(data: Dict) -> Optional[List[List[float]]]:
     """
-    Создаёт список точек для полилинии на основе данных листа.
+    Создаёт список точек для полилинии на основе данных списка.
 
     Args:
         data: Словарь с данными (insert_point, point_list, material, thickness, melt_no, allowance).

@@ -33,8 +33,6 @@ from typing import Optional, Union
 from win32com.client import VARIANT
 
 from config.at_cad_init import ATCadInit
-from errors.at_errors import DataError
-from programs.at_base import regen
 from programs.at_geometry import ensure_point_variant
 from programs.at_input import at_get_point
 from config.at_config import (
@@ -43,7 +41,6 @@ from config.at_config import (
     DEFAULT_DIM_STYLE,
     DEFAULT_DIM_LAYER,
 )
-from locales.at_localization_class import loc
 
 # --------------------------------------------------------------------------------------
 # Константы подсказок
@@ -115,7 +112,7 @@ def _dim_mid_offset(dim_type: str, point1: VARIANT, point2: VARIANT, offset: flo
     result = [0.0, mid_y, 0.0]
 
     # Определяем нормаль и смещение
-    nx, ny = 0.0, 0.0
+    # nx, ny = 0.0, 0.0
     if dim_type == "H":
         # Для горизонтального размера: ближайшая точка с большей y
         base_point = p2 if p2[1] > p1[1] else p1
@@ -201,7 +198,7 @@ def _ensure_layer_exists(adoc, layer_name: str):
     """
     try:
         adoc.Layers.Item(layer_name)
-    except (DataError, IndexError):
+    except Exception:  # noinspection PyBroadException
         adoc.Layers.Add(layer_name)
 
 
@@ -211,11 +208,9 @@ def _ensure_dimstyle_exists(adoc, style_name: str):
     Если отсутствует — используется текущий активный.
     """
     try:
-        adoc.DimStyles.Item(style_name)
         adoc.ActiveDimStyle = adoc.DimStyles.Item(style_name)
-    except Exception:
-        # если стиль отсутствует — не падаем
-        pass
+    except Exception: # noinspection PyBroadException
+        pass  # стиль не найден — AutoCAD использует текущий активный
 
 
 # --------------------------------------------------------------------------------------

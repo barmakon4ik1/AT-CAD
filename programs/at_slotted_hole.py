@@ -29,7 +29,7 @@ class SlottedHoleCommand:
     def execute(self):
         # 1. Получаем model
         model = self.data.get("model")
-        adoc = None
+        # adoc = None
 
         if model is None:
             acad = ATCadInit()
