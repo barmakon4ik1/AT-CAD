@@ -65,6 +65,7 @@ BRACKET4_IMAGE_PATH: Path = IMAGES_DIR / "SB4.png"
 BRACKET5_IMAGE_PATH: Path = IMAGES_DIR / "SB5.png"
 BRACKET5_CONE_IMAGE_PATH: Path = IMAGES_DIR / "SB_cone.png"
 SLOTTED_HOLE_IMAGE_PATH: Path = IMAGES_DIR / "slotted_hole.png"
+ARROWS_IMAGE_PATH: Path = IMAGES_DIR / "arrows/"
 
 # ============================================================
 # ИКОНКИ ЯЗЫКОВ И МЕНЮ

@@ -568,22 +568,22 @@ def main(plate_data: Optional[Dict] = None) -> bool:
 
 if __name__ == "__main__":
     test_data = {
-        "width": 400.0,
-        "height": 250.0,
+        "width": 170.0,
+        "height": 170.0,
         "corners": {
-            "rb": 0,         # острый
-            "rt": 30.0,      # скругление R30
-            "lt": 30.0,      # скругление R30
-            "lb": -20.0,     # фаска 20×20
+            "rb": 20,         # острый
+            "rt": 20.0,      # скругление R30
+            "lt": 20.0,      # скругление R30
+            "lb": 20.0,     # фаска 20×20
         },
         "holes": [
-            {"type": "circle", "cx": 0,   "cy": 60,  "r": 18.0},
-            {"type": "circle", "cx": 100, "cy": -60, "r": 11.0},
-            {"type": "slot",   "cx": -80, "cy": -30,   "length": 60, "diameter": 22, "angle": 0},
+            {"type": "circle", "cx": 0,   "cy": -70,  "r": 2.75},
+            #{"type": "circle", "cx": 100, "cy": -60, "r": 11.0},
+            #{"type": "slot",   "cx": -80, "cy": -30,   "length": 60, "diameter": 22, "angle": 0},
         ],
-        "order":     "TEST-001",
-        "detail":    "1",
-        "material":  "S235JR",
-        "thickness": 12,
+        "order":     "20387-1",
+        "detail":    "17-4",
+        "material":  "1.4301",
+        "thickness": 4,
     }
     main(test_data)
