@@ -108,5 +108,16 @@
         "r": "5",
         "s": "1",
         "remark": "Außengeometry nicht bestimmt"
+    },
+    {
+        "name": "Hydac",
+        "a1": "95",
+        "b1": "68",
+        "a": "85",
+        "b": "58",
+        "d": "3.2",
+        "r": "5",
+        "s": "1",
+        "remark": "Außenmasse sind ermitted"
     }
 ]

@@ -568,22 +568,23 @@ def main(plate_data: Optional[Dict] = None) -> bool:
 
 if __name__ == "__main__":
     test_data = {
-        "width": 170.0,
-        "height": 170.0,
+        "width": 244.0,
+        "height": 130.0,
         "corners": {
-            "rb": 20,         # острый
-            "rt": 20.0,      # скругление R30
-            "lt": 20.0,      # скругление R30
-            "lb": 20.0,     # фаска 20×20
+            "rb": 0,         # острый
+            "rt": 0.0,      # скругление R30
+            "lt": 10.0,      # скругление R30
+            "lb": 10.0,     # фаска 20×20
         },
         "holes": [
-            {"type": "circle", "cx": 0,   "cy": -70,  "r": 2.75},
-            #{"type": "circle", "cx": 100, "cy": -60, "r": 11.0},
-            #{"type": "slot",   "cx": -80, "cy": -30,   "length": 60, "diameter": 22, "angle": 0},
+            {"type": "circle", "cx": -37,   "cy": 0,  "r": 30.15},
+            # {"type": "circle", "cx": 308.15,   "cy": 0,  "r": 10.5},
+            # {"type": "circle", "cx": 100, "cy": -60, "r": 11.0},
+            # {"type": "slot",   "cx": -80, "cy": -30,   "length": 60, "diameter": 22, "angle": 0},
         ],
-        "order":     "20387-1",
-        "detail":    "17-4",
+        "order":     "20473",
+        "detail":    "1",
         "material":  "1.4301",
-        "thickness": 4,
+        "thickness": 10,
     }
     main(test_data)
