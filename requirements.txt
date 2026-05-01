@@ -1,6 +1,6 @@
 # Зависимости Python
 
-pythonnet
+#pythonnet
 wxPython
 pywin32
 
@@ -10,4 +10,7 @@ pandas
 matplotlib
 
 django
+
+comtypes
+
 

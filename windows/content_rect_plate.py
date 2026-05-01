@@ -27,7 +27,7 @@ windows/content_rect_plate.py
 
 Соглашение по углам
 -------------------
-Формат значений совпадает с ``programs.at_rect_plate.RectPlate``:
+Формат значений совпадает с ``programs.at_rect_plate. RectPlate``:
 
     0       -> острый угол;
     r > 0   -> скругление радиусом r;
@@ -61,7 +61,6 @@ from pprint import pprint
 from typing import Any, Callable, Optional
 
 import wx
-import wx.grid as gridlib
 
 # ----------------------------------------------------------------------
 # Проектные импорты
@@ -70,10 +69,15 @@ from config.at_config import (
     ARROWS_IMAGE_PATH,
     BUTTON_SIZE,
     DEFAULT_SETTINGS,
+    FORM_CONFIG,
 )
+try:
+    from programs.at_geometry import at_bulge
+except Exception:
+    at_bulge = None
 from locales.at_translations import loc
 from windows.at_fields_builder import FieldBuilder, FormBuilder, parse_float
-from windows.at_gui_utils import show_popup
+from windows.at_gui_utils import show_popup, get_standard_font
 from windows.at_window_utils import (
     BaseContentPanel,
     apply_styles_to_panel,
@@ -107,8 +111,9 @@ TRANSLATIONS = {
     "height_label": {"ru": "Высота H, мм", "de": "Höhe H, mm", "en": "Height H, mm"},
 
     "corners_label": {"ru": "Углы", "de": "Ecken", "en": "Corners"},
-    "symmetric_holes": {"ru": "Симметричные отверстия", "de": "Symmetrische Bohrungen", "en": "Symmetric holes"},
-    "free_holes": {"ru": "Произвольные отверстия", "de": "Freie Bohrungen", "en": "Free holes"},
+    "corners_and_sides_label": {"ru": "Углы и\nстороны", "de": "Ecken &\nSeiten", "en": "Corners &\nSides"},
+    "symmetric_holes": {"ru": "Симм.\nотверстия", "de": "Symm.\nBohrungen", "en": "Symm.\nholes"},
+    "free_holes": {"ru": "Произв.\nотверстия", "de": "Freie\nBohrungen", "en": "Free\nholes"},
 
     "corner_help": {
         "ru": "0 — острый; 25 — R25; -10 — фаска 10x10; 10;20 — асимметричная фаска.",
@@ -131,6 +136,22 @@ TRANSLATIONS = {
     "offset_y_label": {"ru": "Y от центра, мм", "de": "Y von Mitte, mm", "en": "Y from center, mm"},
     "slot_params": {"ru": "Параметры паза...", "de": "Langlochparameter...", "en": "Slot params..."},
     "slot_params_short": {"ru": "Паз", "de": "Langloch", "en": "Slot"},
+    # Симметричные отверстия
+    "sym_count_x": {"ru": "× Ø", "de": "× Ø", "en": "× Ø"},
+    "sym_from_edge": {"ru": "от края", "de": "vom Rand", "en": "from edge"},
+    "sym_step":     {"ru": "шаг",     "de": "Abstand",   "en": "step"},
+    "sym_add":      {"ru": "Добавить", "de": "Hinzuf.", "en": "Add"},
+    "sym_clear_all":{"ru": "Очистить", "de": "Löschen",  "en": "Clear"},
+    "sym_preview":  {"ru": "Просмотр", "de": "Vorschau", "en": "Preview"},
+    # Произвольные отверстия
+    "free_add_row": {"ru": "Добавить строку", "de": "Zeile hinzuf.", "en": "Add row"},
+    "free_del_row": {"ru": "Удалить строку",  "de": "Zeile löschen", "en": "Del row"},
+    "free_clear":   {"ru": "Очистить всё",    "de": "Alles löschen", "en": "Clear all"},
+    "free_apply":   {"ru": "Применить",       "de": "Anwenden",      "en": "Apply"},
+    "sym_tooltip_sym_x": {"ru": "Симметрично ↔ (относительно оси Y пластины)", "de": "Symmetrisch ↔ (Y-Achse)", "en": "Symmetric ↔ (about Y-axis)"},
+    "sym_tooltip_edge_x": {"ru": "От левого края →", "de": "Ab linker Kante →", "en": "From left edge →"},
+    "sym_tooltip_sym_y": {"ru": "Симметрично ↕ (относительно оси X пластины)", "de": "Symmetrisch ↕ (X-Achse)", "en": "Symmetric ↕ (about X-axis)"},
+    "sym_tooltip_edge_y": {"ru": "От нижнего края ↑", "de": "Ab unterer Kante ↑", "en": "From bottom edge ↑"},
 
     "axis_legend": {
         "ru": "Оси предпросмотра: X — горизонтально, Y — вертикально. Координаты отверстий задаются от центра.",
@@ -193,15 +214,23 @@ RIGHT_PANEL_MIN_WIDTH = 390
 CELL_SIZE = (72, 54)
 CELL_GAP = 4
 WINDOW_PADDING = 10
-SECTION_BUTTON_SIZE = wx.Size(120, -1)
-SUBPANEL_INPUT_SIZE = (130, -1)
+
+# Кнопки секций — двойная высота через rows=2 в universal_row
+SECTION_BUTTON_SIZE = FORM_CONFIG["input_size"]   # wx.Size(150, -1)
+
+# Поля ввода — стандартный размер проекта
+SUBPANEL_INPUT_SIZE = FORM_CONFIG["input_size"]   # wx.Size(150, -1)
 
 NORMAL_FONT_SIZE = int(DEFAULT_SETTINGS.get("FONT_SIZE", 10))
 
-COLOR_FREE_BG = wx.Colour(245, 245, 245)
-COLOR_FREE_FG = wx.Colour(30, 30, 30)
-COLOR_ACTIVE_BG = wx.Colour(210, 235, 255)
-COLOR_ACTIVE_FG = wx.Colour(0, 0, 0)
+# Иконки типов отверстий
+HOLE_ICON_SIZE = (24, 24)
+SYM_ICON_SIZE  = (26, 26)
+
+COLOR_FREE_BG    = wx.Colour(245, 245, 245)
+COLOR_FREE_FG    = wx.Colour(30, 30, 30)
+COLOR_ACTIVE_BG  = wx.Colour(210, 235, 255)
+COLOR_ACTIVE_FG  = wx.Colour(0, 0, 0)
 COLOR_BLOCKED_BG = wx.Colour(215, 215, 215)
 COLOR_BLOCKED_FG = wx.Colour(120, 120, 120)
 COLOR_PREVIEW_BG = wx.Colour(255, 255, 255)
@@ -672,205 +701,412 @@ class CornerInputPanel(wx.Panel):
 
 
 # ----------------------------------------------------------------------
+# Вспомогательная функция: загрузка bitmap с fallback
+# ----------------------------------------------------------------------
+def _load_bmp(filename: str, size: tuple[int, int]) -> wx.Bitmap:
+    """Загружает PNG из ARROWS_IMAGE_PATH. При ошибке возвращает пустой bitmap."""
+    path = IMAGE_DIR / filename
+    try:
+        return load_bitmap(path, size)
+    except Exception:
+        bmp = wx.Bitmap(size[0], size[1])
+        dc = wx.MemoryDC(bmp)
+        dc.SetBackground(wx.Brush(wx.Colour(200, 210, 230)))
+        dc.Clear()
+        dc.SelectObject(wx.NullBitmap)
+        return bmp
+
+
+def _load_hole_bmp(filename: str) -> wx.Bitmap:
+    """Загружает иконку типа отверстия из папки arrows."""
+    return _load_bmp(filename, HOLE_ICON_SIZE)
+
+
+# ----------------------------------------------------------------------
 # Симметричные отверстия
 # ----------------------------------------------------------------------
 class SymmetricHolesPanel(wx.Panel):
     """
-    Компактная панель основного сценария: симметричные отверстия.
+    Панель ввода симметричных отверстий.
 
-    Используется FieldBuilder/universal_row, чтобы подписи, поля и кнопки имели
-    тот же стиль, что и в остальных окнах проекта.
+    Компоновка:
+      Строка 1: [иконка-кнопка тип] [N: Choice 2/4] [× Ø] [TextCtrl D]
+      Grid 2×3: | X | [btn↔/→] | [от края] | [шаг] |
+                | Y | [btn↕/↑] | [от края] | [шаг] |
+      Строка кнопок: [Добавить] [Просмотр] [Очистить]
+
+    status_text — строка подсказки для передачи в футер.
     """
+
+    _FIELD_W = 100   # ширина числовых полей
+    _BTN_W   = 40    # ширина кнопки симметрии
+    _ROW_H   = -1    # авто-высота
 
     def __init__(self, parent: wx.Window, on_change: Optional[Callable[[], None]] = None):
         super().__init__(parent)
         self.on_change = on_change
         self.slot_data: Optional[dict[str, Any]] = None
-        self.local_form = FormBuilder(self)
-        self._build_ui()
-        self._update_slot_button_state()
 
+        self._sym_x = True   # True = симм. ↔, False = от левого края →
+        self._sym_y = True   # True = симм. ↕, False = от нижнего края ↑
+
+        # Накопленные отверстия (добавляются кнопкой «Добавить»)
+        self._holes: list[dict[str, Any]] = []
+
+        # Статусная строка (для футера)
+        self.status_text: str = loc.get("axis_legend")
+
+        self._build_ui()
+        self._refresh_ui()
+
+    # ------------------------------------------------------------------
+    # Построение UI
+    # ------------------------------------------------------------------
     def _build_ui(self):
+        fnt = wx.Font(
+            NORMAL_FONT_SIZE, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL
+        )
+
         root = wx.BoxSizer(wx.VERTICAL)
         self.SetSizer(root)
 
-        fb = FieldBuilder(parent=self, target_sizer=root, form=self.local_form)
+        # ── Строка 1: тип / кол-во / диаметр ──────────────────────────
+        row1 = wx.BoxSizer(wx.HORIZONTAL)
 
-        fb.universal_row(
-            None,
-            [{"type": "info", "value": loc.get("axis_legend"), "wrap": 360}],
-            align_right=False,
+        # Кнопка выбора типа (иконка circle/slot)
+        self._type_btn = wx.BitmapButton(self, size=wx.Size(HOLE_ICON_SIZE[0] + 8, HOLE_ICON_SIZE[1] + 8))
+        self._type_btn.SetToolTip(loc.get("hole_type"))
+        self._type_is_slot = False
+        row1.Add(self._type_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
+
+        # Количество N
+        self._count_ctrl = wx.Choice(self, choices=["2", "4"])
+        self._count_ctrl.SetSelection(1)   # 4 по умолчанию
+        self._count_ctrl.SetFont(fnt)
+        row1.Add(self._count_ctrl, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 4)
+
+        # × Ø
+        lbl_x_d = wx.StaticText(self, label=" × Ø")
+        lbl_x_d.SetFont(fnt)
+        row1.Add(lbl_x_d, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 4)
+
+        # Поле диаметра
+        self._d_ctrl = wx.TextCtrl(self, size=wx.Size(self._FIELD_W, self._ROW_H))
+        self._d_ctrl.SetFont(fnt)
+        row1.Add(self._d_ctrl, 0, wx.ALIGN_CENTER_VERTICAL)
+
+        root.Add(row1, 0, wx.EXPAND | wx.ALL, 5)
+
+        # ── Grid X / Y ─────────────────────────────────────────────────
+        # Сетка: 3 строки (заголовок + X + Y), 4 колонки
+        grid = wx.FlexGridSizer(rows=3, cols=4, vgap=4, hgap=6)
+        grid.AddGrowableCol(2, 1)
+        grid.AddGrowableCol(3, 1)
+
+        def hdr(text):
+            s = wx.StaticText(self, label=text)
+            s.SetFont(wx.Font(NORMAL_FONT_SIZE - 1, wx.FONTFAMILY_DEFAULT,
+                              wx.FONTSTYLE_ITALIC, wx.FONTWEIGHT_NORMAL))
+            s.SetForegroundColour(wx.Colour(110, 110, 110))
+            return s
+
+        # Строка заголовков
+        grid.Add(wx.Size(20, 1))                        # ось
+        grid.Add(wx.Size(self._BTN_W, 1))               # кнопка
+        grid.Add(hdr(loc.get("sym_from_edge")), 0, wx.ALIGN_CENTER)
+        grid.Add(hdr(loc.get("sym_step")),      0, wx.ALIGN_CENTER)
+
+        # Строка X
+        lbl_x = wx.StaticText(self, label="X:")
+        lbl_x.SetFont(fnt)
+        grid.Add(lbl_x, 0, wx.ALIGN_CENTER_VERTICAL)
+
+        self._sym_x_btn = wx.BitmapButton(self, size=wx.Size(self._BTN_W, self._BTN_W))
+        grid.Add(self._sym_x_btn, 0, wx.ALIGN_CENTER_VERTICAL)
+
+        self._x_edge_ctrl = wx.TextCtrl(self, size=wx.Size(self._FIELD_W, self._ROW_H))
+        self._x_edge_ctrl.SetFont(fnt)
+        grid.Add(self._x_edge_ctrl, 0, wx.ALIGN_CENTER_VERTICAL | wx.EXPAND)
+
+        self._x_step_ctrl = wx.TextCtrl(self, size=wx.Size(self._FIELD_W, self._ROW_H))
+        self._x_step_ctrl.SetFont(fnt)
+        grid.Add(self._x_step_ctrl, 0, wx.ALIGN_CENTER_VERTICAL | wx.EXPAND)
+
+        # Строка Y
+        lbl_y = wx.StaticText(self, label="Y:")
+        lbl_y.SetFont(fnt)
+        grid.Add(lbl_y, 0, wx.ALIGN_CENTER_VERTICAL)
+
+        self._sym_y_btn = wx.BitmapButton(self, size=wx.Size(self._BTN_W, self._BTN_W))
+        grid.Add(self._sym_y_btn, 0, wx.ALIGN_CENTER_VERTICAL)
+
+        self._y_edge_ctrl = wx.TextCtrl(self, size=wx.Size(self._FIELD_W, self._ROW_H))
+        self._y_edge_ctrl.SetFont(fnt)
+        grid.Add(self._y_edge_ctrl, 0, wx.ALIGN_CENTER_VERTICAL | wx.EXPAND)
+
+        self._y_step_ctrl = wx.TextCtrl(self, size=wx.Size(self._FIELD_W, self._ROW_H))
+        self._y_step_ctrl.SetFont(fnt)
+        grid.Add(self._y_step_ctrl, 0, wx.ALIGN_CENTER_VERTICAL | wx.EXPAND)
+
+        root.Add(grid, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
+
+        # ── Список добавленных отверстий ───────────────────────────────
+        self._holes_list = wx.ListCtrl(self, style=wx.LC_REPORT | wx.LC_SINGLE_SEL,
+                                       size=wx.Size(-1, 90))
+        self._holes_list.SetFont(wx.Font(NORMAL_FONT_SIZE - 1, wx.FONTFAMILY_DEFAULT,
+                                         wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+        for col, (hdr_txt, w) in enumerate([
+            ("N", 28), ("Тип", 52), ("Ø/D", 46), ("L", 40), ("X→", 50), ("шаг X", 50),
+            ("Y↑", 50), ("шаг Y", 50),
+        ]):
+            self._holes_list.InsertColumn(col, hdr_txt, width=w)
+        root.Add(self._holes_list, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
+
+        # ── Кнопки управления ─────────────────────────────────────────
+        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        btn_fnt = wx.Font(NORMAL_FONT_SIZE - 1, wx.FONTFAMILY_DEFAULT,
+                          wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+
+        def make_btn(label, color, handler):
+            b = wx.Button(self, label=label, size=wx.Size(90, 26))
+            b.SetFont(btn_fnt)
+            b.SetBackgroundColour(wx.Colour(color))
+            b.Bind(wx.EVT_BUTTON, handler)
+            return b
+
+        btn_sizer.Add(make_btn(loc.get("sym_add"),      "#27ae60", self._on_add),      0, wx.RIGHT, 4)
+        btn_sizer.Add(make_btn(loc.get("free_del_row"), "#c0392b", self._on_delete),   0, wx.RIGHT, 4)
+        btn_sizer.Add(make_btn(loc.get("sym_clear_all"),"#7f8c8d", self._on_clear_list), 0)
+        root.Add(btn_sizer, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
+
+        # ── Привязка событий ──────────────────────────────────────────
+        self._type_btn.Bind(wx.EVT_BUTTON, self._on_type_toggle)
+        self._count_ctrl.Bind(wx.EVT_CHOICE, self._on_count_changed)
+        self._sym_x_btn.Bind(wx.EVT_BUTTON, self._on_sym_x_toggle)
+        self._sym_y_btn.Bind(wx.EVT_BUTTON, self._on_sym_y_toggle)
+        for ctrl in (self._d_ctrl, self._x_edge_ctrl, self._x_step_ctrl,
+                     self._y_edge_ctrl, self._y_step_ctrl):
+            ctrl.Bind(wx.EVT_TEXT, lambda e: self._emit_change())
+
+    # ------------------------------------------------------------------
+    # Обновление иконок и блокировок
+    # ------------------------------------------------------------------
+    def _refresh_ui(self):
+        # Тип
+        icon_file = "slot.png" if self._type_is_slot else "circle.png"
+        self._type_btn.SetBitmap(_load_hole_bmp(icon_file))
+        self._type_btn.SetToolTip(
+            loc.get("slot") if self._type_is_slot else loc.get("circle")
         )
 
-        self.type_choice = fb.universal_row(
-            "hole_type",
-            [{
-                "type": "combo",
-                "name": "sym_hole_type",
-                "choices": [loc.get("circle"), loc.get("slot")],
-                "value": loc.get("circle"),
-                "default": loc.get("circle"),
-                "readonly": True,
-                "size": SUBPANEL_INPUT_SIZE,
-            }],
-        )[0]
+        # D: только для круглых
+        self._d_ctrl.Enable(not self._type_is_slot)
 
-        self.count_choice = fb.universal_row(
-            "holes_count",
-            [{
-                "type": "combo",
-                "name": "sym_hole_count",
-                "choices": ["0", "1", "2", "4"],
-                "value": "0",
-                "default": "0",
-                "readonly": True,
-                "size": SUBPANEL_INPUT_SIZE,
-            }],
-        )[0]
+        # Кнопки симметрии
+        self._update_sym_icon(self._sym_x_btn, self._sym_x, axis="x")
+        self._update_sym_icon(self._sym_y_btn, self._sym_y, axis="y")
 
-        self.axis_choice = fb.universal_row(
-            "symmetry_axis",
-            [{
-                "type": "combo",
-                "name": "symmetry_axis_value",
-                "choices": [
-                    loc.get("symmetry_none"),
-                    loc.get("symmetry_x"),
-                    loc.get("symmetry_y"),
-                    loc.get("symmetry_xy"),
-                ],
-                "value": loc.get("symmetry_none"),
-                "default": loc.get("symmetry_none"),
-                "readonly": True,
-                "size": (190, -1),
-            }],
-        )[0]
+        # Блокировка полей "от края"
+        self._x_edge_ctrl.Enable(not self._sym_x)
+        self._y_edge_ctrl.Enable(not self._sym_y)
 
-        self.x_ctrl = fb.universal_row(
-            "offset_x_label",
-            [{"type": "float", "name": "sym_dx", "value": "0", "default": "0", "size": SUBPANEL_INPUT_SIZE}],
-        )[0]
-        self.y_ctrl = fb.universal_row(
-            "offset_y_label",
-            [{"type": "float", "name": "sym_dy", "value": "0", "default": "0", "size": SUBPANEL_INPUT_SIZE}],
-        )[0]
-        self.d_ctrl = fb.universal_row(
-            "diameter_label",
-            [{"type": "float", "name": "sym_diameter", "value": "", "default": "", "size": SUBPANEL_INPUT_SIZE}],
-        )[0]
-
-        self.slot_button = fb.universal_row(
-            "slot_params_short",
-            [{
-                "type": "button",
-                "label": loc.get("slot_params"),
-                "callback": self.on_slot_params,
-                "bg_color": "#2980b9",
-                "size": (150, -1),
-            }],
-        )[0]
-
-        self.slot_summary = wx.StaticText(self, label="")
-        root.Add(self.slot_summary, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        for ctrl in (self.type_choice, self.count_choice, self.axis_choice):
-            ctrl.Bind(wx.EVT_COMBOBOX, self.on_any_change)
-        for ctrl in (self.x_ctrl, self.y_ctrl, self.d_ctrl):
-            ctrl.Bind(wx.EVT_TEXT, self.on_any_change)
-
-    def on_any_change(self, event: wx.Event):
-        self._update_slot_button_state()
-        self._emit_change()
-        event.Skip()
-
-    def _is_slot(self) -> bool:
-        return self.type_choice.GetSelection() == 1
-
-    def _update_slot_button_state(self):
-        is_slot = self._is_slot()
-        self.slot_button.Enable(is_slot)
-        self.d_ctrl.Enable(not is_slot)
-
-        if not is_slot:
-            self.slot_summary.SetLabel("")
-        elif self.slot_data:
-            self.slot_summary.SetLabel(
-                f"D={self.slot_data.get('diameter')}, L={self.slot_data.get('length')}, A={self.slot_data.get('angle')}°"
-            )
+        # При count=2 и sym_x=True — Y-строка неактивна
+        count = self._get_count()
+        if count == 2:
+            self._y_edge_ctrl.Enable(False)
+            self._y_step_ctrl.Enable(False)
+            self._sym_y_btn.Enable(False)
         else:
-            self.slot_summary.SetLabel(loc.get("slot_params_missing"))
+            self._sym_y_btn.Enable(True)
+            self._y_step_ctrl.Enable(True)
+            self._y_edge_ctrl.Enable(not self._sym_y)
+
         self.Layout()
 
-    def on_slot_params(self, _event: wx.Event):
+    def _update_sym_icon(self, btn: wx.BitmapButton, is_sym: bool, axis: str):
+        if is_sym:
+            fname = "sym_xy.png" if axis == "x" else "sym_yx.png"
+            tip = loc.get("sym_tooltip_sym_x" if axis == "x" else "sym_tooltip_sym_y")
+        else:
+            fname = "sym_right.png" if axis == "x" else "sym_up.png"
+            tip = loc.get("sym_tooltip_edge_x" if axis == "x" else "sym_tooltip_edge_y")
+        btn.SetBitmap(_load_bmp(fname, SYM_ICON_SIZE))
+        btn.SetToolTip(tip)
+
+    # ------------------------------------------------------------------
+    # Обработчики
+    # ------------------------------------------------------------------
+    def _on_type_toggle(self, _evt):
+        self._type_is_slot = not self._type_is_slot
+        if self._type_is_slot:
+            self._open_slot_dialog()
+        else:
+            self.slot_data = None
+        self._refresh_ui()
+
+    def _on_count_changed(self, _evt):
+        self._refresh_ui()
+        self._emit_change()
+
+    def _on_sym_x_toggle(self, _evt):
+        self._sym_x = not self._sym_x
+        self._refresh_ui()
+        self._emit_change()
+
+    def _on_sym_y_toggle(self, _evt):
+        self._sym_y = not self._sym_y
+        self._refresh_ui()
+        self._emit_change()
+
+    def _open_slot_dialog(self):
         if open_slotted_hole_dialog is None:
             show_popup(loc.get("slot_dialog_unavailable"), popup_type="error")
+            self._type_is_slot = False
             return
-
         result = open_slotted_hole_dialog(self)
         if result:
             self.slot_data = result
-            self._update_slot_button_state()
-            self._emit_change()
+        else:
+            self._type_is_slot = False
 
-    def clear(self):
-        self.type_choice.SetSelection(0)
-        self.count_choice.SetSelection(0)
-        self.axis_choice.SetSelection(0)
-        self.x_ctrl.SetValue("0")
-        self.y_ctrl.SetValue("0")
-        self.d_ctrl.SetValue("")
-        self.slot_data = None
-        self._update_slot_button_state()
+    def _on_add(self, _evt):
+        """Считывает текущие поля, вычисляет координаты, добавляет в список."""
+        try:
+            holes = self._calc_current_holes()
+        except ValueError as e:
+            show_popup(str(e), popup_type="error")
+            return
+        for h in holes:
+            self._holes.append(h)
+        self._refresh_list()
         self._emit_change()
 
-    def get_holes(self) -> list[dict[str, Any]]:
-        count = int(self.count_choice.GetValue() or "0")
-        if count == 0:
-            return []
+    def _on_delete(self, _evt):
+        idx = self._holes_list.GetFirstSelected()
+        if idx >= 0 and idx < len(self._holes):
+            del self._holes[idx]
+            self._refresh_list()
+            self._emit_change()
 
-        x = _to_float(self.x_ctrl.GetValue(), allow_empty=True, default=0.0)
-        y = _to_float(self.y_ctrl.GetValue(), allow_empty=True, default=0.0)
-        points = self._make_points(count, x, y)
+    def _on_clear_list(self, _evt):
+        self._holes.clear()
+        self._refresh_list()
+        self._emit_change()
 
-        if self._is_slot():
+    # ------------------------------------------------------------------
+    # Вспомогательные методы
+    # ------------------------------------------------------------------
+    def _get_count(self) -> int:
+        return [2, 4][self._count_ctrl.GetSelection()]
+
+    def _calc_current_holes(self) -> list[dict[str, Any]]:
+        """Вычисляет координаты точек из текущих полей ввода."""
+        count = self._get_count()
+
+        x_step = _to_float(self._x_step_ctrl.GetValue(), allow_empty=True, default=0.0)
+        y_step = _to_float(self._y_step_ctrl.GetValue(), allow_empty=True, default=0.0)
+        x_edge = _to_float(self._x_edge_ctrl.GetValue(), allow_empty=True, default=0.0)
+        y_edge = _to_float(self._y_edge_ctrl.GetValue(), allow_empty=True, default=0.0)
+
+        # Координата первого отверстия относительно центра пластины
+        px = x_step / 2.0 if self._sym_x else x_edge
+        py = y_step / 2.0 if self._sym_y else y_edge
+
+        if count == 2:
+            points = [(px, py), (-px, py)]
+        else:
+            points = [(px, py), (-px, py), (-px, -py), (px, -py)]
+
+        if self._type_is_slot:
             if not self.slot_data:
                 raise ValueError(loc.get("slot_params_missing"))
-
             return [
                 {
                     "type": "slot",
-                    "cx": px,
-                    "cy": py,
-                    "length": float(self.slot_data.get("length", 0)),
+                    "cx": p[0], "cy": p[1],
+                    "length":   float(self.slot_data.get("length", 0)),
                     "diameter": float(self.slot_data.get("diameter", 0)),
-                    "angle": float(self.slot_data.get("angle", 0)),
+                    "angle":    float(self.slot_data.get("angle", 0)),
+                    # сохраняем параметры ввода для отображения в списке
+                    "_x_edge": x_edge, "_x_step": x_step,
+                    "_y_edge": y_edge, "_y_step": y_step,
+                    "_sym_x": self._sym_x, "_sym_y": self._sym_y,
                 }
-                for px, py in points
+                for p in points
             ]
 
-        d = _to_float(self.d_ctrl.GetValue())
+        d = _to_float(self._d_ctrl.GetValue())
         if d <= 0:
             raise ValueError(loc.get("hole_error"))
+        return [
+            {
+                "type": "circle",
+                "cx": p[0], "cy": p[1], "r": d / 2.0,
+                "_x_edge": x_edge, "_x_step": x_step,
+                "_y_edge": y_edge, "_y_step": y_step,
+                "_sym_x": self._sym_x, "_sym_y": self._sym_y,
+            }
+            for p in points
+        ]
 
-        return [{"type": "circle", "cx": px, "cy": py, "r": d / 2.0} for px, py in points]
+    def _refresh_list(self):
+        self._holes_list.DeleteAllItems()
+        # Группируем по уникальным наборам параметров
+        shown: set[tuple] = set()
+        display_rows: list[dict] = []
+        for h in self._holes:
+            key = (h["type"],
+                   h.get("_x_edge"), h.get("_x_step"),
+                   h.get("_y_edge"), h.get("_y_step"),
+                   h.get("_sym_x"), h.get("_sym_y"),
+                   h.get("r"), h.get("diameter"))
+            if key not in shown:
+                shown.add(key)
+                display_rows.append(h)
+        # Подсчёт количества отверстий на группу
+        for i, h in enumerate(display_rows):
+            count = sum(1 for hh in self._holes if hh["type"] == h["type"] and
+                        abs(hh.get("r", hh.get("diameter", 0)) - h.get("r", h.get("diameter", 0))) < 1e-6)
+            htype = h["type"]
+            d_val = f"{h.get('r', 0)*2:.1f}" if htype == "circle" else f"{h.get('diameter', 0):.1f}"
+            l_val = f"{h.get('length', '')}"  if htype == "slot" else ""
+            x_edge_val = f"{h.get('_x_edge', 0):.1f}" if not h.get("_sym_x") else "sym"
+            x_step_val = f"{h.get('_x_step', 0):.1f}"
+            y_edge_val = f"{h.get('_y_edge', 0):.1f}" if not h.get("_sym_y") else "sym"
+            y_step_val = f"{h.get('_y_step', 0):.1f}"
 
-    def _make_points(self, count: int, x: float, y: float) -> list[tuple[float, float]]:
-        axis = self.axis_choice.GetSelection()
+            idx = self._holes_list.InsertItem(i, str(count))
+            self._holes_list.SetItem(idx, 1, htype)
+            self._holes_list.SetItem(idx, 2, d_val)
+            self._holes_list.SetItem(idx, 3, l_val)
+            self._holes_list.SetItem(idx, 4, x_edge_val)
+            self._holes_list.SetItem(idx, 5, x_step_val)
+            self._holes_list.SetItem(idx, 6, y_edge_val)
+            self._holes_list.SetItem(idx, 7, y_step_val)
 
-        if count == 1:
-            return [(x, y)]
+    def get_holes(self) -> list[dict[str, Any]]:
+        """Возвращает список отверстий без служебных ключей _*."""
+        result = []
+        for h in self._holes:
+            clean = {k: v for k, v in h.items() if not k.startswith("_")}
+            result.append(clean)
+        return result
 
-        if count == 2:
-            # "относительно X" -> зеркалим координату Y.
-            if axis == 1:
-                return [(x, y), (x, -y)]
-            # Для "без симметрии" и "относительно Y" берём зеркалирование по X.
-            return [(x, y), (-x, y)]
-
-        if count == 4:
-            return [(x, y), (-x, y), (-x, -y), (x, -y)]
-
-        return []
+    def clear(self):
+        self._type_is_slot = False
+        self._count_ctrl.SetSelection(1)
+        self._d_ctrl.SetValue("")
+        self._x_edge_ctrl.SetValue("")
+        self._x_step_ctrl.SetValue("")
+        self._y_edge_ctrl.SetValue("")
+        self._y_step_ctrl.SetValue("")
+        self._sym_x = True
+        self._sym_y = True
+        self.slot_data = None
+        self._holes.clear()
+        self._refresh_list()
+        self._refresh_ui()
+        self._emit_change()
 
     def _emit_change(self):
         if self.on_change:
@@ -881,114 +1117,229 @@ class SymmetricHolesPanel(wx.Panel):
 # Произвольные отверстия
 # ----------------------------------------------------------------------
 class FreeHolesPanel(wx.Panel):
-    """Табличный ввод произвольного количества отверстий."""
+    """
+    Табличный ввод произвольного количества отверстий.
+
+    Тип отверстия выбирается кнопкой с иконкой circle.png / slot.png
+    в первой колонке каждой строки.
+    Под таблицей — кнопки: [Добавить строку] [Удалить строку] [Очистить] [Применить].
+    """
 
     COL_TYPE = 0
-    COL_X = 1
-    COL_Y = 2
-    COL_D = 3
-    COL_L = 4
-    COL_A = 5
+    COL_X    = 1
+    COL_Y    = 2
+    COL_D    = 3
+    COL_L    = 4
+    COL_A    = 5
+
+    _INIT_ROWS = 6
 
     def __init__(self, parent: wx.Window, on_change: Optional[Callable[[], None]] = None):
         super().__init__(parent)
         self.on_change = on_change
+
+        # Загружаем иконки один раз
+        self._bmp_circle = _load_hole_bmp("circle.png")
+        self._bmp_slot   = _load_hole_bmp("slot.png")
+
+        # Тип каждой строки: True = slot, False = circle
+        self._row_is_slot: list[bool] = [False] * self._INIT_ROWS
+
         self._build_ui()
 
     def _build_ui(self):
         root = wx.BoxSizer(wx.VERTICAL)
-        root.Add(_create_static_text(self, loc.get("free_holes_hint")), 0, wx.EXPAND | wx.BOTTOM, 6)
 
-        self.grid = gridlib.Grid(self)
-        self.grid.CreateGrid(4, 6)
-        self.grid.SetRowLabelSize(0)
+        hint = wx.StaticText(self, label=loc.get("free_holes_hint"))
+        hint.SetFont(wx.Font(NORMAL_FONT_SIZE - 1, wx.FONTFAMILY_DEFAULT,
+                             wx.FONTSTYLE_ITALIC, wx.FONTWEIGHT_NORMAL))
+        root.Add(hint, 0, wx.EXPAND | wx.BOTTOM, 4)
 
-        labels = [
-            loc.get("col_type"),
-            loc.get("col_x"),
-            loc.get("col_y"),
-            loc.get("col_d"),
-            loc.get("col_l"),
-            loc.get("col_angle"),
-        ]
-        for col, label in enumerate(labels):
-            self.grid.SetColLabelValue(col, label)
+        # ── Заголовок таблицы ──────────────────────────────────────────
+        hdr_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        col_widths = self._col_widths()
+        for label, w in zip(
+            ["Тип", "X", "Y", "Ø D", "L", "A°"],
+            col_widths
+        ):
+            s = wx.StaticText(self, label=label)
+            s.SetFont(wx.Font(NORMAL_FONT_SIZE - 1, wx.FONTFAMILY_DEFAULT,
+                              wx.FONTSTYLE_ITALIC, wx.FONTWEIGHT_NORMAL))
+            s.SetForegroundColour(wx.Colour(100, 100, 100))
+            hdr_sizer.Add(s, 0, wx.ALIGN_CENTER | wx.RIGHT, 2)
+            hdr_sizer.Add(wx.Size(w - s.GetBestSize().width - 2, 1))
+        root.Add(hdr_sizer, 0, wx.EXPAND | wx.BOTTOM, 2)
 
-        widths = [86, 58, 58, 58, 58, 58]
-        for col, width in enumerate(widths):
-            self.grid.SetColSize(col, width)
+        # ── Прокручиваемая область со строками ─────────────────────────
+        self._scroll = wx.ScrolledWindow(self, style=wx.VSCROLL)
+        self._scroll.SetScrollRate(0, 10)
+        self._rows_sizer = wx.BoxSizer(wx.VERTICAL)
+        self._scroll.SetSizer(self._rows_sizer)
+        self._scroll.SetMinSize(wx.Size(-1, 180))
 
-        font = wx.Font(NORMAL_FONT_SIZE, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
-        self.grid.SetDefaultCellFont(font)
-        self.grid.SetLabelFont(font)
+        self._rows: list[dict] = []   # list of {"type_btn", "ctrls": [x,y,d,l,a]}
+        for _ in range(self._INIT_ROWS):
+            self._append_row()
 
-        for row in range(self.grid.GetNumberRows()):
-            self._init_row(row)
+        root.Add(self._scroll, 1, wx.EXPAND | wx.BOTTOM, 4)
 
-        self.grid.Bind(gridlib.EVT_GRID_CELL_CHANGED, self.on_cell_changed)
+        # ── Кнопки управления ─────────────────────────────────────────
+        btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        btn_fnt = wx.Font(NORMAL_FONT_SIZE - 1, wx.FONTFAMILY_DEFAULT,
+                          wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
 
-        root.Add(self.grid, 1, wx.EXPAND)
+        def make_btn(label, color, handler):
+            b = wx.Button(self, label=label, size=wx.Size(-1, 26))
+            b.SetFont(btn_fnt)
+            b.SetBackgroundColour(wx.Colour(color))
+            b.Bind(wx.EVT_BUTTON, handler)
+            return b
+
+        btn_sizer.Add(make_btn(loc.get("free_add_row"), "#27ae60", self._on_add_row), 1, wx.RIGHT, 3)
+        btn_sizer.Add(make_btn(loc.get("free_del_row"), "#c0392b", self._on_del_row), 1, wx.RIGHT, 3)
+        btn_sizer.Add(make_btn(loc.get("free_clear"),   "#7f8c8d", self._on_clear),   1, wx.RIGHT, 3)
+        btn_sizer.Add(make_btn(loc.get("free_apply"),   "#2980b9", self._on_apply),   1)
+        root.Add(btn_sizer, 0, wx.EXPAND)
+
         self.SetSizer(root)
 
-    def _init_row(self, row: int):
-        self.grid.SetCellValue(row, self.COL_TYPE, "circle")
-        self.grid.SetCellValue(row, self.COL_X, "0")
-        self.grid.SetCellValue(row, self.COL_Y, "0")
-        self.grid.SetCellValue(row, self.COL_D, "")
-        self.grid.SetCellValue(row, self.COL_L, "")
-        self.grid.SetCellValue(row, self.COL_A, "0")
+    def _col_widths(self) -> list[int]:
+        return [36, 62, 62, 62, 62, 52]   # тип, X, Y, D, L, A
 
-        for col in range(self.grid.GetNumberCols()):
-            self.grid.SetCellAlignment(row, col, wx.ALIGN_CENTER, wx.ALIGN_CENTER_VERTICAL)
+    def _append_row(self, is_slot: bool = False):
+        """Добавляет одну строку ввода."""
+        row_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        widths = self._col_widths()
 
-    def on_cell_changed(self, event: gridlib.GridEvent):
-        row = event.GetRow()
-        if row == self.grid.GetNumberRows() - 1 and self._row_has_data(row):
-            self.grid.AppendRows(1)
-            self._init_row(self.grid.GetNumberRows() - 1)
+        # Кнопка-иконка типа
+        bmp = self._bmp_slot if is_slot else self._bmp_circle
+        type_btn = wx.BitmapButton(self._scroll, bitmap=bmp,
+                                   size=wx.Size(widths[0], widths[0]))
+        type_btn.SetToolTip("slot" if is_slot else "circle")
+        row_idx = len(self._rows)
+        type_btn.Bind(wx.EVT_BUTTON, lambda e, i=row_idx: self._on_type_toggle_row(i))
+        row_sizer.Add(type_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 2)
+
+        # Поля X, Y, D, L, A
+        fnt = wx.Font(NORMAL_FONT_SIZE, wx.FONTFAMILY_DEFAULT,
+                      wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+        ctrls = []
+        defaults = ["0", "0", "", "", "0"]
+        for w, default in zip(widths[1:], defaults):
+            ctrl = wx.TextCtrl(self._scroll, value=default, size=wx.Size(w, 26))
+            ctrl.SetFont(fnt)
+            ctrl.Bind(wx.EVT_TEXT, lambda e: self._emit_change())
+            row_sizer.Add(ctrl, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 2)
+            ctrls.append(ctrl)
+
+        self._rows_sizer.Add(row_sizer, 0, wx.EXPAND | wx.BOTTOM, 2)
+        self._rows.append({"type_btn": type_btn, "ctrls": ctrls, "is_slot": is_slot})
+        self._row_is_slot.append(is_slot)
+
+        # Обновляем L (индекс 3) и A (индекс 4) - блокируем если circle
+        self._update_row_locks(len(self._rows) - 1)
+
+    def _update_row_locks(self, row_idx: int):
+        row = self._rows[row_idx]
+        is_slot = row["is_slot"]
+        # L и A - только для слотов
+        row["ctrls"][3].Enable(is_slot)   # L
+        row["ctrls"][4].Enable(is_slot)   # A
+
+    def _on_type_toggle_row(self, row_idx: int):
+        if row_idx >= len(self._rows):
+            return
+        row = self._rows[row_idx]
+        row["is_slot"] = not row["is_slot"]
+        bmp = self._bmp_slot if row["is_slot"] else self._bmp_circle
+        row["type_btn"].SetBitmap(bmp)
+        row["type_btn"].SetToolTip("slot" if row["is_slot"] else "circle")
+        if not row["is_slot"]:
+            row["ctrls"][3].SetValue("")
+            row["ctrls"][4].SetValue("0")
+        self._update_row_locks(row_idx)
         self._emit_change()
-        event.Skip()
 
-    def _row_has_data(self, row: int) -> bool:
-        return any(self.grid.GetCellValue(row, col).strip() for col in range(self.grid.GetNumberCols()))
+    def _on_add_row(self, _evt):
+        self._append_row()
+        self._scroll.FitInside()
+        self._scroll.Scroll(0, 9999)
+        self._emit_change()
+
+    def _on_del_row(self, _evt):
+        if len(self._rows) > 1:
+            row = self._rows.pop()
+            row["type_btn"].Destroy()
+            for c in row["ctrls"]:
+                c.Destroy()
+            # Убрать последний элемент sizer
+            item = self._rows_sizer.GetItem(len(self._rows))
+            if item:
+                self._rows_sizer.Remove(len(self._rows))
+            self._row_is_slot.pop()
+            self._scroll.FitInside()
+            self.Layout()
+            self._emit_change()
+
+    def _on_clear(self, _evt):
+        self.clear()
+
+    def _on_apply(self, _evt):
+        """Принудительно обновляет предпросмотр."""
+        self._emit_change()
 
     def clear(self):
-        self.grid.ClearGrid()
-        while self.grid.GetNumberRows() > 4:
-            self.grid.DeleteRows(4, 1)
-        for row in range(self.grid.GetNumberRows()):
-            self._init_row(row)
+        # Удаляем все строки кроме первых _INIT_ROWS
+        while len(self._rows) > self._INIT_ROWS:
+            row = self._rows.pop()
+            row["type_btn"].Destroy()
+            for c in row["ctrls"]:
+                c.Destroy()
+            self._rows_sizer.Remove(len(self._rows))
+            self._row_is_slot.pop()
+
+        # Сбрасываем оставшиеся
+        for i, row in enumerate(self._rows):
+            row["is_slot"] = False
+            row["type_btn"].SetBitmap(self._bmp_circle)
+            row["type_btn"].SetToolTip("circle")
+            defaults = ["0", "0", "", "", "0"]
+            for ctrl, val in zip(row["ctrls"], defaults):
+                ctrl.SetValue(val)
+            self._update_row_locks(i)
+
+        self._scroll.FitInside()
+        self.Layout()
         self._emit_change()
 
     def get_holes(self) -> list[dict[str, Any]]:
-        holes: list[dict[str, Any]] = []
+        holes = []
+        for row in self._rows:
+            ctrls = row["ctrls"]
+            x_val = ctrls[0].GetValue().strip()
+            y_val = ctrls[1].GetValue().strip()
+            d_val = ctrls[2].GetValue().strip()
+            l_val = ctrls[3].GetValue().strip()
+            a_val = ctrls[4].GetValue().strip()
 
-        for row in range(self.grid.GetNumberRows()):
-            if not self._row_has_data(row):
+            if not d_val:
                 continue
 
-            htype = self.grid.GetCellValue(row, self.COL_TYPE).strip().lower() or "circle"
-            d_text = self.grid.GetCellValue(row, self.COL_D).strip()
-            l_text = self.grid.GetCellValue(row, self.COL_L).strip()
-
-            # Пустая строка с дефолтами circle/0/0 не должна создавать отверстие.
-            if not d_text and not l_text:
-                continue
-
-            x = _to_float(self.grid.GetCellValue(row, self.COL_X), allow_empty=True, default=0.0)
-            y = _to_float(self.grid.GetCellValue(row, self.COL_Y), allow_empty=True, default=0.0)
-            d = _to_float(d_text)
-
+            x = _to_float(x_val, allow_empty=True, default=0.0)
+            y = _to_float(y_val, allow_empty=True, default=0.0)
+            d = _to_float(d_val)
             if d <= 0:
                 raise ValueError(loc.get("hole_error"))
 
-            if htype in ("slot", "langloch", "паз", "продолговатое"):
-                length = _to_float(l_text)
-                angle = _to_float(self.grid.GetCellValue(row, self.COL_A), allow_empty=True, default=0.0)
-                holes.append({"type": "slot", "cx": x, "cy": y, "length": length, "diameter": d, "angle": angle})
+            if row["is_slot"]:
+                if not l_val:
+                    continue
+                length = _to_float(l_val)
+                angle  = _to_float(a_val, allow_empty=True, default=0.0)
+                holes.append({"type": "slot", "cx": x, "cy": y,
+                               "length": length, "diameter": d, "angle": angle})
             else:
                 holes.append({"type": "circle", "cx": x, "cy": y, "r": d / 2.0})
-
         return holes
 
     def _emit_change(self):
@@ -1143,28 +1494,20 @@ class RectPlateContentPanel(BaseContentPanel):
         self.height_ctrl.Bind(wx.EVT_TEXT, self._on_geometry_changed)
 
     def _build_switch_buttons(self):
-        # Кнопки как в модуле мостиков: три переключателя, показывающие одну секцию.
         button_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        fb_button = FieldBuilder(parent=self, target_sizer=button_sizer, form=self.form)
+        fb_btn = FieldBuilder(parent=self, target_sizer=button_sizer, form=self.form)
 
-        controls = fb_button.universal_row(
-            "",
+        controls = fb_btn.universal_row(
+            None,
             [
                 {
                     "type": "button",
-                    "label": loc.get("corners_label"),
+                    "label": loc.get("corners_and_sides_label"),
                     "callback": self.on_toggle_corners,
                     "bg_color": "#27ae60",
                     "toggle": True,
                     "size": SECTION_BUTTON_SIZE,
-                },
-                {
-                    "type": "button",
-                    "label": loc.get("symmetric_holes"),
-                    "callback": self.on_toggle_symmetric_holes,
-                    "bg_color": "#2980b9",
-                    "toggle": True,
-                    "size": SECTION_BUTTON_SIZE,
+                    "rows": 2,
                 },
                 {
                     "type": "button",
@@ -1173,15 +1516,25 @@ class RectPlateContentPanel(BaseContentPanel):
                     "bg_color": "#8e44ad",
                     "toggle": True,
                     "size": SECTION_BUTTON_SIZE,
+                    "rows": 2,
+                },
+                {
+                    "type": "button",
+                    "label": loc.get("symmetric_holes"),
+                    "callback": self.on_toggle_symmetric_holes,
+                    "bg_color": "#2980b9",
+                    "toggle": True,
+                    "size": SECTION_BUTTON_SIZE,
+                    "rows": 2,
                 },
             ],
             align_right=False,
         )
 
         self.section_buttons = {
-            "corners": controls[0],
-            "symmetric": controls[1],
-            "free": controls[2],
+            "corners":   controls[0],
+            "free":      controls[1],
+            "symmetric": controls[2],
         }
 
         self.right_sizer.Add(button_sizer, 0, wx.EXPAND | wx.ALL, 5)
@@ -1225,9 +1578,9 @@ class RectPlateContentPanel(BaseContentPanel):
     def _set_section_buttons_active(self, section: wx.Panel):
         """Синхронизирует визуальное состояние трёх toggle-кнопок секций."""
         mapping = {
-            "corners": self.corner_panel,
+            "corners":   self.corner_panel,
+            "free":      self.free_holes_panel,
             "symmetric": self.symmetric_holes_panel,
-            "free": self.free_holes_panel,
         }
 
         for key, panel in mapping.items():
