@@ -105,16 +105,16 @@ TRANSLATIONS = {
     "width_label": {"ru": "Ширина W, мм", "de": "Breite W, mm", "en": "Width W, mm"},
     "height_label": {"ru": "Высота H, мм", "de": "Höhe H, mm", "en": "Height H, mm"},
 
-    "corners_label": {"ru": "Углы и стороны", "de": "Ecken und Siten", "en": "Corners and sides"},
-    "symmetric_holes": {"ru": "Симм. отверстия", "de": "Symm. Bohrungen", "en": "Symmetric holes"},
-    "free_holes": {"ru": "Произв. отверстия", "de": "Freie Bohrungen", "en": "Free holes"},
+    "corners_label": {"ru": "Углы", "de": "Ecken", "en": "Corners"},
+    "symmetric_holes": {"ru": "Сим.отв.", "de": "Symm.Bohr.", "en": "Symm.holes"},
+    "free_holes": {"ru": "Отверстия", "de": "Bohrungen", "en": "Holes"},
 
     "corner_help_btn":   {"ru": "Справка", "de": "Hilfe", "en": "Help"},
     "corner_help_title": {"ru": "Формат ввода углов и сторон", "de": "Eingabeformat", "en": "Input format"},
     "corner_help": {
-        "ru": "0 — острый; 25 — R25; -10 — фаска 10x10; 10;20 — асимметричная фаска.",
-        "de": "0 — scharf; 25 — R25; -10 — Fase 10x10; 10;20 — asymmetrische Fase.",
-        "en": "0 — sharp; 25 — R25; -10 — chamfer 10x10; 10;20 — asymmetric chamfer.",
+        "ru": "0 — без обработки, острый угол 90°;\n25 — скругление радиусом R25;\n-10 — фаска 10x45°;\n10;20 — асимметричная фаска 10x20",
+        "de": "0 — keine Bearbeitung, spitzer Winkel 90°;\n25 — Abrundung mit Radius R25;\n-10 — Fase 10x45°;\n10;20 — asymmetrische Fase 10x20",
+        "en": "0 — no processing, angle 90°;\n25 — rounding with radius R25;\n-10 — chamfer 10x45°;\n10;20 — asymmetric chamfer 10x20",
     },
 
     "hole_type": {"ru": "Тип отверстия", "de": "Bohrungstyp", "en": "Hole type"},
@@ -179,6 +179,8 @@ TRANSLATIONS = {
         "en": "Slot parameters are missing",
     },
     "result_debug": {"ru": "Данные пластины", "de": "Plattendaten", "en": "Plate data"},
+    "sym_from_edge": {"ru": "от края", "de": "vom Rand", "en": "from edge"},
+    "sym_step": {"ru": "  шаг", "de": "  Schritt", "en": "  step"},
 }
 loc.register_translations(TRANSLATIONS)
 

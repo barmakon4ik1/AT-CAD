@@ -126,6 +126,11 @@ TRANSLATIONS = {
         "de": "Langloch zeichnen",
         "en": "Draw slotted hole"
     },
+    "at_run_plate_with_holes": {
+        "ru": "Пластина с отверстиями",
+        "de": "Platte mit Löchern",
+        "en": "Plate with hole"
+    },
 
 }
 
@@ -217,6 +222,11 @@ CONTENT_REGISTRY = {
         "type": "dialog",
         "build_module": "programs.at_slotted_hole",
     },
+    "plate_with_holes": {
+        "module": "windows.content_rect_plate",
+        "label": "at_run_plate_with_holes",
+        "build_module": "programs.at_rect_plate",
+    }
 }
 
 
