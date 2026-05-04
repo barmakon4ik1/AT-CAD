@@ -1077,31 +1077,84 @@ class SymmetricHolesPanel(wx.Panel):
         return [2, 4][self._count_ctrl.GetSelection()]
 
     def _calc_current_holes(self) -> list[dict[str, Any]]:
-        count = self._get_count()
+        # --- Размеры пластины ---
+        try:
+            parent = self.GetParent()
+            width  = _to_float(parent.width_ctrl.GetValue(),  allow_empty=True, default=0.0)
+            height = _to_float(parent.height_ctrl.GetValue(), allow_empty=True, default=0.0)
+        except Exception:
+            width = height = 0.0
+
+        count  = self._get_count()
         x_step = _to_float(self._x_step_ctrl.GetValue(), allow_empty=True, default=0.0)
         y_step = _to_float(self._y_step_ctrl.GetValue(), allow_empty=True, default=0.0)
         x_edge = _to_float(self._x_edge_ctrl.GetValue(), allow_empty=True, default=0.0)
         y_edge = _to_float(self._y_edge_ctrl.GetValue(), allow_empty=True, default=0.0)
 
-        px = x_step / 2.0 if self._sym_x else x_edge
-        py = y_step / 2.0 if self._sym_y else y_edge
+        # ------------------------------------------------------------------
+        # Вычисление координат пар точек по каждой оси
+        #
+        # Симметрия (sym=True):
+        #   два отверстия на ±step/2 от центра пластины
+        #   → x₁ = +step/2,  x₂ = −step/2
+        #
+        # От края (sym=False):
+        #   левое/нижнее отверстие на расстоянии edge от края,
+        #   второе отверстие со смещением step от первого
+        #   → x₁ = edge − W/2
+        #   → x₂ = x₁ + step  =  edge − W/2 + step
+        # ------------------------------------------------------------------
 
-        if count == 2:
+        if self._sym_x:
+            xs = [+x_step / 2.0, -x_step / 2.0]   # правое, левое
+        else:
+            x1 = x_edge - width / 2.0
+            x2 = x1 + x_step
+            xs = [x1, x2]                           # левое, правое
+
+        if self._sym_y:
+            ys = [+y_step / 2.0, -y_step / 2.0]   # верхнее, нижнее
+        else:
+            y1 = y_edge - height / 2.0
+            y2 = y1 + y_step
+            ys = [y1, y2]                           # нижнее, верхнее
+
+        # ------------------------------------------------------------------
+        # Формирование точек
+        #
+        # N=4: все комбинации xs × ys (4 точки)
+        # N=2: только одна ось активна — xs имеет 2 точки, ys одну (и наоборот)
+        #      при симметрии берём центральное y (=py из одной пары),
+        #      при «от края» обе y совпадают по смыслу с одной строкой
+        # ------------------------------------------------------------------
+
+        if count == 4:
+            points = [(x, y) for y in ys for x in xs]
+            # CCW порядок: (x1,y1), (x2,y1), (x2,y2), (x1,y2)
+            # ys[0]=верх/y2, ys[1]=низ/y1 — перебираем как есть,
+            # порядок для AutoCAD не критичен, модуль at_rect_plate принимает список
+
+        else:  # count == 2
             active = self._first_axis or "x"
             if active == "x":
-                points = [(px, py), (-px, py)]
+                # два отверстия различаются по X, Y — одно значение (среднее)
+                py = (ys[0] + ys[1]) / 2.0 if not self._sym_y else ys[0]
+                points = [(xs[0], py), (xs[1], py)]
             else:
-                points = [(px, py), (px, -py)]
-        else:
-            points = [(px, py), (-px, py), (-px, -py), (px, -py)]
+                # два отверстия различаются по Y, X — одно значение (среднее)
+                px = (xs[0] + xs[1]) / 2.0 if not self._sym_x else xs[0]
+                points = [(px, ys[0]), (px, ys[1])]
 
+        # ------------------------------------------------------------------
+        # Сборка словарей отверстий
+        # ------------------------------------------------------------------
         if self._type_is_slot:
             if not self.slot_data:
                 raise ValueError(loc.get("slot_params_missing"))
             return [{"type": "slot", "cx": p[0], "cy": p[1],
-                     "length": float(self.slot_data.get("length", 0)),
+                     "length":   float(self.slot_data.get("length",   0)),
                      "diameter": float(self.slot_data.get("diameter", 0)),
-                     "angle": float(self.slot_data.get("angle", 0)),
+                     "angle":    float(self.slot_data.get("angle",    0)),
                      "_xe": x_edge, "_xs": x_step,
                      "_ye": y_edge, "_ys": y_step,
                      "_sx": self._sym_x, "_sy": self._sym_y} for p in points]
