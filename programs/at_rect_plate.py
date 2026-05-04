@@ -65,6 +65,7 @@ from programs.at_geometry import (
     ensure_point_variant,
     fillet_points,
     offset_point,
+    bulge_from_three_points
 )
 from programs.at_input import at_get_point
 from windows.at_gui_utils import show_popup
@@ -122,6 +123,11 @@ TRANSLATIONS = {
         "ru": "Неизвестный тип отверстия: {0}",
         "de": "Unbekannter Lochtyp: {0}",
         "en": "Unknown hole type: {0}",
+    },
+    "edge_radius_too_small": {
+        "ru": "Радиус дуги стороны {0} меньше минимального ({1:.1f} мм — полусторона)",
+        "de": "Bogenradius der Seite {0} ist kleiner als Minimum ({1:.1f} mm — halbe Seite)",
+        "en": "Edge arc radius for side {0} is smaller than minimum ({1:.1f} mm — half-side)",
     },
 }
 loc.register_translations(TRANSLATIONS)
@@ -194,6 +200,17 @@ class RectPlate:
             for key in self._CORNER_ORDER
         }
 
+        # --- Дуговые стороны ---
+        raw_edges: Dict = data.get("edges", {})
+        self.edges: Dict[str, float] = {
+            "top": float(raw_edges.get("top", 0.0)),
+            "bottom": float(raw_edges.get("bottom", 0.0)),
+            "left": float(raw_edges.get("left", 0.0)),
+            "right": float(raw_edges.get("right", 0.0)),
+        }
+
+        self._validate_edges()
+
         # --- Отверстия ---
         self.holes: List[Dict] = self._validate_holes(data.get("holes", []))
 
@@ -265,6 +282,96 @@ class RectPlate:
                 ValueError(loc.get("corner_too_large").format(f"{key}: max({a},{b}) > {limit}"))
             )
 
+    def _validate_edges(self) -> None:
+        """
+        Проверяет, что радиус дуги каждой стороны не меньше полудлины этой стороны.
+        R = 0.0 → сторона прямая, проверка пропускается.
+        Знак радиуса определяет направление выпуклости — для валидации берём abs(R).
+        Минимальный радиус: R_min = half_side (при R = half_side — полукруг).
+        """
+        checks = [
+            ("top", self.width / 2.0),
+            ("bottom", self.width / 2.0),
+            ("left", self.height / 2.0),
+            ("right", self.height / 2.0),
+        ]
+        for name, half_side in checks:
+            r = abs(self.edges[name])
+            if r == 0.0:
+                continue
+            if r < half_side:
+                raise DataError(
+                    __name__,
+                    ValueError(loc.get("edge_radius_too_small").format(name, half_side))
+                )
+
+    @staticmethod
+    def _edge_bulge(
+            start: Tuple[float, float],
+            end: Tuple[float, float],
+            radius: float,
+    ) -> float:
+        """
+        Вычисляет bulge для дуговой стороны по двум конечным точкам и радиусу.
+
+        Алгоритм:
+          1. Находим середину хорды (start→end).
+          2. Находим единичный вектор, перпендикулярный хорде.
+          3. Центр окружности лежит на этом перпендикуляре на расстоянии
+             d = √(R² − (chord/2)²) от середины хорды.
+          4. Знак R задаёт сторону отклонения центра:
+               R > 0 → центр с «левой» стороны вектора start→end
+                       (CCW обход пластины → выпуклость наружу)
+               R < 0 → центр с «правой» стороны → вогнутость
+          5. Средняя точка дуги используется для bulge_from_three_points,
+             что даёт правильный знак bulge и CCW/CW направление.
+
+        Args:
+            start:  начальная точка стороны (x, y)
+            end:    конечная точка стороны (x, y)
+            radius: радиус, знак = направление выпуклости
+
+        Returns:
+            bulge (float); 0.0 если radius == 0
+        """
+        if abs(radius) < 1e-12:
+            return 0.0
+
+        R = radius
+        mx = (start[0] + end[0]) / 2.0
+        my = (start[1] + end[1]) / 2.0
+
+        # Вектор хорды и его длина
+        chord_dx = end[0] - start[0]
+        chord_dy = end[1] - start[1]
+        half_chord = math.hypot(chord_dx, chord_dy) / 2.0
+
+        # Перпендикуляр к хорде (левый поворот на 90°)
+        perp_x = -chord_dy
+        perp_y = chord_dx
+        perp_len = math.hypot(perp_x, perp_y)
+        if perp_len < 1e-12:
+            return 0.0
+        perp_x /= perp_len
+        perp_y /= perp_len
+
+        # Расстояние от середины хорды до центра окружности
+        r_abs = abs(R)
+        d = math.sqrt(max(r_abs * r_abs - half_chord * half_chord, 0.0))
+
+        # Знак R определяет сторону центра относительно хорды
+        sign = 1.0 if R > 0 else -1.0
+        cx = mx + sign * d * perp_x
+        cy = my + sign * d * perp_y
+
+        # Средняя точка дуги: от середины хорды в сторону, противоположную центру
+        # (дуга выпячивается от центра)
+        sag = r_abs - d  # стрела дуги
+        mid_x = mx - sign * sag * perp_x
+        mid_y = my - sign * sag * perp_y
+
+        return bulge_from_three_points(start, (mid_x, mid_y), end)
+
     def _validate_holes(self, holes: Any) -> List[Dict]:
         """
         Проверяет список отверстий. Отсеивает некорректные записи.
@@ -320,58 +427,61 @@ class RectPlate:
         Рассчитывает вершины контура пластины как список (x, y, bulge).
 
         Обход: CCW от правого нижнего угла.
-        Вершины углов прямоугольника:
-            rb = (cx + hw, cy - hh)
-            rt = (cx + hw, cy + hh)
-            lt = (cx - hw, cy + hh)
-            lb = (cx - hw, cy - hh)
+
+        Стороны между углами (в порядке обхода CCW):
+            rb → rt : правая сторона  (edges["right"])
+            rt → lt : верхняя сторона (edges["top"])
+            lt → lb : левая сторона   (edges["left"])
+            lb → rb : нижняя сторона  (edges["bottom"])
 
         Для каждого угла:
           - острый → одна вершина, bulge=0
           - скругление → две точки касания + bulge на первой
-          - фаска → две точки касания, bulge=0 (прямой срез)
+          - фаска → две точки касания, bulge=0
 
-        Args:
-            cx, cy: координаты центра пластины
-
-        Returns:
-            vertices — список (x, y, bulge)
-            needs_close — True (контур всегда замкнут)
+        Дуговая сторона задаётся bulge на последней вершине перед следующим углом.
         """
-        hw = self.width / 2
+        hw = self.width  / 2
         hh = self.height / 2
 
         # Вершины прямоугольника CCW от rb
         raw: List[Tuple[float, float]] = [
-            (cx + hw, cy - hh),  # rb
-            (cx + hw, cy + hh),  # rt
-            (cx - hw, cy + hh),  # lt
-            (cx - hw, cy - hh),  # lb
+            (cx + hw, cy - hh),  # rb  [0]
+            (cx + hw, cy + hh),  # rt  [1]
+            (cx - hw, cy + hh),  # lt  [2]
+            (cx - hw, cy - hh),  # lb  [3]
         ]
 
+        # Сторона, уходящая ИЗ угла в следующий угол (в порядке CCW)
+        # Индекс i → сторона от raw[i] к raw[(i+1)%4]
+        _EDGE_BY_CORNER = ("right", "top", "left", "bottom")
+
         n = len(raw)
-        vertices: List[Tuple[float, float, float]] = []  # (x, y, bulge)
+        vertices: List[Tuple[float, float, float]] = []
 
         for i, key in enumerate(self._CORNER_ORDER):
-            spec = self.corners[key]
+            spec    = self.corners[key]
             prev_pt = raw[(i - 1) % n]
             curr_pt = raw[i]
             next_pt = raw[(i + 1) % n]
 
+            # Имя стороны, которая ВЫХОДИТ из этого угла к следующему
+            edge_name   = _EDGE_BY_CORNER[i]
+            edge_radius = self.edges.get(edge_name, 0.0)
+
             if spec.mode == "sharp":
+                # Острый угол — одна вершина.
+                # Bulge будет назначен чуть ниже (для исходящей стороны).
                 vertices.append((curr_pt[0], curr_pt[1], 0.0))
 
             elif spec.mode == "round":
-                # Точки касания
                 t1, t2 = fillet_points(prev_pt, curr_pt, next_pt, spec.a)
-                # Bulge: для прямоугольника угол всегда 90°, CCW обход
-                # Скругление изнутри → bulge отрицательный (дуга выпуклая наружу)
-                bulge = _BULGE_90_CCW
-                vertices.append((t1[0], t1[1], bulge))
+                # t1 — входная точка касания, bulge скругления CCW
+                vertices.append((t1[0], t1[1], _BULGE_90_CCW))
+                # t2 — выходная точка касания, bulge исходящей стороны ставим ниже
                 vertices.append((t2[0], t2[1], 0.0))
 
             elif spec.mode == "chamfer":
-                # Направляющие векторы от curr к prev и к next
                 def _unit(p_from, p_to):
                     dx = p_to[0] - p_from[0]
                     dy = p_to[1] - p_from[1]
@@ -380,13 +490,31 @@ class RectPlate:
 
                 u_prev = _unit(curr_pt, prev_pt)
                 u_next = _unit(curr_pt, next_pt)
-
-                # t1 — точка на стороне к prev, t2 — на стороне к next
                 t1 = (curr_pt[0] + u_prev[0] * spec.a, curr_pt[1] + u_prev[1] * spec.a)
                 t2 = (curr_pt[0] + u_next[0] * spec.b, curr_pt[1] + u_next[1] * spec.b)
-
                 vertices.append((t1[0], t1[1], 0.0))
                 vertices.append((t2[0], t2[1], 0.0))
+
+            # --- Назначаем bulge исходящей дуговой стороны ---
+            # Это bulge последней добавленной вершины (выходная точка угла).
+            if abs(edge_radius) > 1e-12 and vertices:
+                # Нам нужны фактические start/end точки стороны.
+                # start — последняя вершина (которую только что добавили),
+                # end   — первая вершина следующего угла (узнаем после цикла).
+                # Поэтому откладываем: запоминаем pending bulge.
+                # Используем временную метку в вершине (заменим после цикла).
+                # Вместо сложного двухпроходного алгоритма вычислим bulge
+                # по геометрическим точкам raw[] — они известны уже сейчас.
+
+                # Для стороны right: raw[0]→raw[1], top: raw[1]→raw[2],
+                # left: raw[2]→raw[3], bottom: raw[3]→raw[0]
+                raw_start = raw[i]
+                raw_end   = raw[(i + 1) % n]
+                b = self._edge_bulge(raw_start, raw_end, edge_radius)
+
+                # Устанавливаем bulge на последнюю добавленную вершину
+                last = vertices[-1]
+                vertices[-1] = (last[0], last[1], b)
 
         return vertices, True
 
@@ -576,6 +704,7 @@ if __name__ == "__main__":
             "lt": 10.0,      # скругление R30
             "lb": 10.0,     # фаска 20×20
         },
+        # 'edges': {'top': 500.0, 'bottom': 0.0, 'left': 0.0, 'right': 0.0}, # данные для дуги стороны
         "holes": [
             {"type": "circle", "cx": -37,   "cy": 0,  "r": 30.15},
             # {"type": "circle", "cx": 308.15,   "cy": 0,  "r": 10.5},

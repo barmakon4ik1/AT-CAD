@@ -112,9 +112,12 @@ TRANSLATIONS = {
     "corner_help_btn":   {"ru": "Справка", "de": "Hilfe", "en": "Help"},
     "corner_help_title": {"ru": "Формат ввода углов и сторон", "de": "Eingabeformat", "en": "Input format"},
     "corner_help": {
-        "ru": "0 — без обработки, острый угол 90°;\n25 — скругление радиусом R25;\n-10 — фаска 10x45°;\n10;20 — асимметричная фаска 10x20",
-        "de": "0 — keine Bearbeitung, spitzer Winkel 90°;\n25 — Abrundung mit Radius R25;\n-10 — Fase 10x45°;\n10;20 — asymmetrische Fase 10x20",
-        "en": "0 — no processing, angle 90°;\n25 — rounding with radius R25;\n-10 — chamfer 10x45°;\n10;20 — asymmetric chamfer 10x20",
+        "ru": "0 — без обработки, острый угол 90°;\n25 — скругление радиусом R25;\n-10 — фаска 10x45°;\n10;20 — асимметричная фаска 10x20\n"
+              "*100 - выпуклая сторона с радиусом R100;\n*-100 - вогнутая сторона с радиусом R100",
+        "de": "0 — keine Bearbeitung, spitzer Winkel 90°;\n25 — Abrundung mit Radius R25;\n-10 — Fase 10x45°;\n10;20 — asymmetrische Fase 10x20\n"
+              "*100 ist die konvexe Seite mit Radius R100;\n*-100 ist die konkave Seite mit Radius R100.",
+        "en": "0 — no processing, angle 90°;\n25 — rounding with radius R25;\n-10 — chamfer 10x45°;\n10;20 — asymmetric chamfer 10x20\n"
+              "*100 is the convex side with radius R100;\n*-100 is the concave side with radius R100.",
     },
 
     "hole_type": {"ru": "Тип отверстия", "de": "Bohrungstyp", "en": "Hole type"},
@@ -323,9 +326,15 @@ def load_cell_bitmaps() -> dict[str, wx.Bitmap]:
 
 
 def parse_corner_value(value: Any) -> float | tuple[float, float] | int:
-    """Преобразует текст ячейки угла в формат ``programs.at_rect_plate``."""
+    """
+    Преобразует текст ячейки угла в формат ``programs.at_rect_plate``.
+
+    Если текст начинается с '*', это обозначение дуги (bulge) для
+    соседней стороны — возвращается 0 (угол без обработки).
+    Значение bulge извлекается отдельно через parse_edge_bulge().
+    """
     text = str(value).strip().replace(",", ".")
-    if text == "":
+    if text == "" or text.startswith("*"):
         return DEFAULT_CORNER_VALUE
 
     if ";" in text:
@@ -340,6 +349,22 @@ def parse_corner_value(value: Any) -> float | tuple[float, float] | int:
     if abs(value_float) < 1e-12:
         return 0
     return value_float
+
+
+def parse_edge_bulge(value: Any) -> float:
+    """
+    Извлекает значение bulge из ячейки стороны (ячейки 01, 10, 12, 21).
+
+    Формат: '*<число>', например '*0.5' или '*-0.3'.
+    Если префикса '*' нет или строка пустая — возвращает 0.0 (дуга не нужна).
+    """
+    text = str(value).strip().replace(",", ".")
+    if not text.startswith("*"):
+        return 0.0
+    tail = text[1:].strip()
+    if not tail:
+        return 0.0
+    return float(tail)
 
 
 def corner_abs_limit_value(value: float | tuple[float, float] | int) -> float:
@@ -698,12 +723,49 @@ class CornerInputPanel(wx.Panel):
             return
         event.Skip()
 
-    def get_corner_values(self) -> dict[str, float | tuple[float, float] | int]:
-        result: dict[str, float | tuple[float, float] | int] = {"lt": 0, "rt": 0, "lb": 0, "rb": 0}
+    def get_corner_values(self) -> dict[str, Any]:
+        """
+        Возвращает словарь для at_rect_plate с угловыми значениями
+        и опциональными bulge-значениями для сторон.
+
+        Ключи углов:  rb, rt, lt, lb  (float | tuple | int)
+        Ключи сторон: edge_top, edge_bottom, edge_left, edge_right  (float, bulge)
+
+        Ячейки матрицы → стороны:
+            "01" → верхняя  → edge_top
+            "21" → нижняя   → edge_bottom
+            "10" → левая    → edge_left
+            "12" → правая   → edge_right
+        """
+        result: dict[str, Any] = {
+            "lt": 0, "rt": 0, "lb": 0, "rb": 0,
+            # Bulge сторон; 0.0 = не используется (прямая линия)
+            "edge_top":    0.0,
+            "edge_bottom": 0.0,
+            "edge_left":   0.0,
+            "edge_right":  0.0,
+        }
+
+        # Ячейки с одиночными углами и группами
+        _CORNER_CELLS  = {"00", "02", "20", "22", "11"}
+        # Ячейки, определяющие форму стороны (дуга)
+        _EDGE_MAP = {
+            "01": "edge_top",
+            "21": "edge_bottom",
+            "10": "edge_left",
+            "12": "edge_right",
+        }
+
         for code, value in self.values.items():
-            parsed = parse_corner_value(value)
-            for corner in CELL_MASKS[code]:
-                result[corner] = parsed
+            if code in _EDGE_MAP:
+                # Это ячейка стороны — пишем bulge, угол = 0 (сторона не угол)
+                result[_EDGE_MAP[code]] = parse_edge_bulge(value)
+            else:
+                # Обычная угловая ячейка
+                parsed = parse_corner_value(value)
+                for corner in CELL_MASKS[code]:
+                    result[corner] = parsed
+
         return result
 
     def _emit_change(self):
@@ -861,16 +923,32 @@ class SymmetricHolesPanel(wx.Panel):
     # Отслеживание первого введённого шага (для N=2)
     # ------------------------------------------------------------------
     def _on_x_step_text(self, evt):
-        if self._first_axis is None and self._x_step_ctrl.GetValue().strip():
-            self._first_axis = "x"
-            self._refresh_ui()
+        val = self._x_step_ctrl.GetValue().strip()
+        if val:
+            # Если ось Y ещё не зафиксирована — фиксируем X
+            if self._first_axis is None:
+                self._first_axis = "x"
+                self._refresh_ui()
+        else:
+            # Поле X очищено — сбрасываем фиксацию, если была по X
+            if self._first_axis == "x":
+                self._first_axis = None
+                self._refresh_ui()
         self._emit_change()
         evt.Skip()
 
     def _on_y_step_text(self, evt):
-        if self._first_axis is None and self._y_step_ctrl.GetValue().strip():
-            self._first_axis = "y"
-            self._refresh_ui()
+        val = self._y_step_ctrl.GetValue().strip()
+        if val:
+            # Если ось X ещё не зафиксирована — фиксируем Y
+            if self._first_axis is None:
+                self._first_axis = "y"
+                self._refresh_ui()
+        else:
+            # Поле Y очищено — сбрасываем фиксацию, если была по Y
+            if self._first_axis == "y":
+                self._first_axis = None
+                self._refresh_ui()
         self._emit_change()
         evt.Skip()
 
@@ -891,18 +969,27 @@ class SymmetricHolesPanel(wx.Panel):
         self._x_edge_ctrl.Enable(not self._sym_x)
         self._y_edge_ctrl.Enable(not self._sym_y)
 
-        # При N=2 одна из осей заблокирована (та, которая НЕ была введена первой)
+        # При N=2: пока ни одна ось не введена — обе доступны;
+        # как только введена одна — вторая блокируется целиком.
         count = self._get_count()
         if count == 2:
-            active = self._first_axis or "x"   # по умолчанию X, пока не введено
-            x_active = (active == "x")
-            y_active = (active == "y")
-            self._x_step_ctrl.Enable(x_active)
-            self._x_edge_ctrl.Enable(x_active and not self._sym_x)
-            self._sym_x_btn.Enable(x_active)
-            self._y_step_ctrl.Enable(y_active)
-            self._y_edge_ctrl.Enable(y_active and not self._sym_y)
-            self._sym_y_btn.Enable(y_active)
+            if self._first_axis is None:
+                # Обе оси свободны — разрешаем всё
+                self._x_step_ctrl.Enable(True)
+                self._x_edge_ctrl.Enable(not self._sym_x)
+                self._sym_x_btn.Enable(True)
+                self._y_step_ctrl.Enable(True)
+                self._y_edge_ctrl.Enable(not self._sym_y)
+                self._sym_y_btn.Enable(True)
+            else:
+                x_active = (self._first_axis == "x")
+                y_active = (self._first_axis == "y")
+                self._x_step_ctrl.Enable(x_active)
+                self._x_edge_ctrl.Enable(x_active and not self._sym_x)
+                self._sym_x_btn.Enable(x_active)
+                self._y_step_ctrl.Enable(y_active)
+                self._y_edge_ctrl.Enable(y_active and not self._sym_y)
+                self._sym_y_btn.Enable(y_active)
         else:
             for ctrl in (self._x_step_ctrl, self._y_step_ctrl,
                          self._sym_x_btn, self._sym_y_btn):
@@ -1527,21 +1614,47 @@ class RectPlateContentPanel(BaseContentPanel):
 
         return width, height
 
-    def _read_corners(self, width: float, height: float) -> dict[str, float | tuple[float, float] | int]:
-        corners = self.corner_panel.get_corner_values() if self.corner_panel else {"lt": 0, "rt": 0, "lb": 0, "rb": 0}
-        limit = min(width, height) / 2.0
+    def _read_corners(self, width: float, height: float) -> dict[str, Any]:
+        """
+        Считывает значения углов и дуговых сторон из CornerInputPanel.
 
-        for value in corners.values():
+        Угловые ключи:  rb, rt, lt, lb  — проходят валидацию по min(W,H)/2.
+        Edge-ключи: edge_top, edge_bottom, edge_left, edge_right — радиус
+        кривизны (знак = направление выпуклости); валидация не применяется,
+        т.к. ограничение иное (R >= длина_стороны / 2) и проверяется в
+        модуле построения.
+        """
+        all_values = (
+            self.corner_panel.get_corner_values()
+            if self.corner_panel
+            else {
+                "lt": 0, "rt": 0, "lb": 0, "rb": 0,
+                "edge_top": 0.0, "edge_bottom": 0.0,
+                "edge_left": 0.0, "edge_right": 0.0,
+            }
+        )
+
+        # Валидируем ТОЛЬКО угловые ключи
+        corner_keys = {"lt", "rt", "lb", "rb"}
+        limit = min(width, height) / 2.0
+        for key in corner_keys:
+            value = all_values.get(key, 0)
             if corner_abs_limit_value(value) > limit:
                 raise ValueError(loc.get("corner_too_large"))
 
-        # Порядок ключей совпадает с at_rect_plate.py.
         return {
-            "rb": corners["rb"],
-            "rt": corners["rt"],
-            "lt": corners["lt"],
-            "lb": corners["lb"],
+            # Углы
+            "rb": all_values.get("rb", 0),
+            "rt": all_values.get("rt", 0),
+            "lt": all_values.get("lt", 0),
+            "lb": all_values.get("lb", 0),
+            # Дуговые стороны (bulge-радиус; 0.0 = прямая линия)
+            "edge_top":    all_values.get("edge_top",    0.0),
+            "edge_bottom": all_values.get("edge_bottom", 0.0),
+            "edge_left":   all_values.get("edge_left",   0.0),
+            "edge_right":  all_values.get("edge_right",  0.0),
         }
+
 
     def _read_holes(self) -> list[dict[str, Any]]:
         holes: list[dict[str, Any]] = []
@@ -1561,13 +1674,26 @@ class RectPlateContentPanel(BaseContentPanel):
         holes = self._read_holes()
 
         return {
-            "width": width,
-            "height": height,
-            "corners": corners,
-            "holes": holes,
-            "order": raw.get("order", ""),
-            "detail": raw.get("detail", ""),
-            "material": raw.get("material", ""),
+            "width":    width,
+            "height":   height,
+            "corners":  {
+                "rb": corners["rb"],
+                "rt": corners["rt"],
+                "lt": corners["lt"],
+                "lb": corners["lb"],
+            },
+            # Дуговые стороны вынесены отдельным ключом верхнего уровня,
+            # чтобы модуль построения мог использовать их независимо.
+            "edges": {
+                "top":    corners["edge_top"],
+                "bottom": corners["edge_bottom"],
+                "left":   corners["edge_left"],
+                "right":  corners["edge_right"],
+            },
+            "holes":     holes,
+            "order":     raw.get("order", ""),
+            "detail":    raw.get("detail", ""),
+            "material":  raw.get("material", ""),
             "thickness": raw.get("thickness", ""),
         }
 
