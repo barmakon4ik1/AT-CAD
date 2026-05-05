@@ -1034,20 +1034,45 @@ def normalize_input(
     return value
 
 
-def parse_float(value: str) -> float | None:
+def parse_float(
+    value: str,
+    allow_empty: bool = False,
+    default: float | None = None,
+) -> float | None:
     """
     Преобразует строку в float.
-    Поддерживает ',' и '.' как десятичный разделитель.
-    Возвращает None для пустой строки.
-    Вызывает ValueError при некорректном формате.
+
+    Поддерживает "," и "." как десятичный разделитель.
+
+    Args:
+        value:       входная строка или число.
+        allow_empty: если True — пустое значение возвращает default, а не None.
+                     если False (по умолчанию) — пустое значение возвращает None.
+        default:     значение при пустой строке когда allow_empty=True.
+
+    Returns:
+        float, default или None.
+
+    Raises:
+        ValueError: при некорректном формате (непустая строка, не число).
+
+    Примеры:
+        parse_float("3,14")                             -> 3.14
+        parse_float("")                                 -> None
+        parse_float("", allow_empty=True, default=0.0)  -> 0.0
+        parse_float(None, allow_empty=True, default=0.0) -> 0.0
+
+    Примечание:
+        Расширенная сигнатура заменяет паттерн _to_float(v, allow_empty, default),
+        который ранее дублировался в каждом content-модуле.
     """
     if value is None:
-        return None
+        return default if allow_empty else None
 
     cleaned = str(value).strip().replace(",", ".")
 
     if not cleaned:
-        return None
+        return default if allow_empty else None
 
     return float(cleaned)
 

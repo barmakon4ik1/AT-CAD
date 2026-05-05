@@ -68,17 +68,20 @@ import wx
 # ----------------------------------------------------------------------
 from config.at_config import (
     ARROWS_IMAGE_PATH,
-    DEFAULT_SETTINGS, BUTTON_SIZE,
+    BUTTON_SIZE,
 )
 from locales.at_translations import loc
+from windows.at_bitmap_utils import (
+    load_icon_from_dir,
+    load_icon_set,
+    bmp_to_bundle,
+)
 from windows.at_fields_builder import FieldBuilder, FormBuilder, parse_float
-from windows.at_gui_utils import show_popup
+from windows.at_gui_utils import show_popup, get_standard_font
 from windows.at_window_utils import (
     BaseContentPanel,
     apply_styles_to_panel,
-    get_wx_color_from_value,
     load_common_data,
-    load_user_settings,
 )
 
 try:
@@ -112,11 +115,14 @@ TRANSLATIONS = {
     "corner_help_btn":   {"ru": "Справка", "de": "Hilfe", "en": "Help"},
     "corner_help_title": {"ru": "Формат ввода углов и сторон", "de": "Eingabeformat", "en": "Input format"},
     "corner_help": {
-        "ru": "0 — без обработки, острый угол 90°;\n25 — скругление радиусом R25;\n-10 — фаска 10x45°;\n10;20 — асимметричная фаска 10x20\n"
+        "ru": "0 — без обработки, острый угол 90°;\n25 — скругление радиусом R25;\n-10 — фаска 10x45°;\n10;20 — асимметричная фаска 10x20\n\n"
+              "Только для граней!:\n"
               "*100 - выпуклая сторона с радиусом R100;\n*-100 - вогнутая сторона с радиусом R100",
-        "de": "0 — keine Bearbeitung, spitzer Winkel 90°;\n25 — Abrundung mit Radius R25;\n-10 — Fase 10x45°;\n10;20 — asymmetrische Fase 10x20\n"
+        "de": "0 — keine Bearbeitung, spitzer Winkel 90°;\n25 — Abrundung mit Radius R25;\n-10 — Fase 10x45°;\n10;20 — asymmetrische Fase 10x20\n\n"
+              "Nur für Kanten!:\n"
               "*100 ist die konvexe Seite mit Radius R100;\n*-100 ist die konkave Seite mit Radius R100.",
-        "en": "0 — no processing, angle 90°;\n25 — rounding with radius R25;\n-10 — chamfer 10x45°;\n10;20 — asymmetric chamfer 10x20\n"
+        "en": "0 — no processing, angle 90°;\n25 — rounding with radius R25;\n-10 — chamfer 10x45°;\n10;20 — asymmetric chamfer 10x20\n\n"
+              "For faces only!:\n"
               "*100 is the convex side with radius R100;\n*-100 is the concave side with radius R100.",
     },
 
@@ -193,20 +199,20 @@ loc.register_translations(TRANSLATIONS)
 # ----------------------------------------------------------------------
 DEFAULT_CORNER_VALUE = 0
 
-PREVIEW_SIZE        = (760, 560)
+PREVIEW_SIZE        = wx.Size(760, 560)
 RIGHT_PANEL_MIN_WIDTH = 420
 
 CELL_SIZE           = wx.Size(72, 54)     # wx.Size, не tuple
 CELL_GAP            = 4
 WINDOW_PADDING      = 10
 
-SUBPANEL_INPUT_SIZE = wx.Size(130, -1)    # wx.Size, не tuple
+SUBPANEL_INPUT_SIZE = BUTTON_SIZE
 
 HOLE_ICON_SIZE      = (24, 24)            # для circle.png / slot.png
 SYM_ICON_SIZE       = (26, 26)            # для sym_*.png
-BTN_ICON_SIZE       = (22, 22)            # для кнопок управления
+BTN_ICON_SIZE       = (26, 26)            # для кнопок управления
 
-NORMAL_FONT_SIZE = int(DEFAULT_SETTINGS.get("FONT_SIZE", 10))
+# Шрифт берётся через get_standard_font() из at_gui_utils — единый источник.
 
 COLOR_FREE_BG = wx.Colour(245, 245, 245)
 COLOR_FREE_FG = wx.Colour(30, 30, 30)
@@ -271,59 +277,13 @@ def create_window(parent: wx.Window) -> Optional[wx.Panel]:
 
 # ----------------------------------------------------------------------
 # Вспомогательные функции
+#
+# Общие утилиты перенесены в специализированные модули:
+#   parse_float(v, allow_empty, default) — windows.at_fields_builder
+#   load_icon_from_dir(dir, name, size)  — windows.at_bitmap_utils
+#   load_icon_set(dir, files, size)      — windows.at_bitmap_utils
+#   bmp_to_bundle(bmp)                   — windows.at_bitmap_utils
 # ----------------------------------------------------------------------
-def _to_float(value: Any, allow_empty: bool = False, default: float = 0.0) -> float:
-    """Парсит число с поддержкой запятой как десятичного разделителя."""
-    if value is None or str(value).strip() == "":
-        if allow_empty:
-            return default
-        raise ValueError(loc.get("invalid_number_format_error"))
-    return parse_float(value)
-
-
-def _create_static_text(parent: wx.Window, text: str) -> wx.StaticText:
-    label = wx.StaticText(parent, label=text)
-    label.SetFont(wx.Font(NORMAL_FONT_SIZE, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-    return label
-
-
-def load_bitmap(path: Path, size: tuple[int, int]) -> wx.Bitmap:
-    """Загружает PNG-иконку и масштабирует её под ячейку."""
-    if not path.exists():
-        # В тестовом режиме без ресурсов возвращаем пустой bitmap.
-        bmp = wx.Bitmap(size[0], size[1])
-        dc = wx.MemoryDC(bmp)
-        dc.SetBackground(wx.Brush(wx.Colour(245, 245, 245)))
-        dc.Clear()
-        dc.SelectObject(wx.NullBitmap)
-        return bmp
-
-    image = wx.Image(str(path), wx.BITMAP_TYPE_ANY)
-    if not image.IsOk():
-        raise ValueError(f"Не удалось загрузить изображение: {path}")
-    image = image.Rescale(size[0], size[1], wx.IMAGE_QUALITY_HIGH)
-    return wx.Bitmap(image)
-
-
-def _load_bmp(filename: str, size: tuple[int, int]) -> wx.Bitmap:
-    """Загружает PNG из ARROWS_IMAGE_PATH; при ошибке — серый placeholder."""
-    return load_bitmap(IMAGE_DIR / filename, size)
-
-
-def _load_hole_bmp(filename: str) -> wx.Bitmap:
-    """Загружает иконку типа отверстия (circle.png / slot.png)."""
-    return _load_bmp(filename, HOLE_ICON_SIZE)
-
-
-def _bmp_to_bundle(bmp: wx.Bitmap) -> wx.BitmapBundle:
-    """Конвертирует wx.Bitmap → wx.BitmapBundle для BitmapButton."""
-    return wx.BitmapBundle.FromBitmap(bmp)
-
-
-def load_cell_bitmaps() -> dict[str, wx.Bitmap]:
-    """Загружает все иконки матрицы углов."""
-    return {code: load_bitmap(IMAGE_DIR / filename, ICON_DRAW_SIZE) for code, filename in ICON_FILES.items()}
-
 
 def parse_corner_value(value: Any) -> float | tuple[float, float] | int:
     """
@@ -343,7 +303,7 @@ def parse_corner_value(value: Any) -> float | tuple[float, float] | int:
         b = float(b_str.strip())
         if a <= 0 or b <= 0:
             raise ValueError(loc.get("invalid_number_format_error"))
-        return (a, b)
+        return a, b
 
     value_float = float(text)
     if abs(value_float) < 1e-12:
@@ -444,7 +404,7 @@ class RectPlatePreviewPanel(wx.Panel):
         gc.StrokeLine(cx, y, cx, y + draw_h)
 
         gc.SetFont(
-            wx.Font(NORMAL_FONT_SIZE, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL),
+            get_standard_font(),
             COLOR_PREVIEW_AUX,
         )
         gc.DrawText("X", x + draw_w - 16, cy + 4)
@@ -548,7 +508,11 @@ class CornerCell(wx.Panel):
     def __init__(self, parent: wx.Window, code: str, bitmap: wx.Bitmap):
         super().__init__(parent, size=CELL_SIZE, style=wx.BORDER_SIMPLE)
         self.code = code
-        self.bitmap_ctrl = wx.StaticBitmap(self, bitmap=bitmap)
+        # self.bitmap_ctrl = wx.StaticBitmap(self, bitmap=bitmap)
+        self.bitmap_ctrl = wx.StaticBitmap(
+            self,
+            bitmap=wx.BitmapBundle.FromBitmap(bitmap)
+        )
         self.text_ctrl = wx.TextCtrl(self, style=wx.TE_CENTER | wx.BORDER_NONE)
         self.text_ctrl.Hide()
 
@@ -594,8 +558,8 @@ class CornerInputPanel(wx.Panel):
         self.values: dict[str, str] = {}
         self.cells: dict[str, CornerCell] = {}
         self.on_change = on_change
-        self.bitmaps = load_cell_bitmaps()
-        self.normal_font = wx.Font(NORMAL_FONT_SIZE, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+        self.bitmaps = load_icon_set(IMAGE_DIR, ICON_FILES, ICON_DRAW_SIZE)
+        self.normal_font = get_standard_font()
         self._build_ui()
         self.refresh_cells()
 
@@ -624,8 +588,9 @@ class CornerInputPanel(wx.Panel):
 
         # Кнопка «?» — справка по вводу углов
         info_btn = wx.Button(self, label="?  " + loc.get("corner_help_btn", "Справка"), size=BUTTON_SIZE)
-        info_btn.SetFont(wx.Font(NORMAL_FONT_SIZE - 1, wx.FONTFAMILY_DEFAULT,
-                                  wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
+        _help_font = get_standard_font()
+        _help_font.SetPointSize(max(8, _help_font.GetPointSize() - 1))
+        info_btn.SetFont(_help_font)
         info_btn.SetBackgroundColour(wx.Colour(52, 152, 219))
         info_btn.SetForegroundColour(wx.Colour(255, 255, 255))
         info_btn.Bind(wx.EVT_BUTTON, self._on_show_help)
@@ -791,6 +756,8 @@ class SymmetricHolesPanel(wx.Panel):
 
     def __init__(self, parent: wx.Window, on_change: Optional[Callable[[], None]] = None):
         super().__init__(parent)
+        self.height_ctrl = None
+        self.width_ctrl = None
         self.on_change    = on_change
         self.slot_data: Optional[dict[str, Any]] = None
 
@@ -808,10 +775,10 @@ class SymmetricHolesPanel(wx.Panel):
 
     # ------------------------------------------------------------------
     def _build_ui(self):
-        fnt = wx.Font(NORMAL_FONT_SIZE, wx.FONTFAMILY_DEFAULT,
-                      wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
-        hdr_fnt = wx.Font(NORMAL_FONT_SIZE - 1, wx.FONTFAMILY_DEFAULT,
-                          wx.FONTSTYLE_ITALIC, wx.FONTWEIGHT_NORMAL)
+        fnt = get_standard_font()
+        hdr_fnt = get_standard_font()
+        hdr_fnt.SetPointSize(max(8, hdr_fnt.GetPointSize() - 1))
+        hdr_fnt.SetStyle(wx.FONTSTYLE_ITALIC)
         root = wx.BoxSizer(wx.VERTICAL)
         self.SetSizer(root)
 
@@ -820,7 +787,7 @@ class SymmetricHolesPanel(wx.Panel):
 
         self._type_btn = wx.BitmapButton(
             self,
-            bitmap=_bmp_to_bundle(_load_hole_bmp("circle.png")),
+            bitmap=bmp_to_bundle(load_icon_from_dir(IMAGE_DIR, "circle.png", HOLE_ICON_SIZE)),
             size=wx.Size(self._BTN_W, self._BTN_W))
         self._type_btn.SetToolTip(loc.get("hole_type"))
         row1.Add(self._type_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
@@ -845,7 +812,7 @@ class SymmetricHolesPanel(wx.Panel):
 
         hdr_row = wx.BoxSizer(wx.HORIZONTAL)
         hdr_row.Add(wx.Size(20 + self._BTN_W + pad * 2, 1))
-        for label in (loc.get("sym_from_edge"), loc.get("sym_step")):
+        for label in ("↦", "↔"):
             s = wx.StaticText(self, label=label)
             s.SetFont(hdr_fnt)
             s.SetForegroundColour(wx.Colour(110, 110, 110))
@@ -860,7 +827,7 @@ class SymmetricHolesPanel(wx.Panel):
 
             sym_btn = wx.BitmapButton(
                 self,
-                bitmap=_bmp_to_bundle(_load_bmp("sym_xy.png", SYM_ICON_SIZE)),
+                bitmap=bmp_to_bundle(load_icon_from_dir(IMAGE_DIR, "sym_xy.png", SYM_ICON_SIZE)),
                 size=wx.Size(self._BTN_W, self._BTN_W))
             row.Add(sym_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, pad)
 
@@ -884,10 +851,11 @@ class SymmetricHolesPanel(wx.Panel):
         # Ширина колонок ~5 символов × ~7px = 36px + заголовок
         self._holes_list = wx.ListCtrl(
             self, style=wx.LC_REPORT | wx.LC_SINGLE_SEL, size=wx.Size(-1, 85))
-        self._holes_list.SetFont(wx.Font(NORMAL_FONT_SIZE - 1, wx.FONTFAMILY_DEFAULT,
-                                         wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
-        col_defs = [("N", 28), ("Тип", 40), ("Ø", 48), ("L", 42),
-                    ("X от кр.", 58), ("шаг X", 48), ("Y от кр.", 58), ("шаг Y", 48)]
+        _list_fnt = get_standard_font()
+        _list_fnt.SetPointSize(max(8, _list_fnt.GetPointSize() - 1))
+        self._holes_list.SetFont(_list_fnt)
+        col_defs = [("N", 28), ("≡", 40), ("Ø", 48), ("L", 42),
+                    ("X↦", 58), ("X↔", 48), ("Y↦", 58), ("Y↔", 48)]
         for i, (h, w) in enumerate(col_defs):
             self._holes_list.InsertColumn(i, h, width=w)
         root.Add(self._holes_list, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
@@ -899,8 +867,8 @@ class SymmetricHolesPanel(wx.Panel):
             ("clear.png",      self._on_clear_list)
         ]
         for fname, handler in icons:
-            bmp = _load_bmp(fname, self._BTN_ICON)
-            btn = wx.BitmapButton(self, bitmap=_bmp_to_bundle(bmp),
+            bmp = load_icon_from_dir(IMAGE_DIR, fname, self._BTN_ICON)
+            btn = wx.BitmapButton(self, bitmap=bmp_to_bundle(bmp),
                                   size=wx.Size(self._BTN_ICON[0] + 8, self._BTN_ICON[1] + 8))
             btn.Bind(wx.EVT_BUTTON, handler)
             btn_sizer.Add(btn, 0, wx.RIGHT, 3)
@@ -958,7 +926,7 @@ class SymmetricHolesPanel(wx.Panel):
     def _refresh_ui(self):
         # Иконка типа
         self._type_btn.SetBitmap(
-            _bmp_to_bundle(_load_hole_bmp("slot.png" if self._type_is_slot else "circle.png")))
+            bmp_to_bundle(load_icon_from_dir(IMAGE_DIR, "slot.png" if self._type_is_slot else "circle.png", HOLE_ICON_SIZE)))
         self._d_ctrl.Enable(not self._type_is_slot)
 
         # Иконки симметрии
@@ -1007,7 +975,7 @@ class SymmetricHolesPanel(wx.Panel):
         else:
             fname = "sym_right.png" if axis == "x" else "sym_up.png"
             tip = loc.get("sym_tooltip_edge_x" if axis == "x" else "sym_tooltip_edge_y")
-        btn.SetBitmap(_bmp_to_bundle(_load_bmp(fname, SYM_ICON_SIZE)))
+        btn.SetBitmap(bmp_to_bundle(load_icon_from_dir(IMAGE_DIR, fname, SYM_ICON_SIZE)))
         btn.SetToolTip(tip)
 
     # ------------------------------------------------------------------
@@ -1080,16 +1048,16 @@ class SymmetricHolesPanel(wx.Panel):
         # --- Размеры пластины ---
         try:
             parent = self.GetParent()
-            width  = _to_float(parent.width_ctrl.GetValue(),  allow_empty=True, default=0.0)
-            height = _to_float(parent.height_ctrl.GetValue(), allow_empty=True, default=0.0)
+            width  = parse_float(parent.width_ctrl.GetValue(),  allow_empty=True, default=0.0)
+            height = parse_float(parent.height_ctrl.GetValue(), allow_empty=True, default=0.0)
         except Exception:
             width = height = 0.0
 
         count  = self._get_count()
-        x_step = _to_float(self._x_step_ctrl.GetValue(), allow_empty=True, default=0.0)
-        y_step = _to_float(self._y_step_ctrl.GetValue(), allow_empty=True, default=0.0)
-        x_edge = _to_float(self._x_edge_ctrl.GetValue(), allow_empty=True, default=0.0)
-        y_edge = _to_float(self._y_edge_ctrl.GetValue(), allow_empty=True, default=0.0)
+        x_step = parse_float(self._x_step_ctrl.GetValue(), allow_empty=True, default=0.0)
+        y_step = parse_float(self._y_step_ctrl.GetValue(), allow_empty=True, default=0.0)
+        x_edge = parse_float(self._x_edge_ctrl.GetValue(), allow_empty=True, default=0.0)
+        y_edge = parse_float(self._y_edge_ctrl.GetValue(), allow_empty=True, default=0.0)
 
         # ------------------------------------------------------------------
         # Вычисление координат пар точек по каждой оси
@@ -1159,7 +1127,7 @@ class SymmetricHolesPanel(wx.Panel):
                      "_ye": y_edge, "_ys": y_step,
                      "_sx": self._sym_x, "_sy": self._sym_y} for p in points]
 
-        d = _to_float(self._d_ctrl.GetValue())
+        d = parse_float(self._d_ctrl.GetValue())
         if d <= 0:
             raise ValueError(loc.get("hole_error"))
         return [{"type": "circle", "cx": p[0], "cy": p[1], "r": d / 2.0,
@@ -1235,7 +1203,7 @@ class FreeHolesPanel(wx.Panel):
     COL_L    = 4
     COL_A    = 5
 
-    _INIT_ROWS = 4
+    _INIT_ROWS = 5
     # Ширины колонок: тип (кнопка), X, Y, D, L, A
     _COL_W = [30, 60, 60, 60, 60, 50]
     _ROW_H = 26
@@ -1244,8 +1212,8 @@ class FreeHolesPanel(wx.Panel):
     def __init__(self, parent: wx.Window, on_change: Optional[Callable[[], None]] = None):
         super().__init__(parent)
         self.on_change = on_change
-        self._bmp_circle = _load_hole_bmp("circle.png")
-        self._bmp_slot   = _load_hole_bmp("slot.png")
+        self._bmp_circle = load_icon_from_dir(IMAGE_DIR, "circle.png", HOLE_ICON_SIZE)
+        self._bmp_slot   = load_icon_from_dir(IMAGE_DIR, "slot.png", HOLE_ICON_SIZE)
         self._rows: list[dict] = []
         self._build_ui()
 
@@ -1257,8 +1225,9 @@ class FreeHolesPanel(wx.Panel):
         # ── Строка заголовков ─────────────────────────────────────────
         hdr = wx.BoxSizer(wx.HORIZONTAL)
         hdr_labels = ["", "X", "Y", "Ø D", "L", "A°"]
-        hdr_fnt = wx.Font(NORMAL_FONT_SIZE - 1, wx.FONTFAMILY_DEFAULT,
-                          wx.FONTSTYLE_ITALIC, wx.FONTWEIGHT_NORMAL)
+        hdr_fnt = get_standard_font()
+        hdr_fnt.SetPointSize(max(8, hdr_fnt.GetPointSize() - 1))
+        hdr_fnt.SetStyle(wx.FONTSTYLE_ITALIC)
         for label, col_w in zip(hdr_labels, self._COL_W):
             st = wx.StaticText(self, label=label)
             st.SetFont(hdr_fnt)
@@ -1273,7 +1242,7 @@ class FreeHolesPanel(wx.Panel):
         self._scroll.SetScrollRate(0, 10)
         self._rows_sizer = wx.BoxSizer(wx.VERTICAL)
         self._scroll.SetSizer(self._rows_sizer)
-        self._scroll.SetMinSize(wx.Size(-1, self._ROW_H * self._INIT_ROWS + 8))
+        self._scroll.SetMinSize(wx.Size(-1, self._ROW_H * self._INIT_ROWS + 15))
 
         for _ in range(self._INIT_ROWS):
             self._append_row()
@@ -1289,8 +1258,8 @@ class FreeHolesPanel(wx.Panel):
             ("ok.png",         self._on_apply),
         ]
         for fname, handler in icons:
-            bmp = _load_bmp(fname, self._BTN_ICON_SZ)
-            btn = wx.BitmapButton(self, bitmap=_bmp_to_bundle(bmp),
+            bmp = load_icon_from_dir(IMAGE_DIR, fname, self._BTN_ICON_SZ)
+            btn = wx.BitmapButton(self, bitmap=bmp_to_bundle(bmp),
                                   size=wx.Size(self._BTN_ICON_SZ[0] + 8, self._BTN_ICON_SZ[1] + 8))
             btn.Bind(wx.EVT_BUTTON, handler)
             btn_sizer.Add(btn, 0, wx.RIGHT, 3)
@@ -1299,12 +1268,11 @@ class FreeHolesPanel(wx.Panel):
     # ------------------------------------------------------------------
     def _append_row(self, is_slot: bool = False):
         row_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        fnt = wx.Font(NORMAL_FONT_SIZE, wx.FONTFAMILY_DEFAULT,
-                      wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+        fnt = get_standard_font()
 
         # Кнопка-иконка типа
         bmp = self._bmp_slot if is_slot else self._bmp_circle
-        type_btn = wx.BitmapButton(self._scroll, bitmap=_bmp_to_bundle(bmp),
+        type_btn = wx.BitmapButton(self._scroll, bitmap=bmp_to_bundle(bmp),
                                    size=wx.Size(self._COL_W[0], self._ROW_H))
         type_btn.SetToolTip("slot" if is_slot else "circle")
         row_idx = len(self._rows)
@@ -1337,7 +1305,7 @@ class FreeHolesPanel(wx.Panel):
         row = self._rows[row_idx]
         row["is_slot"] = not row["is_slot"]
         bmp = self._bmp_slot if row["is_slot"] else self._bmp_circle
-        row["type_btn"].SetBitmap(_bmp_to_bundle(bmp))
+        row["type_btn"].SetBitmap(bmp_to_bundle(bmp))
         row["type_btn"].SetToolTip("slot" if row["is_slot"] else "circle")
         if not row["is_slot"]:
             row["ctrls"][3].SetValue("")
@@ -1385,7 +1353,7 @@ class FreeHolesPanel(wx.Panel):
 
         for i, row in enumerate(self._rows):
             row["is_slot"] = False
-            row["type_btn"].SetBitmap(_bmp_to_bundle(self._bmp_circle))
+            row["type_btn"].SetBitmap(bmp_to_bundle(self._bmp_circle))
             row["type_btn"].SetToolTip("circle")
             for ctrl, val in zip(row["ctrls"], ["0", "0", "", "", "0"]):
                 ctrl.SetValue(val)
@@ -1402,17 +1370,17 @@ class FreeHolesPanel(wx.Panel):
             d_val = ctrls[2].GetValue().strip()
             if not d_val:
                 continue
-            x = _to_float(ctrls[0].GetValue(), allow_empty=True, default=0.0)
-            y = _to_float(ctrls[1].GetValue(), allow_empty=True, default=0.0)
-            d = _to_float(d_val)
+            x = parse_float(ctrls[0].GetValue(), allow_empty=True, default=0.0)
+            y = parse_float(ctrls[1].GetValue(), allow_empty=True, default=0.0)
+            d = parse_float(d_val)
             if d <= 0:
                 raise ValueError(loc.get("hole_error"))
             if row["is_slot"]:
                 l_val = ctrls[3].GetValue().strip()
                 if not l_val:
                     continue
-                length = _to_float(l_val)
-                angle  = _to_float(ctrls[4].GetValue(), allow_empty=True, default=0.0)
+                length = parse_float(l_val)
+                angle  = parse_float(ctrls[4].GetValue(), allow_empty=True, default=0.0)
                 holes.append({"type": "slot", "cx": x, "cy": y,
                                "length": length, "diameter": d, "angle": angle})
             else:
@@ -1435,8 +1403,7 @@ class RectPlateContentPanel(BaseContentPanel):
 
         self.parent = parent
         self.on_submit_callback = callback
-        self.settings = load_user_settings()
-
+        # self.settings и self.insert_point уже инициализированы в BaseContentPanel.__init__
         self.form: Optional[FormBuilder] = None
         self.fb: Optional[FieldBuilder] = None
 
@@ -1451,15 +1418,11 @@ class RectPlateContentPanel(BaseContentPanel):
         self.section_buttons: dict[str, wx.Button] = {}
         self.active_section: Optional[wx.Panel] = None
 
-        self.insert_point = None
+        # insert_point уже объявлен в BaseContentPanel; дополнительный атрибут для точки вставки CAD
         self.width_ctrl: Optional[wx.TextCtrl] = None
         self.height_ctrl: Optional[wx.TextCtrl] = None
 
-        self.SetBackgroundColour(
-            get_wx_color_from_value(
-                self.settings.get("BACKGROUND_COLOR", DEFAULT_SETTINGS["BACKGROUND_COLOR"])
-            )
-        )
+        # Фон уже установлен в BaseContentPanel.__init__; повторный вызов не нужен.
 
         self.setup_ui()
 
@@ -1534,7 +1497,7 @@ class RectPlateContentPanel(BaseContentPanel):
                 "value": "",
                 "required": True,
                 "default": "1.4301",
-                "size": (230, -1),
+                "size": (310, -1),
             }],
         )
 
@@ -1659,8 +1622,8 @@ class RectPlateContentPanel(BaseContentPanel):
         return raw or {}
 
     def _read_dimensions(self) -> tuple[float, float]:
-        width = _to_float(self.width_ctrl.GetValue())
-        height = _to_float(self.height_ctrl.GetValue())
+        width = parse_float(self.width_ctrl.GetValue())
+        height = parse_float(self.height_ctrl.GetValue())
 
         if width <= 0 or height <= 0:
             raise ValueError(loc.get("invalid_dimensions"))
@@ -1759,8 +1722,8 @@ class RectPlateContentPanel(BaseContentPanel):
 
     def update_preview(self):
         try:
-            width = _to_float(self.width_ctrl.GetValue(), allow_empty=True, default=300.0)
-            height = _to_float(self.height_ctrl.GetValue(), allow_empty=True, default=180.0)
+            width = parse_float(self.width_ctrl.GetValue(), allow_empty=True, default=300.0)
+            height = parse_float(self.height_ctrl.GetValue(), allow_empty=True, default=180.0)
         except Exception:
             width, height = 300.0, 180.0
 
